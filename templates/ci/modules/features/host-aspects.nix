@@ -317,5 +317,34 @@
       }
     );
 
+    # Host aspect with hjem key projects to user who includes den._.host-aspects.
+    test-host-hjem-projects-to-user = denTest (
+      {
+        den,
+        lib,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo = {
+          users.tux.classes = [ "hjem" ];
+          hjem.module.options.hjem.users = lib.mkOption {
+            type = lib.types.lazyAttrsOf (
+              lib.types.submodule {
+                options.foo = lib.mkOption { };
+              }
+            );
+          };
+
+        };
+
+        den.aspects.igloo.hjem.foo = true;
+        den.aspects.tux.includes = [ den._.host-aspects ];
+
+        expr = igloo.hjem.users.tux.foo;
+        expected = true;
+      }
+    );
+
   };
 }

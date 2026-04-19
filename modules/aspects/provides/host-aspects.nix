@@ -1,9 +1,9 @@
-{ den, ... }:
+{ den, lib, ... }:
 let
   inherit (den.lib) parametric;
 
   description = ''
-    Projects all homeManager-class configs from the host's aspect tree
+    Projects all `user.classes` like `homeManager` from the host's aspect tree
     onto users who opt in. Requires the fx pipeline.
 
     ## Usage
@@ -11,18 +11,19 @@ let
       den.aspects.tux.includes = [ den._.host-aspects ];
 
     Any host aspect that defines a `homeManager` key will have that
-    config forwarded to the user's homeManager evaluation. Other class
+    config forwarded to the user's homeManager evaluation. Other host-class
     keys (nixos, darwin) are ignored — host.aspect is resolved
-    specifically for class "homeManager".
+    specifically for `user.classes`.
   '';
 
   from-host =
     { host, user }:
-    {
-      homeManager = den.lib.aspects.resolve "homeManager" (
-        parametric.fixedTo { inherit host user; } host.aspect
-      );
-    };
+    lib.listToAttrs (
+      map (class: {
+        name = class;
+        value = den.lib.aspects.resolve class (parametric.fixedTo { inherit host user; } host.aspect);
+      }) user.classes
+    );
 
 in
 {
