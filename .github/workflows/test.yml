@@ -27,7 +27,7 @@ jobs:
     if: ${{github.ref != 'refs/heads/main' && ! contains( github.event.pull_request.labels.*.name, 'allow-ci')}}
     needs: [non-draft]
     name: ci-fast
-    runs-on: ubuntu-latest
+    runs-on: macos-latest
     steps:
       - uses: wimpysworld/nothing-but-nix@v10
       - uses: cachix/install-nix-action@v31
