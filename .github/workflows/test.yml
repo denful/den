@@ -8,6 +8,8 @@ on:
     paths: ["**/*.nix"]
   pull_request_review:
     types: [submitted]
+  workflow_dispatch:
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -22,8 +24,19 @@ jobs:
       - run: |
           git fetch --depth 1 origin refs/heads/main
           test "refs/heads/main" == "${{github.ref}}" || (git diff --name-only origin/main..${{ github.sha }} -- | grep '.nix')
-  tests:
+  ci-fast:
+    if: ${{github.ref != 'refs/heads/main' && ! contains( github.event.pull_request.labels.*.name, 'allow-ci')}}
     needs: [non-draft]
+    name: ci-fast
+    runs-on: ubuntu-latest
+    steps:
+      - uses: wimpysworld/nothing-but-nix@v10
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - uses: actions/checkout@v6
+      - run: nix-shell --run 'just ci'
+  ci-deep:
+    needs: [allow-ci]
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
