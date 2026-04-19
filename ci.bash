@@ -60,7 +60,7 @@ pass=$(jq -r 'select(.name != null and (.name | startswith("PASS-"))) | "."' "$r
 fail=$(jq -r 'select(.name != null and (.name | startswith("PASS-") | not)) | "."' "$results" | wc -l)
 
 
-if [ "$fail" -eq 0 ]; then
+if [ "$pass" -eq "$total" ]; then
   echo "🎉 ${pass}/${total} successful"
   rm "$results" || true
 else
