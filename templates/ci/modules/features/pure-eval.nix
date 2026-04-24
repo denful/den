@@ -54,6 +54,7 @@ in
             den.policies.a-to-b = {
               from = "a";
               to = "b";
+              _core = true;
               resolve = ctx: if ctx ? v then [ { v = "${ctx.v}!"; } ] else [ ];
             };
             den.stages.b.provides.b =

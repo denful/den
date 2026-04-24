@@ -122,6 +122,7 @@
           to = "b";
           resolve = ctx: if ctx ? host then [ { host = "${ctx.host}!"; } ] else [ ];
         };
+        den.default.policies = [ "a-to-b" ];
         den.stages.b = {
           provides.b =
             { host }:

@@ -548,6 +548,8 @@
           nixos.users.users.tux.description = "from-stage";
         };
 
+        den.default.policies = [ "host-to-test-filter" ];
+
         # Policy tries to shadow core effect "emit-class" — should be filtered out.
         den.policies.host-to-test-filter = {
           from = "host";

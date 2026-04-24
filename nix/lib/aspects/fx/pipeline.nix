@@ -67,48 +67,24 @@ let
     // identity.collectPathsHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
-    // resolvePolicyHandler
     // resolveTargetHandler
     // handlers.forwardHandler
     // handlers.provideToHandler
+    // handlers.compilePolicyHandlers
     // fx.effects.state.handler;
 
-  resolvePolicyHandler = {
-    "resolve-policy" =
-      { param, state }:
-      {
-        resume = den.lib.synthesizePolicies.mergePolicyInto param.stageName param.existingInto;
-        inherit state;
-      };
-  };
-
+  # resolve-target resolves a stage aspect by path using resolveStage.
+  # Policies dispatch via per-policy named effects in the transition handler.
   resolveTargetHandler = {
     "resolve-target" =
       { param, state }:
       let
-        stageAspect = lib.attrByPath param.path null (den.stages or { });
-        targetName = if stageAspect != null then stageAspect.name or "" else "";
+        stageExists = lib.attrByPath param.path null (den.stages or { }) != null;
         stageName = lib.concatStringsSep "." param.path;
-        existingInto = if stageAspect != null then stageAspect.meta.into or null else null;
-        mergedInto = den.lib.synthesizePolicies.mergePolicyInto targetName existingInto;
-        # Tag with __ctxStage so the chainHandler tracks stage transitions.
-        withStage = a: a // { __ctxStage = stageName; };
+        currentCtx = (state.currentCtx or (_: { })) null;
       in
       {
-        resume =
-          if stageAspect != null && mergedInto != null then
-            withStage (
-              stageAspect
-              // {
-                meta = (stageAspect.meta or { }) // {
-                  into = mergedInto;
-                };
-              }
-            )
-          else if stageAspect != null then
-            withStage stageAspect
-          else
-            null;
+        resume = if stageExists then den.lib.resolveStage stageName currentCtx else null;
         inherit state;
       };
   };
@@ -143,30 +119,7 @@ let
       ctx,
     }:
     let
-      existingInto = self.meta.into or self.into or null;
-
-      bootstrapAndResolve =
-        fx.bind
-          (fx.send "resolve-policy" {
-            stageName = self.name or "";
-            inherit existingInto;
-          })
-          (
-            mergedInto:
-            let
-              effectiveSelf =
-                if mergedInto != null && mergedInto != existingInto then
-                  self
-                  // {
-                    meta = (self.meta or { }) // {
-                      into = mergedInto;
-                    };
-                  }
-                else
-                  self;
-            in
-            aspectToEffect effectiveSelf
-          );
+      bootstrapAndResolve = aspectToEffect self;
 
       rootHandlers = defaultHandlers {
         inherit class;

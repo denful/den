@@ -18,6 +18,7 @@
           to = "flat";
           resolve = ctx: if !(builtins.isAttrs ctx) then [ ] else [ ctx ];
         };
+        den.default.policies = [ "test-root-to-flat" ];
 
         expr = funnyNames (den.lib.resolveStage "root" { x = "hi"; });
         expected = [ "hi" ];
@@ -65,6 +66,12 @@
               resolve = _: [ { v = "d"; } ];
             };
           }
+        ];
+        den.default.policies = [
+          "test-root-to-leaf-a"
+          "test-root-to-leaf-b"
+          "test-root-to-leaf-c"
+          "test-root-to-leaf-d"
         ];
 
         expr = funnyNames (den.lib.resolveStage "root" { });

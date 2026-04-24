@@ -92,9 +92,9 @@ let
     lib.filterAttrs (name: policy: policy._core or false || activeSet ? ${name}) policies;
 
   # NOTE: synthesize does not filter by activation model — all matching
-  # policies fire. Activation is enforced by activePoliciesFor and
-  # inspect. Per-policy dispatch will replace this path with
-  # activation-aware handlers.
+  # policies fire. The pipeline uses per-policy named effects for
+  # activation-aware dispatch. synthesize/mergePolicyInto are retained
+  # for the policy-inspect utility and potential future direct callers.
   synthesize =
     stageName:
     let

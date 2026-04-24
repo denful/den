@@ -20,6 +20,7 @@
           to = "shout";
           resolve = ctx: if !(ctx ? hello) then [ ] else [ { shout = lib.toUpper ctx.hello; } ];
         };
+        den.default.policies = [ "test-greeting-to-shout" ];
 
         den.stages.shout.provides.shout =
           { shout }:

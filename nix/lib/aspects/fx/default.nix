@@ -11,4 +11,5 @@
   handlers = import ./handlers { inherit lib den; };
   aspect = import ./aspect.nix { inherit lib den; };
   pipeline = import ./pipeline.nix { inherit lib den; };
+  distributeProvideTo = import ./distribute-provide-to.nix { inherit lib den; };
 }

@@ -36,6 +36,7 @@
                 }
               ];
         };
+        den.default.policies = [ "test-parent-to-child" ];
 
         den.stages.child.provides.child =
           { x, y }:
@@ -90,6 +91,7 @@
                 }
               ];
         };
+        den.default.policies = [ "test-src-to-dst" ];
 
         den.stages.dst.provides.dst =
           { x, i }:
@@ -126,6 +128,7 @@
           to = "dst";
           resolve = ctx: if !(ctx ? x) then [ ] else [ { y = ctx.x; } ];
         };
+        den.default.policies = [ "test-src-to-dst-no-cross" ];
 
         den.stages.dst.provides.dst =
           { y }:

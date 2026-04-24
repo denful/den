@@ -112,6 +112,7 @@ in
       { den, funnyNames, ... }:
       {
         imports = mkCtxChain 30;
+        den.default.policies = lib.genList (i: "c${toString i}-to-c${toString (i + 1)}") 29;
         expr = builtins.length (funnyNames (den.lib.resolveStage "c0" { x = "v"; }));
         expected = 30;
       }
@@ -121,6 +122,7 @@ in
       { den, funnyNames, ... }:
       {
         imports = [ (mkFanOut 50) ];
+        den.default.policies = [ "root-to-leaf" ];
         expr = builtins.length (funnyNames (den.lib.resolveStage "root" { x = "v"; }));
         expected = 51;
       }
@@ -130,6 +132,7 @@ in
       { den, funnyNames, ... }:
       {
         imports = mkCrossProviders 20;
+        den.default.policies = lib.genList (i: "src-to-t${toString i}") 20;
         expr = builtins.length (funnyNames (den.lib.resolveStage "src" { v = "z"; }));
         expected = 41;
       }

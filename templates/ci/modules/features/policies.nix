@@ -18,6 +18,8 @@
           resolve = _: [ { } ];
         };
 
+        den.default.policies = [ "host-to-test-rel" ];
+
         expr = igloo.users.users.tux.description;
         expected = "from-rel-target-stage";
       }
@@ -45,6 +47,8 @@
           to = "test-rel-coexist";
           resolve = _: [ { } ];
         };
+
+        den.default.policies = [ "host-to-test-rel-coexist" ];
 
         expr = [
           igloo.networking.hostName
@@ -76,6 +80,8 @@
           ];
         };
 
+        den.default.policies = [ "host-to-test-scoped" ];
+
         den.policies.host-to-test-scoped = {
           from = "host";
           to = "test-scoped";
@@ -105,6 +111,8 @@
           includes = [ ];
           nixos.users.users.tux.description = "handler-target";
         };
+
+        den.default.policies = [ "host-to-test-handler" ];
 
         den.policies.host-to-test-handler = {
           from = "host";

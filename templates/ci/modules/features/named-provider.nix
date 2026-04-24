@@ -54,6 +54,7 @@
           to = "other";
           resolve = ctx: if !(ctx ? who) then [ ] else lib.singleton ctx;
         };
+        den.default.policies = [ "test-greet-to-other" ];
         den.stages.greet.provides.other =
           _:
           { who }:
@@ -87,6 +88,7 @@
           to = "yell";
           resolve = ctx: if !(ctx ? who) then [ ] else [ { shout = lib.toUpper ctx.who; } ];
         };
+        den.default.policies = [ "test-greet-to-yell" ];
 
         den.stages.yell.provides.yell =
           { shout }:
@@ -130,6 +132,11 @@
           to = "num";
           resolve = ctx: if !(ctx ? who) then [ ] else [ { number = lib.stringLength ctx.who; } ];
         };
+        den.default.policies = [
+          "test-greet-to-yell-fn"
+          "test-greet-to-size"
+          "test-greet-to-num"
+        ];
 
         den.stages.yell.provides.yell =
           { shout }:

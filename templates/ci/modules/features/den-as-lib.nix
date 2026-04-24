@@ -89,6 +89,7 @@ in
             den.policies.foo-to-bar = {
               from = "foo";
               to = "bar";
+              _core = true;
               resolve = ctx: if ctx ? name then lib.singleton { shout = lib.toUpper ctx.name; } else [ ];
             };
             den.stages.foo.provides.bar =

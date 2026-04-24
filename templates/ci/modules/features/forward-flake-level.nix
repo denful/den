@@ -198,6 +198,8 @@
               [ ];
         };
 
+        den.default.policies = [ "flake-system-to-host" ];
+
         expr = {
           package = lib.getName config.flake.packages.x86_64-linux.hello;
           check = lib.getName config.flake.checks.x86_64-linux.hello;

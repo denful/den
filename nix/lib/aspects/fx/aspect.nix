@@ -14,8 +14,8 @@ let
     "description"
     "meta"
     "includes"
-    "policies"
     "provides"
+    "policies"
     "provide-to"
     "into"
     "__fn"
@@ -106,10 +106,16 @@ let
     let
       # meta.into survives freeform deferredModule; aspect.into is the fallback.
       intoFn = aspect.meta.into or aspect.into or null;
+      hasManualInto = intoFn != null && lib.isFunction intoFn;
+      # Only fire per-policy dispatch for stage roots (aspects with __ctxStage).
+      # Inner provides/includes share the stage name but are not transition points.
+      isStageRoot = aspect ? __ctxStage;
+      hasPolicies =
+        isStageRoot && den.lib.aspects.fx.handlers.policyEffectNamesFor (aspect.name or "") != [ ];
     in
-    if intoFn != null && lib.isFunction intoFn then
+    if hasManualInto || hasPolicies then
       fx.send "into-transition" {
-        inherit intoFn;
+        intoFn = if hasManualInto then intoFn else null;
         self = aspect;
       }
     else
@@ -245,6 +251,8 @@ let
       scopeHandlers = aspect.__scopeHandlers or null;
       ctxId = aspect.__ctxId or null;
       # Emit provide-to effects for cross-entity data routing.
+      # Aspects declare provide-to.${label} = data; the handler collects
+      # emissions in state.provideTo for phase 2 distribution.
       provideToData = aspect."provide-to" or { };
       emitProvideTo =
         if provideToData == { } then

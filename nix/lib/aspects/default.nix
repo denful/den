@@ -62,11 +62,24 @@ let
       self = wrapped;
     };
 
+  # Like resolve but returns full pipeline result including state.provideTo.
+  fxResolveTreeFull =
+    class: resolved:
+    let
+      wrapped = normalizeRoot resolved;
+      ctx = resolved.__ctx or { };
+    in
+    fx.pipeline.fxFullResolve {
+      inherit class ctx;
+      self = wrapped;
+    };
+
   types = lib.mapAttrs (_: v: v { }) rawTypes;
 in
 {
   inherit types fx normalizeRoot;
   resolve = fxResolveTree;
+  resolveWithState = fxResolveTreeFull;
   inherit (hasAspect) hasAspectIn collectPathSet mkEntityHasAspect;
   mkAspectsType = typeCfg: lib.mapAttrs (_: v: v typeCfg) rawTypes;
   # Predicates exported directly (not through types mapAttrs which applies { } to each value).

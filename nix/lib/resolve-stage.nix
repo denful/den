@@ -21,17 +21,12 @@ let
     classAttrs
     // {
       name = stageNode.name or name;
-      meta =
-        let
-          stageInto = stageNode.meta.into or null;
-          into = den.lib.synthesizePolicies.mergePolicyInto name stageInto;
-        in
-        {
-          handleWith = null;
-          excludes = [ ];
-          provider = [ ];
-          into = if into != null then into else _: { };
-        };
+      meta = {
+        handleWith = null;
+        excludes = [ ];
+        provider = [ ];
+        into = stageNode.meta.into or null;
+      };
       provides = stageNode.provides or { };
       includes = stageNode.includes or [ ];
       __ctx = ctx;

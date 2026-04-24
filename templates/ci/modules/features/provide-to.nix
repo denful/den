@@ -157,5 +157,48 @@
       }
     );
 
+    # Sibling policy (from == to) routes through provide-to, not local resolution.
+    test-sibling-routes-to-provide-to = denTest (
+      { den, lib, ... }:
+      {
+        den.hosts.x86_64-linux.igloo = { };
+        den.hosts.x86_64-linux.iceberg = { };
+
+        den.policies.test-host-to-peer = {
+          _core = true;
+          from = "host";
+          to = "host";
+          as = "peer";
+          resolve =
+            { host, ... }: lib.filter (h: h.name != host.name) (lib.attrValues (den.hosts.x86_64-linux or { }));
+        };
+
+        expr =
+          let
+            igloo = den.hosts.x86_64-linux.igloo;
+            result = den.lib.aspects.fx.pipeline.fxFullResolve {
+              class = "nixos";
+              self = den.lib.resolveStage "host" {
+                inherit (igloo) system;
+                host = igloo;
+              };
+              ctx = {
+                inherit (igloo) system;
+                host = igloo;
+              };
+            };
+            emissions = result.state.provideTo null;
+          in
+          {
+            hasEmissions = emissions != [ ];
+            label = if emissions != [ ] then (builtins.head emissions).label else "";
+          };
+        expected = {
+          hasEmissions = true;
+          label = "peer";
+        };
+      }
+    );
+
   };
 }

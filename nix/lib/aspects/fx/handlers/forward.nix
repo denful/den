@@ -1,6 +1,8 @@
 # Handles: emit-forward
-# Resolves forwarded source within the current pipeline's context,
-# then delegates to aspectToEffect for class key emission and filtering.
+# Resolves forwarded source in a sub-pipeline (fxFullResolve) for state
+# isolation, wraps the result in an adapter aspect, and re-emits as an
+# include. Provide-to emissions from the sub-pipeline are spliced into
+# the parent's provideTo thunk chain for phase 2 distribution.
 {
   lib,
   den,
@@ -8,7 +10,6 @@
 }:
 let
   fx = den.lib.fx;
-  inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   inherit (den.lib.aspects) normalizeRoot;
 
   mkDirectAspect =
@@ -231,16 +232,24 @@ let
         sourceModule = spec.mapModule rawSourceModule;
 
         forwardAspect = buildForwardAspect spec sourceModule;
+
+        # Propagate provide-to from sub-pipeline to parent state directly.
+        # We can't iterate the list (map/length/== forces the ++ chain
+        # which forces param attrsets containing fixpoint closures).
+        # Instead, append the sub-pipeline's thunk to parent's thunk chain
+        # so the ++ is deferred until distribution time.
+        subProvideToThunk = sourceResult.state.provideTo or (_: [ ]);
       in
       {
-        # Re-emit as a regular include so the pipeline's normal mechanisms
-        # (class key filtering, chain tracking, etc.) handle it exactly
-        # like the old inline forward result.
         resume = fx.send "emit-include" {
           child = forwardAspect;
           idx = null;
         };
-        inherit state;
+        # Splice sub-pipeline's provideTo thunk into parent's thunk chain.
+        # At distribution time: (state.provideTo null) evaluates both.
+        state = state // {
+          provideTo = _: ((state.provideTo or (_: [ ])) null) ++ (subProvideToThunk null);
+        };
       };
   };
 

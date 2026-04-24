@@ -37,6 +37,7 @@ in
       { den, funnyNames, ... }:
       {
         imports = mkCtxModules 5;
+        den.default.policies = lib.genList (i: "ctx-${toString i}-to-ctx-${toString (i + 1)}") 4;
         expr = builtins.length (funnyNames (den.lib.resolveStage "ctx-0" { x = "v"; }));
         expected = 5;
       }
@@ -46,6 +47,7 @@ in
       { den, funnyNames, ... }:
       {
         imports = mkCtxModules 10;
+        den.default.policies = lib.genList (i: "ctx-${toString i}-to-ctx-${toString (i + 1)}") 9;
         expr = builtins.length (funnyNames (den.lib.resolveStage "ctx-0" { x = "v"; }));
         expected = 10;
       }
@@ -55,6 +57,7 @@ in
       { den, funnyNames, ... }:
       {
         imports = mkCtxModules 20;
+        den.default.policies = lib.genList (i: "ctx-${toString i}-to-ctx-${toString (i + 1)}") 19;
         expr = builtins.length (funnyNames (den.lib.resolveStage "ctx-0" { x = "v"; }));
         expected = 20;
       }
@@ -85,6 +88,7 @@ in
             }
           )
         ];
+        den.default.policies = [ "root-to-leaf" ];
         expr = builtins.length (funnyNames (den.lib.resolveStage "root" { x = "v"; }));
         expected = 21;
       }
