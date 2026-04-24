@@ -152,7 +152,7 @@
           expr = config.flake.arbitrary;
           expectedError = {
             type = "ThrownError";
-            msg = "Attempted to set the option \"arbitrary\" in \"flake\"";
+            msg = "STRICT MODE";
           };
         }
       );

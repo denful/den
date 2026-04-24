@@ -50,7 +50,7 @@ let
             if targets == [ ] then
               null
             else
-              builtins.trace "den: policy ${name} → ${toString (builtins.length targets)} target(s)" {
+              {
                 inherit targets;
                 routing = {
                   inherit (policy) from to;
