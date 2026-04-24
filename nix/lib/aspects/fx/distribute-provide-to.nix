@@ -40,7 +40,7 @@ let
             ++ (if content != null then if builtins.isList content then content else [ content ] else [ ]);
         };
       }
-    ) { } emissionThunks;
+    ) { } emissions;
 
   # Build extra handlers from grouped provide-to data.
   # Each label becomes a constantHandler binding so parametric aspects

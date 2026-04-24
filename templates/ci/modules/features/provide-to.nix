@@ -200,5 +200,147 @@
       }
     );
 
+    # Fleet /etc/hosts: two hosts, each provides IP to peers via provide-to.
+    # Distribution groups by target and produces handler bindings.
+    test-fleet-hosts-distribution = denTest (
+      { den, lib, ... }:
+      let
+        # Simulate provide-to emissions from two hosts
+        emissions = [
+          {
+            label = "peer";
+            content = {
+              ip = "10.0.0.1";
+              hostname = "igloo";
+            };
+            emitterCtx = { };
+            aspectName = "fleet-hosts";
+            targetEntity = {
+              name = "iceberg";
+            };
+          }
+          {
+            label = "peer";
+            content = {
+              ip = "10.0.0.2";
+              hostname = "iceberg";
+            };
+            emitterCtx = { };
+            aspectName = "fleet-hosts";
+            targetEntity = {
+              name = "igloo";
+            };
+          }
+        ];
+        grouped = den.lib.aspects.fx.distributeProvideTo.groupByTarget emissions;
+      in
+      {
+        expr = {
+          targets = builtins.sort (a: b: a < b) (builtins.attrNames grouped);
+          iglooData = (builtins.head grouped.igloo.peer).hostname;
+          icebergData = (builtins.head grouped.iceberg.peer).hostname;
+        };
+        expected = {
+          targets = [
+            "iceberg"
+            "igloo"
+          ];
+          iglooData = "iceberg";
+          icebergData = "igloo";
+        };
+      }
+    );
+
+    # Haproxy backends: multiple sources provide http-backend data to a target.
+    # Distribution accumulates data under the same label across sources.
+    test-haproxy-backend-distribution = denTest (
+      { den, lib, ... }:
+      let
+        emissions = [
+          {
+            label = "http-backends";
+            content = [
+              {
+                address = "10.0.0.1";
+                port = 8080;
+                vhost = "example.com";
+              }
+            ];
+            emitterCtx = { };
+            aspectName = "example-site";
+            targetEntity = {
+              name = "lb";
+            };
+          }
+          {
+            label = "http-backends";
+            content = [
+              {
+                address = "10.0.0.2";
+                port = 8081;
+                vhost = "foobar.com";
+              }
+            ];
+            emitterCtx = { };
+            aspectName = "foobar-site";
+            targetEntity = {
+              name = "lb";
+            };
+          }
+        ];
+        grouped = den.lib.aspects.fx.distributeProvideTo.groupByTarget emissions;
+        handlers = den.lib.aspects.fx.distributeProvideTo.distribute emissions;
+      in
+      {
+        expr = {
+          backendCount = builtins.length grouped.lb.http-backends;
+          hasHandler = handlers ? lb;
+          vhosts = builtins.sort (a: b: a < b) (map (b: b.vhost) grouped.lb.http-backends);
+        };
+        expected = {
+          backendCount = 2;
+          hasHandler = true;
+          vhosts = [
+            "example.com"
+            "foobar.com"
+          ];
+        };
+      }
+    );
+
+    # Distribution produces constantHandler bindings usable by bind.fn.
+    test-distribute-produces-handlers = denTest (
+      { den, lib, ... }:
+      let
+        emissions = [
+          {
+            label = "http-backends";
+            content = [
+              {
+                address = "10.0.0.1";
+                port = 80;
+              }
+            ];
+            emitterCtx = { };
+            aspectName = "web";
+            targetEntity = {
+              name = "lb";
+            };
+          }
+        ];
+        handlers = den.lib.aspects.fx.distributeProvideTo.distribute emissions;
+        # The handler for "lb" should contain an "http-backends" effect handler
+        lbHandlers = handlers.lb;
+      in
+      {
+        expr = {
+          hasHttpBackends = lbHandlers ? http-backends;
+        };
+        expected = {
+          hasHttpBackends = true;
+        };
+      }
+    );
+
   };
 }
