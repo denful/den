@@ -213,7 +213,12 @@ let
         let
           newCtx = indexed.ctx;
           scopedCtx = currentCtx // newCtx;
-          targetEntity = newCtx.${transition.routing.targetKey} or newCtx;
+          rawTarget = newCtx.${transition.routing.targetKey} or newCtx;
+          targetEntity =
+            if builtins.isAttrs rawTarget && !(rawTarget ? name) then
+              builtins.trace "den: sibling route target has no name — groupByTarget will use label as key" rawTarget
+            else
+              rawTarget;
         in
         fx.send "provide-to" {
           label = transition.routing.targetKey;
@@ -385,6 +390,8 @@ let
               # may produce separate contexts for the same target stage.
               # Concatenating contexts restores the fan-out behavior that
               # the old mergePolicyInto path provided naturally.
+              # Routing metadata is kept from the first transition per path —
+              # same-path policies must have consistent from/to pairs.
               mergeByPath = builtins.foldl' (
                 acc: t:
                 let
