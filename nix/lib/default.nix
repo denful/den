@@ -32,6 +32,7 @@ let
     resolveStage = ./resolve-stage.nix;
     stageTypes = ./stage-types.nix;
     strict = ./strict.nix;
+    policyInspect = ./policy-inspect.nix;
     synthesizePolicies = ./synthesize-policies.nix;
     fx = ./fx.nix;
   };

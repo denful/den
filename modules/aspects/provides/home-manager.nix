@@ -44,4 +44,9 @@ in
       resolve = mkIntoClassUsers "homeManager";
     };
   };
+
+  den.schema.host.policies = [
+    "host-to-hm-host"
+    "hm-host-to-hm-user"
+  ];
 }

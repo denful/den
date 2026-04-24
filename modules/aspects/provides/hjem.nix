@@ -41,4 +41,9 @@ in
       resolve = mkIntoClassUsers "hjem";
     };
   };
+
+  den.schema.host.policies = [
+    "host-to-hjem-host"
+    "hjem-host-to-hjem-user"
+  ];
 }

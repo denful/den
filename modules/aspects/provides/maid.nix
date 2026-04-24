@@ -44,4 +44,9 @@ in
       resolve = mkIntoClassUsers "maid";
     };
   };
+
+  den.schema.host.policies = [
+    "host-to-maid-host"
+    "maid-host-to-maid-user"
+  ];
 }

@@ -251,6 +251,12 @@ let
             default = { };
           };
 
+          policies = lib.mkOption {
+            description = "Policy names activated when this aspect is the resolution root.";
+            type = lib.types.listOf lib.types.str;
+            default = [ ];
+          };
+
           includes = lib.mkOption {
             description = "Providers to ask aspects from";
             type = lib.types.listOf (providerType typeCfg);

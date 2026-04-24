@@ -6,20 +6,20 @@
 }:
 let
   # Infer the required entity key from a stage name.
+  # Derived from den.schema so user-defined entity kinds are supported.
   # from = "host" or "hm-host" implies ctx.host must be an attrset entity.
-  # from = "user" or "hm-user" implies ctx.user must be an attrset entity.
-  # from = "home" implies ctx.home must be an attrset entity.
   # Other stages (flake, flake-system, etc.) have no entity requirement.
+  schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
+    builtins.attrNames (den.schema or { })
+  );
   entityKeyFor =
     stage:
-    if stage == "host" || lib.hasSuffix "-host" stage then
-      "host"
-    else if stage == "user" || lib.hasSuffix "-user" stage then
-      "user"
-    else if stage == "home" then
-      "home"
-    else
-      null;
+    let
+      # Check exact match first, then suffix match (-host → host, -user → user)
+      exact = lib.findFirst (k: stage == k) null schemaKinds;
+      suffix = lib.findFirst (k: lib.hasSuffix "-${k}" stage) null schemaKinds;
+    in
+    if exact != null then exact else suffix;
 
   # Check if context satisfies the scope implied by the stage name.
   #
@@ -59,6 +59,42 @@ let
     in
     builtins.all (k: ctx ? ${k}) requiredArgs;
 
+  # Build the set of active policies for a given stage and context.
+  #
+  # Activation levels (all additive):
+  #   1. Core: policy._core == true → always active
+  #   2. Default: policy name in den.default.policies → active globally
+  #   3. Schema-kind + entity-instance: entity.policies (merged by module system)
+  #      Setting den.schema.host.policies = [...] applies to all hosts.
+  #      Setting den.hosts.*.policies = [...] applies to one host.
+  #      Both merge via the NixOS module system into entity.policies.
+  #
+  # Context-aware: when ctx contains entity attrsets, their `.policies`
+  # lists are checked for activation.
+  #
+  # A policy not activated at any level is excluded from the returned set.
+  activePoliciesFor =
+    stageName: ctx:
+    let
+      policies = den.policies or { };
+      defaultActive = den.default.policies or [ ];
+      # Entity activation: read from the entity in context.
+      # Schema-kind policies merge into entity.policies via module system.
+      entityKind = entityKeyFor stageName;
+      entityActive =
+        if entityKind != null && ctx ? ${entityKind} && builtins.isAttrs ctx.${entityKind} then
+          ctx.${entityKind}.policies or [ ]
+        else
+          [ ];
+      activeNames = defaultActive ++ entityActive;
+      activeSet = lib.genAttrs activeNames (_: true);
+    in
+    lib.filterAttrs (name: policy: policy._core or false || activeSet ? ${name}) policies;
+
+  # NOTE: synthesize does not filter by activation model — all matching
+  # policies fire. Activation is enforced by activePoliciesFor and
+  # inspect. Per-policy dispatch will replace this path with
+  # activation-aware handlers.
   synthesize =
     stageName:
     let
@@ -75,12 +111,16 @@ let
           scopeOk = ctxSatisfies policy.from rCtx;
           argsOk = resolveArgsSatisfied policy rCtx;
           targets = if scopeOk && argsOk then policy.resolve rCtx else [ ];
-          targetList = if builtins.isList targets then targets else [ targets ];
+          targetList =
+            if builtins.isList targets then
+              targets
+            else
+              builtins.trace
+                "den: policy ${policy.from}->${policy.to}: resolve returned a non-list; coercing to singleton"
+                [ targets ];
+          key = if policy.as != "" then policy.as else policy.to;
         in
-        if targetList == [ ] then
-          acc
-        else
-          acc // { ${policy.to} = (acc.${policy.to} or [ ]) ++ targetList; }
+        if targetList == [ ] then acc else acc // { ${key} = (acc.${key} or [ ]) ++ targetList; }
       ) { } matching;
 
   # Merge an existing into function with synthesized policies for a stage.
@@ -103,5 +143,11 @@ let
       policyInto;
 in
 {
-  inherit synthesize mergePolicyInto;
+  inherit
+    synthesize
+    mergePolicyInto
+    activePoliciesFor
+    ctxSatisfies
+    resolveArgsSatisfied
+    ;
 }

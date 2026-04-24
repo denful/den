@@ -70,6 +70,7 @@ let
     // resolvePolicyHandler
     // resolveTargetHandler
     // handlers.forwardHandler
+    // handlers.provideToHandler
     // fx.effects.state.handler;
 
   resolvePolicyHandler = {
@@ -128,6 +129,7 @@ let
     pathSet = _: { };
     includesChain = _: [ ];
     deferredIncludes = _: [ ];
+    provideTo = _: [ ];
   };
 
   mkPipeline =

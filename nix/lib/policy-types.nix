@@ -12,6 +12,15 @@ let
         type = lib.types.str;
         description = "Target entity kind or stage name (e.g., 'user', 'hm-host')";
       };
+      as = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = ''
+          Context key used for the synthesized output attrset entry.
+          Defaults to the `to` value when empty.
+          Useful for sibling routing (e.g., host→host where `as = "peer"` avoids collision).
+        '';
+      };
       resolve = lib.mkOption {
         type = lib.types.raw;
         description = ''
@@ -24,6 +33,13 @@ let
         type = lib.types.lazyAttrsOf lib.types.raw;
         default = { };
         description = "Named effect handlers installed when this policy fires.";
+      };
+      _core = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        internal = true;
+        visible = false;
+        description = "When true, policy is always active without explicit opt-in.";
       };
     };
   };

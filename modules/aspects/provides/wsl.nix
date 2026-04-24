@@ -67,4 +67,6 @@ in
       { host, ... }:
       lib.optional (host.class == "nixos" && (host.wsl or { }).enable or false) { inherit host; };
   };
+
+  den.schema.host.policies = [ "host-to-wsl-host" ];
 }

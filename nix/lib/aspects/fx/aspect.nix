@@ -14,7 +14,9 @@ let
     "description"
     "meta"
     "includes"
+    "policies"
     "provides"
+    "provide-to"
     "into"
     "__fn"
     "__args"
@@ -242,14 +244,35 @@ let
     let
       scopeHandlers = aspect.__scopeHandlers or null;
       ctxId = aspect.__ctxId or null;
+      # Emit provide-to effects for cross-entity data routing.
+      provideToData = aspect."provide-to" or { };
+      emitProvideTo =
+        if provideToData == { } then
+          fx.pure null
+        else
+          fx.seq (
+            map (
+              label:
+              fx.send "provide-to" {
+                inherit label;
+                content = provideToData.${label};
+                emitterCtx = aspect.__ctx or { };
+                aspectName = aspect.name or "<anon>";
+                targetEntity = null;
+              }
+            ) (builtins.attrNames provideToData)
+          );
       childResolution = fx.bind (emitSelfProvide aspect) (
         selfProvResults:
-        fx.bind (emitTransitions aspect) (
-          transitionResults:
-          fx.bind (emitIncludes {
-            __parentScopeHandlers = scopeHandlers;
-            __parentCtxId = ctxId;
-          } (aspect.includes or [ ])) (children: fx.pure (selfProvResults ++ transitionResults ++ children))
+        fx.bind emitProvideTo (
+          _:
+          fx.bind (emitTransitions aspect) (
+            transitionResults:
+            fx.bind (emitIncludes {
+              __parentScopeHandlers = scopeHandlers;
+              __parentCtxId = ctxId;
+            } (aspect.includes or [ ])) (children: fx.pure (selfProvResults ++ transitionResults ++ children))
+          )
         )
       );
     in
