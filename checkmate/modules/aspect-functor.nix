@@ -7,8 +7,11 @@
 }:
 let
   inherit (den.lib) canTake;
+  inherit (den.lib.aspects.fx.aspect) ctxFromHandlers;
   # Access through den.aspects so __functor comes from mergeWithAspectMeta.
   aspect-example = den.aspects.test-functor-example;
+  # Helper: extract ctx from result's __scopeHandlers
+  ctxOf = result: ctxFromHandlers (result.__scopeHandlers or { });
 
   flake.tests."test functor applied with empty attrs" = {
     expr =
@@ -16,7 +19,7 @@ let
         result = aspect-example { };
       in
       {
-        hasCtx = result ? __ctx;
+        hasCtx = result ? __scopeHandlers;
         hasScopeHandlers = result ? __scopeHandlers;
         includeCount = builtins.length result.includes;
         hasFoo = result ? nixos;
@@ -35,7 +38,7 @@ let
         result = aspect-example { host = 2; };
       in
       {
-        ctxHost = result.__ctx.host;
+        ctxHost = (ctxOf result).host;
         includeCount = builtins.length result.includes;
       };
     expected = {
@@ -50,7 +53,7 @@ let
         result = aspect-example { home = 2; };
       in
       {
-        ctxHome = result.__ctx.home;
+        ctxHome = (ctxOf result).home;
       };
     expected = {
       ctxHome = 2;
@@ -66,8 +69,8 @@ let
         };
       in
       {
-        ctxHome = result.__ctx.home;
-        ctxUnknown = result.__ctx.unknown;
+        ctxHome = (ctxOf result).home;
+        ctxUnknown = (ctxOf result).unknown;
       };
     expected = {
       ctxHome = 2;
@@ -81,7 +84,7 @@ let
         result = aspect-example { user = 2; };
       in
       {
-        ctxUser = result.__ctx.user;
+        ctxUser = (ctxOf result).user;
       };
     expected = {
       ctxUser = 2;
@@ -97,8 +100,8 @@ let
         };
       in
       {
-        ctxUser = result.__ctx.user;
-        ctxHost = result.__ctx.host;
+        ctxUser = (ctxOf result).user;
+        ctxHost = (ctxOf result).host;
       };
     expected = {
       ctxUser = 2;
@@ -116,9 +119,9 @@ let
         };
       in
       {
-        ctxOS = result.__ctx.OS;
-        ctxUser = result.__ctx.user;
-        ctxHost = result.__ctx.host;
+        ctxOS = (ctxOf result).OS;
+        ctxUser = (ctxOf result).user;
+        ctxHost = (ctxOf result).host;
       };
     expected = {
       ctxOS = 0;
