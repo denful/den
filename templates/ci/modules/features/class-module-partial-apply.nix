@@ -378,14 +378,48 @@
       }
     );
 
-    # Collision — error (default): _module.args.host injected by another
-    # module collides with den-provided host. Default policy throws.
+    # Collision — error (default): unit test on the validator directly.
+    # The validator receives moduleArgs with a colliding den arg and throws
+    # inside its warnings when the error policy is active.
     test-collision-error-throws = denTest (
+      { den, lib, ... }:
+      let
+        wrapClassModule = den.lib.aspects.fx.aspect.wrapClassModule;
+        result = wrapClassModule {
+          module =
+            { host, config, ... }:
+            {
+              networking.hostName = host;
+            };
+          ctx = {
+            host = "from-den";
+          };
+          aspectPolicy = null;
+          globalPolicy = "error";
+        };
+        # Call the validator with a colliding host value.
+        # The validator throws inside warnings when error policy is active.
+        validatorFn = lib.setFunctionArgs result.validator result.advertisedArgs;
+        validatorResult = validatorFn { host = "from-specialArgs"; };
+        # Force the warnings to trigger the throw.
+        callResult = builtins.tryEval (builtins.deepSeq validatorResult.warnings true);
+      in
+      {
+        expr = callResult.success;
+        expected = false;
+      }
+    );
+
+    # Collision — error integration: verify throw propagates through NixOS eval.
+    # The validator throws inside config.warnings when it detects _module.args
+    # collision with error policy. We use tryEval to observe the failure without
+    # crashing nix-unit.
+    test-collision-error-integration = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-collision-err = {
+        den.stages.test-collision-err-int = {
           includes = [
             { nixos._module.args.host = "from-module-system"; }
           ];
@@ -396,19 +430,18 @@
             };
         };
 
-        den.policies.host-to-collision-err = {
+        den.policies.host-to-collision-err-int = {
           from = "host";
-          to = "test-collision-err";
+          to = "test-collision-err-int";
           resolve = _: [ { } ];
         };
 
-        den.default.policies = [ "host-to-collision-err" ];
+        den.default.policies = [ "host-to-collision-err-int" ];
 
-        expr = igloo.networking.hostName;
-        expectedError = {
-          type = "ThrownError";
-          msg = "collides with module-system arg";
-        };
+        # The throw from the validator propagates when any part of igloo
+        # config that depends on warnings is accessed. tryEval catches it.
+        expr = !(builtins.tryEval (builtins.seq igloo.warnings null)).success;
+        expected = true;
       }
     );
 

@@ -101,12 +101,45 @@ let
     if builtins.isAttrs module && module ? imports then
       let
         result = wrapDeferredImports { inherit ctx aspectPolicy globalPolicy; } module.imports;
+        policy = resolveCollisionPolicy { inherit ctx aspectPolicy globalPolicy; };
+        denArgNames = builtins.attrNames ctx;
+        advertisedArgs = lib.genAttrs denArgNames (_: true);
+        validator =
+          moduleArgs:
+          let
+            collisionChecks = lib.concatMap (
+              name:
+              let
+                tryResult = builtins.tryEval (builtins.seq moduleArgs.${name} true);
+                hasReal = tryResult.value or false;
+                p = policy name;
+              in
+              if !hasReal then
+                [ ]
+              else if p == "error" then
+                throw "den: class module arg '${name}' collides with module-system arg — set collisionPolicy to resolve"
+              else if p == "class-wins" then
+                [
+                  "den: class module arg '${name}' collision — class-wins, den value dropped"
+                ]
+              else
+                [
+                  "den: class module arg '${name}' collision — den-wins, module-system value shadowed"
+                ]
+            ) denArgNames;
+          in
+          {
+            warnings = collisionChecks;
+          };
       in
       {
         module = module // {
           imports = result.imports;
         };
         inherit (result) wrapped;
+      }
+      // lib.optionalAttrs (result.wrapped && ctx != { }) {
+        inherit validator advertisedArgs;
       }
     else if !builtins.isFunction module then
       {
