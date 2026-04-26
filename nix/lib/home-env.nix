@@ -8,8 +8,6 @@ let
   host-has-user-with-class =
     host: class: builtins.any (user: lib.elem class user.classes) (lib.attrValues host.users);
 
-  # Shared policy helpers for class-based batteries (home-manager, hjem, maid).
-  # Used by both makeHomeEnv (internally) and battery policy declarations.
   mkDetectHost =
     {
       className,
@@ -25,7 +23,7 @@ let
       isEnabled = (host.${optionPath} or { }).enable or false;
       hostHasClass = host-has-user-with-class host className;
     in
-    lib.optional (isEnabled && isOsSupported && hostHasClass) { inherit host; };
+    isEnabled && isOsSupported && hostHasClass;
 
   mkIntoClassUsers =
     className:
@@ -56,31 +54,8 @@ let
       };
     };
 
-  userEnvAspect =
-    ctxName:
-    { host, user, ... }:
-    {
-      includes = [
-        (den.lib.resolveEntity "${ctxName}-user" { inherit host user; })
-        (den.lib.resolveEntity "user" { inherit host user; })
-      ];
-    };
-
-  forwardToHost =
-    {
-      className,
-      ctxName,
-      forwardPathFn,
-    }:
-    { host, user }:
-    den.provides.forward {
-      each = lib.singleton true;
-      fromClass = _: className;
-      intoClass = _: host.class;
-      intoPath = _: forwardPathFn { inherit host user; };
-      fromAspect = _: userEnvAspect ctxName;
-    };
-
+  # Two-hop collapsed to single policy: host → user with aspects.
+  # Aspects are registered in den.aspects, attached via policy.aspects field.
   makeHomeEnv =
     {
       className,
@@ -94,21 +69,22 @@ let
       forwardPathFn,
     }:
     {
-      entityIncludes = {
-        "${ctxName}-host" = [
-          (
-            { host }:
-            {
-              ${host.class}.imports = [ host.${optionPath}.module ];
-            }
-          )
-        ];
+      aspects = {
+        "${ctxName}-host-module" =
+          { host }:
+          {
+            ${host.class}.imports = [ host.${optionPath}.module ];
+          };
 
-        "${ctxName}-user" = [
-          (forwardToHost {
-            inherit className ctxName forwardPathFn;
-          })
-        ];
+        "${ctxName}-user-forward" =
+          { host, user }:
+          den.provides.forward {
+            each = lib.singleton true;
+            fromClass = _: className;
+            intoClass = _: host.class;
+            intoPath = _: forwardPathFn { inherit host user; };
+            fromAspect = _: den.lib.resolveEntity "user" { inherit host user; };
+          };
       };
 
       hostConf = hostOptions {
@@ -120,24 +96,25 @@ let
       };
 
       policies = {
-        "host-to-${ctxName}-host" = {
+        "host-to-${ctxName}-users" = {
           from = "host";
-          to = "${ctxName}-host";
-          resolve = mkDetectHost {
-            inherit className supportedOses optionPath;
-          };
-        };
-        "${ctxName}-host-to-${ctxName}-user" = {
-          from = "${ctxName}-host";
-          to = "${ctxName}-user";
-          resolve = mkIntoClassUsers className;
+          to = "user";
+          aspects = [
+            "${ctxName}-host-module"
+            "${ctxName}-user-forward"
+          ];
+          resolve =
+            { host, ... }:
+            let
+              enabled = mkDetectHost {
+                inherit className supportedOses optionPath;
+              } { inherit host; };
+            in
+            if enabled != false && enabled != [ ] then mkIntoClassUsers className { inherit host; } else [ ];
         };
       };
 
-      schemaPolicies = [
-        "host-to-${ctxName}-host"
-        "${ctxName}-host-to-${ctxName}-user"
-      ];
+      schemaPolicies = [ "host-to-${ctxName}-users" ];
     };
 
 in

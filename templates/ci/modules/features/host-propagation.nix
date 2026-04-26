@@ -20,7 +20,6 @@
     {
 
       den.hosts.x86_64-linux.igloo.users.tux = { };
-      den.entityIncludes.user = [ den.provides.mutual-provider ];
 
       den.aspects.igloo.funny.names = [ "host-owned" ];
       den.aspects.igloo.includes = [
@@ -105,7 +104,7 @@
         ))
       ];
 
-      den.entityIncludes.hm-host = [
+      den.entityIncludes.host = [
         { funny.names = [ "hm-host detected" ]; }
         (
           { host, ... }@ctx:
@@ -115,7 +114,8 @@
         )
       ];
 
-      den.entityIncludes.hm-user = [
+      den.entityIncludes.user = [
+        den.provides.mutual-provider
         (
           { host, user, ... }@ctx:
           {

@@ -22,7 +22,7 @@ let
 
 in
 {
-  den.entityIncludes = result.entityIncludes;
+  den.aspects = result.aspects;
   den.schema.host.imports = [ result.hostConf ];
   den.policies = result.policies;
   den.schema.host.policies = result.schemaPolicies;

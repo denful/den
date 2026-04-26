@@ -7,8 +7,8 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        # hm-host context is activated when host has HM support
-        den.entityIncludes.hm-host = [
+        # host entity includes are applied when host has HM support
+        den.entityIncludes.host = [
           { nixos.home-manager.useGlobalPkgs = true; }
         ];
 

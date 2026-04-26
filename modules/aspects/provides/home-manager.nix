@@ -23,9 +23,8 @@ let
 
 in
 {
-  den.entityIncludes = result.entityIncludes // {
-    home = [ ({ home }: home.aspect) ];
-  };
+  den.aspects = result.aspects;
+  den.entityIncludes.home = [ ({ home }: home.aspect) ];
   den.schema.host.imports = [ result.hostConf ];
   den.policies = result.policies;
   den.schema.host.policies = result.schemaPolicies;

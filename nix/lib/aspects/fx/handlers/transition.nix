@@ -334,7 +334,8 @@ let
                       )
                     else if newAspects != [ ] then
                       # Supplemental aspects for an already-resolved entity:
-                      # emit each new aspect as an include without re-resolving.
+                      # emit each new aspect as an include with parent scope
+                      # so parametric aspects can resolve their args.
                       builtins.foldl' (
                         acc: aspect:
                         fx.bind acc (
@@ -342,6 +343,8 @@ let
                           fx.bind (fx.send "emit-include" {
                             child = aspect;
                             idx = null;
+                            __parentScopeHandlers = scopeHandlers;
+                            __parentCtxId = ctxNames;
                           }) (_: fx.pure prevResults)
                         )
                       ) (fx.pure innerResults) (map (name: den.aspects.${name}) newAspects)
