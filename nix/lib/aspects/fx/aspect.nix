@@ -323,11 +323,19 @@ let
                       rawValue
                     else
                       null;
-                  hasRecognizedSubKeys =
-                    builtins.isAttrs innerValue
-                    && builtins.any (sk: classRegistry ? ${sk} || traitRegistry ? ${sk}) (
-                      builtins.attrNames innerValue
-                    );
+                  # Check if any sub-key is a registered class/trait, or if any
+                  # sub-key is itself an attrset containing recognized keys
+                  # (multi-level nesting detection, depth-limited to 3).
+                  hasRecognizedSubKeysAt =
+                    depth: val:
+                    builtins.isAttrs val
+                    && builtins.any (
+                      sk:
+                      classRegistry ? ${sk}
+                      || traitRegistry ? ${sk}
+                      || (depth > 0 && hasRecognizedSubKeysAt (depth - 1) (val.${sk}))
+                    ) (builtins.attrNames val);
+                  hasRecognizedSubKeys = hasRecognizedSubKeysAt 3 innerValue;
                 in
                 if hasRecognizedSubKeys then
                   acc // { nestedKeys = acc.nestedKeys ++ [ k ]; }
@@ -649,7 +657,14 @@ let
               }
             ) (builtins.attrNames provideToData)
           );
-      childResolution = fx.bind (emitSelfProvide aspect) (
+      # Deprecation trace: warn when provides is non-empty, encouraging direct nesting.
+      providesKeys = builtins.attrNames (aspect.provides or { });
+      _ =
+        if providesKeys != [ ] then
+          builtins.trace "den: aspect '${aspect.name or "<anon>"}' uses 'provides' — migrate to direct nesting (e.g. aspect.foo instead of aspect.provides.foo)" null
+        else
+          null;
+      childResolution = fx.bind (builtins.seq _ (emitSelfProvide aspect)) (
         selfProvResults:
         fx.bind emitProvideTo (
           _:
