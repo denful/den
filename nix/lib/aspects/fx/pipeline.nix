@@ -178,10 +178,53 @@ let
     }:
     let
       result = mkPipeline { inherit class; } { inherit self ctx; };
+      traitSchemas = den.schema.traits or { };
+      traits = result.state.traits null;
+      deferredTraits = result.state.deferredTraits null;
+      consumedTraits = (result.state.consumedTraits or (_: { })) null;
+
+      # partialOk validation: error when trait consumed at pipeline time
+      # AND has deferred emissions, unless schema says partialOk = true.
+      partialOkViolations = builtins.filter (
+        traitName:
+        consumedTraits ? ${traitName}
+        && (deferredTraits.${traitName} or [ ]) != [ ]
+        && !(traitSchemas.${traitName}.partialOk or false)
+      ) (builtins.attrNames consumedTraits);
+
+      # Synthetic module injecting _den.traits into evalModules fixpoint.
+      # Only added when trait schemas exist — zero overhead otherwise.
+      traitModule =
+        { config, lib, ... }:
+        {
+          options._den.traits = lib.mkOption {
+            type = lib.types.attrsOf (lib.types.listOf lib.types.anything);
+            default = { };
+            internal = true;
+          };
+          config._den.traits = lib.mapAttrs (
+            traitName: _:
+            let
+              pipelineData =
+                let
+                  raw = traits.${traitName} or [ ];
+                in
+                if builtins.isList raw then raw else [ raw ];
+              deferred = deferredTraits.${traitName} or [ ];
+              deferredData = map (e: e.value { inherit config lib; }) deferred;
+            in
+            pipelineData ++ deferredData
+          ) traitSchemas;
+        };
+
+      hasTraitSchemas = traitSchemas != { };
     in
-    {
-      imports = result.state.imports null;
-    };
+    if partialOkViolations != [ ] then
+      throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
+    else
+      {
+        imports = (result.state.imports null) ++ lib.optional hasTraitSchemas traitModule;
+      };
 in
 {
   inherit

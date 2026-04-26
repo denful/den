@@ -99,10 +99,18 @@ let
       ctx,
       aspectPolicy,
       globalPolicy,
+      traitNames ? { },
     }:
     if builtins.isAttrs module && module ? imports then
       let
-        result = wrapDeferredImports { inherit ctx aspectPolicy globalPolicy; } module.imports;
+        result = wrapDeferredImports {
+          inherit
+            ctx
+            aspectPolicy
+            globalPolicy
+            traitNames
+            ;
+        } module.imports;
         policy = resolveCollisionPolicy { inherit ctx aspectPolicy globalPolicy; };
         denArgNames = builtins.attrNames ctx;
         advertisedArgs = lib.genAttrs denArgNames (_: true);
@@ -153,6 +161,8 @@ let
         allArgs = builtins.functionArgs module;
         argNames = builtins.attrNames allArgs;
         denArgNames = builtins.filter (k: ctx ? ${k}) argNames;
+        # Trait args: registered trait names not shadowed by ctx.
+        traitArgNames = builtins.filter (k: traitNames ? ${k} && !(ctx ? ${k})) argNames;
         # Only warn for args matching known schema kinds that have no default.
         # Avoids false warnings on module-system args (config, pkgs, etc.).
         schemaKinds = builtins.filter (
@@ -167,7 +177,7 @@ let
           mod: k: lib.warn "den: class module requests '${k}' but no ${k} context is available" mod
         ) module missingDenArgNames;
       in
-      if denArgNames == [ ] then
+      if denArgNames == [ ] && traitArgNames == [ ] then
         {
           module = warnedModule;
           wrapped = false;
@@ -175,13 +185,11 @@ let
       else
         let
           denArgs = lib.genAttrs denArgNames (k: ctx.${k});
-          remainingArgs = removeAttrs allArgs denArgNames;
+          remainingArgs = removeAttrs allArgs (denArgNames ++ traitArgNames);
         in
-        # Full application: all functionArgs are den args (no module-system args).
-        # Call the function directly instead of wrapping — this handles the
-        # { host }: ({ config, pkgs, ... }: {}) pattern where the outer function
-        # returns another function (or any value) to be used as the class module.
-        if remainingArgs == { } then
+        # Full application: all functionArgs are den args + trait args (no module-system args).
+        # Trait args need eval-time resolution, so only fully apply when there are no trait args.
+        if remainingArgs == { } && traitArgNames == [ ] then
           {
             module = warnedModule denArgs;
             wrapped = true;
@@ -196,11 +204,18 @@ let
             classWinsNames = builtins.filter (name: policy name == "class-wins") denArgNames;
             classWinsDen = lib.genAttrs classWinsNames (k: denArgs.${k});
             denWinsDen = removeAttrs denArgs classWinsNames;
+            # Trait args are resolved lazily from config._den.traits at eval time.
+            traitThunks = lib.genAttrs traitArgNames (
+              name: moduleArgs: moduleArgs.config._den.traits.${name} or [ ]
+            );
             wrapper =
               moduleArgs:
               # class-wins args: den first, then moduleArgs shadows
               # den-wins/error args: moduleArgs first, then denArgs shadows
-              warnedModule (classWinsDen // moduleArgs // denWinsDen);
+              # trait args: lazy thunks from config._den.traits
+              warnedModule (
+                classWinsDen // moduleArgs // denWinsDen // lib.mapAttrs (_: thunk: thunk moduleArgs) traitThunks
+              );
             # Validate(X): collision detector. Receives same moduleArgs from
             # NixOS but only produces warnings/errors. The check is inside
             # the warnings value — a thunk that's only forced after the
@@ -234,8 +249,8 @@ let
               {
                 warnings = collisionChecks;
               };
-            # Both advertise den args as optional so NixOS passes thunks.
-            advertisedArgs = remainingArgs // lib.genAttrs denArgNames (_: true);
+            # Both advertise den args + trait args as optional so NixOS passes thunks.
+            advertisedArgs = remainingArgs // lib.genAttrs (denArgNames ++ traitArgNames) (_: true);
           in
           {
             module = lib.setFunctionArgs wrapper advertisedArgs;
@@ -389,6 +404,7 @@ let
               aspectPolicy
               globalPolicy
               ;
+            traitNames = traitRegistry;
           };
           mainEmit = fx.send "emit-class" {
             class = k;
