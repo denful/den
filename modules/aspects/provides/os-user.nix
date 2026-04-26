@@ -47,7 +47,10 @@ let
 
 in
 {
-  den.entityIncludes.user = [ fwd ];
+  den.aspects.os-user-class-fwd = fwd;
+
+  # Empty entityIncludes for schema gating — see os-class.nix comment.
+  den.entityIncludes.user = [ ];
 
   den.classes.user.description = "Lightweight user environment forwarding to OS users.users";
 }

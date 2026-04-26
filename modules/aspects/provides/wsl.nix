@@ -45,28 +45,31 @@ let
     };
   };
 
+  wsl-host-aspect =
+    { host }:
+    {
+      inherit description;
+      ${host.class} = {
+        imports = [ host.wsl.module ];
+        wsl.enable = true;
+      };
+      includes = [ fwd ];
+    };
+
 in
 {
   den.classes.wsl.description = "WSL support class forwarding to host OS";
 
-  den.entityIncludes."wsl-host" = [
-    (
-      { host }:
-      {
-        inherit description;
-        ${host.class} = {
-          imports = [ host.wsl.module ];
-          wsl.enable = true;
-        };
-        includes = [ fwd ];
-      }
-    )
-  ];
+  den.aspects.wsl-host-aspect = wsl-host-aspect;
+
+  # Empty entityIncludes for schema gating — see os-class.nix comment.
+  den.entityIncludes."wsl-host" = [ ];
   den.schema.host.imports = [ hostConf ];
 
   den.policies.host-to-wsl-host = {
     from = "host";
     to = "wsl-host";
+    aspects = [ wsl-host-aspect ];
     resolve =
       { host, ... }:
       lib.optional (host.class == "nixos" && (host.wsl or { }).enable or false) { inherit host; };

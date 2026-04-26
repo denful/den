@@ -36,6 +36,12 @@ let
           ]
         else
           [ ];
+      # Host-level framework aspects have no inbound policy — deliver directly.
+      hostFramework =
+        if name == "host" then
+          builtins.filter (x: x != null) [ (den.aspects.os-host-fwd or null) ]
+        else
+          [ ];
       entityIncludes = den.entityIncludes.${name} or [ ];
       entityProvides = den.entityProvides.${name} or { };
     in
@@ -47,7 +53,7 @@ let
         provider = [ ];
         into = null;
       };
-      rootIncludes = selfProvide ++ entityIncludes;
+      rootIncludes = selfProvide ++ hostFramework ++ entityIncludes;
       provides = entityProvides;
       includes = [ ];
       __ctxStage = name;

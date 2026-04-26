@@ -106,7 +106,9 @@ let
           aspects = [
             hostModule
             userForward
-          ];
+          ]
+          ++ (lib.optional (den.aspects ? os-user-fwd) den.aspects.os-user-fwd)
+          ++ (lib.optional (den.aspects ? os-user-class-fwd) den.aspects.os-user-class-fwd);
           resolve =
             { host, ... }:
             let
