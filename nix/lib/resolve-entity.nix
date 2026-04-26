@@ -5,26 +5,32 @@
 }:
 let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
+  inherit (den.lib.aspects.fx.aspect) structuralKeysSet;
+
+  structuralKeys = builtins.attrNames structuralKeysSet;
 
   # Thinner entity resolution — replaces resolveStage.
-  # Entity includes come from den.stages.${name}.includes for now;
-  # Task 3 will switch to entity schema includes.
+  #
+  # During migration, reads provides/includes/classAttrs from den.stages
+  # (same data as resolveStage). Will be simplified once stages are removed.
   resolveEntity =
     name: ctx:
     let
       scopeHandlers = constantHandler ctx;
-      stageIncludes = (den.stages.${name} or { }).includes or [ ];
+      stageNode = den.stages.${name} or { };
+      classAttrs = builtins.removeAttrs stageNode structuralKeys;
     in
-    {
+    classAttrs
+    // {
       inherit name;
       meta = {
         handleWith = null;
         excludes = [ ];
         provider = [ ];
-        into = null;
+        into = stageNode.meta.into or null;
       };
-      provides = { };
-      includes = stageIncludes;
+      provides = stageNode.provides or { };
+      includes = stageNode.includes or [ ];
       __ctxStage = name;
       __scopeHandlers = scopeHandlers;
     };

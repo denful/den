@@ -102,7 +102,7 @@ let
                       ${kind} = config;
                     };
                   in
-                  den.lib.resolveStage kind ctx;
+                  den.lib.resolveEntity kind ctx;
               };
               options.collisionPolicy = lib.mkOption {
                 description = "How to handle collisions between den context args and module-system args in flat-form class modules.";
