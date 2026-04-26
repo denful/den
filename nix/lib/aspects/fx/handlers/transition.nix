@@ -180,12 +180,12 @@ let
         __scopeHandlers = scopeHandlers;
         __ctxId = ctxNames;
       };
-      fanOutResult = den.lib.aspects.fx.pipeline.fxFullResolve {
+      sub = den.lib.aspects.fx.pipeline.runSubPipeline {
         class = targetClass;
         self = tagged;
         ctx = scopedCtx;
       };
-      subImports = fanOutResult.state.imports null;
+      subImports = sub.imports;
       # state.modify reads st.imports at the modify call site. This is safe
       # because fxFullResolve above is a separate pipeline whose results are
       # fully materialized before the modify runs. No concurrent handlers
@@ -217,12 +217,12 @@ let
               rawTarget;
           # Run sub-pipeline per peer to collect traits from source entity.
           stageAspect = den.lib.resolveEntity transition.routing.from scopedCtx;
-          subResult = den.lib.aspects.fx.pipeline.fxFullResolve {
+          sub = den.lib.aspects.fx.pipeline.runSubPipeline {
             class = targetClass;
             self = stageAspect;
             ctx = scopedCtx;
           };
-          traits = subResult.state.traits null;
+          traits = sub.traits;
         in
         fx.send "provide-to" {
           inherit targetEntity traits;

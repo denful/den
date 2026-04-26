@@ -221,35 +221,28 @@ let
         hasOwnContext = sourceScopeHandlers != { };
         resolveCtx = if hasOwnContext then sourceCtx else entityCtx;
 
-        sourceResult = den.lib.aspects.fx.pipeline.fxFullResolve {
+        sub = den.lib.aspects.fx.pipeline.runSubPipeline {
           class = spec.fromClass;
           self = normalizedSource;
           ctx = resolveCtx;
         };
 
         rawSourceModule = {
-          imports = sourceResult.state.imports null;
+          imports = sub.imports;
         };
         sourceModule = spec.mapModule rawSourceModule;
-
         forwardAspect = buildForwardAspect spec sourceModule;
 
-        # Propagate provide-to from sub-pipeline to parent state directly.
-        # We can't iterate the list (map/length/== forces the ++ chain
-        # which forces param attrsets containing fixpoint closures).
-        # Instead, append the sub-pipeline's thunk to parent's thunk chain
-        # so the ++ is deferred until distribution time.
-        subProvideToThunk = sourceResult.state.provideTo or (_: [ ]);
+        # provideTo is now a plain list (already materialized by runSubPipeline)
+        subProvideTo = sub.provideTo;
       in
       {
         resume = fx.send "emit-include" {
           child = forwardAspect;
           idx = null;
         };
-        # Splice sub-pipeline's provideTo thunk into parent's thunk chain.
-        # At distribution time: (state.provideTo null) evaluates both.
         state = state // {
-          provideTo = _: ((state.provideTo or (_: [ ])) null) ++ (subProvideToThunk null);
+          provideTo = _: ((state.provideTo or (_: [ ])) null) ++ subProvideTo;
         };
       };
   };

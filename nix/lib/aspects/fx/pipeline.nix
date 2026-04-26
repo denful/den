@@ -164,6 +164,23 @@ let
     }:
     mkPipeline { inherit class; } { inherit self ctx; };
 
+  # Thin wrapper: runs sub-pipeline, materializes state thunks.
+  # Each call site does its own post-processing.
+  runSubPipeline =
+    {
+      class,
+      self,
+      ctx,
+    }:
+    let
+      result = fxFullResolve { inherit class self ctx; };
+    in
+    {
+      imports = result.state.imports null;
+      traits = result.state.traits null;
+      provideTo = (result.state.provideTo or (_: [ ])) null;
+    };
+
   # Drop-in resolve shape: returns { imports = [...] }.
   fxResolve =
     {
@@ -252,6 +269,7 @@ in
     defaultState
     mkPipeline
     fxFullResolve
+    runSubPipeline
     fxResolve
     ;
 }
