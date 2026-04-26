@@ -19,7 +19,7 @@ let
   # or den.policies reference the kind.
   # Context args are derived from the entity's _module.args, filtered to
   # known stage kinds so framework args don't leak through.
-  knownKinds = builtins.attrNames (den.stages or { });
+  knownKinds = builtins.attrNames ((den.stages or { }) // (den.entityIncludes or { }));
 
   # Option type names whose values are safe for identity hashing.
   primitiveTypeNames = [
@@ -117,7 +117,7 @@ let
               };
             };
         in
-        if den.stages ? ${kind} then
+        if den.stages ? ${kind} || den.entityIncludes ? ${kind} then
           {
             imports = [
               merged

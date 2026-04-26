@@ -93,12 +93,14 @@ let
     "resolve-target" =
       { param, state }:
       let
-        stageExists = lib.attrByPath param.path null (den.stages or { }) != null;
         stageName = lib.concatStringsSep "." param.path;
+        entityExists =
+          lib.attrByPath param.path null (den.stages or { }) != null
+          || (den.entityIncludes or { }) ? ${stageName};
         currentCtx = (state.currentCtx or (_: { })) null;
       in
       {
-        resume = if stageExists then den.lib.resolveEntity stageName currentCtx else null;
+        resume = if entityExists then den.lib.resolveEntity stageName currentCtx else null;
         inherit state;
       };
   };
