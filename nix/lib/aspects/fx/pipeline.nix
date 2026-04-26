@@ -87,17 +87,16 @@ let
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.
-  # Returns null when the kind has no entityIncludes (tombstoned).
+  # Always returns a valid entity — existence gating removed.
   resolveEntityHandler = {
     "resolve-entity" =
       { param, state }:
       let
         kind = param.kind;
-        entityExists = (den.entityIncludes or { }) ? ${kind};
         currentCtx = (state.currentCtx or (_: { })) null;
       in
       {
-        resume = if entityExists then den.lib.resolveEntity kind currentCtx else null;
+        resume = den.lib.resolveEntity kind currentCtx;
         inherit state;
       };
   };
