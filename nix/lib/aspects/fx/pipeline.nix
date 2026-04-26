@@ -48,15 +48,32 @@ let
   # last-wins, so overlap silently shadows. constantHandler generates
   # dynamic keys from ctx (host, user, class, etc.) which don't collide
   # with the named handlers below.
+  #
+  # Priority (low→high, last wins via //):
+  # 1. traitArgHandler — trait names as effects for parametric consumers
+  # 2. constantHandler — den context args; overwrites trait names on collision
+  # 3. Named handlers — emit-trait, emit-class, chain-*, etc. (no collision)
+  # 4. state.handler — always last
   defaultHandlers =
     { class, ctx }:
-    handlers.constantHandler (
+    let
+      # Use _traitNames (attrsOf bool) for cycle-free pipeline lookup.
+      # den.schema.traits depends on den.aspects which triggers pipeline
+      # resolution → cycle. _traitNames is populated independently.
+      traitNames = den._traitNames or { };
+      # For collection strategy, we need the schema. This is safe to access
+      # in the handler itself (lazy), not during handler construction.
+      traitSchemas = den.schema.traits or { };
+    in
+    handlers.traitArgHandler traitNames
+    // handlers.constantHandler (
       {
         inherit class;
         "aspect-chain" = [ ];
       }
       // ctx
     )
+    // handlers.traitCollectorHandler { inherit ctx traitSchemas; }
     // handlers.classCollectorHandler { targetClass = class; }
     // handlers.constraintRegistryHandler
     // handlers.chainHandler
@@ -71,14 +88,6 @@ let
     // handlers.forwardHandler
     // handlers.provideToHandler
     // handlers.compilePolicyHandlers
-    // {
-      "emit-trait" =
-        { param, state }:
-        {
-          resume = null;
-          inherit state;
-        };
-    }
     // fx.effects.state.handler;
 
   # resolve-target resolves a stage aspect by path using resolveStage.
@@ -116,6 +125,7 @@ let
     provideTo = _: [ ];
     traits = _: { };
     deferredTraits = _: { };
+    consumedTraits = _: { };
   };
 
   mkPipeline =
