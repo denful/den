@@ -57,13 +57,10 @@ let
   defaultHandlers =
     { class, ctx }:
     let
-      # Use _traitNames (attrsOf bool) for cycle-free pipeline lookup.
-      # den.schema.traits depends on den.aspects which triggers pipeline
-      # resolution → cycle. _traitNames is populated independently.
-      traitNames = den._traitNames or { };
-      # For collection strategy, we need the schema. This is safe to access
-      # in the handler itself (lazy), not during handler construction.
-      traitSchemas = den.schema.traits or { };
+      # Top-level den.traits lives outside den.schema, breaking
+      # the evaluation cycle that existed with den.schema.traits.
+      traitNames = den.traits or { };
+      traitSchemas = den.traits or { };
     in
     handlers.traitArgHandler traitNames
     // handlers.constantHandler (
@@ -178,7 +175,7 @@ let
     }:
     let
       result = mkPipeline { inherit class; } { inherit self ctx; };
-      traitSchemas = den.schema.traits or { };
+      traitSchemas = den.traits or { };
       traits = result.state.traits null;
       deferredTraits = result.state.deferredTraits null;
       consumedTraits = (result.state.consumedTraits or (_: { })) null;

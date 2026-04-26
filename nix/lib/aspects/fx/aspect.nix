@@ -165,9 +165,9 @@ let
         traitArgNames = builtins.filter (k: traitNames ? ${k} && !(ctx ? ${k})) argNames;
         # Only warn for args matching known schema kinds that have no default.
         # Avoids false warnings on module-system args (config, pkgs, etc.).
-        schemaKinds = builtins.filter (
-          n: n != "conf" && n != "classes" && n != "traits" && n != "aspect" && !(lib.hasPrefix "_" n)
-        ) (builtins.attrNames (den.schema or { }));
+        schemaKinds = builtins.filter (n: n != "conf" && n != "aspect" && !(lib.hasPrefix "_" n)) (
+          builtins.attrNames (den.schema or { })
+        );
         missingDenArgNames = builtins.filter (k: builtins.elem k schemaKinds && !(allArgs.${k} or false)) (
           builtins.filter (k: !(ctx ? ${k})) argNames
         );
@@ -275,12 +275,10 @@ let
     ) handlers;
 
   # Schema registries for 4-step key classification.
-  # Use den._classNames/den._traitNames instead of den.schema.classes/traits
-  # to avoid infinite recursion: den.schema.classes depends on den.aspects
-  # (via aspect-schema.nix) which triggers compileStatic during pipeline
-  # resolution, creating a cycle.
-  classRegistry = den._classNames or { };
-  traitRegistry = den._traitNames or { };
+  # Top-level den.classes/den.traits live outside den.schema, breaking
+  # the evaluation cycle that existed when they lived inside den.schema.
+  classRegistry = den.classes or { };
+  traitRegistry = den.traits or { };
 
   # Classify non-structural keys using the schema registry.
   # 4-step: class → trait → nested aspect → unregistered class.

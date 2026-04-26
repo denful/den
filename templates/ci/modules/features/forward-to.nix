@@ -15,7 +15,7 @@
       in
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.schema.classes.custom = {
+        den.classes.custom = {
           description = "Custom class with forwardTo";
           forwardTo = {
             class = "nixos";
@@ -55,7 +55,7 @@
       in
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.schema.classes.src = {
+        den.classes.src = {
           description = "Source class with path";
           forwardTo = {
             class = "nixos";
@@ -99,7 +99,7 @@
       in
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.schema.classes.custom = {
+        den.classes.custom = {
           description = "Custom class";
           forwardTo = {
             class = "homeManager";
@@ -133,7 +133,7 @@
       in
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.schema.classes.noroute = {
+        den.classes.noroute = {
           description = "No routing";
         };
 

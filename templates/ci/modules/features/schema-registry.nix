@@ -4,9 +4,9 @@
     test-class-declaration = denTest (
       { den, ... }:
       {
-        den.schema.classes.nixos.description = "NixOS system configuration";
+        den.classes.nixos.description = "NixOS system configuration";
 
-        expr = den.schema.classes.nixos.description;
+        expr = den.classes.nixos.description;
         expected = "NixOS system configuration";
       }
     );
@@ -14,9 +14,9 @@
     test-class-forwardTo-default = denTest (
       { den, ... }:
       {
-        den.schema.classes.nixos.description = "NixOS";
+        den.classes.nixos.description = "NixOS";
 
-        expr = den.schema.classes.nixos.forwardTo;
+        expr = den.classes.nixos.forwardTo;
         expected = null;
       }
     );
@@ -24,14 +24,14 @@
     test-trait-declaration = denTest (
       { den, ... }:
       {
-        den.schema.traits.firewall = {
+        den.traits.firewall = {
           description = "Firewall trait";
           collection = "map";
           partialOk = true;
         };
 
         expr = {
-          inherit (den.schema.traits.firewall) description collection partialOk;
+          inherit (den.traits.firewall) description collection partialOk;
         };
         expected = {
           description = "Firewall trait";
@@ -44,10 +44,10 @@
     test-trait-defaults = denTest (
       { den, ... }:
       {
-        den.schema.traits.firewall.description = "Firewall trait";
+        den.traits.firewall.description = "Firewall trait";
 
         expr = {
-          inherit (den.schema.traits.firewall) collection partialOk;
+          inherit (den.traits.firewall) collection partialOk;
         };
         expected = {
           collection = "list";
@@ -59,25 +59,25 @@
     test-trait-type-default = denTest (
       { den, ... }:
       {
-        den.schema.traits.firewall.description = "Firewall trait";
+        den.traits.firewall.description = "Firewall trait";
 
-        expr = den.schema.traits.firewall.type;
+        expr = den.traits.firewall.type;
         expected = null;
       }
     );
 
-    test-schema-has-classes = denTest (
+    test-has-classes = denTest (
       { den, ... }:
       {
-        expr = den.schema ? classes;
+        expr = den ? classes;
         expected = true;
       }
     );
 
-    test-schema-has-traits = denTest (
+    test-has-traits = denTest (
       { den, ... }:
       {
-        expr = den.schema ? traits;
+        expr = den ? traits;
         expected = true;
       }
     );
@@ -96,7 +96,7 @@
     test-auto-nixos = denTest (
       { den, ... }:
       {
-        expr = den.schema.classes.nixos.description;
+        expr = den.classes.nixos.description;
         expected = "NixOS system configuration";
       }
     );
@@ -104,7 +104,7 @@
     test-auto-darwin = denTest (
       { den, ... }:
       {
-        expr = den.schema.classes.darwin.description;
+        expr = den.classes.darwin.description;
         expected = "nix-darwin system configuration";
       }
     );
@@ -112,7 +112,7 @@
     test-auto-os = denTest (
       { den, ... }:
       {
-        expr = den.schema.classes.os.description;
+        expr = den.classes.os.description;
         expected = "Convenience class forwarding to both nixos and darwin";
       }
     );
@@ -120,7 +120,7 @@
     test-auto-user = denTest (
       { den, ... }:
       {
-        expr = den.schema.classes.user.description;
+        expr = den.classes.user.description;
         expected = "Lightweight user environment forwarding to OS users.users";
       }
     );
@@ -128,7 +128,7 @@
     test-auto-classes-exist = denTest (
       { den, ... }:
       {
-        expr = builtins.all (c: den.schema.classes ? ${c}) [
+        expr = builtins.all (c: den.classes ? ${c}) [
           "nixos"
           "darwin"
           "os"
@@ -141,7 +141,7 @@
     test-auto-forwardTo-null = denTest (
       { den, ... }:
       {
-        expr = den.schema.classes.nixos.forwardTo;
+        expr = den.classes.nixos.forwardTo;
         expected = null;
       }
     );
@@ -149,10 +149,10 @@
     test-collision-error = denTest (
       { den, ... }:
       {
-        den.schema.classes.shared.description = "A class";
-        den.schema.traits.shared.description = "A trait";
+        den.classes.shared.description = "A class";
+        den.traits.shared.description = "A trait";
 
-        expr = den.schema.classes.shared.description;
+        expr = den.classes.shared.description;
         expectedError = {
           type = "ThrownError";
           msg = "cannot be both a class and a trait";
@@ -160,7 +160,7 @@
       }
     );
 
-    # Namespace-level trait/class declarations merge into den.schema
+    # Namespace-level trait/class declarations merge into den.traits/den.classes
     test-namespace-trait-merges = denTest (
       { den, ... }:
       {
@@ -170,7 +170,7 @@
         };
 
         expr = {
-          inherit (den.schema.traits.monitoring) description collection;
+          inherit (den.traits.monitoring) description collection;
         };
         expected = {
           description = "Monitoring trait";
@@ -186,7 +186,7 @@
           description = "Container class";
         };
 
-        expr = den.schema.classes.container.description;
+        expr = den.classes.container.description;
         expected = "Container class";
       }
     );
@@ -194,14 +194,14 @@
     test-namespace-traits-preserve-existing = denTest (
       { den, ... }:
       {
-        den.schema.traits.firewall.description = "Firewall trait";
+        den.traits.firewall.description = "Firewall trait";
         den.ful.test-ns.traits.monitoring = {
           description = "Monitoring trait";
         };
 
         expr = {
-          firewall = den.schema.traits.firewall.description;
-          monitoring = den.schema.traits.monitoring.description;
+          firewall = den.traits.firewall.description;
+          monitoring = den.traits.monitoring.description;
         };
         expected = {
           firewall = "Firewall trait";
@@ -222,7 +222,7 @@
           collection = "map";
         };
 
-        expr = den.schema.traits.shared-trait.description;
+        expr = den.traits.shared-trait.description;
         expected = "Shared trait";
       }
     );
@@ -237,7 +237,7 @@
         };
 
         expr = {
-          inherit (den.schema.traits.firewall) description collection;
+          inherit (den.traits.firewall) description collection;
         };
         expected = {
           description = "Firewall rules";
@@ -253,7 +253,7 @@
           description = "Wayland compositor configuration";
         };
 
-        expr = den.schema.classes.wayland.description;
+        expr = den.classes.wayland.description;
         expected = "Wayland compositor configuration";
       }
     );
@@ -270,7 +270,7 @@
           collection = "list";
         };
 
-        expr = den.schema.traits.firewall.description;
+        expr = den.traits.firewall.description;
         expected = "Firewall rules";
       }
     );

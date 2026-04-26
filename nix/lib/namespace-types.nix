@@ -21,13 +21,13 @@ let
         };
       };
       options.traits = lib.mkOption {
-        description = "trait declarations merged into den.schema.traits on import";
+        description = "trait declarations merged into den.traits on import";
         defaultText = lib.literalExpression "{ }";
         default = { };
         type = lib.types.lazyAttrsOf lib.types.raw;
       };
       options.classes = lib.mkOption {
-        description = "class declarations merged into den.schema.classes on import";
+        description = "class declarations merged into den.classes on import";
         defaultText = lib.literalExpression "{ }";
         default = { };
         type = lib.types.lazyAttrsOf lib.types.raw;

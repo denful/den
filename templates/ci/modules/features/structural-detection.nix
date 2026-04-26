@@ -64,7 +64,7 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS system configuration";
+        den.classes.nixos.description = "NixOS system configuration";
 
         expr = builtins.length (result.state.imports null) > 0;
         expected = true;
@@ -101,12 +101,12 @@
                 };
             };
           state = den.lib.aspects.fx.pipeline.defaultState // {
-            traitRegistry = den.schema.traits or { };
+            traitRegistry = den.traits or { };
           };
         } comp;
       in
       {
-        den.schema.traits.firewall = {
+        den.traits.firewall = {
           description = "Firewall rules";
           collection = "list";
         };
@@ -144,8 +144,8 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall = {
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall = {
           description = "Firewall rules";
         };
 
@@ -162,8 +162,8 @@
         classifyKeys = den.lib.aspects.fx.aspect.classifyKeys or null;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall.description = "Firewall";
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall.description = "Firewall";
 
         # classifyKeys is internal — test through pipeline behavior instead.
         # An aspect with nixos (class) + firewall (trait) + unknown key.
@@ -226,7 +226,7 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
+        den.classes.nixos.description = "NixOS";
 
         # The nested "servers" aspect should recurse and emit its "nixos" sub-key as a class
         expr = builtins.length (result.state.imports null) > 0;
@@ -258,7 +258,7 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
+        den.classes.nixos.description = "NixOS";
 
         # Only the class "nixos" produces an import; randomThing is freeform → ignored
         expr = {

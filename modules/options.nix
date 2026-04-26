@@ -94,9 +94,9 @@ let
                   let
                     # Entity kinds derived from schema so user-defined kinds
                     # automatically become first-class context args.
-                    schemaKinds = builtins.filter (
-                      n: n != "conf" && n != "classes" && n != "traits" && !(lib.hasPrefix "_" n)
-                    ) (builtins.attrNames (den.schema or { }));
+                    schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
+                      builtins.attrNames (den.schema or { })
+                    );
                     isContextArg = n: builtins.elem n knownKinds || builtins.elem n schemaKinds;
                     ctx = lib.filterAttrs (n: v: isContextArg n && v != null) config._module.args // {
                       ${kind} = config;
@@ -128,120 +128,97 @@ let
           merged;
     };
 
-  classSchemaType = lib.types.submodule {
-    options.description = lib.mkOption {
-      description = "Human-readable description of this class domain.";
-      type = lib.types.str;
-    };
-    options.forwardTo = lib.mkOption {
-      description = "Optional forward target for class evaluation.";
-      type = lib.types.nullOr lib.types.raw;
-      default = null;
-    };
-  };
+  classSchemaType = lib.types.submodule (
+    { name, ... }:
+    {
+      options.description = lib.mkOption {
+        description = "Human-readable description of this class domain.";
+        type = lib.types.str;
+        apply =
+          v:
+          if (den.traits or { }) ? ${name} then
+            throw "den: '${name}' cannot be both a class and a trait"
+          else
+            v;
+      };
+      options.forwardTo = lib.mkOption {
+        description = "Optional forward target for class evaluation.";
+        type = lib.types.nullOr lib.types.raw;
+        default = null;
+      };
+    }
+  );
 
-  traitSchemaType = lib.types.submodule {
-    options.description = lib.mkOption {
-      description = "Human-readable description of this trait channel.";
-      type = lib.types.str;
-    };
-    options.collection = lib.mkOption {
-      description = "Collection strategy for trait data.";
-      type = lib.types.enum [
-        "list"
-        "map"
-      ];
-      default = "list";
-    };
-    options.partialOk = lib.mkOption {
-      description = "Whether partial trait data is acceptable.";
-      type = lib.types.bool;
-      default = false;
-    };
-    options.type = lib.mkOption {
-      description = "Optional type constraint for trait values.";
-      type = lib.types.nullOr lib.types.raw;
-      default = null;
-    };
-  };
+  traitSchemaType = lib.types.submodule (
+    { name, ... }:
+    {
+      options.description = lib.mkOption {
+        description = "Human-readable description of this trait channel.";
+        type = lib.types.str;
+        apply =
+          v:
+          if (den.classes or { }) ? ${name} then
+            throw "den: '${name}' cannot be both a class and a trait"
+          else
+            v;
+      };
+      options.collection = lib.mkOption {
+        description = "Collection strategy for trait data.";
+        type = lib.types.enum [
+          "list"
+          "map"
+        ];
+        default = "list";
+      };
+      options.partialOk = lib.mkOption {
+        description = "Whether partial trait data is acceptable.";
+        type = lib.types.bool;
+        default = false;
+      };
+      options.type = lib.mkOption {
+        description = "Optional type constraint for trait values.";
+        type = lib.types.nullOr lib.types.raw;
+        default = null;
+      };
+    }
+  );
+
+  # Collision check lives in each schema type's description `apply`
+  # function rather than the outer type merge. This keeps the check
+  # lazy — it only fires when `.description` of a colliding key is
+  # accessed, avoiding circular evaluation between den.classes/den.traits.
 
   schemaOption = lib.mkOption {
     description = "freeform deferred modules per entity kind";
     defaultText = lib.literalExpression "{ }";
     default = { };
-    type =
-      let
-        # Wrap a lazyAttrsOf type to inject a collision check into its merge.
-        # The check accesses the sibling option (traits or classes) via the
-        # top-level den.schema config, ensuring it only fires when the
-        # value is actually forced.
-        withCollisionCheck =
-          baseType: siblingName:
-          baseType
-          // {
-            merge =
-              loc: defs:
-              let
-                val = baseType.merge loc defs;
-                siblingVal = den.schema.${siblingName} or { };
-                myNames = builtins.attrNames val;
-                siblingNames = builtins.attrNames siblingVal;
-                collisions = builtins.filter (n: builtins.elem n siblingNames) myNames;
-              in
-              if collisions != [ ] then
-                throw "den: '${builtins.head collisions}' cannot be both a class and a trait"
-              else
-                val;
-          };
-      in
-      lib.types.submodule {
-        freeformType = lib.types.lazyAttrsOf schemaEntryType;
-        options.classes = lib.mkOption {
-          description = "Class evaluation domains";
-          type = withCollisionCheck (lib.types.lazyAttrsOf classSchemaType) "traits";
-          default = { };
-        };
-        options.traits = lib.mkOption {
-          description = "Trait semantic data channels";
-          type = withCollisionCheck (lib.types.lazyAttrsOf traitSchemaType) "classes";
-          default = { };
-        };
-      };
+    type = lib.types.submodule {
+      freeformType = lib.types.lazyAttrsOf schemaEntryType;
+    };
   };
 in
 {
   options.den.hosts = types.hostsOption;
   options.den.homes = types.homesOption;
   options.den.schema = schemaOption;
+  options.den.classes = lib.mkOption {
+    description = "Class evaluation domains";
+    type = lib.types.lazyAttrsOf classSchemaType;
+    default = { };
+  };
+  options.den.traits = lib.mkOption {
+    description = "Trait semantic data channels";
+    type = lib.types.lazyAttrsOf traitSchemaType;
+    default = { };
+  };
   config.den.schema = {
     conf = { };
     host.imports = [ den.schema.conf ];
     user.imports = [ den.schema.conf ];
     home.imports = [ den.schema.conf ];
-
-    classes.nixos.description = "NixOS system configuration";
-    classes.darwin.description = "nix-darwin system configuration";
   };
-
-  # Internal registries for pipeline key classification.
-  # Separate from den.schema.classes/traits to avoid the cycle:
-  # den.schema.classes → aspect-schema.nix → den.aspects → aspect submodule
-  # → den.schema.aspect → den.schema merge → infinite recursion.
-  # Batteries and namespace modules write to both den.schema.* and den._classNames/den._traitNames.
-  options.den._classNames = lib.mkOption {
-    internal = true;
-    type = lib.types.attrsOf lib.types.bool;
-    default = { };
-    description = "Internal: set of registered class names for pipeline key classification.";
-  };
-  options.den._traitNames = lib.mkOption {
-    internal = true;
-    type = lib.types.attrsOf lib.types.bool;
-    default = { };
-    description = "Internal: set of registered trait names for pipeline key classification.";
-  };
-  config.den._classNames = {
-    nixos = true;
-    darwin = true;
+  config.den.classes = {
+    nixos.description = "NixOS system configuration";
+    darwin.description = "nix-darwin system configuration";
   };
 }

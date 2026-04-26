@@ -29,6 +29,5 @@ in
   den.policies = result.policies;
   den.schema.host.policies = result.schemaPolicies;
 
-  den.schema.classes.maid.description = "nix-maid user environment";
-  den._classNames.maid = true;
+  den.classes.maid.description = "nix-maid user environment";
 }

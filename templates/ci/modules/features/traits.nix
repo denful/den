@@ -478,12 +478,11 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall = {
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall = {
           description = "Firewall rules";
           collection = "list";
         };
-        den._traitNames.firewall = true;
 
         expr = (result.state.traits null).firewall;
         expected = [
@@ -511,8 +510,7 @@
         } comp;
       in
       {
-        den.schema.traits.host.description = "Host trait";
-        den._traitNames.host = true;
+        den.traits.host.description = "Host trait";
 
         # constantHandler should win — returns "igloo", not trait data
         expr = result.value;
@@ -547,12 +545,11 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall = {
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall = {
           description = "Firewall rules";
           collection = "list";
         };
-        den._traitNames.firewall = true;
 
         expr = {
           importsCount = builtins.length (result.state.imports null);
@@ -681,12 +678,11 @@
         };
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall = {
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall = {
           description = "Firewall rules";
           collection = "list";
         };
-        den._traitNames.firewall = true;
 
         # imports should contain at least the traitModule
         expr = builtins.length result.imports >= 1;
@@ -711,7 +707,7 @@
         };
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
+        den.classes.nixos.description = "NixOS";
         # No trait schemas → no traitModule overhead
         expr = builtins.length result.imports;
         expected = 1;
@@ -757,12 +753,11 @@
         hasDeferredFirewall = (deferredTraits.firewall or [ ]) != [ ];
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall = {
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall = {
           description = "Firewall rules";
           collection = "list";
         };
-        den._traitNames.firewall = true;
 
         # Verify the deferred trait was actually collected
         expr = hasDeferredFirewall;
@@ -814,13 +809,12 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall = {
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall = {
           description = "Firewall rules";
           collection = "list";
           partialOk = true;
         };
-        den._traitNames.firewall = true;
 
         # With partialOk = true, fxResolve should NOT throw even with
         # consumed + deferred. We can't easily test fxResolve with pre-seeded

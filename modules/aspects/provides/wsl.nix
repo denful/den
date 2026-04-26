@@ -47,8 +47,7 @@ let
 
 in
 {
-  den.schema.classes.wsl.description = "WSL support class forwarding to host OS";
-  den._classNames.wsl = true;
+  den.classes.wsl.description = "WSL support class forwarding to host OS";
 
   den.stages.wsl-host.provides.wsl-host =
     { host }:

@@ -39,6 +39,5 @@ in
   den.stages.host.includes = [ host-os-fwd ];
   den.stages.user.includes = [ user-os-fwd ];
 
-  den.schema.classes.os.description = "Convenience class forwarding to both nixos and darwin";
-  den._classNames.os = true;
+  den.classes.os.description = "Convenience class forwarding to both nixos and darwin";
 }

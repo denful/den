@@ -49,6 +49,5 @@ in
 {
   den.stages.user.includes = [ fwd ];
 
-  den.schema.classes.user.description = "Lightweight user environment forwarding to OS users.users";
-  den._classNames.user = true;
+  den.classes.user.description = "Lightweight user environment forwarding to OS users.users";
 }

@@ -322,13 +322,13 @@ let
           };
 
           traits = lib.mkOption {
-            description = "Trait schemas declared by this aspect, merged into den.schema.traits.";
+            description = "Trait schemas declared by this aspect, merged into den.traits.";
             type = lib.types.lazyAttrsOf lib.types.raw;
             default = { };
           };
 
           classes = lib.mkOption {
-            description = "Class schemas declared by this aspect, merged into den.schema.classes.";
+            description = "Class schemas declared by this aspect, merged into den.classes.";
             type = lib.types.lazyAttrsOf lib.types.raw;
             default = { };
           };

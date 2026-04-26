@@ -95,12 +95,11 @@
         } comp;
       in
       {
-        den.schema.classes.nixos.description = "NixOS";
-        den.schema.traits.firewall = {
+        den.classes.nixos.description = "NixOS";
+        den.traits.firewall = {
           description = "Firewall rules";
           collection = "list";
         };
-        den._traitNames.firewall = true;
 
         expr = {
           hasImports = builtins.length (result.state.imports null) > 0;

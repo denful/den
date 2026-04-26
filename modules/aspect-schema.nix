@@ -1,10 +1,10 @@
-# Collect trait/class declarations from aspects and merge into den.schema.
+# Collect trait/class declarations from aspects and merge into den.traits/den.classes.
 #
 # Aspects can declare:
 #   den.aspects.foo.traits.firewall = { description = "..."; collection = "list"; };
 #   den.aspects.foo.classes.hjem = { description = "..."; };
 #
-# These are folded into den.schema.traits / den.schema.classes so the
+# These are folded into den.traits / den.classes so the
 # schema registry sees them alongside manual declarations.
 {
   den,
@@ -71,7 +71,7 @@ let
   allClasses = lib.foldl' (acc: x: acc // x.classes) (topLevel.classes // nsLevelClasses) nsCollected;
 in
 {
-  config.den.schema = {
+  config.den = {
     traits = allTraits;
     classes = allClasses;
   };

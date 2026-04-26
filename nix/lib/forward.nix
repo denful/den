@@ -11,7 +11,7 @@ let
     }@fwd:
     let
       fromClass = fwd.fromClass item;
-      classForwardTo = (den.schema.classes.${fromClass} or { }).forwardTo or null;
+      classForwardTo = (den.classes.${fromClass} or { }).forwardTo or null;
       intoClass =
         if fwd ? intoClass then
           fwd.intoClass item

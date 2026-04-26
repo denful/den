@@ -30,6 +30,5 @@ in
   den.policies = result.policies;
   den.schema.host.policies = result.schemaPolicies;
 
-  den.schema.classes.homeManager.description = "Home Manager user environment";
-  den._classNames.homeManager = true;
+  den.classes.homeManager.description = "Home Manager user environment";
 }
