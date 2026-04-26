@@ -198,22 +198,34 @@ let
         { config, lib, ... }:
         {
           options._den.traits = lib.mkOption {
-            type = lib.types.attrsOf (lib.types.listOf lib.types.anything);
+            type = lib.types.attrsOf lib.types.anything;
             default = { };
             internal = true;
           };
           config._den.traits = lib.mapAttrs (
-            traitName: _:
+            traitName: schema:
             let
-              pipelineData =
-                let
-                  raw = traits.${traitName} or [ ];
-                in
-                if builtins.isList raw then raw else [ raw ];
+              strategy = schema.collection or "list";
+              raw = traits.${traitName} or (if strategy == "map" then { } else [ ]);
               deferred = deferredTraits.${traitName} or [ ];
               deferredData = map (e: e.value { inherit config lib; }) deferred;
             in
-            pipelineData ++ deferredData
+            if strategy == "map" then
+              # "map": pipeline data is already a merged attrset; deferred
+              # emissions are resolved and merged in (duplicates error)
+              builtins.foldl' (
+                acc: d:
+                let
+                  dupes = builtins.filter (k: acc ? ${k}) (builtins.attrNames d);
+                in
+                if dupes != [ ] then
+                  throw "den: trait '${traitName}' map collection: duplicate key '${builtins.head dupes}' in deferred emission"
+                else
+                  acc // d
+              ) raw deferredData
+            else
+              # "list": pipeline data is a list; deferred emissions appended
+              raw ++ deferredData
           ) traitSchemas;
         };
 

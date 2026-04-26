@@ -157,7 +157,11 @@ let
       { param, state }:
       let
         traits = (state.traits or (_: { })) null;
-        traitData = traits.${traitName} or null;
+        # Default to [] for uncollected traits. "map" collection stores
+        # attrsets in state.traits, but parametric consumers still get []
+        # when no emissions exist — the empty-map case is {} which would
+        # need schema access. [] is safe: consumers iterate or check length.
+        traitData = traits.${traitName} or [ ];
         consumed = (state.consumedTraits or (_: { })) null;
       in
       {

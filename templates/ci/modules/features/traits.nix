@@ -438,8 +438,9 @@
         } comp;
       in
       {
+        # Uncollected traits default to [] (empty list), not null
         expr = result.value;
-        expected = null;
+        expected = [ ];
       }
     );
 
