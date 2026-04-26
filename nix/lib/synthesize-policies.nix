@@ -5,44 +5,32 @@
   ...
 }:
 let
-  # Infer the required entity key from a stage name.
-  # Derived from den.schema so user-defined entity kinds are supported.
-  # from = "host" or "hm-host" implies ctx.host must be an attrset entity.
-  # Other stages (flake, flake-system, etc.) have no entity requirement.
+  # Schema entity kinds (host, user, home, etc.) — used for context checks.
   schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
     builtins.attrNames (den.schema or { })
   );
-  entityKeyFor =
-    stage:
-    let
-      # Check exact match first, then suffix match (-host → host, -user → user)
-      exact = lib.findFirst (k: stage == k) null schemaKinds;
-      suffix = lib.findFirst (k: lib.hasSuffix "-${k}" stage) null schemaKinds;
-    in
-    if exact != null then exact else suffix;
 
-  # Check if context satisfies the scope implied by the stage name.
+  # Check if context satisfies the scope implied by the entity kind.
   #
-  # Entity stages (host, *-host, user, *-user, home):
-  #   The implied entity key must be present as an attrset.
+  # Entity kinds (host, user, home):
+  #   The kind key must be present as an attrset in context.
   #   Policies can safely destructure { host, ... }: etc.
   #
-  # Flake stages (flake, flake-*):
-  #   No entity values may be present (attrset values in ctx indicate
-  #   entity scope). This prevents flake-level policies from firing
-  #   during host/user transitions where system is also in context.
-  #   No hardcoded entity keys — uses value type detection.
+  # Flake kinds (flake, flake-*):
+  #   No entity values may be present (attrset values indicate
+  #   entity scope). Prevents flake-level policies from firing
+  #   during host/user transitions.
   #
-  # Other stages: no restriction.
+  # Other kinds: no restriction.
   ctxSatisfies =
-    stage: ctx:
+    kind: ctx:
     let
-      key = entityKeyFor stage;
-      isFlakeScope = stage == "flake" || lib.hasPrefix "flake-" stage;
+      isEntityKind = builtins.elem kind schemaKinds;
+      isFlakeScope = kind == "flake" || lib.hasPrefix "flake-" kind;
       hasEntityValues = builtins.any builtins.isAttrs (builtins.attrValues ctx);
     in
-    if key != null then
-      ctx ? ${key} && builtins.isAttrs ctx.${key}
+    if isEntityKind then
+      ctx ? ${kind} && builtins.isAttrs ctx.${kind}
     else if isFlakeScope then
       !hasEntityValues
     else
@@ -78,16 +66,16 @@ let
   #
   # A policy not activated at any level is excluded from the returned set.
   activePoliciesFor =
-    stageName: ctx:
+    kind: ctx:
     let
       policies = den.policies or { };
       defaultActive = den.default.policies or [ ];
       # Entity activation: read from the entity in context.
       # Schema-kind policies merge into entity.policies via module system.
-      entityKind = entityKeyFor stageName;
+      isEntityKind = builtins.elem kind schemaKinds;
       entityActive =
-        if entityKind != null && ctx ? ${entityKind} && builtins.isAttrs ctx.${entityKind} then
-          ctx.${entityKind}.policies or [ ]
+        if isEntityKind && ctx ? ${kind} && builtins.isAttrs ctx.${kind} then
+          ctx.${kind}.policies or [ ]
         else
           [ ];
       activeNames = defaultActive ++ entityActive;
