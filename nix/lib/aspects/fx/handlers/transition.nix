@@ -248,7 +248,17 @@ let
           inherit targetClass;
         })
         (
-          effectiveTarget:
+          rawTarget:
+          let
+            # Inject policy-declared aspects into the target's includes.
+            policyAspectNames = (transition.routing or { }).aspects or [ ];
+            policyAspects = map (name: den.aspects.${name}) policyAspectNames;
+            effectiveTarget =
+              if rawTarget == null then
+                null
+              else
+                rawTarget // { includes = (rawTarget.includes or [ ]) ++ policyAspects; };
+          in
           if effectiveTarget == null && crossProvider == null then
             let
               tombstone = {
@@ -281,7 +291,7 @@ let
                   newCtx = indexed.ctx;
                   scopedCtx = currentCtx // newCtx;
                   ctxNames = mkCtxId newCtx;
-                  ctxKey = if isFanOut then "${key}/{${ctxNames}}#${toString indexed.i}" else key;
+                  ctxKey = if isFanOut then "${key}/{${ctxNames}}" else key;
                   scopeHandlers = constantHandler scopedCtx;
                   updateCtx = fx.effects.state.modify (st: st // { currentCtx = _: scopedCtx; });
                   baseComputation =
@@ -311,15 +321,33 @@ let
                     else
                       baseComputation;
                 in
-                fx.bind (fx.send "ctx-seen" ctxKey) (
-                  { isFirst }:
-                  if !isFirst then
-                    fx.pure innerResults
-                  else
-                    fx.bind updateCtx (
-                      _: fx.bind withTarget (targetResults: emitCross scopedCtx scopeHandlers ctxNames targetResults)
-                    )
-                )
+                fx.bind
+                  (fx.send "ctx-seen" {
+                    key = ctxKey;
+                    aspects = policyAspectNames;
+                  })
+                  (
+                    { isFirst, newAspects }:
+                    if isFirst then
+                      fx.bind updateCtx (
+                        _: fx.bind withTarget (targetResults: emitCross scopedCtx scopeHandlers ctxNames targetResults)
+                      )
+                    else if newAspects != [ ] then
+                      # Supplemental aspects for an already-resolved entity:
+                      # emit each new aspect as an include without re-resolving.
+                      builtins.foldl' (
+                        acc: aspect:
+                        fx.bind acc (
+                          prevResults:
+                          fx.bind (fx.send "emit-include" {
+                            child = aspect;
+                            idx = null;
+                          }) (_: fx.pure prevResults)
+                        )
+                      ) (fx.pure innerResults) (map (name: den.aspects.${name}) newAspects)
+                    else
+                      fx.pure innerResults
+                  )
               )
             ) (fx.pure results) indexedContexts
         );
@@ -391,18 +419,23 @@ let
               # the old mergePolicyInto path provided naturally.
               # Routing metadata is kept from the first transition per path —
               # same-path policies must have consistent from/to pairs.
+              # Merge transitions targeting the same path + aspect set.
+              # Different aspect sets stay separate — they represent
+              # distinct resolution configurations for the same target.
               mergeByPath = builtins.foldl' (
                 acc: t:
                 let
-                  pathKey = lib.concatStringsSep "." t.path;
+                  sortedAspects = lib.sort (a: b: a < b) ((t.routing or { }).aspects or [ ]);
+                  aspectsKey = builtins.concatStringsSep "," sortedAspects;
+                  mergeKey = "${lib.concatStringsSep "." t.path}|${aspectsKey}";
                 in
                 acc
                 // {
-                  ${pathKey} =
-                    if acc ? ${pathKey} then
-                      acc.${pathKey}
+                  ${mergeKey} =
+                    if acc ? ${mergeKey} then
+                      acc.${mergeKey}
                       // {
-                        contexts = acc.${pathKey}.contexts ++ t.contexts;
+                        contexts = acc.${mergeKey}.contexts ++ t.contexts;
                       }
                     else
                       t;
