@@ -7,7 +7,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.igloo.provides.tux = den.lib.parametric {
           homeManager.home.shellAliases.g = "git";
@@ -24,7 +24,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.tux.provides.igloo = den.lib.parametric {
           nixos.boot.crashDump.reservedMemory = "99999M";
@@ -41,7 +41,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.igloo.provides.tux = den.lib.parametric {
           homeManager.home.keyboard.model = "denboard";
@@ -68,7 +68,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.igloo.provides.to-users = {
           homeManager.home.keyboard.model = "denboard";

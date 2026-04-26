@@ -32,7 +32,7 @@
 
   # include den batteries or your own re-usable aspects
   # this affects all users, could also be done per user
-  den.entityIncludes.user = [ den.provides.define-user ];
+  den.schema.user.includes = [ den.provides.define-user ];
 
   # user aspect
   den.aspects.tux = {

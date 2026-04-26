@@ -8,7 +8,7 @@ let
         name = "c${toString i}";
         next = "c${toString (i + 1)}";
         baseStage = {
-          den.entityIncludes.${name} = [
+          den.schema.${name}.includes = [
             (
               { x }:
               {
@@ -37,7 +37,7 @@ let
     n:
     { den, ... }:
     {
-      den.entityIncludes.root = [
+      den.schema.root.includes = [
         (
           { x }:
           {
@@ -45,7 +45,7 @@ let
           }
         )
       ];
-      den.entityIncludes.leaf = [ ];
+      den.schema.leaf.includes = [ ];
       den.policies.root-to-leaf = {
         from = "root";
         to = "leaf";
@@ -68,7 +68,7 @@ let
       srcMod =
         { den, ... }:
         {
-          den.entityIncludes.src = [
+          den.schema.src.includes = [
             (
               { v }:
               {
@@ -108,7 +108,7 @@ let
         in
         { den, ... }:
         {
-          den.entityIncludes.${name} = [ ];
+          den.schema.${name}.includes = [ ];
         }
       ) n;
     in

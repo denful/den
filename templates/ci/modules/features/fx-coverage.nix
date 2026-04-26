@@ -543,7 +543,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-filter = [ ];
+        den.schema.test-filter.includes = [ ];
 
         den.default.policies = [ "host-to-test-filter" ];
 

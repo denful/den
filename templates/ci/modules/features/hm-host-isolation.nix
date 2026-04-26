@@ -6,7 +6,7 @@
       { den, funnyNames, ... }:
       {
         den.hosts.x86_64-linux.igloo = { };
-        den.entityIncludes.hm-host = [
+        den.schema.hm-host.includes = [
           { funny.names = [ "hm-host-owned" ]; }
         ];
 
@@ -19,7 +19,7 @@
       { den, funnyNames, ... }:
       {
         den.hosts.x86_64-linux.igloo = { };
-        den.entityIncludes.hm-host = [
+        den.schema.hm-host.includes = [
           { funny.names = [ "hm-host-include" ]; }
         ];
 

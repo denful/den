@@ -104,7 +104,7 @@
         ))
       ];
 
-      den.entityIncludes.host = [
+      den.schema.host.includes = [
         { funny.names = [ "hm-host detected" ]; }
         (
           { host, ... }@ctx:
@@ -114,7 +114,7 @@
         )
       ];
 
-      den.entityIncludes.user = [
+      den.schema.user.includes = [
         den.provides.mutual-provider
         (
           { host, user, ... }@ctx:

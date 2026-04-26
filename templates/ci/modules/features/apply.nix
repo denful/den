@@ -3,7 +3,7 @@
   flake.tests.ctx.test-apply = denTest (
     { den, funnyNames, ... }:
     {
-      den.entityIncludes.foobar = [
+      den.schema.foobar.includes = [
         (
           { foo, bar }:
           {

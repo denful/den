@@ -78,7 +78,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.host = [
+        den.schema.host.includes = [
           (
             { host, ... }:
             {

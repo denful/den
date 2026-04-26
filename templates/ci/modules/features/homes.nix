@@ -46,7 +46,7 @@
         den.homes.x86_64-linux.tux = { };
         den.default.homeManager.home.stateVersion = "25.11";
         den.default.includes = [ den.provides.define-user ];
-        den.entityIncludes.home = [
+        den.schema.home.includes = [
           { homeManager.programs.vim.enable = true; }
         ];
 
@@ -71,7 +71,7 @@
           home.keyboard.model = if args ? osConfig then "os-bound" else "standalone";
         };
 
-        den.entityIncludes.home = [ den.provides.mutual-provider ];
+        den.schema.home.includes = [ den.provides.mutual-provider ];
         den.aspects.tux.provides.igloo = {
           homeManager.home.keyboard.layout = "enthium";
           includes = [

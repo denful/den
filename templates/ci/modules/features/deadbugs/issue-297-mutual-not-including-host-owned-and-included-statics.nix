@@ -12,7 +12,7 @@
       }:
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.igloo.provides.to-users.homeManager.home.keyboard.model = "denkbd";
 
@@ -31,7 +31,7 @@
       }:
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.base.homeManager.home.keyboard.model = "denkbd";
         den.aspects.igloo.provides.to-users.includes = [ den.aspects.base ];
@@ -51,7 +51,7 @@
       }:
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.igloo.provides.to-users.homeManager.options.foo = lib.mkOption { default = "foo"; };
 
@@ -70,7 +70,7 @@
       }:
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         # NOTE: this causes an error: Option already defined!
         # This is because mutuality includes host configs again.

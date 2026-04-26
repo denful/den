@@ -5,7 +5,7 @@
     test-self-named-provider = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.greet = [
+        den.schema.greet.includes = [
           (
             { who }:
             {
@@ -22,7 +22,7 @@
     test-self-named-plus-owned = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.greet = [
+        den.schema.greet.includes = [
           (
             { who }:
             {
@@ -48,7 +48,7 @@
         ...
       }:
       {
-        den.entityIncludes.greet = [
+        den.schema.greet.includes = [
           (
             { who }:
             {
@@ -57,7 +57,7 @@
           )
         ];
 
-        den.entityIncludes.other = [ ];
+        den.schema.other.includes = [ ];
         den.policies.test-greet-to-other = {
           from = "greet";
           to = "other";
@@ -89,7 +89,7 @@
         ...
       }:
       {
-        den.entityIncludes.greet = [
+        den.schema.greet.includes = [
           (
             { who }:
             {
@@ -97,7 +97,7 @@
             }
           )
         ];
-        den.entityIncludes.yell = [ ];
+        den.schema.yell.includes = [ ];
         den.policies.test-greet-to-yell = {
           from = "greet";
           to = "yell";
@@ -129,7 +129,7 @@
         ...
       }:
       {
-        den.entityIncludes.greet = [
+        den.schema.greet.includes = [
           (
             { who }:
             {
@@ -137,9 +137,9 @@
             }
           )
         ];
-        den.entityIncludes.yell = [ ];
-        den.entityIncludes.size = [ ];
-        den.entityIncludes.num = [ ];
+        den.schema.yell.includes = [ ];
+        den.schema.size.includes = [ ];
+        den.schema.num.includes = [ ];
         den.policies.test-greet-to-yell-fn = {
           from = "greet";
           to = "yell";

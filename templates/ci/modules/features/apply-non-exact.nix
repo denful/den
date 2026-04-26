@@ -3,7 +3,7 @@
   flake.tests.ctx-non-exact.test-apply-non-exact-less = denTest (
     { den, funnyNames, ... }:
     {
-      den.entityIncludes.foobar = [
+      den.schema.foobar.includes = [
         # use atLeast if you get error: function called with unexpected argument
         (den.lib.take.atLeast (
           { foo, bar }:
@@ -30,7 +30,7 @@
   flake.tests.ctx-non-exact.test-apply-non-exact-more = denTest (
     { den, funnyNames, ... }:
     {
-      den.entityIncludes.foobar = [
+      den.schema.foobar.includes = [
         # use exactly if you want to restrict to not having more args
         (den.lib.take.exactly (
           { foo, bar }:

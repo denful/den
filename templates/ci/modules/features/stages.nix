@@ -43,7 +43,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.user = [
+        den.schema.user.includes = [
           { nixos.users.users.tux.description = "from-user-stage"; }
         ];
 
@@ -57,7 +57,7 @@
     test-stage-function-sugar = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.greet = [
+        den.schema.greet.includes = [
           (
             { hello }:
             {

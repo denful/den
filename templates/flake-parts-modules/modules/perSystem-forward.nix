@@ -21,6 +21,6 @@ let
   perSystemModule = den.lib.aspects.resolve "flake-parts" (den.lib.resolveEntity "flake-parts" { });
 in
 {
-  den.entityIncludes.flake-parts-system = [ perSystemFwd ];
+  den.schema.flake-parts-system.includes = [ perSystemFwd ];
   perSystem.imports = [ perSystemModule ];
 }

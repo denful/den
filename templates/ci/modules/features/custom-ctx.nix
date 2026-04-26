@@ -10,7 +10,7 @@
         ...
       }:
       {
-        den.entityIncludes.greeting = [
+        den.schema.greeting.includes = [
           (
             { hello }:
             {
@@ -18,7 +18,7 @@
             }
           )
         ];
-        den.entityIncludes.shout = [ ];
+        den.schema.shout.includes = [ ];
         den.policies.test-greeting-to-shout = {
           from = "greeting";
           to = "shout";
@@ -45,7 +45,7 @@
     test-ctx-includes-static-and-parametric = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.foo = [
+        den.schema.foo.includes = [
           (
             { foo }:
             {
@@ -73,7 +73,7 @@
     test-ctx-owned = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.bar = [
+        den.schema.bar.includes = [
           (
             { x }:
             {

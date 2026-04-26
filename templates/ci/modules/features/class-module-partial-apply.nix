@@ -10,7 +10,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-flat = [ ];
+        den.schema.test-flat.includes = [ ];
 
         den.policies.host-to-test-flat = {
           from = "host";
@@ -42,7 +42,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-twolayer = [ ];
+        den.schema.test-twolayer.includes = [ ];
 
         den.policies.host-to-test-twolayer = {
           from = "host";
@@ -77,7 +77,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-multi-args = [ ];
+        den.schema.test-multi-args.includes = [ ];
 
         den.policies.host-to-test-multi-args = {
           from = "host";
@@ -139,7 +139,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-functor = [ ];
+        den.schema.test-functor.includes = [ ];
 
         den.policies.host-to-test-functor = {
           from = "host";
@@ -176,7 +176,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-funcargs = [ ];
+        den.schema.test-funcargs.includes = [ ];
 
         den.policies.host-to-test-funcargs = {
           from = "host";
@@ -262,7 +262,7 @@
             };
         };
 
-        den.entityIncludes.test-static-flat = [ ];
+        den.schema.test-static-flat.includes = [ ];
 
         den.policies.host-to-test-static-flat = {
           from = "host";
@@ -286,7 +286,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-cross-param = [ ];
+        den.schema.test-cross-param.includes = [ ];
 
         den.policies.host-to-test-cross-param = {
           from = "host";
@@ -321,7 +321,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-paren = [ ];
+        den.schema.test-paren.includes = [ ];
 
         den.policies.host-to-test-paren = {
           from = "host";
@@ -357,7 +357,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-full-apply = [ ];
+        den.schema.test-full-apply.includes = [ ];
 
         den.policies.host-to-test-full-apply = {
           from = "host";
@@ -425,7 +425,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-collision-err-int = [ ];
+        den.schema.test-collision-err-int.includes = [ ];
 
         den.policies.host-to-collision-err-int = {
           from = "host";
@@ -459,7 +459,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.schema.host.collisionPolicy = "den-wins";
 
-        den.entityIncludes.test-collision-dw = [ ];
+        den.schema.test-collision-dw.includes = [ ];
 
         den.policies.host-to-collision-dw = {
           from = "host";
@@ -492,7 +492,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.config.classModuleCollisionPolicy = "den-wins";
 
-        den.entityIncludes.test-collision-global = [ ];
+        den.schema.test-collision-global.includes = [ ];
 
         den.policies.host-to-collision-global = {
           from = "host";
@@ -524,7 +524,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.schema.host.collisionPolicy = "class-wins";
 
-        den.entityIncludes.test-collision-cw = [ ];
+        den.schema.test-collision-cw.includes = [ ];
 
         den.policies.host-to-collision-cw = {
           from = "host";

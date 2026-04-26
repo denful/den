@@ -10,7 +10,7 @@
     inputs.den.flakeOutputs.packages
   ];
 
-  den.entityIncludes.flake-packages = [ den.aspects.flake ];
+  den.schema.flake-packages.includes = [ den.aspects.flake ];
 
   den.aspects.flake.packages =
     { pkgs, ... }:

@@ -8,7 +8,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         # host entity includes are applied when host has HM support
-        den.entityIncludes.host = [
+        den.schema.host.includes = [
           { nixos.home-manager.useGlobalPkgs = true; }
         ];
 
@@ -30,7 +30,7 @@
       { den, config, ... }:
       {
         den.hosts.x86_64-linux.igloo = { };
-        den.entityIncludes.hm-host = [
+        den.schema.hm-host.includes = [
           { nixos.home-manager.useGlobalPkgs = true; }
         ];
 

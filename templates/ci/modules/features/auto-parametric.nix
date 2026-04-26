@@ -82,7 +82,7 @@
           ];
         };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.aspects.igloo.provides.to-users.includes = [ den.aspects.strict-helper ];
 
         # strict-helper requires exactly { host, user } — since ctx.host only provides
@@ -112,7 +112,7 @@
     test-second-level-helper-owned-config-preserved = denTest (
       { den, igloo, ... }:
       {
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.aspects.second-with-owned = {
@@ -143,7 +143,7 @@
     test-second-provides-helper-owned-config-preserved = denTest (
       { den, igloo, ... }:
       {
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.aspects.second.provides.with-owned = {

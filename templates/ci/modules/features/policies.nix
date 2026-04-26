@@ -7,7 +7,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-rel-target = [ ];
+        den.schema.test-rel-target.includes = [ ];
 
         den.policies.host-to-test-rel = {
           from = "host";
@@ -32,7 +32,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-rel-coexist = [ ];
+        den.schema.test-rel-coexist.includes = [ ];
 
         den.default.nixos.users.users.tux.description = "from-default-stage";
 
@@ -66,7 +66,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-scoped = [ ];
+        den.schema.test-scoped.includes = [ ];
 
         den.default.policies = [ "host-to-test-scoped" ];
 
@@ -103,7 +103,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-handler-target = [ ];
+        den.schema.test-handler-target.includes = [ ];
 
         den.default.policies = [ "host-to-test-handler" ];
 

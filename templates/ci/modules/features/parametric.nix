@@ -18,7 +18,7 @@
         };
       in
       {
-        den.entityIncludes.start = [
+        den.schema.start.includes = [
           (
             { level }:
             {
@@ -52,7 +52,7 @@
         aspects = lib.genList mkParam 30;
       in
       {
-        den.entityIncludes.start = [
+        den.schema.start.includes = [
           (
             { host }:
             {
@@ -81,7 +81,7 @@
         };
       in
       {
-        den.entityIncludes.start = [
+        den.schema.start.includes = [
           (
             { host }:
             {
@@ -112,7 +112,7 @@
         };
       in
       {
-        den.entityIncludes.a = [
+        den.schema.a.includes = [
           (
             { host }:
             {
@@ -121,7 +121,7 @@
           )
           shared
         ];
-        den.entityIncludes.b = [ ];
+        den.schema.b.includes = [ ];
         den.policies.a-to-b = {
           from = "a";
           to = "b";

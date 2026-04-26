@@ -21,8 +21,8 @@
     test-non-core-excluded-from-active = denTest (
       { den, ... }:
       {
-        den.entityIncludes.test-act-src = [ ];
-        den.entityIncludes.test-act-tgt = [ ];
+        den.schema.test-act-src.includes = [ ];
+        den.schema.test-act-tgt.includes = [ ];
 
         den.policies.test-act-src-to-tgt = {
           from = "test-act-src";
@@ -43,8 +43,8 @@
     test-default-policies-activates = denTest (
       { den, ... }:
       {
-        den.entityIncludes.test-dflt-src = [ ];
-        den.entityIncludes.test-dflt-tgt = [ ];
+        den.schema.test-dflt-src.includes = [ ];
+        den.schema.test-dflt-tgt.includes = [ ];
 
         den.policies.test-dflt-src-to-tgt = {
           from = "test-dflt-src";

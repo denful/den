@@ -130,7 +130,7 @@ in
       aspects = [ microvmGuestProvide ];
     };
   };
-  den.entityIncludes.microvm-host = [ ];
-  den.entityIncludes.microvm-guest = [ ];
+  den.schema.microvm-host.includes = [ ];
+  den.schema.microvm-guest.includes = [ ];
   den.schema.host.imports = [ extendHostSchema ];
 }

@@ -63,8 +63,8 @@
     test-inspect-respects-activation = denTest (
       { den, ... }:
       {
-        den.entityIncludes.test-insp-src = [ ];
-        den.entityIncludes.test-insp-tgt = [ ];
+        den.schema.test-insp-src.includes = [ ];
+        den.schema.test-insp-tgt.includes = [ ];
 
         den.policies.test-insp-inactive = {
           from = "test-insp-src";
@@ -89,8 +89,8 @@
     test-inspect-shows-activated = denTest (
       { den, ... }:
       {
-        den.entityIncludes.test-insp-act-src = [ ];
-        den.entityIncludes.test-insp-act-tgt = [ ];
+        den.schema.test-insp-act-src.includes = [ ];
+        den.schema.test-insp-act-tgt.includes = [ ];
 
         den.policies.test-insp-act-pol = {
           from = "test-insp-act-src";

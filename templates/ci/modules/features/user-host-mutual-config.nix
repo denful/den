@@ -42,7 +42,7 @@
           pingu = { };
         };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.aspects.igloo.provides.to-users.homeManager.programs.direnv.enable = true;
 
         expr = [
@@ -69,7 +69,7 @@
           pingu = { };
         };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.igloo.provides.to-users.includes = [
           {
@@ -136,7 +136,7 @@
           pingu = { };
         };
 
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.igloo.provides.to-users.includes = [
           (
@@ -252,7 +252,7 @@
         ...
       }:
       {
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.hosts.x86_64-linux.igloo.users = {
           tux = { };

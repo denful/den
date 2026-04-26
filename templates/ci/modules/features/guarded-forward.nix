@@ -104,7 +104,7 @@ in
 
         den.aspects.pingu.homeManager.programs.vim.enable = true;
 
-        den.entityIncludes.user =
+        den.schema.user.includes =
           let
             unset.homeManager.home.keyboard.model = lib.mkDefault "unset";
 

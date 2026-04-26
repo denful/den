@@ -8,9 +8,9 @@
     test-policy-as-renames-key = denTest (
       { den, ... }:
       {
-        den.entityIncludes.test-as-source = [ ];
+        den.schema.test-as-source.includes = [ ];
 
-        den.entityIncludes.test-as-target = [ ];
+        den.schema.test-as-target.includes = [ ];
 
         den.policies.test-as-source-to-target = {
           from = "test-as-source";
@@ -34,9 +34,9 @@
     test-policy-as-defaults-to-to = denTest (
       { den, ... }:
       {
-        den.entityIncludes.test-as-default-source = [ ];
+        den.schema.test-as-default-source.includes = [ ];
 
-        den.entityIncludes.test-as-default-target = [ ];
+        den.schema.test-as-default-target.includes = [ ];
 
         den.policies.test-as-default-source-to-target = {
           from = "test-as-default-source";

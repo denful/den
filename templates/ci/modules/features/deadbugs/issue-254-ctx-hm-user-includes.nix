@@ -15,7 +15,7 @@
         den.default.homeManager.home.stateVersion = "25.11";
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.user = [
+        den.schema.user.includes = [
           {
             homeManager = {
               programs.nix-index.enable = true;
@@ -24,7 +24,7 @@
         ];
 
         den.aspects.tux.homeManager = {
-          # Dont enable this, it should be set via den.entityIncludes.user
+          # Dont enable this, it should be set via den.schema.user.includes
           # programs.nix-index.enable = true;
         };
 
@@ -45,7 +45,7 @@
         den.default.homeManager.home.stateVersion = "25.11";
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.user = [
+        den.schema.user.includes = [
           {
             homeManager = {
               programs.nix-index.enable = true;
@@ -70,7 +70,7 @@
         den.default.homeManager.home.stateVersion = "25.11";
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.host = [
+        den.schema.host.includes = [
           {
             nixos = {
               home-manager.useGlobalPkgs = true;
@@ -109,7 +109,7 @@
           };
         };
 
-        den.entityIncludes.user = [
+        den.schema.user.includes = [
           {
             hjem.foo = "bar";
           }

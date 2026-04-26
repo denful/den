@@ -36,7 +36,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-into-target = [ ];
+        den.schema.test-into-target.includes = [ ];
 
         den.policies.host-to-into-target = {
           from = "host";

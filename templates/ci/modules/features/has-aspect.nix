@@ -365,7 +365,7 @@
     test-E-present-via-provides-to-users = denTest (
       { den, ... }:
       {
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.aspects.igloo.provides.to-users = {
@@ -381,7 +381,7 @@
     test-E-present-via-provides-specific-user = denTest (
       { den, ... }:
       {
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.igloo.users.alice = { };
 
@@ -404,7 +404,7 @@
     test-E-present-via-user-to-hosts = denTest (
       { den, ... }:
       {
-        den.entityIncludes.user = [ den.provides.mutual-provider ];
+        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.aspects.tux.provides.to-hosts = {

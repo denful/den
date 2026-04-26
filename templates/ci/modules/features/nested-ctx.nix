@@ -7,7 +7,7 @@
     test-flat-still-works = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.flat = [ ];
+        den.schema.flat.includes = [ ];
 
         den.policies.test-root-to-flat = {
           from = "root";
@@ -32,7 +32,7 @@
     test-into-root-and-child-merge = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.leaf = [
+        den.schema.leaf.includes = [
           (
             { v }:
             {

@@ -10,7 +10,7 @@
         ...
       }:
       {
-        den.entityIncludes.parent = [
+        den.schema.parent.includes = [
           (
             { x }:
             {
@@ -18,7 +18,7 @@
             }
           )
         ];
-        den.entityIncludes.child = [ ];
+        den.schema.child.includes = [ ];
         den.policies.test-parent-to-child = {
           from = "parent";
           to = "child";
@@ -67,7 +67,7 @@
         ...
       }:
       {
-        den.entityIncludes.src = [
+        den.schema.src.includes = [
           (
             { x }:
             {
@@ -75,7 +75,7 @@
             }
           )
         ];
-        den.entityIncludes.dst = [ ];
+        den.schema.dst.includes = [ ];
         den.policies.test-src-to-dst = {
           from = "src";
           to = "dst";
@@ -130,7 +130,7 @@
         ...
       }:
       {
-        den.entityIncludes.src = [
+        den.schema.src.includes = [
           (
             { x }:
             {
@@ -138,7 +138,7 @@
             }
           )
         ];
-        den.entityIncludes.dst = [ ];
+        den.schema.dst.includes = [ ];
         den.policies.test-src-to-dst-no-cross = {
           from = "src";
           to = "dst";
