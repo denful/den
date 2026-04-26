@@ -59,10 +59,9 @@ let
     let
       # Top-level den.traits lives outside den.schema, breaking
       # the evaluation cycle that existed with den.schema.traits.
-      traitNames = den.traits or { };
       traitSchemas = den.traits or { };
     in
-    handlers.traitArgHandler traitNames
+    handlers.traitArgHandler traitSchemas
     // handlers.constantHandler (
       {
         inherit class;
@@ -192,7 +191,7 @@ let
       # Synthetic module injecting _den.traits into evalModules fixpoint.
       # Only added when trait schemas exist — zero overhead otherwise.
       traitModule =
-        { config, lib, ... }:
+        { config, lib, pkgs, options, modulesPath, ... }@moduleArgs:
         {
           options._den.traits = lib.mkOption {
             type = lib.types.attrsOf lib.types.anything;
@@ -205,7 +204,7 @@ let
               strategy = schema.collection or "list";
               raw = traits.${traitName} or (if strategy == "map" then { } else [ ]);
               deferred = deferredTraits.${traitName} or [ ];
-              deferredData = map (e: e.value { inherit config lib; }) deferred;
+              deferredData = map (e: e.value moduleArgs) deferred;
             in
             if strategy == "map" then
               # "map": pipeline data is already a merged attrset; deferred

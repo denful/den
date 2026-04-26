@@ -52,11 +52,21 @@ let
             inherit value;
           }
         else
-          # All args are den context args → Tier 2, resolve now
-          {
-            tier = 2;
-            value = value ctx;
-          };
+          let
+            allInCtx = builtins.all (k: ctx ? ${k}) argNames;
+          in
+          if allInCtx then
+            # All args are den context args → Tier 2, resolve now
+            {
+              tier = 2;
+              value = value (lib.getAttrs argNames ctx);
+            }
+          else
+            # Args not in ctx and not module-system → conservative Tier 3
+            {
+              tier = 3;
+              inherit value;
+            };
 
   # Apply collection strategy when collecting trait data.
   # "list" → concat lists
@@ -150,18 +160,17 @@ let
   # One handler per trait name. When bind.fn resolves `{ traitName, ... }:`,
   # it sends the trait name as an effect. This handler responds with
   # collected data and tracks consumption.
+  # Accepts full trait schemas so collection strategy determines empty default.
   traitArgHandler =
-    traitNames:
+    traitSchemas:
     builtins.mapAttrs (
-      traitName: _:
+      traitName: schema:
       { param, state }:
       let
         traits = (state.traits or (_: { })) null;
-        # Default to [] for uncollected traits. "map" collection stores
-        # attrsets in state.traits, but parametric consumers still get []
-        # when no emissions exist — the empty-map case is {} which would
-        # need schema access. [] is safe: consumers iterate or check length.
-        traitData = traits.${traitName} or [ ];
+        strategy = if builtins.isAttrs schema then schema.collection or "list" else "list";
+        emptyDefault = if strategy == "map" then { } else [ ];
+        traitData = traits.${traitName} or emptyDefault;
         consumed = (state.consumedTraits or (_: { })) null;
       in
       {
@@ -175,7 +184,7 @@ let
             };
         };
       }
-    ) traitNames;
+    ) traitSchemas;
 
 in
 {

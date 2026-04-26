@@ -310,13 +310,15 @@ let
               else
                 let
                   rawValue = aspect.${k};
-                  # Unwrap aspectContentType to inspect sub-keys
+                  # Unwrap aspectContentType to inspect sub-keys.
+                  # Multi-site defs: merge all attrset values for detection.
                   innerValue =
                     if builtins.isAttrs rawValue && rawValue ? __contentValues then
                       let
                         vals = map (d: d.value) rawValue.__contentValues;
+                        attrVals = builtins.filter builtins.isAttrs vals;
                       in
-                      if builtins.length vals == 1 then builtins.head vals else null
+                      if attrVals != [ ] then builtins.foldl' (a: b: a // b) { } attrVals else null
                     else if builtins.isAttrs rawValue then
                       rawValue
                     else
@@ -655,11 +657,13 @@ let
               }
             ) (builtins.attrNames provideToData)
           );
-      # Deprecation trace: warn when provides is non-empty, encouraging direct nesting.
-      providesKeys = builtins.attrNames (aspect.provides or { });
+      # Deprecation trace: warn when provides has non-self-provide keys.
+      # Self-provide (provides.${self.name}) is the established pattern — skip it.
+      aspectName = aspect.name or "<anon>";
+      providesKeys = builtins.filter (k: k != aspectName) (builtins.attrNames (aspect.provides or { }));
       _ =
         if providesKeys != [ ] then
-          builtins.trace "den: aspect '${aspect.name or "<anon>"}' uses 'provides' — migrate to direct nesting (e.g. aspect.foo instead of aspect.provides.foo)" null
+          builtins.trace "den: aspect '${aspectName}' uses 'provides.{${builtins.concatStringsSep "," providesKeys}}' — migrate to direct nesting" null
         else
           null;
       childResolution = fx.bind (builtins.seq _ (emitSelfProvide aspect)) (
