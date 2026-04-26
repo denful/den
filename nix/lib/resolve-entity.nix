@@ -6,16 +6,36 @@
 let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
 
-  # Entity resolution — the sole resolution path.
-  #
-  # Root aspect: read from den.entityIncludes → placed in rootIncludes
-  # (resolved before transitions) so deferred includes can drain during
-  # context widening.
-  # Cross-provides: read from den.entityProvides (used by transition handler).
+  # Entity kinds that carry .aspect on their schema entry.
+  # These get a parametric self-provide wrapper so the root aspect
+  # is resolved once the entity's scope handlers are established.
+  schemaKinds = builtins.attrNames (den.schema or { });
+  aspectKinds = builtins.filter (
+    k: k != "conf" && !(lib.hasPrefix "_" k) && k != "default"
+  ) schemaKinds;
+  aspectKindSet = lib.genAttrs aspectKinds (_: true);
+
   resolveEntity =
     name: ctx:
     let
       scopeHandlers = constantHandler ctx;
+      selfProvide =
+        if name == "default" && den ? default then
+          [ den.default ]
+        else if aspectKindSet ? ${name} then
+          [
+            {
+              __fn = c: c.${name}.aspect;
+              __args = {
+                ${name} = false;
+              };
+              name = "<self:${name}>";
+              meta = { };
+              includes = [ ];
+            }
+          ]
+        else
+          [ ];
       entityIncludes = den.entityIncludes.${name} or [ ];
       entityProvides = den.entityProvides.${name} or { };
     in
@@ -27,7 +47,7 @@ let
         provider = [ ];
         into = null;
       };
-      rootIncludes = entityIncludes;
+      rootIncludes = selfProvide ++ entityIncludes;
       provides = entityProvides;
       includes = [ ];
       __ctxStage = name;
