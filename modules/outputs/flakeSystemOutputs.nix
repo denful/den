@@ -17,13 +17,7 @@ let
       aspect-chain,
     }:
     let
-      entityIncs = den.entityIncludes."flake-${output}" or [ ];
-      hasEntityContent = entityIncs != [ ];
-      source =
-        if hasEntityContent then
-          den.lib.resolveEntity "flake-${output}" { inherit system; }
-        else
-          lib.head aspect-chain;
+      source = lib.head aspect-chain;
     in
     den.provides.forward {
       each = lib.optional (class == "flake") output;
@@ -57,17 +51,4 @@ in
     }) outputs
   );
 
-  # Entity registrations: flake-system must exist as an entity for
-  # flake-to-flake-system transitions. Per-output entities (flake-packages etc.)
-  # must exist for flake-system-to-flake-* transitions.
-  den.entityIncludes =
-    lib.listToAttrs (
-      map (output: {
-        name = "flake-${output}";
-        value = [ ];
-      }) outputs
-    )
-    // {
-      flake-system = [ ];
-    };
 }

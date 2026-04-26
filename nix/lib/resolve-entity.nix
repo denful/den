@@ -42,8 +42,7 @@ let
           builtins.filter (x: x != null) [ (den.aspects.os-host-fwd or null) ]
         else
           [ ];
-      entityIncludes = (den.schema.${name}.includes or [ ]) ++ (den.entityIncludes.${name} or [ ]);
-      entityProvides = den.entityProvides.${name} or { };
+      schemaIncludes = ((den.schema or { }).${name} or { }).includes or [ ];
     in
     {
       inherit name;
@@ -53,8 +52,8 @@ let
         provider = [ ];
         into = null;
       };
-      rootIncludes = selfProvide ++ hostFramework ++ entityIncludes;
-      provides = entityProvides;
+      rootIncludes = selfProvide ++ hostFramework ++ schemaIncludes;
+      provides = { };
       includes = [ ];
       __ctxStage = name;
       __scopeHandlers = scopeHandlers;

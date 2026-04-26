@@ -1,4 +1,4 @@
-# Compatibility shim: forwards den.ctx.* to den.entityIncludes
+# Compatibility shim: forwards den.ctx.* to den.aspects
 # with deprecation warnings.
 # den.ctx was always flat (host, user, hm-host — never nested namespaces).
 # Remove after downstream users have migrated.
@@ -20,13 +20,13 @@ let
 in
 {
   options.den.ctx = lib.mkOption {
-    description = "DEPRECATED: use den.entityIncludes instead.";
+    description = "DEPRECATED: use den.aspects instead.";
     default = { };
     type = lib.types.lazyAttrsOf ctxSubmodule;
   };
 
-  # Forward den.ctx entries as entityIncludes.
-  config.den.entityIncludes = lib.mkMerge (
+  # Forward den.ctx entries as schema includes so they participate in entity resolution.
+  config.den.schema = lib.mkMerge (
     lib.mapAttrsToList (
       name: value:
       let
@@ -36,8 +36,8 @@ in
         ];
       in
       {
-        ${name} = [
-          (lib.warn "den.ctx.${name} is deprecated — use den.entityIncludes.${name}" stageValue)
+        ${name}.includes = [
+          (lib.warn "den.ctx.${name} is deprecated — use den.schema.${name}.includes" stageValue)
         ];
       }
     ) (builtins.removeAttrs config.den.ctx [ "_module" ])

@@ -17,9 +17,15 @@ let
           bogusModule
         ];
       };
-      fooAspect = ev.config.den.lib.resolveEntity "foo" {
+      entity = ev.config.den.lib.resolveEntity "foo" {
         x = 0;
         y = 1;
+      };
+      # Inject entity-level includes that previously came from den.entityIncludes/schema
+      fooAspect = entity // {
+        rootIncludes = entity.rootIncludes ++ [
+          ({ x, y }@ctx: ev.config.den.lib.parametric.fixedTo ctx ev.config.den.aspects.foo)
+        ];
       };
       resolve = ev.config.den.lib.aspects.resolve;
       fooModule = resolve "foo" fooAspect;
@@ -71,9 +77,6 @@ in
           }
           {
             den.aspects.foo.includes = [ den.aspects.groups ];
-          }
-          {
-            den.entityIncludes.foo = [ ({ x, y }@ctx: parametric.fixedTo ctx den.aspects.foo) ];
           }
         ];
       }

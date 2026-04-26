@@ -22,5 +22,4 @@ let
 in
 {
   den.aspects.flake-os = osFwd;
-  den.entityIncludes.flake-os = [ ];
 }

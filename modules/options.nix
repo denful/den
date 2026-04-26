@@ -20,9 +20,7 @@ let
   schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
     builtins.attrNames (den.schema or { })
   );
-  knownKinds = lib.unique (
-    schemaKinds ++ builtins.attrNames ((den.entityIncludes or { }) // (den.entityProvides or { }))
-  );
+  knownKinds = schemaKinds;
 
   # Option type names whose values are safe for identity hashing.
   primitiveTypeNames = [
@@ -130,11 +128,9 @@ let
                 default = null;
               };
             };
-          # Entity gating: kind gets pipeline wiring if it has includes OR entityIncludes (backward compat)
-          hasEntityContent =
-            allIncludes != [ ]
-            || (den.entityIncludes or { }) ? ${kind}
-            || (den.entityProvides or { }) ? ${kind};
+          # Entity gating: kind gets pipeline wiring if it has includes or structural module content.
+          # `conf` is a shared base module, not an entity — always excluded.
+          hasEntityContent = kind != "conf" && (allIncludes != [ ] || hasStructuralContent);
           # A schema entry is "structural" if it has module content beyond just includes.
           # Only structural entries should get self-provide aspect lookup.
           hasStructuralContent = builtins.any (

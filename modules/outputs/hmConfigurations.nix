@@ -20,5 +20,4 @@ let
 in
 {
   den.aspects.flake-hm = hmFwd;
-  den.entityIncludes.flake-hm = [ ];
 }

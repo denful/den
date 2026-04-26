@@ -39,11 +39,5 @@ in
   den.aspects.os-host-fwd = host-os-fwd;
   den.aspects.os-user-fwd = user-os-fwd;
 
-  # Empty entityIncludes kept for schema gating (options.nix uses these
-  # keys to decide which entity kinds get `resolved` / pipeline wiring).
-  # Removed in Task 4 when the gating mechanism itself is replaced.
-  den.entityIncludes.host = [ ];
-  den.entityIncludes.user = [ ];
-
   den.classes.os.description = "Convenience class forwarding to both nixos and darwin";
 }

@@ -62,8 +62,6 @@ in
 
   den.aspects.wsl-host-aspect = wsl-host-aspect;
 
-  # Empty entityIncludes for schema gating — see os-class.nix comment.
-  den.entityIncludes."wsl-host" = [ ];
   den.schema.host.imports = [ hostConf ];
 
   den.policies.host-to-wsl-host = {

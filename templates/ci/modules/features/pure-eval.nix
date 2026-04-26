@@ -41,18 +41,17 @@ in
 
     test-pure-ctx-chain =
       let
+        aIncludes = [
+          (
+            { v }:
+            {
+              my.val = [ v ];
+            }
+          )
+        ];
         ev = evalPure (
           { den, ... }:
           {
-            den.entityIncludes.a = [
-              (
-                { v }:
-                {
-                  my.val = [ v ];
-                }
-              )
-            ];
-            den.entityIncludes.b = [ ];
             den.policies.a-to-b = {
               from = "a";
               to = "b";
@@ -69,7 +68,10 @@ in
             };
           }
         );
-        asp = ev.config.den.lib.resolveEntity "a" { v = "x"; };
+        entity = ev.config.den.lib.resolveEntity "a" { v = "x"; };
+        asp = entity // {
+          rootIncludes = entity.rootIncludes ++ aIncludes;
+        };
         mod = ev.config.den.lib.aspects.resolve "my" asp;
         ev2 = lib.evalModules {
           modules = [

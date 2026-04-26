@@ -24,7 +24,6 @@ let
 in
 {
   den.aspects = result.aspects;
-  den.entityIncludes.home = [ ];
   den.schema.host.imports = [ result.hostConf ];
   den.policies = result.policies;
   den.schema.host.policies = result.schemaPolicies;

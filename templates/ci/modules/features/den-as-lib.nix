@@ -31,16 +31,6 @@ in
         inherit expr expected;
       };
 
-    test-module-has-empty-entityIncludes =
-      let
-        ev = lib.evalModules { modules = [ denModule ]; };
-        expr = lib.attrNames ev.config.den.entityIncludes;
-        expected = [ ];
-      in
-      {
-        inherit expr expected;
-      };
-
     test-module-has-empty-aspects =
       let
         ev = lib.evalModules { modules = [ denModule ]; };
@@ -78,17 +68,18 @@ in
           ];
         };
 
+        fooIncludes = [
+          (
+            { name }:
+            {
+              my.names = [ "foo ${name}" ];
+            }
+          )
+        ];
+
         module =
           { den, lib, ... }:
           {
-            den.entityIncludes.foo = [
-              (
-                { name }:
-                {
-                  my.names = [ "foo ${name}" ];
-                }
-              )
-            ];
             den.policies.foo-to-bar = {
               from = "foo";
               to = "bar";
@@ -103,13 +94,18 @@ in
                 )
               ];
             };
-            den.entityIncludes.bar = [ ];
 
             den.aspects.foobar.includes = [
-              # resolveStage results carry __scopeHandlers which are
+              # resolveEntity results carry __scopeHandlers which are
               # destroyed by providerType merge. Wrap in a function
               # so it's called at resolution time, not definition time.
-              ({ class, ... }: den.lib.resolveEntity "foo" { name = "good"; })
+              (
+                { class, ... }:
+                let
+                  entity = den.lib.resolveEntity "foo" { name = "good"; };
+                in
+                entity // { rootIncludes = entity.rootIncludes ++ fooIncludes; }
+              )
             ];
           };
 
