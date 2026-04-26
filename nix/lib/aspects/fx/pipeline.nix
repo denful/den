@@ -171,6 +171,7 @@ let
       class,
       self,
       ctx,
+      crossEntityTraits ? { },
     }:
     let
       result = mkPipeline { inherit class; } { inherit self ctx; };
@@ -212,23 +213,27 @@ let
               raw = traits.${traitName} or (if strategy == "map" then { } else [ ]);
               deferred = deferredTraits.${traitName} or [ ];
               deferredData = map (e: e.value moduleArgs) deferred;
+              crossEntity = crossEntityTraits.${traitName} or (if strategy == "map" then { } else [ ]);
+              mergeMaps =
+                base: extras:
+                builtins.foldl' (
+                  acc: d:
+                  let
+                    dupes = builtins.filter (k: acc ? ${k}) (builtins.attrNames d);
+                  in
+                  if dupes != [ ] then
+                    throw "den: trait '${traitName}' map collection: duplicate key '${builtins.head dupes}'"
+                  else
+                    acc // d
+                ) base extras;
             in
             if strategy == "map" then
-              # "map": pipeline data is already a merged attrset; deferred
-              # emissions are resolved and merged in (duplicates error)
-              builtins.foldl' (
-                acc: d:
-                let
-                  dupes = builtins.filter (k: acc ? ${k}) (builtins.attrNames d);
-                in
-                if dupes != [ ] then
-                  throw "den: trait '${traitName}' map collection: duplicate key '${builtins.head dupes}' in deferred emission"
-                else
-                  acc // d
-              ) raw deferredData
+              # "map": merge pipeline data, deferred emissions, and cross-entity data
+              # (duplicates error across all three)
+              mergeMaps raw (deferredData ++ [ crossEntity ])
             else
-              # "list": pipeline data is a list; deferred emissions appended
-              raw ++ deferredData
+              # "list": pipeline data, deferred emissions, then cross-entity data
+              raw ++ deferredData ++ crossEntity
           ) traitSchemas;
         };
 

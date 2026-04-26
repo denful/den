@@ -308,5 +308,226 @@
       }
     );
 
+    # --- fxResolve: cross-entity traits injection (list strategy) ---
+
+    test-cross-entity-list-injection = denTest (
+      { den, lib, ... }:
+      let
+        result = den.lib.aspects.fx.pipeline.fxResolve {
+          class = "nixos";
+          self = {
+            name = "target-host";
+            meta = { };
+            peer = [
+              {
+                ip = "127.0.0.1";
+                hostname = "self";
+              }
+            ];
+            includes = [ ];
+          };
+          ctx = { };
+          crossEntityTraits = {
+            peer = [
+              {
+                ip = "10.0.0.1";
+                hostname = "igloo";
+              }
+              {
+                ip = "10.0.0.2";
+                hostname = "iceberg";
+              }
+            ];
+          };
+        };
+        # The last import is the traitModule; call it with minimal moduleArgs
+        traitModule = lib.last result.imports;
+        moduleResult = traitModule {
+          inherit lib;
+          config = { };
+          pkgs = { };
+          options = { };
+          modulesPath = "";
+        };
+        peers = moduleResult.config._den.traits.peer;
+      in
+      {
+        den.classes.nixos.description = "NixOS";
+        den.traits.peer = {
+          description = "Peer hosts";
+          collection = "list";
+        };
+
+        expr = {
+          # Within-entity (1) + cross-entity (2) = 3
+          totalPeers = builtins.length peers;
+          crossEntityPresent = builtins.any (p: p.hostname == "igloo") peers;
+          withinEntityPresent = builtins.any (p: p.hostname == "self") peers;
+        };
+        expected = {
+          totalPeers = 3;
+          crossEntityPresent = true;
+          withinEntityPresent = true;
+        };
+      }
+    );
+
+    # --- fxResolve: cross-entity traits injection (map strategy) ---
+
+    test-cross-entity-map-injection = denTest (
+      { den, lib, ... }:
+      let
+        result = den.lib.aspects.fx.pipeline.fxResolve {
+          class = "nixos";
+          self = {
+            name = "gateway";
+            meta = { };
+            endpoints = {
+              local = "127.0.0.1:80";
+            };
+            includes = [ ];
+          };
+          ctx = { };
+          crossEntityTraits = {
+            endpoints = {
+              api = "10.0.0.1:8080";
+              web = "10.0.0.2:80";
+            };
+          };
+        };
+        traitModule = lib.last result.imports;
+        moduleResult = traitModule {
+          inherit lib;
+          config = { };
+          pkgs = { };
+          options = { };
+          modulesPath = "";
+        };
+        endpoints = moduleResult.config._den.traits.endpoints;
+      in
+      {
+        den.classes.nixos.description = "NixOS";
+        den.traits.endpoints = {
+          description = "Service endpoints";
+          collection = "map";
+        };
+
+        expr = {
+          hasLocal = endpoints ? local;
+          hasApi = endpoints ? api;
+          hasWeb = endpoints ? web;
+          localVal = endpoints.local;
+          apiVal = endpoints.api;
+        };
+        expected = {
+          hasLocal = true;
+          hasApi = true;
+          hasWeb = true;
+          localVal = "127.0.0.1:80";
+          apiVal = "10.0.0.1:8080";
+        };
+      }
+    );
+
+    # --- fxResolve: cross-entity map duplicate detection ---
+
+    test-cross-entity-map-duplicate-throws = denTest (
+      { den, lib, ... }:
+      let
+        result = den.lib.aspects.fx.pipeline.fxResolve {
+          class = "nixos";
+          self = {
+            name = "gateway";
+            meta = { };
+            endpoints = {
+              api = "127.0.0.1:80";
+            };
+            includes = [ ];
+          };
+          ctx = { };
+          crossEntityTraits = {
+            endpoints = {
+              api = "10.0.0.1:8080";
+            };
+          };
+        };
+        traitModule = lib.last result.imports;
+        moduleResult = traitModule {
+          inherit lib;
+          config = { };
+          pkgs = { };
+          options = { };
+          modulesPath = "";
+        };
+        evaluated = builtins.tryEval (builtins.deepSeq moduleResult.config._den.traits.endpoints true);
+      in
+      {
+        den.classes.nixos.description = "NixOS";
+        den.traits.endpoints = {
+          description = "Service endpoints";
+          collection = "map";
+        };
+
+        expr = evaluated.success;
+        expected = false;
+      }
+    );
+
+    # --- fxResolve: empty crossEntityTraits is no-op ---
+
+    test-cross-entity-empty-is-noop = denTest (
+      { den, lib, ... }:
+      let
+        resultWithout = den.lib.aspects.fx.pipeline.fxResolve {
+          class = "nixos";
+          self = {
+            name = "test";
+            meta = { };
+            peer = [
+              {
+                ip = "127.0.0.1";
+              }
+            ];
+            includes = [ ];
+          };
+          ctx = { };
+        };
+        resultWith = den.lib.aspects.fx.pipeline.fxResolve {
+          class = "nixos";
+          self = {
+            name = "test";
+            meta = { };
+            peer = [
+              {
+                ip = "127.0.0.1";
+              }
+            ];
+            includes = [ ];
+          };
+          ctx = { };
+          crossEntityTraits = { };
+        };
+        mkModuleArgs = {
+          inherit lib;
+          config = { };
+          pkgs = { };
+          options = { };
+          modulesPath = "";
+        };
+        traitsWithout = (lib.last resultWithout.imports) mkModuleArgs;
+        traitsWith = (lib.last resultWith.imports) mkModuleArgs;
+      in
+      {
+        den.classes.nixos.description = "NixOS";
+        den.traits.peer = {
+          description = "Peer hosts";
+          collection = "list";
+        };
+
+        expr = traitsWithout.config._den.traits == traitsWith.config._den.traits;
+        expected = true;
+      }
+    );
+
   };
 }
