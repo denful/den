@@ -26,6 +26,7 @@ let
     "__functionArgs"
     "__scopeHandlers"
     "__ctxId"
+    "__ctxStage"
     "__parametricResolved"
     "_module"
     "_"

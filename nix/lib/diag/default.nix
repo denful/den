@@ -26,12 +26,12 @@
 #
 # ## Generic form (any entity kind)
 #
-#   root = den.lib.resolveStage "user" { inherit host user; };
+#   root = den.lib.resolveEntity "user" { inherit host user; };
 #   g = diag.context { inherit root; name = user.name; classes = [ "homeManager" ]; };
 #
 # ## Pipeline form for finer control
 #
-#   root = den.lib.resolveStage "host" { inherit host; };
+#   root = den.lib.resolveEntity "host" { inherit host; };
 #   entries = diag.captureAll [ "nixos" "homeManager" ] root;
 #   g = diag.graph.build {
 #     inherit entries;

@@ -17,5 +17,5 @@
   #
 
   # automatically set hostname on all hosts.
-  den.stages.host.includes = [ den.provides.hostname ];
+  den.entityIncludes.host = [ den.provides.hostname ];
 }

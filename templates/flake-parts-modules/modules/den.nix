@@ -38,7 +38,7 @@
   };
 
   # Read flake-parts classes from foo aspect and its includes
-  den.stages.flake-parts.includes = [ den.aspects.foo ];
+  den.entityIncludes.flake-parts = [ den.aspects.foo ];
 
   den.aspects.foo = {
     includes = [ den.aspects.bar ];

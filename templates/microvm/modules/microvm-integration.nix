@@ -121,13 +121,14 @@ in
         }) host.microvm.guests;
     };
   };
-  den.stages = {
-    microvm-host.provides.microvm-host =
+  den.entityIncludes.microvm-host = [
+    (
       { host }:
       {
         ${host.class}.imports = [ host.microvm.hostModule ];
-      };
-    microvm-host.provides.microvm-guest = microvmGuestProvide;
-  };
+      }
+    )
+  ];
+  den.entityIncludes.microvm-guest = [ microvmGuestProvide ];
   den.schema.host.imports = [ extendHostSchema ];
 }

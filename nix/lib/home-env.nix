@@ -110,7 +110,7 @@ let
                 inherit className supportedOses optionPath;
               } { inherit host; };
             in
-            if enabled != false && enabled != [ ] then mkIntoClassUsers className { inherit host; } else [ ];
+            if enabled then mkIntoClassUsers className { inherit host; } else [ ];
         };
       };
 
