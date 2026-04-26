@@ -50,10 +50,10 @@ let
     else
       globalPolicy;
 
-  # Deferred modules from the freeform type (lazyAttrsOf deferredModule)
-  # are { imports = [...]; } attrsets. The original function is nested
-  # inside.  We recursively descend into imports to find and wrap any
-  # functions that request den context args.
+  # Class modules (after aspectContentType unwrapping or from deferred
+  # imports) may be { imports = [...]; } attrsets. The original function
+  # is nested inside.  We recursively descend into imports to find and
+  # wrap any functions that request den context args.
   wrapDeferredImports =
     args: imports:
     let
@@ -268,9 +268,24 @@ let
       lib.concatMap (
         k:
         let
+          rawValue = aspect.${k};
+          # aspectContentType wraps values with __contentValues/__provider.
+          # Unwrap to recover the original module value for wrapClassModule.
+          module =
+            if builtins.isAttrs rawValue && rawValue ? __contentValues then
+              let
+                vals = map (d: d.value) rawValue.__contentValues;
+              in
+              if builtins.length vals == 1 then builtins.head vals else { imports = vals; }
+            else
+              rawValue;
           result = wrapClassModule {
-            module = aspect.${k};
-            inherit ctx aspectPolicy globalPolicy;
+            inherit
+              module
+              ctx
+              aspectPolicy
+              globalPolicy
+              ;
           };
           mainEmit = fx.send "emit-class" {
             class = k;

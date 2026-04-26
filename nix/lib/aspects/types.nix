@@ -190,12 +190,43 @@ let
             baseType.merge loc nonParametrics;
     };
 
+  # Generic content wrapper for aspect freeform keys.
+  # Wraps any value (class module, trait data, function) with provenance metadata.
+  # Multi-site definitions are preserved as a list with file attribution.
+  # Already-wrapped values (from cross-submodule propagation) are flattened
+  # to prevent double-wrapping.
+  aspectContentType =
+    typeCfg:
+    lib.types.mkOptionType {
+      name = "aspectContent";
+      description = "class module, trait emission, or nested aspect";
+      check = _: true;
+      merge =
+        loc: defs:
+        let
+          keyName = lib.last loc;
+          # Flatten: if a def value is already wrapped, expand its __contentValues
+          # instead of nesting another layer.
+          flatDefs = lib.concatMap (
+            d:
+            if builtins.isAttrs d.value && d.value ? __contentValues then
+              d.value.__contentValues
+            else
+              [ { inherit (d) value file; } ]
+          ) defs;
+        in
+        {
+          __contentValues = flatDefs;
+          __provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
+        };
+    };
+
   aspectSubmodule =
     typeCfg:
     lib.types.submodule (
       { name, config, ... }:
       {
-        freeformType = lib.types.lazyAttrsOf lib.types.deferredModule;
+        freeformType = lib.types.lazyAttrsOf (aspectContentType typeCfg);
         imports = [
           (lib.mkAliasOptionModule [ "_" ] [ "provides" ])
           (den.schema.aspect or { })
@@ -315,6 +346,7 @@ in
   inherit
     aspectsType
     aspectType
+    aspectContentType
     providerType
     isParametricWrapper
     isSubmoduleFn
