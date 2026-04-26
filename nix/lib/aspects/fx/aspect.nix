@@ -16,7 +16,6 @@ let
     "includes"
     "provides"
     "policies"
-    "provide-to"
     "into"
     "traits"
     "classes"
@@ -637,26 +636,6 @@ let
     let
       scopeHandlers = aspect.__scopeHandlers or null;
       ctxId = aspect.__ctxId or null;
-      # Emit provide-to effects for cross-entity data routing.
-      # Aspects declare provide-to.${label} = data; the handler collects
-      # emissions in state.provideTo for phase 2 distribution.
-      provideToData = aspect."provide-to" or { };
-      emitProvideTo =
-        if provideToData == { } then
-          fx.pure null
-        else
-          fx.seq (
-            map (
-              label:
-              fx.send "provide-to" {
-                inherit label;
-                content = provideToData.${label};
-                emitterCtx = ctxFromHandlers (aspect.__scopeHandlers or { });
-                aspectName = aspect.name or "<anon>";
-                targetEntity = null;
-              }
-            ) (builtins.attrNames provideToData)
-          );
       # Deprecation trace: warn when provides has non-self-provide keys.
       # Self-provide (provides.${self.name}) is the established pattern — skip it.
       aspectName = aspect.name or "<anon>";
@@ -668,15 +647,12 @@ let
           null;
       childResolution = fx.bind (builtins.seq _ (emitSelfProvide aspect)) (
         selfProvResults:
-        fx.bind emitProvideTo (
-          _:
-          fx.bind (emitTransitions aspect) (
-            transitionResults:
-            fx.bind (emitIncludes {
-              __parentScopeHandlers = scopeHandlers;
-              __parentCtxId = ctxId;
-            } (aspect.includes or [ ])) (children: fx.pure (selfProvResults ++ transitionResults ++ children))
-          )
+        fx.bind (emitTransitions aspect) (
+          transitionResults:
+          fx.bind (emitIncludes {
+            __parentScopeHandlers = scopeHandlers;
+            __parentCtxId = ctxId;
+          } (aspect.includes or [ ])) (children: fx.pure (selfProvResults ++ transitionResults ++ children))
         )
       );
     in
