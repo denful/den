@@ -57,21 +57,21 @@
           )
         ];
 
+        den.entityIncludes.other = [ ];
         den.policies.test-greet-to-other = {
           from = "greet";
           to = "other";
           resolve = ctx: if !(ctx ? who) then [ ] else lib.singleton ctx;
+          aspects = [
+            (
+              { who }:
+              {
+                funny.names = [ "other-${who}" ];
+              }
+            )
+          ];
         };
         den.default.policies = [ "test-greet-to-other" ];
-
-        den.entityIncludes.other = [
-          (
-            { who }:
-            {
-              funny.names = [ "other-${who}" ];
-            }
-          )
-        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [
@@ -97,21 +97,21 @@
             }
           )
         ];
+        den.entityIncludes.yell = [ ];
         den.policies.test-greet-to-yell = {
           from = "greet";
           to = "yell";
           resolve = ctx: if !(ctx ? who) then [ ] else [ { shout = lib.toUpper ctx.who; } ];
+          aspects = [
+            (
+              { shout }:
+              {
+                funny.names = [ shout ];
+              }
+            )
+          ];
         };
         den.default.policies = [ "test-greet-to-yell" ];
-
-        den.entityIncludes.yell = [
-          (
-            { shout }:
-            {
-              funny.names = [ shout ];
-            }
-          )
-        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });
         expected = [
@@ -137,52 +137,52 @@
             }
           )
         ];
+        den.entityIncludes.yell = [ ];
+        den.entityIncludes.size = [ ];
+        den.entityIncludes.num = [ ];
         den.policies.test-greet-to-yell-fn = {
           from = "greet";
           to = "yell";
           resolve = ctx: if !(ctx ? who) then [ ] else [ { shout = lib.toUpper ctx.who; } ];
+          aspects = [
+            (
+              { shout }:
+              {
+                funny.names = [ shout ];
+              }
+            )
+          ];
         };
         den.policies.test-greet-to-size = {
           from = "greet";
           to = "size";
           resolve = ctx: if !(ctx ? who) then [ ] else [ { length = lib.stringLength ctx.who; } ];
+          aspects = [
+            (
+              { length }:
+              {
+                funny.names = [ (lib.toString length) ];
+              }
+            )
+          ];
         };
         den.policies.test-greet-to-num = {
           from = "greet";
           to = "num";
           resolve = ctx: if !(ctx ? who) then [ ] else [ { number = lib.stringLength ctx.who; } ];
+          aspects = [
+            (
+              { number }:
+              {
+                funny.names = [ ("num:" + lib.toString number) ];
+              }
+            )
+          ];
         };
         den.default.policies = [
           "test-greet-to-yell-fn"
           "test-greet-to-size"
           "test-greet-to-num"
-        ];
-
-        den.entityIncludes.yell = [
-          (
-            { shout }:
-            {
-              funny.names = [ shout ];
-            }
-          )
-        ];
-
-        den.entityIncludes.size = [
-          (
-            { length }:
-            {
-              funny.names = [ (lib.toString length) ];
-            }
-          )
-        ];
-
-        den.entityIncludes.num = [
-          (
-            { number }:
-            {
-              funny.names = [ ("num:" + lib.toString number) ];
-            }
-          )
         ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });

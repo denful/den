@@ -110,6 +110,14 @@ in
       from = "host";
       to = "microvm-host";
       resolve = { host, ... }: lib.optional (host.microvm.guests != [ ]) { inherit host; };
+      aspects = [
+        (
+          { host }:
+          {
+            ${host.class}.imports = [ host.microvm.hostModule ];
+          }
+        )
+      ];
     };
     microvm-host-to-microvm-guest = {
       from = "microvm-host";
@@ -119,16 +127,10 @@ in
         map (vm: {
           inherit host vm;
         }) host.microvm.guests;
+      aspects = [ microvmGuestProvide ];
     };
   };
-  den.entityIncludes.microvm-host = [
-    (
-      { host }:
-      {
-        ${host.class}.imports = [ host.microvm.hostModule ];
-      }
-    )
-  ];
-  den.entityIncludes.microvm-guest = [ microvmGuestProvide ];
+  den.entityIncludes.microvm-host = [ ];
+  den.entityIncludes.microvm-guest = [ ];
   den.schema.host.imports = [ extendHostSchema ];
 }

@@ -18,21 +18,21 @@
             }
           )
         ];
+        den.entityIncludes.shout = [ ];
         den.policies.test-greeting-to-shout = {
           from = "greeting";
           to = "shout";
           resolve = ctx: if !(ctx ? hello) then [ ] else [ { shout = lib.toUpper ctx.hello; } ];
+          aspects = [
+            (
+              { shout }:
+              {
+                funny.names = [ shout ];
+              }
+            )
+          ];
         };
         den.default.policies = [ "test-greeting-to-shout" ];
-
-        den.entityIncludes.shout = [
-          (
-            { shout }:
-            {
-              funny.names = [ shout ];
-            }
-          )
-        ];
 
         expr = funnyNames (den.lib.resolveEntity "greeting" { hello = "world"; });
         expected = [

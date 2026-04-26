@@ -81,19 +81,20 @@ in
                   }
                 )
               ];
+              den.entityIncludes.leaf = [ ];
               den.policies.root-to-leaf = {
                 from = "root";
                 to = "leaf";
                 resolve = ctx: if ctx ? x then lib.genList (i: { x = "${ctx.x}-${toString i}"; }) 20 else [ ];
+                aspects = [
+                  (
+                    { x }:
+                    {
+                      funny.names = [ "leaf-${x}" ];
+                    }
+                  )
+                ];
               };
-              den.entityIncludes.leaf = [
-                (
-                  { x }:
-                  {
-                    funny.names = [ "leaf-${x}" ];
-                  }
-                )
-              ];
             }
           )
         ];

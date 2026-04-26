@@ -8,16 +8,14 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.default = [
-          { nixos.users.users.tux.description = "from-default-stage"; }
-        ];
+        den.default.nixos.users.users.tux.description = "from-default-stage";
 
         expr = igloo.users.users.tux.description;
         expected = "from-default-stage";
       }
     );
 
-    # den.default and entityIncludes.default coexist:
+    # den.default carries both values:
     # both contribute to the resolved NixOS config without clobbering each other.
     test-stage-default-coexists-with-ctx = denTest (
       { den, igloo, ... }:
@@ -25,9 +23,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.default.nixos.networking.hostName = "from-ctx-default";
-        den.entityIncludes.default = [
-          { nixos.users.users.tux.description = "from-default-stage"; }
-        ];
+        den.default.nixos.users.users.tux.description = "from-default-stage";
 
         expr = [
           igloo.networking.hostName

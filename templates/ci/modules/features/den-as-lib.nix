@@ -94,15 +94,16 @@ in
               to = "bar";
               _core = true;
               resolve = ctx: if ctx ? name then lib.singleton { shout = lib.toUpper ctx.name; } else [ ];
+              aspects = [
+                (
+                  { shout }:
+                  {
+                    my.names = [ "bar ${shout}" ];
+                  }
+                )
+              ];
             };
-            den.entityIncludes.bar = [
-              (
-                { shout }:
-                {
-                  my.names = [ "bar ${shout}" ];
-                }
-              )
-            ];
+            den.entityIncludes.bar = [ ];
 
             den.aspects.foobar.includes = [
               # resolveStage results carry __scopeHandlers which are

@@ -7,19 +7,20 @@
     test-flat-still-works = denTest (
       { den, funnyNames, ... }:
       {
-        den.entityIncludes.flat = [
-          (
-            { x }:
-            {
-              funny.names = [ x ];
-            }
-          )
-        ];
+        den.entityIncludes.flat = [ ];
 
         den.policies.test-root-to-flat = {
           from = "root";
           to = "flat";
           resolve = ctx: if !(builtins.isAttrs ctx) then [ ] else [ ctx ];
+          aspects = [
+            (
+              { x }:
+              {
+                funny.names = [ x ];
+              }
+            )
+          ];
         };
         den.default.policies = [ "test-root-to-flat" ];
 

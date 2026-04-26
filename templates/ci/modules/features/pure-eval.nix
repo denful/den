@@ -52,20 +52,21 @@ in
                 }
               )
             ];
+            den.entityIncludes.b = [ ];
             den.policies.a-to-b = {
               from = "a";
               to = "b";
               _core = true;
               resolve = ctx: if ctx ? v then [ { v = "${ctx.v}!"; } ] else [ ];
+              aspects = [
+                (
+                  { v }:
+                  {
+                    my.val = [ v ];
+                  }
+                )
+              ];
             };
-            den.entityIncludes.b = [
-              (
-                { v }:
-                {
-                  my.val = [ v ];
-                }
-              )
-            ];
           }
         );
         asp = ev.config.den.lib.resolveEntity "a" { v = "x"; };

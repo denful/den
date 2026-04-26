@@ -121,21 +121,22 @@
           )
           shared
         ];
+        den.entityIncludes.b = [ ];
         den.policies.a-to-b = {
           from = "a";
           to = "b";
           resolve = ctx: if ctx ? host then [ { host = "${ctx.host}!"; } ] else [ ];
+          aspects = [
+            (
+              { host }:
+              {
+                funny.names = [ "b-${host}" ];
+              }
+            )
+            shared
+          ];
         };
         den.default.policies = [ "a-to-b" ];
-        den.entityIncludes.b = [
-          (
-            { host }:
-            {
-              funny.names = [ "b-${host}" ];
-            }
-          )
-          shared
-        ];
 
         expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { host = "v"; }));
         expected = 6;

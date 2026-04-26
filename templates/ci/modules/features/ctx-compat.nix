@@ -36,14 +36,15 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-into-target = [
-          { nixos.users.users.tux.description = "from-into-target"; }
-        ];
+        den.entityIncludes.test-into-target = [ ];
 
         den.policies.host-to-into-target = {
           from = "host";
           to = "test-into-target";
           resolve = _: [ { } ];
+          aspects = [
+            { nixos.users.users.tux.description = "from-into-target"; }
+          ];
         };
         den.default.policies = [ "host-to-into-target" ];
 

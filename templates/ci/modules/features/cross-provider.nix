@@ -18,6 +18,7 @@
             }
           )
         ];
+        den.entityIncludes.child = [ ];
         den.policies.test-parent-to-child = {
           from = "parent";
           to = "child";
@@ -32,23 +33,22 @@
                   y = "derived";
                 }
               ];
+          aspects = [
+            (
+              { x, y }:
+              {
+                funny.names = [ "child-${y}" ];
+              }
+            )
+            (
+              { x, y }:
+              {
+                funny.names = [ "parent-for-child-${x}-${y}" ];
+              }
+            )
+          ];
         };
         den.default.policies = [ "test-parent-to-child" ];
-
-        den.entityIncludes.child = [
-          (
-            { x, y }:
-            {
-              funny.names = [ "child-${y}" ];
-            }
-          )
-          (
-            { x, y }:
-            {
-              funny.names = [ "parent-for-child-${x}-${y}" ];
-            }
-          )
-        ];
 
         expr = funnyNames (den.lib.resolveEntity "parent" { x = "hello"; });
         expected = [
@@ -75,6 +75,7 @@
             }
           )
         ];
+        den.entityIncludes.dst = [ ];
         den.policies.test-src-to-dst = {
           from = "src";
           to = "dst";
@@ -93,23 +94,22 @@
                   i = 2;
                 }
               ];
+          aspects = [
+            (
+              { x, i }:
+              {
+                funny.names = [ "dst-${toString i}" ];
+              }
+            )
+            (
+              { x, i }:
+              {
+                funny.names = [ "src-for-${x}-${toString i}" ];
+              }
+            )
+          ];
         };
         den.default.policies = [ "test-src-to-dst" ];
-
-        den.entityIncludes.dst = [
-          (
-            { x, i }:
-            {
-              funny.names = [ "dst-${toString i}" ];
-            }
-          )
-          (
-            { x, i }:
-            {
-              funny.names = [ "src-for-${x}-${toString i}" ];
-            }
-          )
-        ];
 
         expr = funnyNames (den.lib.resolveEntity "src" { x = "a"; });
         expected = [
@@ -138,21 +138,21 @@
             }
           )
         ];
+        den.entityIncludes.dst = [ ];
         den.policies.test-src-to-dst-no-cross = {
           from = "src";
           to = "dst";
           resolve = ctx: if !(ctx ? x) then [ ] else [ { y = ctx.x; } ];
+          aspects = [
+            (
+              { y }:
+              {
+                funny.names = [ "dst-${y}" ];
+              }
+            )
+          ];
         };
         den.default.policies = [ "test-src-to-dst-no-cross" ];
-
-        den.entityIncludes.dst = [
-          (
-            { y }:
-            {
-              funny.names = [ "dst-${y}" ];
-            }
-          )
-        ];
 
         expr = funnyNames (den.lib.resolveEntity "src" { x = "val"; });
         expected = [

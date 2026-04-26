@@ -45,19 +45,20 @@ let
           }
         )
       ];
+      den.entityIncludes.leaf = [ ];
       den.policies.root-to-leaf = {
         from = "root";
         to = "leaf";
         resolve = ctx: if ctx ? x then lib.genList (i: { x = "${ctx.x}-${toString i}"; }) n else [ ];
+        aspects = [
+          (
+            { x }:
+            {
+              funny.names = [ "leaf-${x}" ];
+            }
+          )
+        ];
       };
-      den.entityIncludes.leaf = [
-        (
-          { x }:
-          {
-            funny.names = [ "leaf-${x}" ];
-          }
-        )
-      ];
     };
 
   mkCrossProviders =
@@ -82,6 +83,20 @@ let
                 from = "src";
                 to = tgt;
                 resolve = ctx: if ctx ? v then [ { v = "${ctx.v}!"; } ] else [ ];
+                aspects = [
+                  (
+                    { v }:
+                    {
+                      funny.names = [ "${tgt}-${v}" ];
+                    }
+                  )
+                  (
+                    { v }:
+                    {
+                      funny.names = [ "cross-${tgt}-${v}" ];
+                    }
+                  )
+                ];
               };
             }) targetNames
           );
@@ -93,20 +108,7 @@ let
         in
         { den, ... }:
         {
-          den.entityIncludes.${name} = [
-            (
-              { v }:
-              {
-                funny.names = [ "${name}-${v}" ];
-              }
-            )
-            (
-              { v }:
-              {
-                funny.names = [ "cross-${name}-${v}" ];
-              }
-            )
-          ];
+          den.entityIncludes.${name} = [ ];
         }
       ) n;
     in

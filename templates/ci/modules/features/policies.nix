@@ -7,14 +7,15 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-rel-target = [
-          { nixos.users.users.tux.description = "from-rel-target-stage"; }
-        ];
+        den.entityIncludes.test-rel-target = [ ];
 
         den.policies.host-to-test-rel = {
           from = "host";
           to = "test-rel-target";
           resolve = _: [ { } ];
+          aspects = [
+            { nixos.users.users.tux.description = "from-rel-target-stage"; }
+          ];
         };
 
         den.default.policies = [ "host-to-test-rel" ];
@@ -31,18 +32,17 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-rel-coexist = [
-          { nixos.networking.hostName = "from-rel-stage"; }
-        ];
+        den.entityIncludes.test-rel-coexist = [ ];
 
-        den.entityIncludes.default = [
-          { nixos.users.users.tux.description = "from-default-stage"; }
-        ];
+        den.default.nixos.users.users.tux.description = "from-default-stage";
 
         den.policies.host-to-test-rel-coexist = {
           from = "host";
           to = "test-rel-coexist";
           resolve = _: [ { } ];
+          aspects = [
+            { nixos.networking.hostName = "from-rel-stage"; }
+          ];
         };
 
         den.default.policies = [ "host-to-test-rel-coexist" ];
@@ -66,14 +66,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-scoped = [
-          (
-            { test-greet, ... }:
-            {
-              nixos.users.users.tux.description = test-greet;
-            }
-          )
-        ];
+        den.entityIncludes.test-scoped = [ ];
 
         den.default.policies = [ "host-to-test-scoped" ];
 
@@ -81,6 +74,14 @@
           from = "host";
           to = "test-scoped";
           resolve = _: [ { } ];
+          aspects = [
+            (
+              { test-greet, ... }:
+              {
+                nixos.users.users.tux.description = test-greet;
+              }
+            )
+          ];
           handlers.test-greet =
             {
               param,
@@ -102,9 +103,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.entityIncludes.test-handler-target = [
-          { nixos.users.users.tux.description = "handler-target"; }
-        ];
+        den.entityIncludes.test-handler-target = [ ];
 
         den.default.policies = [ "host-to-test-handler" ];
 
@@ -112,6 +111,9 @@
           from = "host";
           to = "test-handler-target";
           resolve = _: [ { } ];
+          aspects = [
+            { nixos.users.users.tux.description = "handler-target"; }
+          ];
           handlers.test-effect =
             {
               param,
