@@ -169,34 +169,44 @@ let
     description = "freeform deferred modules per entity kind";
     defaultText = lib.literalExpression "{ }";
     default = { };
-    type = lib.types.submodule (
-      { config, ... }:
-      {
+    type =
+      let
+        # Wrap a lazyAttrsOf type to inject a collision check into its merge.
+        # The check accesses the sibling option (traits or classes) via the
+        # top-level den.schema config, ensuring it only fires when the
+        # value is actually forced.
+        withCollisionCheck =
+          baseType: siblingName:
+          baseType
+          // {
+            merge =
+              loc: defs:
+              let
+                val = baseType.merge loc defs;
+                siblingVal = den.schema.${siblingName} or { };
+                myNames = builtins.attrNames val;
+                siblingNames = builtins.attrNames siblingVal;
+                collisions = builtins.filter (n: builtins.elem n siblingNames) myNames;
+              in
+              if collisions != [ ] then
+                throw "den: '${builtins.head collisions}' cannot be both a class and a trait"
+              else
+                val;
+          };
+      in
+      lib.types.submodule {
         freeformType = lib.types.lazyAttrsOf schemaEntryType;
         options.classes = lib.mkOption {
           description = "Class evaluation domains";
-          type = lib.types.lazyAttrsOf classSchemaType;
+          type = withCollisionCheck (lib.types.lazyAttrsOf classSchemaType) "traits";
           default = { };
         };
         options.traits = lib.mkOption {
           description = "Trait semantic data channels";
-          type = lib.types.lazyAttrsOf traitSchemaType;
+          type = withCollisionCheck (lib.types.lazyAttrsOf traitSchemaType) "classes";
           default = { };
         };
-        config = lib.mkIf (config.classes != { } && config.traits != { }) {
-          _module.checks.classTraitCollision =
-            let
-              classNames = builtins.attrNames config.classes;
-              traitNames = builtins.attrNames config.traits;
-              collisions = builtins.filter (n: builtins.elem n traitNames) classNames;
-            in
-            if collisions != [ ] then
-              throw "den: '${builtins.head collisions}' cannot be both a class and a trait"
-            else
-              true;
-        };
-      }
-    );
+      };
   };
 in
 {
