@@ -22,7 +22,7 @@ let
       _core = true;
       from = "flake-system";
       to = "flake-${output}";
-      aspects = [ "flake-${output}" ];
+      aspects = [ den.aspects."flake-${output}" ];
       resolve =
         { system, ... }:
         lib.singleton {
@@ -44,7 +44,7 @@ in
       _core = true;
       from = "flake-system";
       to = "flake-os";
-      aspects = [ "flake-os" ];
+      aspects = [ den.aspects."flake-os" ];
       resolve =
         { system, ... }: map (host: { inherit host; }) (builtins.attrValues (den.hosts.${system} or { }));
     };
@@ -53,7 +53,7 @@ in
       _core = true;
       from = "flake-system";
       to = "flake-hm";
-      aspects = [ "flake-hm" ];
+      aspects = [ den.aspects."flake-hm" ];
       resolve =
         { system, ... }: map (home: { inherit home; }) (builtins.attrValues (den.homes.${system} or { }));
     };

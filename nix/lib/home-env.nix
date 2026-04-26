@@ -68,23 +68,27 @@ let
       getModule,
       forwardPathFn,
     }:
+    let
+      hostModule =
+        { host }:
+        {
+          ${host.class}.imports = [ host.${optionPath}.module ];
+        };
+
+      userForward =
+        { host, user }:
+        den.provides.forward {
+          each = lib.singleton true;
+          fromClass = _: className;
+          intoClass = _: host.class;
+          intoPath = _: forwardPathFn { inherit host user; };
+          fromAspect = _: den.lib.resolveEntity "user" { inherit host user; };
+        };
+    in
     {
       aspects = {
-        "${ctxName}-host-module" =
-          { host }:
-          {
-            ${host.class}.imports = [ host.${optionPath}.module ];
-          };
-
-        "${ctxName}-user-forward" =
-          { host, user }:
-          den.provides.forward {
-            each = lib.singleton true;
-            fromClass = _: className;
-            intoClass = _: host.class;
-            intoPath = _: forwardPathFn { inherit host user; };
-            fromAspect = _: den.lib.resolveEntity "user" { inherit host user; };
-          };
+        "${ctxName}-host-module" = hostModule;
+        "${ctxName}-user-forward" = userForward;
       };
 
       hostConf = hostOptions {
@@ -100,8 +104,8 @@ let
           from = "host";
           to = "user";
           aspects = [
-            "${ctxName}-host-module"
-            "${ctxName}-user-forward"
+            hostModule
+            userForward
           ];
           resolve =
             { host, ... }:
