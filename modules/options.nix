@@ -218,5 +218,8 @@ in
     host.imports = [ den.schema.conf ];
     user.imports = [ den.schema.conf ];
     home.imports = [ den.schema.conf ];
+
+    classes.nixos.description = "NixOS system configuration";
+    classes.darwin.description = "nix-darwin system configuration";
   };
 }

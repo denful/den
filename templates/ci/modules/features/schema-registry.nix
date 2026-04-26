@@ -92,6 +92,60 @@
       }
     );
 
+    # Auto-registration tests: batteries register classes without manual declaration
+    test-auto-nixos = denTest (
+      { den, ... }:
+      {
+        expr = den.schema.classes.nixos.description;
+        expected = "NixOS system configuration";
+      }
+    );
+
+    test-auto-darwin = denTest (
+      { den, ... }:
+      {
+        expr = den.schema.classes.darwin.description;
+        expected = "nix-darwin system configuration";
+      }
+    );
+
+    test-auto-os = denTest (
+      { den, ... }:
+      {
+        expr = den.schema.classes.os.description;
+        expected = "Convenience class forwarding to both nixos and darwin";
+      }
+    );
+
+    test-auto-user = denTest (
+      { den, ... }:
+      {
+        expr = den.schema.classes.user.description;
+        expected = "Lightweight user environment forwarding to OS users.users";
+      }
+    );
+
+    test-auto-classes-exist = denTest (
+      { den, ... }:
+      {
+        expr = builtins.all (c: den.schema.classes ? ${c}) [
+          "nixos"
+          "darwin"
+          "os"
+          "user"
+        ];
+        expected = true;
+      }
+    );
+
+    test-auto-forwardTo-null = denTest (
+      { den, ... }:
+      {
+        expr = den.schema.classes.nixos.forwardTo;
+        expected = null;
+      }
+    );
+
     test-collision-error = denTest (
       { den, ... }:
       {

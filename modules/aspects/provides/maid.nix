@@ -28,4 +28,6 @@ in
   den.schema.host.imports = [ result.hostConf ];
   den.policies = result.policies;
   den.schema.host.policies = result.schemaPolicies;
+
+  den.schema.classes.maid.description = "nix-maid user environment";
 }
