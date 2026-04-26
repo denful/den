@@ -81,6 +81,7 @@ let
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
     // resolveTargetHandler
+    // resolveEntityHandler
     // handlers.forwardHandler
     // handlers.provideToHandler
     // handlers.compilePolicyHandlers
@@ -98,6 +99,21 @@ let
       in
       {
         resume = if stageExists then den.lib.resolveStage stageName currentCtx else null;
+        inherit state;
+      };
+  };
+
+  # resolve-entity resolves an entity by kind using resolveEntity.
+  # Coexists with resolve-target during migration; will replace it.
+  resolveEntityHandler = {
+    "resolve-entity" =
+      { param, state }:
+      let
+        kind = param.kind;
+        currentCtx = (state.currentCtx or (_: { })) null;
+      in
+      {
+        resume = den.lib.resolveEntity kind currentCtx;
         inherit state;
       };
   };
