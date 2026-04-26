@@ -1,7 +1,7 @@
 # Entity-agnostic context constructors.
 #
 # Build graph IR from any resolved stage root (host, user, home,
-# or custom entity kind). Callers resolve via `den.lib.resolveStage`
+# or custom entity kind). Callers resolve via `den.lib.resolveEntity`
 # and pass the result here, or use convenience wrappers below.
 {
   den,
@@ -57,7 +57,7 @@ let
             ]
             ++ userClasses
           );
-      root = den.lib.resolveStage "host" { inherit host; };
+      root = den.lib.resolveEntity "host" { inherit host; };
     in
     context {
       inherit root direction;
@@ -85,7 +85,7 @@ let
             ]
             ++ (user.classes or [ "homeManager" ])
           );
-      root = den.lib.resolveStage "user" { inherit host user; };
+      root = den.lib.resolveEntity "user" { inherit host user; };
     in
     context {
       inherit root direction;
@@ -106,7 +106,7 @@ let
           classes
         else
           lib.unique ([ "homeManager" ] ++ (home.classes or [ "homeManager" ]));
-      root = den.lib.resolveStage "home" { inherit home; };
+      root = den.lib.resolveEntity "home" { inherit home; };
     in
     context {
       inherit root direction;

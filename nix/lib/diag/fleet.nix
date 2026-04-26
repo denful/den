@@ -41,7 +41,7 @@ let
   providerSubAspectsOf =
     hostInfo:
     let
-      hostAspect = den.lib.resolveStage "host" { host = hostInfo.host; };
+      hostAspect = den.lib.resolveEntity "host" { host = hostInfo.host; };
       entries = capture.capture "nixos" hostAspect;
       meaningful =
         name: name != "<anon>" && name != "<function body>" && !(lib.hasPrefix "[definition " name);

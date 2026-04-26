@@ -214,8 +214,8 @@ let
               builtins.trace "den: sibling route target has no name — groupByTarget will use label as key" rawTarget
             else
               rawTarget;
-          # Run sub-pipeline per peer to collect traits from source stage.
-          stageAspect = den.lib.resolveStage transition.routing.from scopedCtx;
+          # Run sub-pipeline per peer to collect traits from source entity.
+          stageAspect = den.lib.resolveEntity transition.routing.from scopedCtx;
           subResult = den.lib.aspects.fx.pipeline.fxFullResolve {
             class = targetClass;
             self = stageAspect;

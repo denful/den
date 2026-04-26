@@ -87,7 +87,7 @@ let
     // handlers.compilePolicyHandlers
     // fx.effects.state.handler;
 
-  # resolve-target resolves a stage aspect by path using resolveStage.
+  # resolve-target resolves a stage/entity by path using resolveEntity.
   # Policies dispatch via per-policy named effects in the transition handler.
   resolveTargetHandler = {
     "resolve-target" =
@@ -98,13 +98,12 @@ let
         currentCtx = (state.currentCtx or (_: { })) null;
       in
       {
-        resume = if stageExists then den.lib.resolveStage stageName currentCtx else null;
+        resume = if stageExists then den.lib.resolveEntity stageName currentCtx else null;
         inherit state;
       };
   };
 
   # resolve-entity resolves an entity by kind using resolveEntity.
-  # Coexists with resolve-target during migration; will replace it.
   resolveEntityHandler = {
     "resolve-entity" =
       { param, state }:
