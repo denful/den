@@ -11,8 +11,21 @@ let
     }@fwd:
     let
       fromClass = fwd.fromClass item;
-      intoClass = fwd.intoClass item;
-      intoPath = fwd.intoPath item;
+      classForwardTo = (den.schema.classes.${fromClass} or { }).forwardTo or null;
+      intoClass =
+        if fwd ? intoClass then
+          fwd.intoClass item
+        else if classForwardTo != null then
+          classForwardTo.class
+        else
+          throw "forward: no intoClass for fromClass=${fromClass}";
+      intoPath =
+        if fwd ? intoPath then
+          fwd.intoPath item
+        else if classForwardTo != null then
+          classForwardTo.path or [ ]
+        else
+          [ ];
       mapModule = (fwd.mapModule or (_: lib.id)) item;
 
       intoPathArgs = if lib.isFunction intoPath then lib.functionArgs intoPath else { };
