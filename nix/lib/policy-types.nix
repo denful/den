@@ -34,6 +34,11 @@ let
         default = { };
         description = "Named effect handlers installed when this policy fires.";
       };
+      aspects = lib.mkOption {
+        type = lib.types.listOf lib.types.str;
+        default = [ ];
+        description = "Registered aspect names to include for entities resolved by this policy.";
+      };
       _core = lib.mkOption {
         type = lib.types.bool;
         default = false;

@@ -33,11 +33,15 @@ let
         let
           ctx = param.ctx;
           stageName = param.stageName;
+          # Merge accumulated traits into resolve context so policies
+          # can destructure trait data (entity context wins on collision).
+          traits = (state.traits or (_: { })) null;
+          resolveCtx = traits // ctx;
           active = activePoliciesFor stageName ctx;
           isActive = active ? ${name};
           scopeOk = isActive && ctxSatisfies policy.from ctx;
-          argsOk = scopeOk && resolveArgsSatisfied policy ctx;
-          rawResult = if argsOk then policy.resolve ctx else [ ];
+          argsOk = scopeOk && resolveArgsSatisfied policy resolveCtx;
+          rawResult = if argsOk then policy.resolve resolveCtx else [ ];
           targets =
             if builtins.isList rawResult then
               rawResult
@@ -56,6 +60,7 @@ let
                   inherit (policy) from to;
                   inherit targetKey;
                   policyName = name;
+                  aspects = policy.aspects or [ ];
                 };
               };
           inherit state;
