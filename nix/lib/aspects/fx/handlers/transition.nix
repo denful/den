@@ -278,7 +278,7 @@ let
                 scopeHandlers = constantHandler scopedCtx;
                 updateCtx = fx.effects.state.modify (st: st // { currentCtx = _: scopedCtx; });
                 baseComputation =
-                  if isFanOut && targetClass == "flake" then
+                  if isFanOut && ((transition.routing or { }).isolateFanOut or false) then
                     resolveFanOut {
                       inherit
                         targetClass

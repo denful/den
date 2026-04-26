@@ -41,6 +41,11 @@ let
         default = [ ];
         description = "Aspects to include for entities resolved by this policy.";
       };
+      isolateFanOut = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Run each fan-out context in an isolated sub-pipeline instead of shared state.";
+      };
       _core = lib.mkOption {
         type = lib.types.bool;
         default = false;

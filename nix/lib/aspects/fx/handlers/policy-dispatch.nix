@@ -61,6 +61,7 @@ let
                   inherit targetKey;
                   policyName = name;
                   aspects = policy.aspects or [ ];
+                  isolateFanOut = policy.isolateFanOut or false;
                 };
               };
           inherit state;
