@@ -26,42 +26,30 @@ Den is an aspect-oriented Nix framework: you write features, not host files. A p
 
 ## Understand
 
-### Core Principles
-
+<Card title="Core Principles" icon="open-book">
 Den's [design philosophy](/explanation/core-principles/): features over hosts, aspects over modules, composition over duplication.
+</Card>
 
-### Aspects
+<Card title="Aspects" icon="puzzle">
+The primary concept in Den. Aspects bundle per-class config into composable, reusable units.\
+[Aspects & Functors](/explanation/aspects/) | [Class Modules](/explanation/class-modules/) | [Context-Aware Aspects](/explanation/parametric/)
+</Card>
 
-The primary concept in Den. Aspects bundle per-class config into composable, reusable units.
+<Card title="The Four Concerns" icon="list-format">
+Den separates configuration into four orthogonal concerns.\
+[Entities & Schema](/explanation/entities/) | [Stages](/explanation/stages/) | [Policies](/explanation/policies/) | [Resolution Pipeline](/explanation/context-pipeline/)
+</Card>
 
-<CardGrid>
-  <LinkCard title="Aspects & Functors" href="/explanation/aspects/" description="The __functor pattern, includes, and provides." />
-  <LinkCard title="Class Modules" href="/explanation/class-modules/" description="Flat-form functions: Den args and module args in one signature." />
-  <LinkCard title="Context-Aware Aspects" href="/explanation/parametric/" description="Automatic shape-based dispatch: functions receive only matching contexts." />
-</CardGrid>
-
-### The Four Concerns
-
-Den's model separates configuration into four orthogonal concerns.
-
-<CardGrid>
-  <LinkCard title="Entities & Schema" href="/explanation/entities/" description="Data: typed declarations for hosts, users, and homes." />
-  <LinkCard title="Stages" href="/explanation/stages/" description="Behavior scoping: named pipeline steps that bind context." />
-  <LinkCard title="Policies" href="/explanation/policies/" description="Topology: directed edges between entity kinds." />
-  <LinkCard title="Resolution Pipeline" href="/explanation/context-pipeline/" description="How it all compiles into NixOS/Darwin/HM modules." />
-</CardGrid>
-
-### Deep Dives
-
-<CardGrid>
-  <LinkCard title="ABC on Den Effects" href="/explanation/effects/" description="The pure algebraic effects engine under the hood." />
-  <LinkCard title="Diagrams" href="/explanation/diagrams/" description="Visualize your resolution graph for debugging and docs." />
-  <LinkCard title="Library vs Framework" href="/explanation/library-vs-framework/" description="Using den.lib for any Nix domain, beyond NixOS." />
-</CardGrid>
+<Card title="Deep Dives" icon="setting">
+Under the hood.\
+[Algebraic Effects](/explanation/effects/) | [Diagrams](/explanation/diagrams/) | [Library vs Framework](/explanation/library-vs-framework/)
+</Card>
 
 ## Build
 
+<Card title="Guides" icon="pencil">
 Task-oriented guides for working with Den day to day.
+</Card>
 
 <CardGrid>
   <LinkCard title="Declare Hosts & Users" href="/guides/declare-hosts/" description="den.hosts, den.homes, users, and schema options." />
@@ -77,15 +65,17 @@ Task-oriented guides for working with Den day to day.
 
 ## Reference
 
-Option namespaces and API documentation.
+<Card title="API Documentation" icon="document">
+Option namespaces and library functions.
+</Card>
 
 <CardGrid>
   <LinkCard title="den.schema" href="/reference/schema/" description="Host, user, and home schema options." />
   <LinkCard title="den.aspects" href="/reference/aspects/" description="Aspect type, resolution, class configs." />
   <LinkCard title="den.provides" href="/reference/batteries/" description="Built-in batteries reference." />
-  <LinkCard title="den.stages" href="/reference/ctx/" description="Stage types, policy transitions, provides." />
+  <LinkCard title="den.stages" href="/reference/ctx/" description="Stage types and behavior scoping." />
   <LinkCard title="den.policies" href="/reference/policies/" description="Policy option types and built-in policies." />
-  <LinkCard title="den.lib" href="/reference/lib/" description="Core library: take, statics, owned, __findFile." />
+  <LinkCard title="den.lib" href="/reference/lib/" description="Core library: parametric dispatch, __findFile." />
   <LinkCard title="den.lib.diag" href="/reference/diag/" description="Diagram generation and graph introspection." />
   <LinkCard title="flake.*" href="/reference/output/" description="Output generation and instantiation." />
   <LinkCard title="Glossary" href="/reference/glossary/" description="Definitions for Den-specific terms." />
@@ -93,9 +83,7 @@ Option namespaces and API documentation.
 
 ## Community
 
-Questions, ideas, or real-world examples — find other Den users and contributors.
-
-<CardGrid>
-  <LinkCard title="Community" href="/community/" description="Discussions, Matrix channel, ecosystem." />
-  <LinkCard title="Contributors Guide" href="/contributing/" description="Tests, CI, code style." />
-</CardGrid>
+<Card title="Get Involved" icon="heart">
+Questions, ideas, or real-world examples — find other Den users and contributors.\
+[Community](/community/) | [Contributors Guide](/contributing/)
+</Card>
