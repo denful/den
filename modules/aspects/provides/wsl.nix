@@ -49,16 +49,19 @@ in
 {
   den.classes.wsl.description = "WSL support class forwarding to host OS";
 
-  den.stages.wsl-host.provides.wsl-host =
-    { host }:
-    {
-      inherit description;
-      ${host.class} = {
-        imports = [ host.wsl.module ];
-        wsl.enable = true;
-      };
-      includes = [ fwd ];
-    };
+  den.entityIncludes."wsl-host" = [
+    (
+      { host }:
+      {
+        inherit description;
+        ${host.class} = {
+          imports = [ host.wsl.module ];
+          wsl.enable = true;
+        };
+        includes = [ fwd ];
+      }
+    )
+  ];
   den.schema.host.imports = [ hostConf ];
 
   den.policies.host-to-wsl-host = {

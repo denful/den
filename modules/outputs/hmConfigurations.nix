@@ -19,5 +19,5 @@ let
     };
 in
 {
-  den.stages.flake-system.provides.flake-hm = _: hmFwd;
+  den.entityProvides.flake-system.flake-hm = _: hmFwd;
 }

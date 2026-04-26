@@ -13,15 +13,11 @@ let
     { system, output }:
     { class, aspect-chain }:
     let
-      # Use the target stage if it has content (user set den.stages.flake-packages).
-      # Fall back to aspect-chain root for test/inline patterns where packages
-      # class is on the root aspect directly.
-      stageTarget = den.stages."flake-${output}" or null;
-      hasStageContent =
-        stageTarget != null
-        && ((stageTarget.includes or [ ]) != [ ] || (stageTarget.provides or { }) != { });
+      # Use the target entity if it has content (user set den.entityIncludes.flake-packages).
+      entityIncs = den.entityIncludes."flake-${output}" or [ ];
+      hasEntityContent = entityIncs != [ ];
       source =
-        if hasStageContent then
+        if hasEntityContent then
           den.lib.resolveEntity "flake-${output}" { inherit system; }
         else
           lib.head aspect-chain;
@@ -48,11 +44,14 @@ let
     "legacyPackages"
   ];
 
-  stageSystemOuts = map (output: {
-    flake-system.provides."flake-${output}" = _: systemOutputFwd;
-  }) outputs;
-
 in
 {
-  den.stages = lib.mkMerge stageSystemOuts;
+  # Cross-provides on flake-system: transition handler uses these when
+  # policies route flake-system → flake-${output}.
+  den.entityProvides.flake-system = lib.listToAttrs (
+    map (output: {
+      name = "flake-${output}";
+      value = _: systemOutputFwd;
+    }) outputs
+  );
 }

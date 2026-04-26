@@ -5,35 +5,42 @@
 }:
 let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
-  inherit (den.lib.aspects.fx.aspect) structuralKeysSet;
 
-  structuralKeys = builtins.attrNames structuralKeysSet;
-
+  # Entity resolution — replaces resolveStage.
+  #
+  # Root aspect: read from den.entityIncludes → placed in rootIncludes
+  # (resolved before transitions) so deferred includes can drain during
+  # context widening.
+  # Cross-provides: read from den.entityProvides (used by transition handler).
+  # Stage fallback: reads den.stages during migration.
   resolveEntity =
     name: ctx:
     let
       scopeHandlers = constantHandler ctx;
 
-      # Entity includes from the new registry (replaces den.stages.*.includes).
+      # New entity data sources.
       entityIncludes = den.entityIncludes.${name} or [ ];
+      entityProvides = den.entityProvides.${name} or { };
 
-      # Stage data (transitional — read until all modules migrate).
+      # Stage fallback (transitional — will be removed).
       stageNode = den.stages.${name} or { };
       stageIncludes = stageNode.includes or [ ];
-      classAttrs = builtins.removeAttrs stageNode structuralKeys;
       stageProvides = stageNode.provides or { };
-      provides = stageProvides;
     in
-    classAttrs
-    // {
-      inherit name provides;
+    {
+      inherit name;
       meta = {
         handleWith = null;
         excludes = [ ];
         provider = [ ];
         into = stageNode.meta.into or null;
       };
-      includes = entityIncludes ++ stageIncludes;
+      # Root includes resolve before transitions.
+      rootIncludes = entityIncludes;
+      # Cross-provides: entity + stage merged (entity wins).
+      provides = stageProvides // entityProvides;
+      # Regular includes from stages (transitional).
+      includes = stageIncludes;
       __ctxStage = name;
       __scopeHandlers = scopeHandlers;
     };

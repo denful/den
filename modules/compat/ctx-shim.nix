@@ -1,6 +1,7 @@
-# Compatibility shim: forwards den.ctx.* to den.stages.* with deprecation warnings.
+# Compatibility shim: forwards den.ctx.* to den.entityIncludes/entityProvides
+# with deprecation warnings.
 # den.ctx was always flat (host, user, hm-host — never nested namespaces).
-# Also handles den.ctx.*.into by forwarding to den.stages.*.meta.into.
+# Also handles den.ctx.*.into by forwarding to stage meta.into (transitional).
 # Remove after downstream users have migrated.
 {
   den,
@@ -9,9 +10,6 @@
   ...
 }:
 let
-  # Extends stageSubmodule with an into option (stages don't have into,
-  # but the old den.ctx did). The into value is forwarded to meta.into
-  # where the pipeline already reads it.
   ctxSubmodule = lib.types.submodule {
     imports = den.lib.aspects.types.aspectType.getSubModules;
     options.into = lib.mkOption {
@@ -23,11 +21,12 @@ let
 in
 {
   options.den.ctx = lib.mkOption {
-    description = "DEPRECATED: use den.stages instead.";
+    description = "DEPRECATED: use den.entityIncludes instead.";
     default = { };
     type = lib.types.lazyAttrsOf ctxSubmodule;
   };
 
+  # Forward den.ctx entries to stages (transitional — stages still read by resolveEntity).
   config.den.stages = lib.mkMerge (
     lib.mapAttrsToList (
       name: value:
@@ -37,7 +36,7 @@ in
       in
       {
         ${name} =
-          lib.warn "den.ctx.${name} is deprecated — use den.stages.${name}" stageValue
+          lib.warn "den.ctx.${name} is deprecated — use den.entityIncludes.${name}" stageValue
           // lib.optionalAttrs (intoFn != null) {
             meta.into = lib.warn "den.ctx.${name}.into is deprecated — use den.policies" intoFn;
           };

@@ -22,7 +22,7 @@ let
 
 in
 {
-  den.stages = result.stages;
+  den.entityIncludes = result.entityIncludes;
   den.schema.host.imports = [ result.hostConf ];
   den.policies = result.policies;
   den.schema.host.policies = result.schemaPolicies;

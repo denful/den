@@ -23,8 +23,8 @@ let
 
 in
 {
-  den.stages = result.stages // {
-    home.provides.home = { home }: home.aspect;
+  den.entityIncludes = result.entityIncludes // {
+    home = [ ({ home }: home.aspect) ];
   };
   den.schema.host.imports = [ result.hostConf ];
   den.policies = result.policies;

@@ -94,16 +94,21 @@ let
       forwardPathFn,
     }:
     {
-      stages = {
-        "${ctxName}-host".provides."${ctxName}-host" =
-          { host }:
-          {
-            ${host.class}.imports = [ host.${optionPath}.module ];
-          };
+      entityIncludes = {
+        "${ctxName}-host" = [
+          (
+            { host }:
+            {
+              ${host.class}.imports = [ host.${optionPath}.module ];
+            }
+          )
+        ];
 
-        "${ctxName}-user".provides."${ctxName}-user" = forwardToHost {
-          inherit className ctxName forwardPathFn;
-        };
+        "${ctxName}-user" = [
+          (forwardToHost {
+            inherit className ctxName forwardPathFn;
+          })
+        ];
       };
 
       hostConf = hostOptions {
@@ -121,13 +126,11 @@ let
           resolve = mkDetectHost {
             inherit className supportedOses optionPath;
           };
-          # Future: aspects = [ "${ctxName}-host" ] when stages are removed
         };
         "${ctxName}-host-to-${ctxName}-user" = {
           from = "${ctxName}-host";
           to = "${ctxName}-user";
           resolve = mkIntoClassUsers className;
-          # Future: aspects = [ "${ctxName}-user" ] when stages are removed
         };
       };
 

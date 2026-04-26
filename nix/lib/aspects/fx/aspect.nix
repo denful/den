@@ -14,6 +14,7 @@ let
     "description"
     "meta"
     "includes"
+    "rootIncludes"
     "provides"
     "policies"
     "into"
@@ -645,14 +646,24 @@ let
           builtins.trace "den: aspect '${aspectName}' uses 'provides.{${builtins.concatStringsSep "," providesKeys}}' — migrate to direct nesting" null
         else
           null;
+      # Root includes resolve before transitions (same phase as self-provides),
+      # enabling deferred includes from the root aspect to drain when context
+      # widens during transitions. Regular includes resolve after transitions.
+      emitCtx = {
+        __parentScopeHandlers = scopeHandlers;
+        __parentCtxId = ctxId;
+      };
+      rootIncs = aspect.rootIncludes or [ ];
       childResolution = fx.bind (builtins.seq _ (emitSelfProvide aspect)) (
         selfProvResults:
-        fx.bind (emitTransitions aspect) (
-          transitionResults:
-          fx.bind (emitIncludes {
-            __parentScopeHandlers = scopeHandlers;
-            __parentCtxId = ctxId;
-          } (aspect.includes or [ ])) (children: fx.pure (selfProvResults ++ transitionResults ++ children))
+        fx.bind (emitIncludes emitCtx rootIncs) (
+          rootResults:
+          fx.bind (emitTransitions aspect) (
+            transitionResults:
+            fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
+              children: fx.pure (selfProvResults ++ rootResults ++ transitionResults ++ children)
+            )
+          )
         )
       );
     in

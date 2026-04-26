@@ -1,4 +1,4 @@
 { ... }:
 {
-  den.stages.user.provides.user = { host, user }: user.aspect;
+  den.entityIncludes.user = [ ({ host, user }: user.aspect) ];
 }

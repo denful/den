@@ -21,5 +21,5 @@ let
     };
 in
 {
-  den.stages.flake-system.provides.flake-os = _: osFwd;
+  den.entityProvides.flake-system.flake-os = _: osFwd;
 }
