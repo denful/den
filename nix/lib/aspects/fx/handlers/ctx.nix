@@ -23,26 +23,38 @@ let
     ) ctx;
 
   # Dedup handler. Tracks seen keys in state.seen.
-  # Each key maps to its accumulated aspect list (not just boolean).
-  # Returns { isFirst, newAspects } where newAspects lists aspects
+  # Each key maps to { ids } where ids is the accumulated aspect path-identity list.
+  # Returns { isFirst, newAspectValues } where newAspectValues lists aspect values
   # not previously recorded for this key.
   ctxSeenHandler = {
     "ctx-seen" =
       { param, state }:
       let
-        # Accept both string (legacy) and attrset { key, aspects } params.
+        # Accept both string (legacy) and attrset { key, aspects, aspectValues } params.
         key = if builtins.isString param then param else param.key;
         aspects = if builtins.isString param then [ ] else param.aspects or [ ];
+        aspectValues = if builtins.isString param then [ ] else param.aspectValues or [ ];
         seenSet = (state.seen or (_: { })) null;
         isFirst = !(seenSet ? ${key});
-        previousAspects = if isFirst then [ ] else seenSet.${key};
+        previousAspects = if isFirst then [ ] else seenSet.${key}.ids;
         previousSet = lib.genAttrs previousAspects (_: true);
-        newAspects = builtins.filter (a: !(previousSet ? ${a})) aspects;
+        newIndices = lib.filter (i: !(previousSet ? ${builtins.elemAt aspects i})) (
+          lib.genList lib.id (builtins.length aspects)
+        );
+        newAspectIds = map (i: builtins.elemAt aspects i) newIndices;
+        newAspectValues = map (i: builtins.elemAt aspectValues i) newIndices;
       in
       {
-        resume = { inherit isFirst newAspects; };
+        resume = { inherit isFirst newAspectValues; };
         state = state // {
-          seen = _: seenSet // { ${key} = previousAspects ++ newAspects; };
+          seen =
+            _:
+            seenSet
+            // {
+              ${key} = {
+                ids = (if isFirst then [ ] else seenSet.${key}.ids) ++ newAspectIds;
+              };
+            };
         };
       };
   };

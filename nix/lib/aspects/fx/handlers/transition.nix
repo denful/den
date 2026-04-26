@@ -8,6 +8,7 @@ let
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects) isParametricWrapper;
+  inherit (den.lib.aspects.fx.identity) pathKey aspectPath;
 
   mkCtxId =
     ctx:
@@ -250,8 +251,7 @@ let
           rawTarget:
           let
             # Inject policy-declared aspects into the target's includes.
-            policyAspectNames = (transition.routing or { }).aspects or [ ];
-            policyAspects = map (name: den.aspects.${name}) policyAspectNames;
+            policyAspects = (transition.routing or { }).aspects or [ ];
             effectiveTarget =
               if rawTarget == null then
                 null
@@ -323,15 +323,16 @@ let
                 fx.bind
                   (fx.send "ctx-seen" {
                     key = ctxKey;
-                    aspects = policyAspectNames;
+                    aspects = map (a: pathKey (aspectPath a)) policyAspects;
+                    aspectValues = policyAspects;
                   })
                   (
-                    { isFirst, newAspects }:
+                    { isFirst, newAspectValues }:
                     if isFirst then
                       fx.bind updateCtx (
                         _: fx.bind withTarget (targetResults: emitCross scopedCtx scopeHandlers ctxNames targetResults)
                       )
-                    else if newAspects != [ ] then
+                    else if newAspectValues != [ ] then
                       # Supplemental aspects for an already-resolved entity:
                       # emit each new aspect as an include with parent scope
                       # so parametric aspects can resolve their args.
@@ -346,7 +347,7 @@ let
                             __parentCtxId = ctxNames;
                           }) (_: fx.pure prevResults)
                         )
-                      ) (fx.pure innerResults) (map (name: den.aspects.${name}) newAspects)
+                      ) (fx.pure innerResults) newAspectValues
                     else
                       fx.pure innerResults
                   )
@@ -427,7 +428,8 @@ let
               mergeByPath = builtins.foldl' (
                 acc: t:
                 let
-                  sortedAspects = lib.sort (a: b: a < b) ((t.routing or { }).aspects or [ ]);
+                  aspectIds = map (a: pathKey (aspectPath a)) ((t.routing or { }).aspects or [ ]);
+                  sortedAspects = lib.sort (a: b: a < b) aspectIds;
                   aspectsKey = builtins.concatStringsSep "," sortedAspects;
                   mergeKey = "${lib.concatStringsSep "." t.path}|${aspectsKey}";
                 in

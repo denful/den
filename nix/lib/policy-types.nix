@@ -1,6 +1,6 @@
 # A policy declares a directed edge between entity kinds with a
 # resolve function that performs fan-out/discrimination.
-{ lib, ... }:
+{ lib, den, ... }:
 let
   policyType = lib.types.submodule {
     options = {
@@ -35,9 +35,11 @@ let
         description = "Named effect handlers installed when this policy fires.";
       };
       aspects = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
+        type = lib.types.listOf (
+          lib.types.coercedTo lib.types.str (name: den.aspects.${name}) den.lib.aspects.types.providerType
+        );
         default = [ ];
-        description = "Registered aspect names to include for entities resolved by this policy.";
+        description = "Aspects to include for entities resolved by this policy.";
       };
       _core = lib.mkOption {
         type = lib.types.bool;
