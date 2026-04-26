@@ -20,6 +20,18 @@ let
           freeformType = lib.types.lazyAttrsOf lib.types.deferredModule;
         };
       };
+      options.traits = lib.mkOption {
+        description = "trait declarations merged into den.schema.traits on import";
+        defaultText = lib.literalExpression "{ }";
+        default = { };
+        type = lib.types.lazyAttrsOf lib.types.raw;
+      };
+      options.classes = lib.mkOption {
+        description = "class declarations merged into den.schema.classes on import";
+        defaultText = lib.literalExpression "{ }";
+        default = { };
+        type = lib.types.lazyAttrsOf lib.types.raw;
+      };
       freeformType = (mkAspectsType { providerPrefix = [ name ]; }).aspectsType;
     }
   );

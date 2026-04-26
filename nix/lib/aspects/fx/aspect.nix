@@ -18,6 +18,8 @@ let
     "policies"
     "provide-to"
     "into"
+    "traits"
+    "classes"
     "__fn"
     "__args"
     "__functor"

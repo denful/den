@@ -321,6 +321,18 @@ let
             };
           };
 
+          traits = lib.mkOption {
+            description = "Trait schemas declared by this aspect, merged into den.schema.traits.";
+            type = lib.types.lazyAttrsOf lib.types.raw;
+            default = { };
+          };
+
+          classes = lib.mkOption {
+            description = "Class schemas declared by this aspect, merged into den.schema.classes.";
+            type = lib.types.lazyAttrsOf lib.types.raw;
+            default = { };
+          };
+
         };
       }
     );

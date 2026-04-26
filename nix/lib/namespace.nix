@@ -33,11 +33,19 @@ let
       }
     else
       { };
+
+  # Merge external source traits/classes into den.schema.
+  # Local namespace traits/classes are collected by aspect-schema.nix.
+  traitClassModule = {
+    config.den.schema.traits = lib.mkMerge (map (denful: denful.traits or { }) denfuls);
+    config.den.schema.classes = lib.mkMerge (map (denful: denful.classes or { }) denfuls);
+  };
 in
 {
   imports = sourceModules ++ [
     aliasModule
     outputModule
+    traitClassModule
   ];
   config._module.args.${name} = config.den.ful.${name};
 }

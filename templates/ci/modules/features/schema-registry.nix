@@ -159,5 +159,149 @@
         };
       }
     );
+
+    # Namespace-level trait/class declarations merge into den.schema
+    test-namespace-trait-merges = denTest (
+      { den, ... }:
+      {
+        den.ful.test-ns.traits.monitoring = {
+          description = "Monitoring trait";
+          collection = "list";
+        };
+
+        expr = {
+          inherit (den.schema.traits.monitoring) description collection;
+        };
+        expected = {
+          description = "Monitoring trait";
+          collection = "list";
+        };
+      }
+    );
+
+    test-namespace-class-merges = denTest (
+      { den, ... }:
+      {
+        den.ful.test-ns.classes.container = {
+          description = "Container class";
+        };
+
+        expr = den.schema.classes.container.description;
+        expected = "Container class";
+      }
+    );
+
+    test-namespace-traits-preserve-existing = denTest (
+      { den, ... }:
+      {
+        den.schema.traits.firewall.description = "Firewall trait";
+        den.ful.test-ns.traits.monitoring = {
+          description = "Monitoring trait";
+        };
+
+        expr = {
+          firewall = den.schema.traits.firewall.description;
+          monitoring = den.schema.traits.monitoring.description;
+        };
+        expected = {
+          firewall = "Firewall trait";
+          monitoring = "Monitoring trait";
+        };
+      }
+    );
+
+    test-cross-namespace-trait-merge = denTest (
+      { den, ... }:
+      {
+        den.ful.ns-a.traits.shared-trait = {
+          description = "Shared trait";
+          collection = "map";
+        };
+        den.ful.ns-b.traits.shared-trait = {
+          description = "Shared trait";
+          collection = "map";
+        };
+
+        expr = den.schema.traits.shared-trait.description;
+        expected = "Shared trait";
+      }
+    );
+
+    # Aspect-level trait/class installation tests
+    test-aspect-trait-install = denTest (
+      { den, ... }:
+      {
+        den.aspects.netstack.traits.firewall = {
+          description = "Firewall rules";
+          collection = "list";
+        };
+
+        expr = {
+          inherit (den.schema.traits.firewall) description collection;
+        };
+        expected = {
+          description = "Firewall rules";
+          collection = "list";
+        };
+      }
+    );
+
+    test-aspect-class-install = denTest (
+      { den, ... }:
+      {
+        den.aspects.gui.classes.wayland = {
+          description = "Wayland compositor configuration";
+        };
+
+        expr = den.schema.classes.wayland.description;
+        expected = "Wayland compositor configuration";
+      }
+    );
+
+    test-aspect-trait-merge-compatible = denTest (
+      { den, ... }:
+      {
+        den.aspects.netstack.traits.firewall = {
+          description = "Firewall rules";
+          collection = "list";
+        };
+        den.aspects.security.traits.firewall = {
+          description = "Firewall rules";
+          collection = "list";
+        };
+
+        expr = den.schema.traits.firewall.description;
+        expected = "Firewall rules";
+      }
+    );
+
+    test-aspect-traits-not-freeform = denTest (
+      { den, ... }:
+      {
+        den.aspects.netstack = {
+          traits.firewall = {
+            description = "Firewall rules";
+          };
+          nixos = { };
+        };
+
+        expr = builtins.attrNames (
+          builtins.removeAttrs den.aspects.netstack [
+            "name"
+            "description"
+            "meta"
+            "includes"
+            "provides"
+            "policies"
+            "traits"
+            "classes"
+            "_module"
+            "_"
+            "__functor"
+          ]
+        );
+        expected = [ "nixos" ];
+      }
+    );
   };
 }
