@@ -6,9 +6,10 @@
 }:
 let
   # Schema entity kinds (host, user, home, etc.) — used for context checks.
-  schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
-    builtins.attrNames (den.schema or { })
-  );
+  # Only structural entities (with module content beyond includes) are entity kinds.
+  schemaKinds = builtins.filter (
+    n: n != "conf" && !(lib.hasPrefix "_" n) && (den.schema.${n}.isEntity or false)
+  ) (builtins.attrNames (den.schema or { }));
 
   # Check if context satisfies the scope implied by the entity kind.
   #

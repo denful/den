@@ -135,6 +135,20 @@ let
             allIncludes != [ ]
             || (den.entityIncludes or { }) ? ${kind}
             || (den.entityProvides or { }) ? ${kind};
+          # A schema entry is "structural" if it has module content beyond just includes.
+          # Only structural entries should get self-provide aspect lookup.
+          hasStructuralContent = builtins.any (
+            d:
+            let
+              v = d.value;
+              stripped =
+                if builtins.isAttrs v && v ? includes && builtins.isList v.includes then
+                  builtins.removeAttrs v [ "includes" ]
+                else
+                  v;
+            in
+            !builtins.isAttrs stripped || stripped != { }
+          ) defs;
         in
         if hasEntityContent then
           {
@@ -148,11 +162,13 @@ let
                 ];
               };
             includes = allIncludes;
+            isEntity = hasStructuralContent;
           }
         else
           {
             __functor = _: { ... }: merged;
             includes = [ ];
+            isEntity = false;
           };
     };
 

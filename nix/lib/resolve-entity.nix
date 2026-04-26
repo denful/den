@@ -11,7 +11,7 @@ let
   # is resolved once the entity's scope handlers are established.
   schemaKinds = builtins.attrNames (den.schema or { });
   aspectKinds = builtins.filter (
-    k: k != "conf" && !(lib.hasPrefix "_" k) && k != "default"
+    k: k != "conf" && !(lib.hasPrefix "_" k) && k != "default" && (den.schema.${k}.isEntity or false)
   ) schemaKinds;
   aspectKindSet = lib.genAttrs aspectKinds (_: true);
 
