@@ -47,7 +47,7 @@
             igloo = den.hosts.x86_64-linux.igloo;
             result = den.lib.aspects.fx.pipeline.fxFullResolve {
               class = "nixos";
-              self = den.lib.resolveStage "host" {
+              self = den.lib.resolveEntity "host" {
                 inherit (igloo) system;
                 host = igloo;
               };

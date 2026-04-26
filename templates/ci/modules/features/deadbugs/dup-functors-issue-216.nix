@@ -17,7 +17,7 @@ let
           bogusModule
         ];
       };
-      fooAspect = ev.config.den.lib.resolveStage "foo" {
+      fooAspect = ev.config.den.lib.resolveEntity "foo" {
         x = 0;
         y = 1;
       };

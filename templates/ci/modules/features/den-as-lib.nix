@@ -109,7 +109,7 @@ in
               # resolveStage results carry __scopeHandlers which are
               # destroyed by providerType merge. Wrap in a function
               # so it's called at resolution time, not definition time.
-              ({ class, ... }: den.lib.resolveStage "foo" { name = "good"; })
+              ({ class, ... }: den.lib.resolveEntity "foo" { name = "good"; })
             ];
           };
 

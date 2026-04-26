@@ -44,7 +44,7 @@
             funny.names = [ "child-${y}" ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "parent" { x = "hello"; });
+        expr = funnyNames (den.lib.resolveEntity "parent" { x = "hello"; });
         expected = [
           "child-derived"
           "parent-for-child-hello-derived"
@@ -99,7 +99,7 @@
             funny.names = [ "dst-${toString i}" ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "src" { x = "a"; });
+        expr = funnyNames (den.lib.resolveEntity "src" { x = "a"; });
         expected = [
           "a"
           "dst-1"
@@ -136,7 +136,7 @@
             funny.names = [ "dst-${y}" ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "src" { x = "val"; });
+        expr = funnyNames (den.lib.resolveEntity "src" { x = "val"; });
         expected = [
           "dst-val"
           "val"

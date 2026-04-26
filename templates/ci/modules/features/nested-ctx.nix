@@ -20,7 +20,7 @@
         };
         den.default.policies = [ "test-root-to-flat" ];
 
-        expr = funnyNames (den.lib.resolveStage "root" { x = "hi"; });
+        expr = funnyNames (den.lib.resolveEntity "root" { x = "hi"; });
         expected = [ "hi" ];
       }
     );
@@ -74,7 +74,7 @@
           "test-root-to-leaf-d"
         ];
 
-        expr = funnyNames (den.lib.resolveStage "root" { });
+        expr = funnyNames (den.lib.resolveEntity "root" { });
         expected = [
           "a"
           "b"

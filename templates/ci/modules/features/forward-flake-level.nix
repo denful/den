@@ -18,7 +18,7 @@
             "very"
             "funny"
           ];
-          fromAspect = item: den.lib.resolveStage "foo" item;
+          fromAspect = item: den.lib.resolveEntity "foo" item;
         };
 
         mod = den.lib.aspects.resolve "flake" fwd;

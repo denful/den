@@ -9,7 +9,7 @@
         den.stages.hm-host.funny.names = [ "hm-host-owned" ];
         den.stages.hm-host.includes = [ ];
 
-        expr = funnyNames (den.lib.resolveStage "host" { host = den.hosts.x86_64-linux.igloo; });
+        expr = funnyNames (den.lib.resolveEntity "host" { host = den.hosts.x86_64-linux.igloo; });
         expected = [ ];
       }
     );
@@ -22,7 +22,7 @@
           { funny.names = [ "hm-host-include" ]; }
         ];
 
-        expr = funnyNames (den.lib.resolveStage "host" { host = den.hosts.x86_64-linux.igloo; });
+        expr = funnyNames (den.lib.resolveEntity "host" { host = den.hosts.x86_64-linux.igloo; });
         expected = [ ];
       }
     );

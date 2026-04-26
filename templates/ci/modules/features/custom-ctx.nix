@@ -28,7 +28,7 @@
             funny.names = [ shout ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "greeting" { hello = "world"; });
+        expr = funnyNames (den.lib.resolveEntity "greeting" { hello = "world"; });
         expected = [
           "WORLD"
           "world"
@@ -54,7 +54,7 @@
           )
         ];
 
-        expr = funnyNames (den.lib.resolveStage "foo" { foo = "hello"; });
+        expr = funnyNames (den.lib.resolveEntity "foo" { foo = "hello"; });
         expected = [
           "hello"
           "param-hello"
@@ -74,7 +74,7 @@
         den.stages.bar.funny.names = [ "owned" ];
         den.stages.bar.includes = [ ];
 
-        expr = funnyNames (den.lib.resolveStage "bar" { x = "val"; });
+        expr = funnyNames (den.lib.resolveEntity "bar" { x = "val"; });
         expected = [
           "owned"
           "val"

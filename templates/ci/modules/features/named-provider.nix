@@ -11,7 +11,7 @@
             funny.names = [ "hello-${who}" ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "greet" { who = "nix"; });
+        expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [ "hello-nix" ];
       }
     );
@@ -27,7 +27,7 @@
         den.stages.greet.funny.names = [ "owned" ];
         den.stages.greet.includes = [ ];
 
-        expr = funnyNames (den.lib.resolveStage "greet" { who = "nix"; });
+        expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [
           "hello-nix"
           "owned"
@@ -62,7 +62,7 @@
             funny.names = [ "other-${who}" ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "greet" { who = "nix"; });
+        expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [
           "hello-nix"
           "other-nix"
@@ -96,7 +96,7 @@
             funny.names = [ shout ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "greet" { who = "world"; });
+        expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });
         expected = [
           "WORLD"
           "world"
@@ -157,7 +157,7 @@
             funny.names = [ ("num:" + lib.toString number) ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "greet" { who = "world"; });
+        expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });
         expected = [
           "5"
           "WORLD"

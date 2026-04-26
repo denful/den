@@ -12,7 +12,7 @@
 
         expr =
           let
-            iglooCtx = den.lib.resolveStage "host" { host = den.hosts.x86_64-linux.igloo; };
+            iglooCtx = den.lib.resolveEntity "host" { host = den.hosts.x86_64-linux.igloo; };
             resolved = den.lib.aspects.resolve "nixos" iglooCtx;
           in
           resolved ? imports;

@@ -69,7 +69,7 @@
             funny.names = [ hello ];
           };
 
-        expr = funnyNames (den.lib.resolveStage "greet" { hello = "world"; });
+        expr = funnyNames (den.lib.resolveEntity "greet" { hello = "world"; });
         expected = [ "world" ];
       }
     );

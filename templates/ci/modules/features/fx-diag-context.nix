@@ -54,7 +54,7 @@
         expr =
           let
             host = lib.head (builtins.attrValues den.hosts.x86_64-linux);
-            root = den.lib.resolveStage "host" { inherit host; };
+            root = den.lib.resolveEntity "host" { inherit host; };
             result = den.lib.diag.captureWithPaths [ "nixos" ] root;
           in
           {

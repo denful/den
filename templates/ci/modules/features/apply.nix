@@ -16,7 +16,7 @@
       den.stages.foobar.includes = [ ];
 
       expr = funnyNames (
-        den.lib.resolveStage "foobar" {
+        den.lib.resolveEntity "foobar" {
           foo = "moo";
           bar = "baa";
         }

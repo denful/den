@@ -16,7 +16,7 @@
         );
 
       expr = funnyNames (
-        den.lib.resolveStage "foobar" {
+        den.lib.resolveEntity "foobar" {
           foo = "moo";
           # missing bar
         }
@@ -42,7 +42,7 @@
         );
 
       expr = funnyNames (
-        den.lib.resolveStage "foobar" {
+        den.lib.resolveEntity "foobar" {
           foo = "moo";
           bar = "bar";
           baz = "man";

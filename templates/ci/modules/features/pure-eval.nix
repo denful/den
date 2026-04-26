@@ -64,7 +64,7 @@ in
               };
           }
         );
-        asp = ev.config.den.lib.resolveStage "a" { v = "x"; };
+        asp = ev.config.den.lib.resolveEntity "a" { v = "x"; };
         mod = ev.config.den.lib.aspects.resolve "my" asp;
         ev2 = lib.evalModules {
           modules = [

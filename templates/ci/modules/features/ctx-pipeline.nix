@@ -113,7 +113,7 @@ in
       {
         imports = mkCtxChain 30;
         den.default.policies = lib.genList (i: "c${toString i}-to-c${toString (i + 1)}") 29;
-        expr = builtins.length (funnyNames (den.lib.resolveStage "c0" { x = "v"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "c0" { x = "v"; }));
         expected = 30;
       }
     );
@@ -123,7 +123,7 @@ in
       {
         imports = [ (mkFanOut 50) ];
         den.default.policies = [ "root-to-leaf" ];
-        expr = builtins.length (funnyNames (den.lib.resolveStage "root" { x = "v"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "root" { x = "v"; }));
         expected = 51;
       }
     );
@@ -133,7 +133,7 @@ in
       {
         imports = mkCrossProviders 20;
         den.default.policies = lib.genList (i: "src-to-t${toString i}") 20;
-        expr = builtins.length (funnyNames (den.lib.resolveStage "src" { v = "z"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "src" { v = "z"; }));
         expected = 41;
       }
     );

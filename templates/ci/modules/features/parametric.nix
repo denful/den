@@ -27,7 +27,7 @@
           includes = [ top ];
         };
 
-        expr = builtins.length (funnyNames (den.lib.resolveStage "start" { level = "deep"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { level = "deep"; }));
         expected = 42;
       }
     );
@@ -60,7 +60,7 @@
           includes = aspects;
         };
 
-        expr = builtins.length (funnyNames (den.lib.resolveStage "start" { host = "h"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { host = "h"; }));
         expected = 61;
       }
     );
@@ -88,7 +88,7 @@
           includes = [ expanded ];
         };
 
-        expr = builtins.length (funnyNames (den.lib.resolveStage "start" { host = "h"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { host = "h"; }));
         expected = 17;
       }
     );
@@ -132,7 +132,7 @@
           includes = [ shared ];
         };
 
-        expr = builtins.length (funnyNames (den.lib.resolveStage "a" { host = "v"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { host = "v"; }));
         expected = 6;
       }
     );
