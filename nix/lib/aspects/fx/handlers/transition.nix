@@ -200,7 +200,7 @@ let
     transition: transition ? routing && transition.routing.from == transition.routing.to;
 
   resolveSiblingTransition =
-    sourceAspect: currentCtx: results: transition:
+    targetClass: sourceAspect: currentCtx: results: transition:
     builtins.foldl' (
       acc: indexed:
       fx.bind acc (
@@ -214,13 +214,17 @@ let
               builtins.trace "den: sibling route target has no name — groupByTarget will use label as key" rawTarget
             else
               rawTarget;
+          # Run sub-pipeline per peer to collect traits from source stage.
+          stageAspect = den.lib.resolveStage transition.routing.from scopedCtx;
+          subResult = den.lib.aspects.fx.pipeline.fxFullResolve {
+            class = targetClass;
+            self = stageAspect;
+            ctx = scopedCtx;
+          };
+          traits = subResult.state.traits null;
         in
         fx.send "provide-to" {
-          label = transition.routing.targetKey;
-          content = null;
-          emitterCtx = currentCtx;
-          aspectName = sourceAspect.name or "<anon>";
-          inherit targetEntity;
+          inherit targetEntity traits;
         }
       )
     ) (fx.pure results) (lib.imap0 (i: ctx: { inherit i ctx; }) transition.contexts);
@@ -228,7 +232,7 @@ let
   resolveTransition =
     targetClass: sourceAspect: currentCtx: results: transition:
     if isSiblingRoute transition then
-      resolveSiblingTransition sourceAspect currentCtx results transition
+      resolveSiblingTransition targetClass sourceAspect currentCtx results transition
     else
       let
         key = "${targetClass}/${lib.concatStringsSep "/" transition.path}";

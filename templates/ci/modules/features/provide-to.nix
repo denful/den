@@ -57,14 +57,19 @@
               };
             };
             emissions = result.state.provideTo null;
+            first = builtins.head emissions;
           in
           {
             hasEmissions = emissions != [ ];
-            label = if emissions != [ ] then (builtins.head emissions).label else "";
+            hasTargetEntity = first ? targetEntity;
+            hasTraits = first ? traits;
+            targetName = first.targetEntity.name or "";
           };
         expected = {
           hasEmissions = true;
-          label = "peer";
+          hasTargetEntity = true;
+          hasTraits = true;
+          targetName = "iceberg";
         };
       }
     );
