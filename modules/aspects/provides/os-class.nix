@@ -36,8 +36,8 @@ let
 
 in
 {
-  den.stages.host.includes = [ host-os-fwd ];
-  den.stages.user.includes = [ user-os-fwd ];
+  den.entityIncludes.host = [ host-os-fwd ];
+  den.entityIncludes.user = [ user-os-fwd ];
 
   den.classes.os.description = "Convenience class forwarding to both nixos and darwin";
 }

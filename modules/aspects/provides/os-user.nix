@@ -47,7 +47,7 @@ let
 
 in
 {
-  den.stages.user.includes = [ fwd ];
+  den.entityIncludes.user = [ fwd ];
 
   den.classes.user.description = "Lightweight user environment forwarding to OS users.users";
 }
