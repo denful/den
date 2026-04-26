@@ -22,7 +22,7 @@ let
         && ((stageTarget.includes or [ ]) != [ ] || (stageTarget.provides or { }) != { });
       source =
         if hasStageContent then
-          den.lib.resolveStage "flake-${output}" { inherit system; }
+          den.lib.resolveEntity "flake-${output}" { inherit system; }
         else
           lib.head aspect-chain;
     in
