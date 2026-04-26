@@ -39,6 +39,13 @@ let
   traitClassModule = {
     config.den.schema.traits = lib.mkMerge (map (denful: denful.traits or { }) denfuls);
     config.den.schema.classes = lib.mkMerge (map (denful: denful.classes or { }) denfuls);
+    # Mirror into _classNames/_traitNames for cycle-free pipeline access.
+    config.den._classNames = lib.mkMerge (
+      map (denful: lib.genAttrs (builtins.attrNames (denful.classes or { })) (_: true)) denfuls
+    );
+    config.den._traitNames = lib.mkMerge (
+      map (denful: lib.genAttrs (builtins.attrNames (denful.traits or { })) (_: true)) denfuls
+    );
   };
 in
 {

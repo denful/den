@@ -28,4 +28,5 @@ in
   den.schema.host.policies = result.schemaPolicies;
 
   den.schema.classes.hjem.description = "Hjem user environment";
+  den._classNames.hjem = true;
 }

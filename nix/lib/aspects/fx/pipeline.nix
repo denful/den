@@ -71,6 +71,14 @@ let
     // handlers.forwardHandler
     // handlers.provideToHandler
     // handlers.compilePolicyHandlers
+    // {
+      "emit-trait" =
+        { param, state }:
+        {
+          resume = null;
+          inherit state;
+        };
+    }
     // fx.effects.state.handler;
 
   # resolve-target resolves a stage aspect by path using resolveStage.
@@ -106,6 +114,8 @@ let
     includesChain = _: [ ];
     deferredIncludes = _: [ ];
     provideTo = _: [ ];
+    traits = _: { };
+    deferredTraits = _: { };
   };
 
   mkPipeline =

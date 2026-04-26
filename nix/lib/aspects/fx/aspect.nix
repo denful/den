@@ -259,6 +259,107 @@ let
       }).resume
     ) handlers;
 
+  # Schema registries for 4-step key classification.
+  # Use den._classNames/den._traitNames instead of den.schema.classes/traits
+  # to avoid infinite recursion: den.schema.classes depends on den.aspects
+  # (via aspect-schema.nix) which triggers compileStatic during pipeline
+  # resolution, creating a cycle.
+  classRegistry = den._classNames or { };
+  traitRegistry = den._traitNames or { };
+
+  # Classify non-structural keys using the schema registry.
+  # 4-step: class → trait → nested aspect → unregistered class.
+  # When both registries are empty (no batteries), fall back to treating
+  # all non-structural keys as classes for backward compatibility.
+  classifyKeys =
+    aspect:
+    let
+      allKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
+      isEmpty = classRegistry == { } && traitRegistry == { };
+    in
+    if isEmpty then
+      {
+        classKeys = allKeys;
+        traitKeys = [ ];
+        nestedKeys = [ ];
+        unregisteredClassKeys = [ ];
+      }
+    else
+      let
+        partition =
+          builtins.foldl'
+            (
+              acc: k:
+              if classRegistry ? ${k} then
+                acc // { classKeys = acc.classKeys ++ [ k ]; }
+              else if traitRegistry ? ${k} then
+                acc // { traitKeys = acc.traitKeys ++ [ k ]; }
+              else
+                let
+                  rawValue = aspect.${k};
+                  # Unwrap aspectContentType to inspect sub-keys
+                  innerValue =
+                    if builtins.isAttrs rawValue && rawValue ? __contentValues then
+                      let
+                        vals = map (d: d.value) rawValue.__contentValues;
+                      in
+                      if builtins.length vals == 1 then builtins.head vals else null
+                    else if builtins.isAttrs rawValue then
+                      rawValue
+                    else
+                      null;
+                  hasRecognizedSubKeys =
+                    builtins.isAttrs innerValue
+                    && builtins.any (sk: classRegistry ? ${sk} || traitRegistry ? ${sk}) (
+                      builtins.attrNames innerValue
+                    );
+                in
+                if hasRecognizedSubKeys then
+                  acc // { nestedKeys = acc.nestedKeys ++ [ k ]; }
+                else
+                  # Unknown key with no recognized sub-keys — treat as class
+                  # (backward compat) but emit trace warning for future migration.
+                  acc // { unregisteredClassKeys = acc.unregisteredClassKeys ++ [ k ]; }
+            )
+            {
+              classKeys = [ ];
+              traitKeys = [ ];
+              nestedKeys = [ ];
+              unregisteredClassKeys = [ ];
+            }
+            allKeys;
+      in
+      partition;
+
+  emitTraits =
+    aspect: traitKeys: nodeIdentity:
+    fx.seq (
+      lib.concatMap (
+        k:
+        let
+          wrapped = aspect.${k};
+          contentValues =
+            if builtins.isAttrs wrapped && wrapped ? __contentValues then
+              wrapped.__contentValues
+            else
+              [
+                {
+                  value = wrapped;
+                  file = "<unknown>";
+                }
+              ];
+        in
+        map (
+          cv:
+          fx.send "emit-trait" {
+            trait = k;
+            inherit (cv) value;
+            chain = nodeIdentity;
+          }
+        ) contentValues
+      ) traitKeys
+    );
+
   emitClasses =
     aspect: classKeys: nodeIdentity:
     let
@@ -556,6 +657,36 @@ let
       fx.bind (fx.send "resolve-complete" resolved) (_: fx.pure resolved)
     );
 
+  # Build a nested sub-aspect from a freeform key and recurse via aspectToEffect.
+  emitNestedAspect =
+    aspect: k: nodeIdentity:
+    let
+      rawValue = aspect.${k};
+      innerValue =
+        if builtins.isAttrs rawValue && rawValue ? __contentValues then
+          let
+            vals = map (d: d.value) rawValue.__contentValues;
+          in
+          if builtins.length vals == 1 then builtins.head vals else { imports = vals; }
+        else
+          rawValue;
+      subAspect =
+        (if builtins.isAttrs innerValue then innerValue else { })
+        // {
+          name = k;
+          meta = (aspect.meta or { }) // {
+            provider = (aspect.meta.provider or [ ]) ++ [ (aspect.name or "<anon>") ];
+          };
+        }
+        // lib.optionalAttrs (aspect ? __scopeHandlers) {
+          inherit (aspect) __scopeHandlers;
+        }
+        // lib.optionalAttrs (aspect ? __ctxId) {
+          inherit (aspect) __ctxId;
+        };
+    in
+    aspectToEffect subAspect;
+
   compileStatic =
     aspect:
     let
@@ -564,14 +695,29 @@ let
       # not fan-out dedup. This keeps chain entries aligned with entry
       # fullNames (provider/name) so parent resolution in graph.nix works.
       chainIdentity = identity.pathKey ((aspect.meta.provider or [ ]) ++ [ (aspect.name or "<anon>") ]);
-      classKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
       rawName = aspect.name or "<anon>";
       isMeaningful = isMeaningfulName rawName;
     in
-    fx.bind (fx.seq [
-      (emitClasses aspect classKeys nodeIdentity)
-      (registerConstraints aspect)
-    ]) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; });
+    let
+      classified = classifyKeys aspect;
+      inherit (classified)
+        classKeys
+        traitKeys
+        nestedKeys
+        unregisteredClassKeys
+        ;
+      # Unregistered keys are treated as classes (backward compat) but
+      # with a trace warning to encourage schema registration.
+      allClassKeys = classKeys ++ unregisteredClassKeys;
+    in
+    fx.bind (fx.seq (
+      [
+        (emitClasses aspect allClassKeys nodeIdentity)
+        (emitTraits aspect traitKeys nodeIdentity)
+        (registerConstraints aspect)
+      ]
+      ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
+    )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; });
 
   # Submodule functions merge through the type system; bare functions
   # become another parametric level; attrsets merge directly.

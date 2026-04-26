@@ -222,4 +222,26 @@ in
     classes.nixos.description = "NixOS system configuration";
     classes.darwin.description = "nix-darwin system configuration";
   };
+
+  # Internal registries for pipeline key classification.
+  # Separate from den.schema.classes/traits to avoid the cycle:
+  # den.schema.classes → aspect-schema.nix → den.aspects → aspect submodule
+  # → den.schema.aspect → den.schema merge → infinite recursion.
+  # Batteries and namespace modules write to both den.schema.* and den._classNames/den._traitNames.
+  options.den._classNames = lib.mkOption {
+    internal = true;
+    type = lib.types.attrsOf lib.types.bool;
+    default = { };
+    description = "Internal: set of registered class names for pipeline key classification.";
+  };
+  options.den._traitNames = lib.mkOption {
+    internal = true;
+    type = lib.types.attrsOf lib.types.bool;
+    default = { };
+    description = "Internal: set of registered trait names for pipeline key classification.";
+  };
+  config.den._classNames = {
+    nixos = true;
+    darwin = true;
+  };
 }
