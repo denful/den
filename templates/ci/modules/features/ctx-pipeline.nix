@@ -75,17 +75,6 @@ let
               }
             )
           ];
-          den.entityProvides.src = lib.listToAttrs (
-            map (tgt: {
-              name = tgt;
-              value =
-                _:
-                { v }:
-                {
-                  funny.names = [ "cross-${tgt}-${v}" ];
-                };
-            }) targetNames
-          );
           den.policies = lib.listToAttrs (
             map (tgt: {
               name = "src-to-${tgt}";
@@ -109,6 +98,12 @@ let
               { v }:
               {
                 funny.names = [ "${name}-${v}" ];
+              }
+            )
+            (
+              { v }:
+              {
+                funny.names = [ "cross-${name}-${v}" ];
               }
             )
           ];

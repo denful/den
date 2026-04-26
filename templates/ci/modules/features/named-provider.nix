@@ -63,12 +63,15 @@
           resolve = ctx: if !(ctx ? who) then [ ] else lib.singleton ctx;
         };
         den.default.policies = [ "test-greet-to-other" ];
-        den.entityProvides.greet.other =
-          _:
-          { who }:
-          {
-            funny.names = [ "other-${who}" ];
-          };
+
+        den.entityIncludes.other = [
+          (
+            { who }:
+            {
+              funny.names = [ "other-${who}" ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [
@@ -173,12 +176,14 @@
           )
         ];
 
-        den.entityProvides.greet.num =
-          _:
-          { number }:
-          {
-            funny.names = [ ("num:" + lib.toString number) ];
-          };
+        den.entityIncludes.num = [
+          (
+            { number }:
+            {
+              funny.names = [ ("num:" + lib.toString number) ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });
         expected = [

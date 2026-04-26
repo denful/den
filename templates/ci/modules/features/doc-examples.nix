@@ -109,12 +109,6 @@
 
         den.schema.host.policies = [ "host-to-peers" ];
 
-        den.entityProvides.host.peer-count =
-          { peer, ... }:
-          {
-            nixos.networking.hostName = peer.name;
-          };
-
         expr =
           let
             result = den.lib.policyInspect.inspect {

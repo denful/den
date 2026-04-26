@@ -87,13 +87,13 @@ let
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.
-  # Returns null when the kind has no entityIncludes/entityProvides (tombstoned).
+  # Returns null when the kind has no entityIncludes (tombstoned).
   resolveEntityHandler = {
     "resolve-entity" =
       { param, state }:
       let
         kind = param.kind;
-        entityExists = (den.entityIncludes or { }) ? ${kind} || (den.entityProvides or { }) ? ${kind};
+        entityExists = (den.entityIncludes or { }) ? ${kind};
         currentCtx = (state.currentCtx or (_: { })) null;
       in
       {

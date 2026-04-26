@@ -18,12 +18,6 @@
             }
           )
         ];
-        den.entityProvides.parent.child =
-          _:
-          { x, y }:
-          {
-            funny.names = [ "parent-for-child-${x}-${y}" ];
-          };
         den.policies.test-parent-to-child = {
           from = "parent";
           to = "child";
@@ -46,6 +40,12 @@
             { x, y }:
             {
               funny.names = [ "child-${y}" ];
+            }
+          )
+          (
+            { x, y }:
+            {
+              funny.names = [ "parent-for-child-${x}-${y}" ];
             }
           )
         ];
@@ -75,12 +75,6 @@
             }
           )
         ];
-        den.entityProvides.src.dst =
-          _:
-          { x, i }:
-          {
-            funny.names = [ "src-for-${x}-${toString i}" ];
-          };
         den.policies.test-src-to-dst = {
           from = "src";
           to = "dst";
@@ -107,6 +101,12 @@
             { x, i }:
             {
               funny.names = [ "dst-${toString i}" ];
+            }
+          )
+          (
+            { x, i }:
+            {
+              funny.names = [ "src-for-${x}-${toString i}" ];
             }
           )
         ];

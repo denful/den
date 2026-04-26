@@ -95,13 +95,6 @@ in
               _core = true;
               resolve = ctx: if ctx ? name then lib.singleton { shout = lib.toUpper ctx.name; } else [ ];
             };
-            den.entityProvides.foo.bar =
-              { name }:
-              { shout }:
-              {
-                my.names = [ "foo ${name} shouted ${shout}" ];
-              };
-
             den.entityIncludes.bar = [
               (
                 { shout }:
@@ -130,7 +123,6 @@ in
 
         expr = ev2.config.names;
         expected = [
-          "foo good shouted GOOD"
           "bar GOOD"
           "foo good"
         ];
