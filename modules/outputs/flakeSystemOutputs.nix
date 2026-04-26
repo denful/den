@@ -10,10 +10,13 @@ let
     output: ((options.flake.type.getSubOptions or (_: options.flake)) { }) ? ${output};
 
   systemOutputFwd =
-    { system, output }:
-    { class, aspect-chain }:
+    {
+      system,
+      output,
+      class,
+      aspect-chain,
+    }:
     let
-      # Use the target entity if it has content (user set den.entityIncludes.flake-packages).
       entityIncs = den.entityIncludes."flake-${output}" or [ ];
       hasEntityContent = entityIncs != [ ];
       source =
@@ -46,12 +49,25 @@ let
 
 in
 {
-  # Cross-provides on flake-system: transition handler uses these when
-  # policies route flake-system → flake-${output}.
-  den.entityProvides.flake-system = lib.listToAttrs (
+  # Register forwarders as named aspects.
+  den.aspects = lib.listToAttrs (
     map (output: {
       name = "flake-${output}";
-      value = _: systemOutputFwd;
+      value = systemOutputFwd;
     }) outputs
   );
+
+  # Entity registrations: flake-system must exist as an entity for
+  # flake-to-flake-system transitions. Per-output entities (flake-packages etc.)
+  # must exist for flake-system-to-flake-* transitions.
+  den.entityIncludes =
+    lib.listToAttrs (
+      map (output: {
+        name = "flake-${output}";
+        value = [ ];
+      }) outputs
+    )
+    // {
+      flake-system = [ ];
+    };
 }

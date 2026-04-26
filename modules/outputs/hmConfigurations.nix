@@ -1,7 +1,7 @@
 { lib, den, ... }:
 let
   hmFwd =
-    { home }:
+    { home, ... }:
     den.provides.forward {
       each = lib.optional (home.intoAttr != [ ]) true;
       fromClass = _: home.class;
@@ -19,5 +19,6 @@ let
     };
 in
 {
-  den.entityProvides.flake-system.flake-hm = _: hmFwd;
+  den.aspects.flake-hm = hmFwd;
+  den.entityIncludes.flake-hm = [ ];
 }

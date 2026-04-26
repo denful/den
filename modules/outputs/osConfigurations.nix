@@ -1,7 +1,7 @@
 { lib, den, ... }:
 let
   osFwd =
-    { host }:
+    { host, ... }:
     den.provides.forward {
       each = lib.optional (host.intoAttr != [ ]) true;
       fromClass = _: host.class;
@@ -21,5 +21,6 @@ let
     };
 in
 {
-  den.entityProvides.flake-system.flake-os = _: osFwd;
+  den.aspects.flake-os = osFwd;
+  den.entityIncludes.flake-os = [ ];
 }
