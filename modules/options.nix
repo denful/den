@@ -94,9 +94,9 @@ let
                   let
                     # Entity kinds derived from schema so user-defined kinds
                     # automatically become first-class context args.
-                    schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
-                      builtins.attrNames (den.schema or { })
-                    );
+                    schemaKinds = builtins.filter (
+                      n: n != "conf" && n != "classes" && n != "traits" && !(lib.hasPrefix "_" n)
+                    ) (builtins.attrNames (den.schema or { }));
                     isContextArg = n: builtins.elem n knownKinds || builtins.elem n schemaKinds;
                     ctx = lib.filterAttrs (n: v: isContextArg n && v != null) config._module.args // {
                       ${kind} = config;
@@ -128,13 +128,75 @@ let
           merged;
     };
 
+  classSchemaType = lib.types.submodule {
+    options.description = lib.mkOption {
+      description = "Human-readable description of this class domain.";
+      type = lib.types.str;
+    };
+    options.forwardTo = lib.mkOption {
+      description = "Optional forward target for class evaluation.";
+      type = lib.types.nullOr lib.types.raw;
+      default = null;
+    };
+  };
+
+  traitSchemaType = lib.types.submodule {
+    options.description = lib.mkOption {
+      description = "Human-readable description of this trait channel.";
+      type = lib.types.str;
+    };
+    options.collection = lib.mkOption {
+      description = "Collection strategy for trait data.";
+      type = lib.types.enum [
+        "list"
+        "map"
+      ];
+      default = "list";
+    };
+    options.partialOk = lib.mkOption {
+      description = "Whether partial trait data is acceptable.";
+      type = lib.types.bool;
+      default = false;
+    };
+    options.type = lib.mkOption {
+      description = "Optional type constraint for trait values.";
+      type = lib.types.nullOr lib.types.raw;
+      default = null;
+    };
+  };
+
   schemaOption = lib.mkOption {
     description = "freeform deferred modules per entity kind";
     defaultText = lib.literalExpression "{ }";
     default = { };
-    type = lib.types.submodule {
-      freeformType = lib.types.lazyAttrsOf schemaEntryType;
-    };
+    type = lib.types.submodule (
+      { config, ... }:
+      {
+        freeformType = lib.types.lazyAttrsOf schemaEntryType;
+        options.classes = lib.mkOption {
+          description = "Class evaluation domains";
+          type = lib.types.lazyAttrsOf classSchemaType;
+          default = { };
+        };
+        options.traits = lib.mkOption {
+          description = "Trait semantic data channels";
+          type = lib.types.lazyAttrsOf traitSchemaType;
+          default = { };
+        };
+        config = lib.mkIf (config.classes != { } && config.traits != { }) {
+          _module.checks.classTraitCollision =
+            let
+              classNames = builtins.attrNames config.classes;
+              traitNames = builtins.attrNames config.traits;
+              collisions = builtins.filter (n: builtins.elem n traitNames) classNames;
+            in
+            if collisions != [ ] then
+              throw "den: '${builtins.head collisions}' cannot be both a class and a trait"
+            else
+              true;
+        };
+      }
+    );
   };
 in
 {
