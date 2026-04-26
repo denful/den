@@ -75,44 +75,47 @@
     );
 
     # Fleet /etc/hosts: two hosts, each provides IP to peers via provide-to.
-    # Distribution groups by target and produces handler bindings.
+    # Distribution groups by target and merges trait data.
     test-fleet-hosts-distribution = denTest (
       { den, lib, ... }:
       let
-        # Simulate provide-to emissions from two hosts
+        # Simulate provide-to emissions (new shape: { targetEntity, traits })
         emissions = [
           {
-            label = "peer";
-            content = {
-              ip = "10.0.0.1";
-              hostname = "igloo";
-            };
-            emitterCtx = { };
-            aspectName = "fleet-hosts";
             targetEntity = {
               name = "iceberg";
             };
+            traits = {
+              peer = [
+                {
+                  ip = "10.0.0.1";
+                  hostname = "igloo";
+                }
+              ];
+            };
           }
           {
-            label = "peer";
-            content = {
-              ip = "10.0.0.2";
-              hostname = "iceberg";
-            };
-            emitterCtx = { };
-            aspectName = "fleet-hosts";
             targetEntity = {
               name = "igloo";
             };
+            traits = {
+              peer = [
+                {
+                  ip = "10.0.0.2";
+                  hostname = "iceberg";
+                }
+              ];
+            };
           }
         ];
-        grouped = den.lib.aspects.fx.distributeProvideTo.groupByTarget emissions;
+        grouped = den.lib.aspects.fx.distributeCrossEntity.groupByTarget emissions;
+        distributed = den.lib.aspects.fx.distributeCrossEntity.distributeCrossEntityTraits { } emissions;
       in
       {
         expr = {
           targets = builtins.sort (a: b: a < b) (builtins.attrNames grouped);
-          iglooData = (builtins.head grouped.igloo.peer).hostname;
-          icebergData = (builtins.head grouped.iceberg.peer).hostname;
+          iglooData = (builtins.head distributed.igloo.peer).hostname;
+          icebergData = (builtins.head distributed.iceberg.peer).hostname;
         };
         expected = {
           targets = [
@@ -126,50 +129,48 @@
     );
 
     # Haproxy backends: multiple sources provide http-backend data to a target.
-    # Distribution accumulates data under the same label across sources.
+    # Distribution accumulates data under the same trait across sources.
     test-haproxy-backend-distribution = denTest (
       { den, lib, ... }:
       let
         emissions = [
           {
-            label = "http-backends";
-            content = [
-              {
-                address = "10.0.0.1";
-                port = 8080;
-                vhost = "example.com";
-              }
-            ];
-            emitterCtx = { };
-            aspectName = "example-site";
             targetEntity = {
               name = "lb";
+            };
+            traits = {
+              http-backends = [
+                {
+                  address = "10.0.0.1";
+                  port = 8080;
+                  vhost = "example.com";
+                }
+              ];
             };
           }
           {
-            label = "http-backends";
-            content = [
-              {
-                address = "10.0.0.2";
-                port = 8081;
-                vhost = "foobar.com";
-              }
-            ];
-            emitterCtx = { };
-            aspectName = "foobar-site";
             targetEntity = {
               name = "lb";
             };
+            traits = {
+              http-backends = [
+                {
+                  address = "10.0.0.2";
+                  port = 8081;
+                  vhost = "foobar.com";
+                }
+              ];
+            };
           }
         ];
-        grouped = den.lib.aspects.fx.distributeProvideTo.groupByTarget emissions;
-        handlers = den.lib.aspects.fx.distributeProvideTo.distribute emissions;
+        distributed = den.lib.aspects.fx.distributeCrossEntity.distributeCrossEntityTraits { } emissions;
+        handlers = den.lib.aspects.fx.distributeCrossEntity.distribute { } emissions;
       in
       {
         expr = {
-          backendCount = builtins.length grouped.lb.http-backends;
+          backendCount = builtins.length distributed.lb.http-backends;
           hasHandler = handlers ? lb;
-          vhosts = builtins.sort (a: b: a < b) (map (b: b.vhost) grouped.lb.http-backends);
+          vhosts = builtins.sort (a: b: a < b) (map (b: b.vhost) distributed.lb.http-backends);
         };
         expected = {
           backendCount = 2;
@@ -188,21 +189,20 @@
       let
         emissions = [
           {
-            label = "http-backends";
-            content = [
-              {
-                address = "10.0.0.1";
-                port = 80;
-              }
-            ];
-            emitterCtx = { };
-            aspectName = "web";
             targetEntity = {
               name = "lb";
             };
+            traits = {
+              http-backends = [
+                {
+                  address = "10.0.0.1";
+                  port = 80;
+                }
+              ];
+            };
           }
         ];
-        handlers = den.lib.aspects.fx.distributeProvideTo.distribute emissions;
+        handlers = den.lib.aspects.fx.distributeCrossEntity.distribute { } emissions;
         # The handler for "lb" should contain an "http-backends" effect handler
         lbHandlers = handlers.lb;
       in
@@ -213,6 +213,98 @@
         expected = {
           hasHttpBackends = true;
         };
+      }
+    );
+
+    # Map collection strategy: merges attrsets, detects duplicate keys.
+    test-map-collection-merges = denTest (
+      { den, lib, ... }:
+      let
+        traitSchemas = {
+          endpoints = {
+            collection = "map";
+          };
+        };
+        emissions = [
+          {
+            targetEntity = {
+              name = "gateway";
+            };
+            traits = {
+              endpoints = {
+                api = "10.0.0.1:8080";
+              };
+            };
+          }
+          {
+            targetEntity = {
+              name = "gateway";
+            };
+            traits = {
+              endpoints = {
+                web = "10.0.0.2:80";
+              };
+            };
+          }
+        ];
+        distributed = den.lib.aspects.fx.distributeCrossEntity.distributeCrossEntityTraits {
+          inherit traitSchemas;
+        } emissions;
+      in
+      {
+        expr = {
+          hasApi = distributed.gateway.endpoints ? api;
+          hasWeb = distributed.gateway.endpoints ? web;
+          apiVal = distributed.gateway.endpoints.api;
+        };
+        expected = {
+          hasApi = true;
+          hasWeb = true;
+          apiVal = "10.0.0.1:8080";
+        };
+      }
+    );
+
+    # Map collection with duplicate keys throws error.
+    test-map-collection-duplicate-throws = denTest (
+      { den, lib, ... }:
+      let
+        traitSchemas = {
+          endpoints = {
+            collection = "map";
+          };
+        };
+        emissions = [
+          {
+            targetEntity = {
+              name = "gateway";
+            };
+            traits = {
+              endpoints = {
+                api = "10.0.0.1:8080";
+              };
+            };
+          }
+          {
+            targetEntity = {
+              name = "gateway";
+            };
+            traits = {
+              endpoints = {
+                api = "10.0.0.2:9090";
+              };
+            };
+          }
+        ];
+        result = builtins.tryEval (
+          builtins.deepSeq (den.lib.aspects.fx.distributeCrossEntity.distributeCrossEntityTraits {
+            inherit traitSchemas;
+          } emissions) true
+        );
+      in
+      {
+        expr = result.success;
+        expected = false;
       }
     );
 
