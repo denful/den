@@ -42,7 +42,7 @@ let
           builtins.filter (x: x != null) [ (den.aspects.os-host-fwd or null) ]
         else
           [ ];
-      entityIncludes = den.entityIncludes.${name} or [ ];
+      entityIncludes = (den.schema.${name}.includes or [ ]) ++ (den.entityIncludes.${name} or [ ]);
       entityProvides = den.entityProvides.${name} or { };
     in
     {

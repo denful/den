@@ -17,7 +17,12 @@ let
 
   # Context args are derived from the entity's _module.args, filtered to
   # known entity kinds so framework args don't leak through.
-  knownKinds = builtins.attrNames ((den.entityIncludes or { }) // (den.entityProvides or { }));
+  schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
+    builtins.attrNames (den.schema or { })
+  );
+  knownKinds = lib.unique (
+    schemaKinds ++ builtins.attrNames ((den.entityIncludes or { }) // (den.entityProvides or { }))
+  );
 
   # Option type names whose values are safe for identity hashing.
   primitiveTypeNames = [
@@ -36,7 +41,22 @@ let
         loc: defs:
         let
           kind = lib.last loc;
-          merged = base.merge loc defs;
+          # Extract includes from defs that have them, strip before deferred merge
+          allIncludes = lib.concatMap (
+            d:
+            if builtins.isAttrs d.value && d.value ? includes && builtins.isList d.value.includes then
+              d.value.includes
+            else
+              [ ]
+          ) defs;
+          strippedDefs = map (
+            d:
+            if builtins.isAttrs d.value && d.value ? includes && builtins.isList d.value.includes then
+              d // { value = builtins.removeAttrs d.value [ "includes" ]; }
+            else
+              d
+          ) defs;
+          merged = base.merge loc strippedDefs;
 
           resolvedCtx =
             { config, options, ... }:
@@ -90,12 +110,8 @@ let
                 type = lib.types.raw;
                 default =
                   let
-                    # Entity kinds derived from schema so user-defined kinds
-                    # automatically become first-class context args.
-                    schemaKinds = builtins.filter (n: n != "conf" && !(lib.hasPrefix "_" n)) (
-                      builtins.attrNames (den.schema or { })
-                    );
-                    isContextArg = n: builtins.elem n knownKinds || builtins.elem n schemaKinds;
+                    # knownKinds already includes schema-derived kinds.
+                    isContextArg = n: builtins.elem n knownKinds;
                     ctx = lib.filterAttrs (n: v: isContextArg n && v != null) config._module.args // {
                       ${kind} = config;
                     };
@@ -114,16 +130,30 @@ let
                 default = null;
               };
             };
+          # Entity gating: kind gets pipeline wiring if it has includes OR entityIncludes (backward compat)
+          hasEntityContent =
+            allIncludes != [ ]
+            || (den.entityIncludes or { }) ? ${kind}
+            || (den.entityProvides or { }) ? ${kind};
         in
-        if (den.entityIncludes or { }) ? ${kind} || (den.entityProvides or { }) ? ${kind} then
+        if hasEntityContent then
           {
-            imports = [
-              merged
-              resolvedCtx
-            ];
+            __functor =
+              _:
+              { ... }:
+              {
+                imports = [
+                  merged
+                  resolvedCtx
+                ];
+              };
+            includes = allIncludes;
           }
         else
-          merged;
+          {
+            __functor = _: { ... }: merged;
+            includes = [ ];
+          };
     };
 
   classSchemaType = lib.types.submodule (
