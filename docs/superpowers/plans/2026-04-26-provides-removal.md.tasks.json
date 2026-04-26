@@ -1,0 +1,41 @@
+{
+  "planPath": "docs/superpowers/plans/2026-04-26-provides-removal.md",
+  "tasks": [
+    {
+      "id": 0,
+      "subject": "Task 0: Migrate provides.X patterns + mutual-provider reads",
+      "status": "pending",
+      "description": "Convert all aspect.provides.X writes to direct nesting AND update mutual-provider reads — in single atomic commit.",
+      "metadata": {
+        "files": ["templates/ci/modules/features/", "templates/default/", "templates/ci/provider/", "modules/aspects/provides/mutual-provider.nix"],
+        "verifyCommand": "nix develop -c just fmt && just ci",
+        "acceptanceCriteria": ["No template writes to aspect.provides.X", "mutual-provider reads from aspect.X", "632/632 tests pass"]
+      }
+    },
+    {
+      "id": 1,
+      "subject": "Task 1: Delete provides pipeline machinery",
+      "status": "pending",
+      "blockedBy": [0],
+      "description": "Delete emitSelfProvide, mkPositionalInclude, mkNamedInclude, emitCrossProvider, crossProvider. Simplify resolveChildren.",
+      "metadata": {
+        "files": ["nix/lib/aspects/fx/aspect.nix", "nix/lib/aspects/fx/handlers/transition.nix"],
+        "verifyCommand": "nix develop -c just fmt && just ci",
+        "acceptanceCriteria": ["emitSelfProvide deleted", "emitCrossProvider deleted", "resolveChildren simplified", "632/632 tests pass"]
+      }
+    },
+    {
+      "id": 2,
+      "subject": "Task 2: Remove provides option + cleanup",
+      "status": "pending",
+      "blockedBy": [1],
+      "description": "Remove provides option and _ alias from aspectSubmodule. Remove provides and _ from structuralKeysSet. Clean up den-brackets.nix.",
+      "metadata": {
+        "files": ["nix/lib/aspects/types.nix", "nix/lib/aspects/fx/aspect.nix", "nix/lib/den-brackets.nix"],
+        "verifyCommand": "nix develop -c just fmt && just ci",
+        "acceptanceCriteria": ["provides option gone", "_ alias gone", "structuralKeysSet clean", "den-brackets simplified", "632/632 tests pass"]
+      }
+    }
+  ],
+  "lastUpdated": "2026-04-26T18:00:00Z"
+}
