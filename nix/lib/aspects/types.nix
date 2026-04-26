@@ -70,7 +70,14 @@ let
         d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
       ) defs;
       originalFunctor =
-        if explicitFunctors != [ ] then (lib.last explicitFunctors).value.__functor else null;
+        if builtins.length explicitFunctors > 1 then
+          throw "den: multiple __functor definitions at ${
+            lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc)
+          } — merge is ambiguous. Use lib.mkForce to override."
+        else if explicitFunctors != [ ] then
+          (lib.head explicitFunctors).value.__functor
+        else
+          null;
       merged = sub.merge loc (
         defs
         ++ [
@@ -129,9 +136,10 @@ let
     in
     if subFns != [ ] then
       baseType.merge loc subFns
-    else
+    else if builtins.length paramFns == 1 then
+      # Single bare parametric fn: return raw wrapper (cheap, no submodule eval).
       let
-        fn = (lib.last paramFns).value;
+        fn = (builtins.head paramFns).value;
       in
       if builtins.isAttrs fn then
         fn
@@ -148,7 +156,20 @@ let
           __fn = fn;
           __args = args;
           __functor = self: self.__fn;
-        };
+        }
+    else
+      # Multiple bare parametric fns: coerce each to { includes = [fn]; }, merge through aspectType.
+      baseType.merge loc (
+        map (
+          d:
+          d
+          // {
+            value = {
+              includes = [ d.value ];
+            };
+          }
+        ) paramFns
+      );
 
   providerType =
     typeCfg:
@@ -172,10 +193,29 @@ let
         in
         if parametrics != [ ] then
           let
-            wrapper = (lib.last parametrics).value;
-            nameFromLoc = lib.last loc;
+            nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
           in
-          wrapper // lib.optionalAttrs (!(wrapper ? name) || wrapper.name == "<anon>") { name = nameFromLoc; }
+          # Single wrapper with no other defs: return wrapper directly (cheap, no submodule eval).
+          # Multiple wrappers or mixed: coerce __fn to includes, merge through aspectType.
+          if builtins.length parametrics == 1 && nonParametrics == [ ] then
+            let
+              wrapper = (builtins.head parametrics).value;
+              nameFromLoc = lib.last loc;
+            in
+            wrapper // lib.optionalAttrs (!(wrapper ? name) || wrapper.name == "<anon>") { name = nameFromLoc; }
+          else
+            baseType.merge loc (
+              map (
+                d:
+                d
+                // {
+                  value = {
+                    includes = [ d.value.__fn ];
+                  };
+                }
+              ) parametrics
+              ++ nonParametrics
+            )
         else
           let
             nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
