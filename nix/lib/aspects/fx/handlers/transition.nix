@@ -107,7 +107,7 @@ let
     "get-path-set"
     "has-handler"
     "provide-to"
-    "resolve-target"
+    "resolve-entity"
   ];
 
   collectPolicyHandlers =
@@ -243,9 +243,8 @@ let
         policyHandlers = collectPolicyHandlers (sourceAspect.name or "") targetKey;
       in
       fx.bind
-        (fx.send "resolve-target" {
-          path = transition.path;
-          inherit targetClass;
+        (fx.send "resolve-entity" {
+          kind = lib.concatStringsSep "." transition.path;
         })
         (
           rawTarget:

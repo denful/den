@@ -80,40 +80,24 @@ let
     // identity.collectPathsHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
-    // resolveTargetHandler
     // resolveEntityHandler
     // handlers.forwardHandler
     // handlers.provideToHandler
     // handlers.compilePolicyHandlers
     // fx.effects.state.handler;
 
-  # resolve-target resolves a stage/entity by path using resolveEntity.
-  # Policies dispatch via per-policy named effects in the transition handler.
-  resolveTargetHandler = {
-    "resolve-target" =
-      { param, state }:
-      let
-        stageName = lib.concatStringsSep "." param.path;
-        entityExists =
-          (den.entityIncludes or { }) ? ${stageName} || (den.entityProvides or { }) ? ${stageName};
-        currentCtx = (state.currentCtx or (_: { })) null;
-      in
-      {
-        resume = if entityExists then den.lib.resolveEntity stageName currentCtx else null;
-        inherit state;
-      };
-  };
-
   # resolve-entity resolves an entity by kind using resolveEntity.
+  # Returns null when the kind has no entityIncludes/entityProvides (tombstoned).
   resolveEntityHandler = {
     "resolve-entity" =
       { param, state }:
       let
         kind = param.kind;
+        entityExists = (den.entityIncludes or { }) ? ${kind} || (den.entityProvides or { }) ? ${kind};
         currentCtx = (state.currentCtx or (_: { })) null;
       in
       {
-        resume = den.lib.resolveEntity kind currentCtx;
+        resume = if entityExists then den.lib.resolveEntity kind currentCtx else null;
         inherit state;
       };
   };
