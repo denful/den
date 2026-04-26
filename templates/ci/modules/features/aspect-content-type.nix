@@ -62,7 +62,7 @@ in
         aspect = {
           name = "classTest";
           meta = { };
-          nixosModules = {
+          nixos = {
             enable = true;
           };
           includes = [ ];
@@ -81,7 +81,7 @@ in
         };
         expected = {
           classCount = 1;
-          className = "nixosModules";
+          className = "nixos";
           module = {
             enable = true;
           };
@@ -89,7 +89,7 @@ in
       }
     );
 
-    # Plain data values (attrsets) accepted without type errors.
+    # Unregistered attrset keys are ignored (not emitted as classes).
     test-plain-data-attrset = denTest (
       { den, ... }:
       let
@@ -107,22 +107,22 @@ in
           handlers = collectHandlers;
           state = { };
         } comp;
-        # myTrait becomes a class emission — the pipeline emits it
-        emitted = builtins.filter (c: c.class == "myTrait") result.state.classes;
+        # myTrait is unregistered — ignored by freeform-ignore
+        emitted = builtins.filter (c: c.class == "myTrait") (result.state.classes or [ ]);
       in
       {
         expr = {
           emitCount = builtins.length emitted;
-          className = (builtins.head emitted).class;
+          resolvedOk = result.value.name == "dataTest";
         };
         expected = {
-          emitCount = 1;
-          className = "myTrait";
+          emitCount = 0;
+          resolvedOk = true;
         };
       }
     );
 
-    # Plain list values accepted without type errors.
+    # Unregistered list keys are ignored (not emitted as classes).
     test-plain-data-list = denTest (
       { den, ... }:
       let
@@ -140,11 +140,11 @@ in
           handlers = collectHandlers;
           state = { };
         } comp;
-        emitted = builtins.filter (c: c.class == "myPackages") result.state.classes;
+        emitted = builtins.filter (c: c.class == "myPackages") (result.state.classes or [ ]);
       in
       {
         expr = builtins.length emitted;
-        expected = 1;
+        expected = 0;
       }
     );
 

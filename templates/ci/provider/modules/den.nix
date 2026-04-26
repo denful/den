@@ -42,6 +42,8 @@
     ];
   };
 
+  den.classes.funny.description = "Test class for pipeline verification";
+
   # A provider entry shared to consumers — provides a self-provider function.
   provider.simple.provides.simple = _: { funny.names = [ "from-provider" ]; };
 

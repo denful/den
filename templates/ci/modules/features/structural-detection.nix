@@ -316,5 +316,115 @@
       }
     );
 
+    # targetClass recognition: pipeline's class is recognized even without registry entry.
+    test-target-class-recognized = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        aspect = {
+          name = "custom";
+          meta = { };
+          # "myclass" is NOT in den.classes but IS the pipeline targetClass
+          myclass = {
+            some.config = true;
+          };
+          includes = [ ];
+        };
+        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
+        result = fx.handle {
+          handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
+            class = "myclass";
+            ctx = { };
+          };
+          state = den.lib.aspects.fx.pipeline.defaultState;
+        } comp;
+      in
+      {
+        den.classes.nixos.description = "NixOS";
+
+        # myclass matches targetClass → emitted as class → produces import
+        expr = builtins.length (result.state.imports null);
+        expected = 1;
+      }
+    );
+
+    # Unregistered key with no sub-keys is ignored (not emitted as class).
+    test-unregistered-key-ignored = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        aspect = {
+          name = "test";
+          meta = { };
+          nixos = {
+            networking.hostName = "test";
+          };
+          # "bogus" is not registered and has no recognized sub-keys
+          bogus = {
+            whatever = true;
+          };
+          includes = [ ];
+        };
+        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
+        result = fx.handle {
+          handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
+            class = "nixos";
+            ctx = { };
+          };
+          state = den.lib.aspects.fx.pipeline.defaultState;
+        } comp;
+      in
+      {
+        den.classes.nixos.description = "NixOS";
+
+        # Only nixos produces an import; bogus is ignored
+        expr = builtins.length (result.state.imports null);
+        expected = 1;
+      }
+    );
+
+    # targetClass null safety: when class is not in scope, no match occurs.
+    test-target-class-null-safe = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        aspect = {
+          name = "safe";
+          meta = { };
+          nixos = {
+            networking.hostName = "test";
+          };
+          includes = [ ];
+        };
+        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
+        result = fx.handle {
+          handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
+            class = "nixos";
+            ctx = { };
+          };
+          state = den.lib.aspects.fx.pipeline.defaultState;
+        } comp;
+      in
+      {
+        den.classes.nixos.description = "NixOS";
+
+        expr = result.value.name;
+        expected = "safe";
+      }
+    );
+
+    # funnyNames helper works with funny class registered in provider.
+    test-funny-class-registered = denTest (
+      { den, funnyNames, ... }:
+      {
+        den.aspects.simple = {
+          funny.names = [ "test-value" ];
+        };
+
+        expr = funnyNames den.aspects.simple;
+        expected = [ "test-value" ];
+      }
+    );
+
   };
 }

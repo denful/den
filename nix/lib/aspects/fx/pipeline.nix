@@ -191,7 +191,14 @@ let
       # Synthetic module injecting _den.traits into evalModules fixpoint.
       # Only added when trait schemas exist — zero overhead otherwise.
       traitModule =
-        { config, lib, pkgs, options, modulesPath, ... }@moduleArgs:
+        {
+          config,
+          lib,
+          pkgs,
+          options,
+          modulesPath,
+          ...
+        }@moduleArgs:
         {
           options._den.traits = lib.mkOption {
             type = lib.types.attrsOf lib.types.anything;

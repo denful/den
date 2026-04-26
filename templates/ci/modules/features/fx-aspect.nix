@@ -62,7 +62,7 @@ in
         aspect = {
           name = "myAspect";
           meta = { };
-          nixosModules = {
+          nixos = {
             enable = true;
           };
           includes = [ ];
@@ -82,7 +82,7 @@ in
         };
         expected = {
           classCount = 1;
-          className = "nixosModules";
+          className = "nixos";
           module = {
             enable = true;
           };
@@ -98,10 +98,10 @@ in
         aspect = {
           name = "multiClass";
           meta = { };
-          nixosModules = {
+          nixos = {
             x = 1;
           };
-          homeModules = {
+          homeManager = {
             y = 2;
           };
           includes = [ ];
@@ -116,8 +116,8 @@ in
       {
         expr = builtins.sort builtins.lessThan classNames;
         expected = [
-          "homeModules"
-          "nixosModules"
+          "homeManager"
+          "nixos"
         ];
       }
     );
@@ -132,7 +132,7 @@ in
           __fn =
             { host }:
             {
-              nixosModules = {
+              nixos = {
                 hostName = host;
               };
               includes = [ ];
@@ -179,7 +179,7 @@ in
         aspect = {
           name = "staticAspect";
           meta = { };
-          nixosModules = {
+          nixos = {
             enabled = true;
           };
           includes = [ ];

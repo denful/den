@@ -285,7 +285,7 @@ let
   # When both registries are empty (no batteries), fall back to treating
   # all non-structural keys as classes for backward compatibility.
   classifyKeys =
-    aspect:
+    targetClass: aspect:
     let
       allKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
       isEmpty = classRegistry == { } && traitRegistry == { };
@@ -303,7 +303,7 @@ let
           builtins.foldl'
             (
               acc: k:
-              if classRegistry ? ${k} then
+              if classRegistry ? ${k} || (targetClass != null && k == targetClass) then
                 acc // { classKeys = acc.classKeys ++ [ k ]; }
               else if traitRegistry ? ${k} then
                 acc // { traitKeys = acc.traitKeys ++ [ k ]; }
@@ -731,26 +731,38 @@ let
       rawName = aspect.name or "<anon>";
       isMeaningful = isMeaningfulName rawName;
     in
-    let
-      classified = classifyKeys aspect;
-      inherit (classified)
-        classKeys
-        traitKeys
-        nestedKeys
-        unregisteredClassKeys
-        ;
-      # Unregistered keys are treated as classes (backward compat) but
-      # with a trace warning to encourage schema registration.
-      allClassKeys = classKeys ++ unregisteredClassKeys;
-    in
-    fx.bind (fx.seq (
-      [
-        (emitClasses aspect allClassKeys nodeIdentity)
-        (emitTraits aspect traitKeys nodeIdentity)
-        (registerConstraints aspect)
-      ]
-      ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
-    )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; });
+    fx.bind (fx.effects.hasHandler "class") (
+      hasClassHandler:
+      fx.bind (if hasClassHandler then fx.send "class" null else fx.pure null) (
+        targetClass:
+        let
+          classified = classifyKeys targetClass aspect;
+          inherit (classified)
+            classKeys
+            traitKeys
+            nestedKeys
+            unregisteredClassKeys
+            ;
+          # Unregistered keys are ignored with a trace warning.
+          # targetClass recognition ensures forward-scoped class aliases are not dropped.
+          allClassKeys = classKeys;
+          _warn = builtins.seq (map (
+            k:
+            builtins.trace "den: ignoring unregistered key '${k}' in aspect '${rawName}' — register in den.classes or den.traits" null
+          ) unregisteredClassKeys) null;
+        in
+        builtins.seq _warn (
+          fx.bind (fx.seq (
+            [
+              (emitClasses aspect allClassKeys nodeIdentity)
+              (emitTraits aspect traitKeys nodeIdentity)
+              (registerConstraints aspect)
+            ]
+            ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
+          )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
+        )
+      )
+    );
 
   # Submodule functions merge through the type system; bare functions
   # become another parametric level; attrsets merge directly.
