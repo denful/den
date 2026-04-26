@@ -10,11 +10,14 @@
         ...
       }:
       {
-        den.stages.greeting.provides.greeting =
-          { hello }:
-          {
-            funny.names = [ hello ];
-          };
+        den.entityIncludes.greeting = [
+          (
+            { hello }:
+            {
+              funny.names = [ hello ];
+            }
+          )
+        ];
         den.policies.test-greeting-to-shout = {
           from = "greeting";
           to = "shout";
@@ -22,11 +25,14 @@
         };
         den.default.policies = [ "test-greeting-to-shout" ];
 
-        den.stages.shout.provides.shout =
-          { shout }:
-          {
-            funny.names = [ shout ];
-          };
+        den.entityIncludes.shout = [
+          (
+            { shout }:
+            {
+              funny.names = [ shout ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "greeting" { hello = "world"; });
         expected = [
@@ -39,12 +45,13 @@
     test-ctx-includes-static-and-parametric = denTest (
       { den, funnyNames, ... }:
       {
-        den.stages.foo.provides.foo =
-          { foo }:
-          {
-            funny.names = [ foo ];
-          };
-        den.stages.foo.includes = [
+        den.entityIncludes.foo = [
+          (
+            { foo }:
+            {
+              funny.names = [ foo ];
+            }
+          )
           { funny.names = [ "static-include" ]; }
           (
             { foo, ... }:
@@ -66,13 +73,15 @@
     test-ctx-owned = denTest (
       { den, funnyNames, ... }:
       {
-        den.stages.bar.provides.bar =
-          { x }:
-          {
-            funny.names = [ x ];
-          };
-        den.stages.bar.funny.names = [ "owned" ];
-        den.stages.bar.includes = [ ];
+        den.entityIncludes.bar = [
+          (
+            { x }:
+            {
+              funny.names = [ x ];
+            }
+          )
+          { funny.names = [ "owned" ]; }
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "bar" { x = "val"; });
         expected = [

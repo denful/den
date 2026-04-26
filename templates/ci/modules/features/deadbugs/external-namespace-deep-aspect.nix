@@ -87,7 +87,7 @@
         ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.igloo.provides.to-users.includes = [ provider.tools.provides.dev.provides.user-stamp ];
-        den.stages.user.includes = [ den.provides.mutual-provider ];
+        den.entityIncludes.user = [ den.provides.mutual-provider ];
         expr = igloo.users.users.tux.description;
         expected = "user-of-igloo";
       }

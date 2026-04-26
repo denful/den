@@ -8,10 +8,9 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.default = {
-          includes = [ ];
-          nixos.users.users.tux.description = "from-default-stage";
-        };
+        den.entityIncludes.default = [
+          { nixos.users.users.tux.description = "from-default-stage"; }
+        ];
 
         expr = igloo.users.users.tux.description;
         expected = "from-default-stage";
@@ -48,10 +47,9 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.user = {
-          includes = [ ];
-          nixos.users.users.tux.description = "from-user-stage";
-        };
+        den.entityIncludes.user = [
+          { nixos.users.users.tux.description = "from-user-stage"; }
+        ];
 
         expr = igloo.users.users.tux.description;
         expected = "from-user-stage";
@@ -63,11 +61,14 @@
     test-stage-function-sugar = denTest (
       { den, funnyNames, ... }:
       {
-        den.stages.greet =
-          { hello }:
-          {
-            funny.names = [ hello ];
-          };
+        den.entityIncludes.greet = [
+          (
+            { hello }:
+            {
+              funny.names = [ hello ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { hello = "world"; });
         expected = [ "world" ];

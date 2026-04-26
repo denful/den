@@ -15,13 +15,9 @@ let
       ;
   };
 
-  # Schema entries auto-inject config.resolved when den.stages.${kind} exists
-  # or den.policies reference the kind.
   # Context args are derived from the entity's _module.args, filtered to
-  # known stage kinds so framework args don't leak through.
-  knownKinds = builtins.attrNames (
-    (den.stages or { }) // (den.entityIncludes or { }) // (den.entityProvides or { })
-  );
+  # known entity kinds so framework args don't leak through.
+  knownKinds = builtins.attrNames ((den.entityIncludes or { }) // (den.entityProvides or { }));
 
   # Option type names whose values are safe for identity hashing.
   primitiveTypeNames = [
@@ -119,11 +115,7 @@ let
               };
             };
         in
-        if
-          den.stages ? ${kind}
-          || (den.entityIncludes or { }) ? ${kind}
-          || (den.entityProvides or { }) ? ${kind}
-        then
+        if (den.entityIncludes or { }) ? ${kind} || (den.entityProvides or { }) ? ${kind} then
           {
             imports = [
               merged

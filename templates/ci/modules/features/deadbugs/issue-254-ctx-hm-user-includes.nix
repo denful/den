@@ -15,15 +15,13 @@
         den.default.homeManager.home.stateVersion = "25.11";
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.hm-user = {
-          includes = [
-            {
-              homeManager = {
-                programs.nix-index.enable = true;
-              };
-            }
-          ];
-        };
+        den.entityIncludes.hm-user = [
+          {
+            homeManager = {
+              programs.nix-index.enable = true;
+            };
+          }
+        ];
 
         den.aspects.tux.homeManager = {
           # Dont enable this, it should be set via den.stages.hm-user
@@ -47,15 +45,13 @@
         den.default.homeManager.home.stateVersion = "25.11";
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.user = {
-          includes = [
-            {
-              homeManager = {
-                programs.nix-index.enable = true;
-              };
-            }
-          ];
-        };
+        den.entityIncludes.user = [
+          {
+            homeManager = {
+              programs.nix-index.enable = true;
+            };
+          }
+        ];
 
         expr = tuxHm.programs.nix-index.enable;
         expected = true;
@@ -74,15 +70,13 @@
         den.default.homeManager.home.stateVersion = "25.11";
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.hm-host = {
-          includes = [
-            {
-              nixos = {
-                home-manager.useGlobalPkgs = true;
-              };
-            }
-          ];
-        };
+        den.entityIncludes.hm-host = [
+          {
+            nixos = {
+              home-manager.useGlobalPkgs = true;
+            };
+          }
+        ];
 
         expr = igloo.home-manager.useGlobalPkgs;
         expected = true;
@@ -115,13 +109,11 @@
           };
         };
 
-        den.stages.hjem-user = {
-          includes = [
-            {
-              hjem.foo = "bar";
-            }
-          ];
-        };
+        den.entityIncludes.hjem-user = [
+          {
+            hjem.foo = "bar";
+          }
+        ];
 
         expr = igloo.hjem.users.tux.foo;
         expected = "bar";

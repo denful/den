@@ -30,8 +30,6 @@ let
     take = ./take.nix;
     policyTypes = ./policy-types.nix;
     resolveEntity = ./resolve-entity.nix;
-    resolveStage = ./resolve-stage.nix;
-    stageTypes = ./stage-types.nix;
     strict = ./strict.nix;
     diag = ./diag;
     policyInspect = ./policy-inspect.nix;

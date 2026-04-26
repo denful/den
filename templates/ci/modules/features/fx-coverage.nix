@@ -543,10 +543,9 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-filter = {
-          includes = [ ];
-          nixos.users.users.tux.description = "from-stage";
-        };
+        den.entityIncludes.test-filter = [
+          { nixos.users.users.tux.description = "from-stage"; }
+        ];
 
         den.default.policies = [ "host-to-test-filter" ];
 

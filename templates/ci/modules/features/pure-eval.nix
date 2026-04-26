@@ -44,24 +44,28 @@ in
         ev = evalPure (
           { den, ... }:
           {
-            den.stages.a = {
-              provides.a =
+            den.entityIncludes.a = [
+              (
                 { v }:
                 {
                   my.val = [ v ];
-                };
-            };
+                }
+              )
+            ];
             den.policies.a-to-b = {
               from = "a";
               to = "b";
               _core = true;
               resolve = ctx: if ctx ? v then [ { v = "${ctx.v}!"; } ] else [ ];
             };
-            den.stages.b.provides.b =
-              { v }:
-              {
-                my.val = [ v ];
-              };
+            den.entityIncludes.b = [
+              (
+                { v }:
+                {
+                  my.val = [ v ];
+                }
+              )
+            ];
           }
         );
         asp = ev.config.den.lib.resolveEntity "a" { v = "x"; };

@@ -35,7 +35,7 @@
       in
       {
 
-        den.stages.foo.provides.foo = { name }: den.aspects.${name};
+        den.entityIncludes.foo = [ ({ name }: den.aspects.${name}) ];
 
         den.aspects.moo = {
           goofy.names = [ "hello" ];
@@ -64,7 +64,7 @@
         imports = [ inputs.den.flakeOutputs.packages ];
         den.hosts.x86_64-linux.igloo = { };
 
-        den.stages.flake-packages.includes = [ den.aspects.igloo ];
+        den.entityIncludes.flake-packages = [ den.aspects.igloo ];
 
         den.aspects.igloo = {
           packages =
@@ -99,7 +99,7 @@
             };
         };
 
-        den.stages.flake-apps.includes = [ den.aspects.foo ];
+        den.entityIncludes.flake-apps = [ den.aspects.foo ];
 
         expr = lib.getName config.flake.apps.x86_64-linux.hello;
         expected = "hello";
@@ -125,7 +125,7 @@
             };
         };
 
-        den.stages.flake-checks.includes = [ den.aspects.foo ];
+        den.entityIncludes.flake-checks = [ den.aspects.foo ];
 
         expr = lib.getName config.flake.checks.x86_64-linux.hello;
         expected = "hello";
@@ -153,7 +153,7 @@
             };
         };
 
-        den.stages.flake-devShells.includes = [ den.aspects.foo ];
+        den.entityIncludes.flake-devShells = [ den.aspects.foo ];
 
         expr = config.flake.devShells.x86_64-linux ? default;
         expected = true;

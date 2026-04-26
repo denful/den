@@ -31,10 +31,10 @@ in
         inherit expr expected;
       };
 
-    test-module-has-empty-stages =
+    test-module-has-empty-entityIncludes =
       let
         ev = lib.evalModules { modules = [ denModule ]; };
-        expr = lib.attrNames ev.config.den.stages;
+        expr = lib.attrNames ev.config.den.entityIncludes;
         expected = [ ];
       in
       {
@@ -81,29 +81,35 @@ in
         module =
           { den, lib, ... }:
           {
-            den.stages.foo.provides.foo =
-              { name }:
-              {
-                my.names = [ "foo ${name}" ];
-              };
+            den.entityIncludes.foo = [
+              (
+                { name }:
+                {
+                  my.names = [ "foo ${name}" ];
+                }
+              )
+            ];
             den.policies.foo-to-bar = {
               from = "foo";
               to = "bar";
               _core = true;
               resolve = ctx: if ctx ? name then lib.singleton { shout = lib.toUpper ctx.name; } else [ ];
             };
-            den.stages.foo.provides.bar =
+            den.entityProvides.foo.bar =
               { name }:
               { shout }:
               {
                 my.names = [ "foo ${name} shouted ${shout}" ];
               };
 
-            den.stages.bar.provides.bar =
-              { shout }:
-              {
-                my.names = [ "bar ${shout}" ];
-              };
+            den.entityIncludes.bar = [
+              (
+                { shout }:
+                {
+                  my.names = [ "bar ${shout}" ];
+                }
+              )
+            ];
 
             den.aspects.foobar.includes = [
               # resolveStage results carry __scopeHandlers which are

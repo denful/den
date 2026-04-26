@@ -46,8 +46,9 @@
         den.homes.x86_64-linux.tux = { };
         den.default.homeManager.home.stateVersion = "25.11";
         den.default.includes = [ den.provides.define-user ];
-        den.stages.home.homeManager.programs.vim.enable = true;
-        den.stages.home.includes = [ ];
+        den.entityIncludes.home = [
+          { homeManager.programs.vim.enable = true; }
+        ];
 
         expr = config.flake.homeConfigurations.tux.config.programs.vim.enable;
         expected = true;
@@ -70,7 +71,7 @@
           home.keyboard.model = if args ? osConfig then "os-bound" else "standalone";
         };
 
-        den.stages.home.includes = [ den.provides.mutual-provider ];
+        den.entityIncludes.home = [ den.provides.mutual-provider ];
         den.aspects.tux.provides.igloo = {
           homeManager.home.keyboard.layout = "enthium";
           includes = [

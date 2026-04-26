@@ -10,14 +10,15 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-flat = {
-          includes = [ ];
-          nixos =
-            { host, config, ... }:
-            {
-              networking.hostName = host.name;
-            };
-        };
+        den.entityIncludes.test-flat = [
+          {
+            nixos =
+              { host, config, ... }:
+              {
+                networking.hostName = host.name;
+              };
+          }
+        ];
 
         den.policies.host-to-test-flat = {
           from = "host";
@@ -40,20 +41,18 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-twolayer = {
-          includes = [
-            (
-              { host, ... }:
-              {
-                nixos =
-                  { config, ... }:
-                  {
-                    networking.hostName = host.name;
-                  };
-              }
-            )
-          ];
-        };
+        den.entityIncludes.test-twolayer = [
+          (
+            { host, ... }:
+            {
+              nixos =
+                { config, ... }:
+                {
+                  networking.hostName = host.name;
+                };
+            }
+          )
+        ];
 
         den.policies.host-to-test-twolayer = {
           from = "host";
@@ -76,19 +75,20 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-multi-args = {
-          includes = [ ];
-          nixos =
-            {
-              host,
-              user,
-              config,
-              ...
-            }:
-            {
-              users.users.tux.description = "${host.name}/${user.name}";
-            };
-        };
+        den.entityIncludes.test-multi-args = [
+          {
+            nixos =
+              {
+                host,
+                user,
+                config,
+                ...
+              }:
+              {
+                users.users.tux.description = "${host.name}/${user.name}";
+              };
+          }
+        ];
 
         den.policies.host-to-test-multi-args = {
           from = "host";
@@ -136,18 +136,19 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-functor = {
-          includes = [ ];
-          nixos = {
-            __functor =
-              self:
-              { config, ... }:
-              {
-                networking.hostName = self.myName;
-              };
-            myName = "from-functor";
-          };
-        };
+        den.entityIncludes.test-functor = [
+          {
+            nixos = {
+              __functor =
+                self:
+                { config, ... }:
+                {
+                  networking.hostName = self.myName;
+                };
+              myName = "from-functor";
+            };
+          }
+        ];
 
         den.policies.host-to-test-functor = {
           from = "host";
@@ -171,20 +172,21 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-funcargs = {
-          includes = [ ];
-          nixos =
-            {
-              host,
-              config,
-              lib,
-              pkgs,
-              ...
-            }:
-            {
-              users.users.tux.description = host.name;
-            };
-        };
+        den.entityIncludes.test-funcargs = [
+          {
+            nixos =
+              {
+                host,
+                config,
+                lib,
+                pkgs,
+                ...
+              }:
+              {
+                users.users.tux.description = host.name;
+              };
+          }
+        ];
 
         den.policies.host-to-test-funcargs = {
           from = "host";
@@ -255,9 +257,7 @@
             };
         };
 
-        den.stages.test-static-flat = {
-          includes = [ den.aspects.static-flat ];
-        };
+        den.entityIncludes.test-static-flat = [ den.aspects.static-flat ];
 
         den.policies.host-to-test-static-flat = {
           from = "host";
@@ -280,20 +280,18 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-cross-param = {
-          includes = [
-            (
-              { host, ... }:
-              {
-                nixos =
-                  { user, config, ... }:
-                  {
-                    users.users.tux.description = "${host.name}/${user.name}";
-                  };
-              }
-            )
-          ];
-        };
+        den.entityIncludes.test-cross-param = [
+          (
+            { host, ... }:
+            {
+              nixos =
+                { user, config, ... }:
+                {
+                  users.users.tux.description = "${host.name}/${user.name}";
+                };
+            }
+          )
+        ];
 
         den.policies.host-to-test-cross-param = {
           from = "host";
@@ -316,21 +314,19 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-paren = {
-          includes = [
-            (
-              { host, ... }:
-              {
-                nixos = (
-                  { config, ... }:
-                  {
-                    networking.hostName = host.name;
-                  }
-                );
-              }
-            )
-          ];
-        };
+        den.entityIncludes.test-paren = [
+          (
+            { host, ... }:
+            {
+              nixos = (
+                { config, ... }:
+                {
+                  networking.hostName = host.name;
+                }
+              );
+            }
+          )
+        ];
 
         den.policies.host-to-test-paren = {
           from = "host";
@@ -353,17 +349,18 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-full-apply = {
-          includes = [ ];
-          nixos =
-            { host }:
-            (
-              { config, ... }:
-              {
-                networking.hostName = host.name;
-              }
-            );
-        };
+        den.entityIncludes.test-full-apply = [
+          {
+            nixos =
+              { host }:
+              (
+                { config, ... }:
+                {
+                  networking.hostName = host.name;
+                }
+              );
+          }
+        ];
 
         den.policies.host-to-test-full-apply = {
           from = "host";
@@ -419,16 +416,16 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-collision-err-int = {
-          includes = [
-            { nixos._module.args.host = "from-module-system"; }
-          ];
-          nixos =
-            { host, config, ... }:
-            {
-              networking.hostName = if builtins.isString host then host else host.name;
-            };
-        };
+        den.entityIncludes.test-collision-err-int = [
+          { nixos._module.args.host = "from-module-system"; }
+          {
+            nixos =
+              { host, config, ... }:
+              {
+                networking.hostName = if builtins.isString host then host else host.name;
+              };
+          }
+        ];
 
         den.policies.host-to-collision-err-int = {
           from = "host";
@@ -452,16 +449,16 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.schema.host.collisionPolicy = "den-wins";
 
-        den.stages.test-collision-dw = {
-          includes = [
-            { nixos._module.args.host = "from-module-system"; }
-          ];
-          nixos =
-            { host, config, ... }:
-            {
-              networking.hostName = if builtins.isString host then host else host.name;
-            };
-        };
+        den.entityIncludes.test-collision-dw = [
+          { nixos._module.args.host = "from-module-system"; }
+          {
+            nixos =
+              { host, config, ... }:
+              {
+                networking.hostName = if builtins.isString host then host else host.name;
+              };
+          }
+        ];
 
         den.policies.host-to-collision-dw = {
           from = "host";
@@ -484,16 +481,16 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.config.classModuleCollisionPolicy = "den-wins";
 
-        den.stages.test-collision-global = {
-          includes = [
-            { nixos._module.args.host = "from-module-system"; }
-          ];
-          nixos =
-            { host, config, ... }:
-            {
-              networking.hostName = if builtins.isString host then host else host.name;
-            };
-        };
+        den.entityIncludes.test-collision-global = [
+          { nixos._module.args.host = "from-module-system"; }
+          {
+            nixos =
+              { host, config, ... }:
+              {
+                networking.hostName = if builtins.isString host then host else host.name;
+              };
+          }
+        ];
 
         den.policies.host-to-collision-global = {
           from = "host";
@@ -515,16 +512,16 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.schema.host.collisionPolicy = "class-wins";
 
-        den.stages.test-collision-cw = {
-          includes = [
-            { nixos._module.args.host = "from-module-system"; }
-          ];
-          nixos =
-            { host, config, ... }:
-            {
-              networking.hostName = if builtins.isString host then host else host.name;
-            };
-        };
+        den.entityIncludes.test-collision-cw = [
+          { nixos._module.args.host = "from-module-system"; }
+          {
+            nixos =
+              { host, config, ... }:
+              {
+                networking.hostName = if builtins.isString host then host else host.name;
+              };
+          }
+        ];
 
         den.policies.host-to-collision-cw = {
           from = "host";

@@ -78,7 +78,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.host.includes = [
+        den.entityIncludes.host = [
           (
             { host, ... }:
             {
@@ -109,7 +109,7 @@
 
         den.schema.host.policies = [ "host-to-peers" ];
 
-        den.stages.host.provides.peer-count =
+        den.entityProvides.host.peer-count =
           { peer, ... }:
           {
             nixos.networking.hostName = peer.name;

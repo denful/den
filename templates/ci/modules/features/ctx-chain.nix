@@ -8,11 +8,14 @@ let
         name = "ctx-${toString i}";
         next = "ctx-${toString (i + 1)}";
         baseStage = {
-          den.stages.${name}.provides.${name} =
-            { x }:
-            {
-              funny.names = [ "${name}-${x}" ];
-            };
+          den.entityIncludes.${name} = [
+            (
+              { x }:
+              {
+                funny.names = [ "${name}-${x}" ];
+              }
+            )
+          ];
         };
         withPolicy =
           if i + 1 < n then
@@ -70,21 +73,27 @@ in
           (
             { den, ... }:
             {
-              den.stages.root.provides.root =
-                { x }:
-                {
-                  funny.names = [ "root-${x}" ];
-                };
+              den.entityIncludes.root = [
+                (
+                  { x }:
+                  {
+                    funny.names = [ "root-${x}" ];
+                  }
+                )
+              ];
               den.policies.root-to-leaf = {
                 from = "root";
                 to = "leaf";
                 resolve = ctx: if ctx ? x then lib.genList (i: { x = "${ctx.x}-${toString i}"; }) 20 else [ ];
               };
-              den.stages.leaf.provides.leaf =
-                { x }:
-                {
-                  funny.names = [ "leaf-${x}" ];
-                };
+              den.entityIncludes.leaf = [
+                (
+                  { x }:
+                  {
+                    funny.names = [ "leaf-${x}" ];
+                  }
+                )
+              ];
             }
           )
         ];

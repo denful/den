@@ -8,11 +8,14 @@ let
         name = "c${toString i}";
         next = "c${toString (i + 1)}";
         baseStage = {
-          den.stages.${name}.provides.${name} =
-            { x }:
-            {
-              funny.names = [ "${name}-${x}" ];
-            };
+          den.entityIncludes.${name} = [
+            (
+              { x }:
+              {
+                funny.names = [ "${name}-${x}" ];
+              }
+            )
+          ];
         };
         withPolicy =
           if i + 1 < n then
@@ -34,21 +37,27 @@ let
     n:
     { den, ... }:
     {
-      den.stages.root.provides.root =
-        { x }:
-        {
-          funny.names = [ "root-${x}" ];
-        };
+      den.entityIncludes.root = [
+        (
+          { x }:
+          {
+            funny.names = [ "root-${x}" ];
+          }
+        )
+      ];
       den.policies.root-to-leaf = {
         from = "root";
         to = "leaf";
         resolve = ctx: if ctx ? x then lib.genList (i: { x = "${ctx.x}-${toString i}"; }) n else [ ];
       };
-      den.stages.leaf.provides.leaf =
-        { x }:
-        {
-          funny.names = [ "leaf-${x}" ];
-        };
+      den.entityIncludes.leaf = [
+        (
+          { x }:
+          {
+            funny.names = [ "leaf-${x}" ];
+          }
+        )
+      ];
     };
 
   mkCrossProviders =
@@ -58,14 +67,15 @@ let
       srcMod =
         { den, ... }:
         {
-          den.stages.src.provides = {
-            src =
+          den.entityIncludes.src = [
+            (
               { v }:
               {
                 funny.names = [ "src-${v}" ];
-              };
-          }
-          // lib.listToAttrs (
+              }
+            )
+          ];
+          den.entityProvides.src = lib.listToAttrs (
             map (tgt: {
               name = tgt;
               value =
@@ -94,11 +104,14 @@ let
         in
         { den, ... }:
         {
-          den.stages.${name}.provides.${name} =
-            { v }:
-            {
-              funny.names = [ "${name}-${v}" ];
-            };
+          den.entityIncludes.${name} = [
+            (
+              { v }:
+              {
+                funny.names = [ "${name}-${v}" ];
+              }
+            )
+          ];
         }
       ) n;
     in

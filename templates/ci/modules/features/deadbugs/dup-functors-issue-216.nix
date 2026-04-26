@@ -73,7 +73,7 @@ in
             den.aspects.foo.includes = [ den.aspects.groups ];
           }
           {
-            den.stages.foo.provides.foo = { x, y }@ctx: parametric.fixedTo ctx den.aspects.foo;
+            den.entityIncludes.foo = [ ({ x, y }@ctx: parametric.fixedTo ctx den.aspects.foo) ];
           }
         ];
       }

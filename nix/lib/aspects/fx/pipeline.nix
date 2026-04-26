@@ -95,9 +95,7 @@ let
       let
         stageName = lib.concatStringsSep "." param.path;
         entityExists =
-          lib.attrByPath param.path null (den.stages or { }) != null
-          || (den.entityIncludes or { }) ? ${stageName}
-          || (den.entityProvides or { }) ? ${stageName};
+          (den.entityIncludes or { }) ? ${stageName} || (den.entityProvides or { }) ? ${stageName};
         currentCtx = (state.currentCtx or (_: { })) null;
       in
       {

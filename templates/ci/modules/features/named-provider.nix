@@ -5,11 +5,14 @@
     test-self-named-provider = denTest (
       { den, funnyNames, ... }:
       {
-        den.stages.greet.provides.greet =
-          { who }:
-          {
-            funny.names = [ "hello-${who}" ];
-          };
+        den.entityIncludes.greet = [
+          (
+            { who }:
+            {
+              funny.names = [ "hello-${who}" ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [ "hello-nix" ];
@@ -19,13 +22,15 @@
     test-self-named-plus-owned = denTest (
       { den, funnyNames, ... }:
       {
-        den.stages.greet.provides.greet =
-          { who }:
-          {
-            funny.names = [ "hello-${who}" ];
-          };
-        den.stages.greet.funny.names = [ "owned" ];
-        den.stages.greet.includes = [ ];
+        den.entityIncludes.greet = [
+          (
+            { who }:
+            {
+              funny.names = [ "hello-${who}" ];
+            }
+          )
+          { funny.names = [ "owned" ]; }
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [
@@ -43,11 +48,14 @@
         ...
       }:
       {
-        den.stages.greet.provides.greet =
-          { who }:
-          {
-            funny.names = [ "hello-${who}" ];
-          };
+        den.entityIncludes.greet = [
+          (
+            { who }:
+            {
+              funny.names = [ "hello-${who}" ];
+            }
+          )
+        ];
 
         den.policies.test-greet-to-other = {
           from = "greet";
@@ -55,7 +63,7 @@
           resolve = ctx: if !(ctx ? who) then [ ] else lib.singleton ctx;
         };
         den.default.policies = [ "test-greet-to-other" ];
-        den.stages.greet.provides.other =
+        den.entityProvides.greet.other =
           _:
           { who }:
           {
@@ -78,11 +86,14 @@
         ...
       }:
       {
-        den.stages.greet.provides.greet =
-          { who }:
-          {
-            funny.names = [ who ];
-          };
+        den.entityIncludes.greet = [
+          (
+            { who }:
+            {
+              funny.names = [ who ];
+            }
+          )
+        ];
         den.policies.test-greet-to-yell = {
           from = "greet";
           to = "yell";
@@ -90,11 +101,14 @@
         };
         den.default.policies = [ "test-greet-to-yell" ];
 
-        den.stages.yell.provides.yell =
-          { shout }:
-          {
-            funny.names = [ shout ];
-          };
+        den.entityIncludes.yell = [
+          (
+            { shout }:
+            {
+              funny.names = [ shout ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });
         expected = [
@@ -112,11 +126,14 @@
         ...
       }:
       {
-        den.stages.greet.provides.greet =
-          { who }:
-          {
-            funny.names = [ who ];
-          };
+        den.entityIncludes.greet = [
+          (
+            { who }:
+            {
+              funny.names = [ who ];
+            }
+          )
+        ];
         den.policies.test-greet-to-yell-fn = {
           from = "greet";
           to = "yell";
@@ -138,19 +155,25 @@
           "test-greet-to-num"
         ];
 
-        den.stages.yell.provides.yell =
-          { shout }:
-          {
-            funny.names = [ shout ];
-          };
+        den.entityIncludes.yell = [
+          (
+            { shout }:
+            {
+              funny.names = [ shout ];
+            }
+          )
+        ];
 
-        den.stages.size.provides.size =
-          { length }:
-          {
-            funny.names = [ (lib.toString length) ];
-          };
+        den.entityIncludes.size = [
+          (
+            { length }:
+            {
+              funny.names = [ (lib.toString length) ];
+            }
+          )
+        ];
 
-        den.stages.greet.provides.num =
+        den.entityProvides.greet.num =
           _:
           { number }:
           {

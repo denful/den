@@ -1,7 +1,6 @@
-# Compatibility shim: forwards den.ctx.* to den.entityIncludes/entityProvides
+# Compatibility shim: forwards den.ctx.* to den.entityIncludes
 # with deprecation warnings.
 # den.ctx was always flat (host, user, hm-host — never nested namespaces).
-# Also handles den.ctx.*.into by forwarding to stage meta.into (transitional).
 # Remove after downstream users have migrated.
 {
   den,
@@ -26,20 +25,20 @@ in
     type = lib.types.lazyAttrsOf ctxSubmodule;
   };
 
-  # Forward den.ctx entries to stages (transitional — stages still read by resolveEntity).
-  config.den.stages = lib.mkMerge (
+  # Forward den.ctx entries as entityIncludes.
+  config.den.entityIncludes = lib.mkMerge (
     lib.mapAttrsToList (
       name: value:
       let
-        intoFn = value.into or null;
-        stageValue = builtins.removeAttrs value [ "into" ];
+        stageValue = builtins.removeAttrs value [
+          "into"
+          "_module"
+        ];
       in
       {
-        ${name} =
-          lib.warn "den.ctx.${name} is deprecated — use den.entityIncludes.${name}" stageValue
-          // lib.optionalAttrs (intoFn != null) {
-            meta.into = lib.warn "den.ctx.${name}.into is deprecated — use den.policies" intoFn;
-          };
+        ${name} = [
+          (lib.warn "den.ctx.${name} is deprecated — use den.entityIncludes.${name}" stageValue)
+        ];
       }
     ) (builtins.removeAttrs config.den.ctx [ "_module" ])
   );

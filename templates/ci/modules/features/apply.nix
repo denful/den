@@ -3,17 +3,18 @@
   flake.tests.ctx.test-apply = denTest (
     { den, funnyNames, ... }:
     {
-      den.stages.foobar.provides.foobar =
-        { foo, bar }:
-        {
-          funny.names = [
-            foo
-            bar
-          ];
-        };
-
-      den.stages.foobar.funny.names = [ "owned" ];
-      den.stages.foobar.includes = [ ];
+      den.entityIncludes.foobar = [
+        (
+          { foo, bar }:
+          {
+            funny.names = [
+              foo
+              bar
+            ];
+          }
+        )
+        { funny.names = [ "owned" ]; }
+      ];
 
       expr = funnyNames (
         den.lib.resolveEntity "foobar" {

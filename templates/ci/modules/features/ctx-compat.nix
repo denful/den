@@ -30,21 +30,22 @@
       }
     );
 
-    # den.ctx.host.into forwards to den.stages.host.meta.into,
-    # firing the transition through the pipeline.
+    # Manual into replaced by policy — den.ctx.*.into is no longer supported.
     test-ctx-shim-into = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-into-target = {
-          includes = [ ];
-          nixos.users.users.tux.description = "from-into-target";
-        };
+        den.entityIncludes.test-into-target = [
+          { nixos.users.users.tux.description = "from-into-target"; }
+        ];
 
-        den.ctx.host.into = _ctx: {
-          test-into-target = [ { } ];
+        den.policies.host-to-into-target = {
+          from = "host";
+          to = "test-into-target";
+          resolve = _: [ { } ];
         };
+        den.default.policies = [ "host-to-into-target" ];
 
         expr = igloo.users.users.tux.description;
         expected = "from-into-target";

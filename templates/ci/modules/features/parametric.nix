@@ -18,14 +18,15 @@
         };
       in
       {
-        den.stages.start = {
-          provides.start =
+        den.entityIncludes.start = [
+          (
             { level }:
             {
               funny.names = [ level ];
-            };
-          includes = [ top ];
-        };
+            }
+          )
+          top
+        ];
 
         expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { level = "deep"; }));
         expected = 42;
@@ -51,14 +52,15 @@
         aspects = lib.genList mkParam 30;
       in
       {
-        den.stages.start = {
-          provides.start =
+        den.entityIncludes.start = [
+          (
             { host }:
             {
               funny.names = [ host ];
-            };
-          includes = aspects;
-        };
+            }
+          )
+        ]
+        ++ aspects;
 
         expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { host = "h"; }));
         expected = 61;
@@ -79,14 +81,15 @@
         };
       in
       {
-        den.stages.start = {
-          provides.start =
+        den.entityIncludes.start = [
+          (
             { host }:
             {
               funny.names = [ host ];
-            };
-          includes = [ expanded ];
-        };
+            }
+          )
+          expanded
+        ];
 
         expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { host = "h"; }));
         expected = 17;
@@ -109,28 +112,30 @@
         };
       in
       {
-        den.stages.a = {
-          provides.a =
+        den.entityIncludes.a = [
+          (
             { host }:
             {
               funny.names = [ "a-${host}" ];
-            };
-          includes = [ shared ];
-        };
+            }
+          )
+          shared
+        ];
         den.policies.a-to-b = {
           from = "a";
           to = "b";
           resolve = ctx: if ctx ? host then [ { host = "${ctx.host}!"; } ] else [ ];
         };
         den.default.policies = [ "a-to-b" ];
-        den.stages.b = {
-          provides.b =
+        den.entityIncludes.b = [
+          (
             { host }:
             {
               funny.names = [ "b-${host}" ];
-            };
-          includes = [ shared ];
-        };
+            }
+          )
+          shared
+        ];
 
         expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { host = "v"; }));
         expected = 6;

@@ -10,12 +10,15 @@
         ...
       }:
       {
-        den.stages.parent.provides.parent =
-          { x }:
-          {
-            funny.names = [ "parent-${x}" ];
-          };
-        den.stages.parent.provides.child =
+        den.entityIncludes.parent = [
+          (
+            { x }:
+            {
+              funny.names = [ "parent-${x}" ];
+            }
+          )
+        ];
+        den.entityProvides.parent.child =
           _:
           { x, y }:
           {
@@ -38,11 +41,14 @@
         };
         den.default.policies = [ "test-parent-to-child" ];
 
-        den.stages.child.provides.child =
-          { x, y }:
-          {
-            funny.names = [ "child-${y}" ];
-          };
+        den.entityIncludes.child = [
+          (
+            { x, y }:
+            {
+              funny.names = [ "child-${y}" ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "parent" { x = "hello"; });
         expected = [
@@ -61,12 +67,15 @@
         ...
       }:
       {
-        den.stages.src.provides.src =
-          { x }:
-          {
-            funny.names = [ x ];
-          };
-        den.stages.src.provides.dst =
+        den.entityIncludes.src = [
+          (
+            { x }:
+            {
+              funny.names = [ x ];
+            }
+          )
+        ];
+        den.entityProvides.src.dst =
           _:
           { x, i }:
           {
@@ -93,11 +102,14 @@
         };
         den.default.policies = [ "test-src-to-dst" ];
 
-        den.stages.dst.provides.dst =
-          { x, i }:
-          {
-            funny.names = [ "dst-${toString i}" ];
-          };
+        den.entityIncludes.dst = [
+          (
+            { x, i }:
+            {
+              funny.names = [ "dst-${toString i}" ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "src" { x = "a"; });
         expected = [
@@ -118,11 +130,14 @@
         ...
       }:
       {
-        den.stages.src.provides.src =
-          { x }:
-          {
-            funny.names = [ x ];
-          };
+        den.entityIncludes.src = [
+          (
+            { x }:
+            {
+              funny.names = [ x ];
+            }
+          )
+        ];
         den.policies.test-src-to-dst-no-cross = {
           from = "src";
           to = "dst";
@@ -130,11 +145,14 @@
         };
         den.default.policies = [ "test-src-to-dst-no-cross" ];
 
-        den.stages.dst.provides.dst =
-          { y }:
-          {
-            funny.names = [ "dst-${y}" ];
-          };
+        den.entityIncludes.dst = [
+          (
+            { y }:
+            {
+              funny.names = [ "dst-${y}" ];
+            }
+          )
+        ];
 
         expr = funnyNames (den.lib.resolveEntity "src" { x = "val"; });
         expected = [

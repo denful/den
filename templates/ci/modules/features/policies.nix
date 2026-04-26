@@ -7,10 +7,9 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-rel-target = {
-          includes = [ ];
-          nixos.users.users.tux.description = "from-rel-target-stage";
-        };
+        den.entityIncludes.test-rel-target = [
+          { nixos.users.users.tux.description = "from-rel-target-stage"; }
+        ];
 
         den.policies.host-to-test-rel = {
           from = "host";
@@ -32,15 +31,13 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-rel-coexist = {
-          includes = [ ];
-          nixos.networking.hostName = "from-rel-stage";
-        };
+        den.entityIncludes.test-rel-coexist = [
+          { nixos.networking.hostName = "from-rel-stage"; }
+        ];
 
-        den.stages.default = {
-          includes = [ ];
-          nixos.users.users.tux.description = "from-default-stage";
-        };
+        den.entityIncludes.default = [
+          { nixos.users.users.tux.description = "from-default-stage"; }
+        ];
 
         den.policies.host-to-test-rel-coexist = {
           from = "host";
@@ -69,16 +66,14 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-scoped = {
-          includes = [
-            (
-              { test-greet, ... }:
-              {
-                nixos.users.users.tux.description = test-greet;
-              }
-            )
-          ];
-        };
+        den.entityIncludes.test-scoped = [
+          (
+            { test-greet, ... }:
+            {
+              nixos.users.users.tux.description = test-greet;
+            }
+          )
+        ];
 
         den.default.policies = [ "host-to-test-scoped" ];
 
@@ -107,10 +102,9 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.stages.test-handler-target = {
-          includes = [ ];
-          nixos.users.users.tux.description = "handler-target";
-        };
+        den.entityIncludes.test-handler-target = [
+          { nixos.users.users.tux.description = "handler-target"; }
+        ];
 
         den.default.policies = [ "host-to-test-handler" ];
 

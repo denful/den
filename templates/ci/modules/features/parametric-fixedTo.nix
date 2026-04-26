@@ -105,7 +105,7 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
               (test-aspect aspects)
             ];
@@ -146,11 +146,11 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
             ];
 
-            den.stages.user.includes = [
+            den.entityIncludes.user = [
               (test-aspect aspects)
             ];
 
@@ -206,7 +206,7 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
               ({ host }: den.lib.parametric.fixedTo.exactly { inherit host; } (test-aspect aspects))
             ];
@@ -249,11 +249,11 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
             ];
 
-            den.stages.user.includes = [
+            den.entityIncludes.user = [
               ({ host, user }: den.lib.parametric.fixedTo.exactly { inherit host user; } (test-aspect aspects))
             ];
 
@@ -319,12 +319,12 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
               ({ host }: den.lib.parametric.fixedTo.atLeast { inherit host; } (test-aspect aspects))
             ];
 
-            den.stages.user.includes = [ ];
+            den.entityIncludes.user = [ ];
 
             expr = lib.sort lib.lessThan igloo.test;
             expected = [
@@ -364,11 +364,11 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
             ];
 
-            den.stages.user.includes = [
+            den.entityIncludes.user = [
               ({ host, user }: den.lib.parametric.fixedTo.atLeast { inherit host user; } (test-aspect aspects))
             ];
 
@@ -426,7 +426,7 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
               ({ host }: den.lib.parametric.fixedTo.upTo { inherit host; } (test-aspect aspects))
             ];
@@ -469,11 +469,11 @@
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
-            den.stages.host.includes = [
+            den.entityIncludes.host = [
               test-option
             ];
 
-            den.stages.user.includes = [
+            den.entityIncludes.user = [
               ({ host, user }: den.lib.parametric.fixedTo.upTo { inherit host user; } (test-aspect aspects))
             ];
 

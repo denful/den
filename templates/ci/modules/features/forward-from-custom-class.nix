@@ -189,7 +189,7 @@
         den.hosts.x86_64-linux.iceberg.users.tux = { };
 
         den.aspects.igloo.homeManager.home.stateVersion = "25.11";
-        den.stages.default.includes = [ forwarded ];
+        den.entityIncludes.default = [ forwarded ];
 
         den.aspects.tux = {
           iced.networking.hostName = "iced";

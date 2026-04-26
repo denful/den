@@ -7,11 +7,14 @@
     test-flat-still-works = denTest (
       { den, funnyNames, ... }:
       {
-        den.stages.flat.provides.flat =
-          { x }:
-          {
-            funny.names = [ x ];
-          };
+        den.entityIncludes.flat = [
+          (
+            { x }:
+            {
+              funny.names = [ x ];
+            }
+          )
+        ];
 
         den.policies.test-root-to-flat = {
           from = "root";
@@ -28,11 +31,14 @@
     test-into-root-and-child-merge = denTest (
       { den, funnyNames, ... }:
       {
-        den.stages.leaf.provides.leaf =
-          { v }:
-          {
-            funny.names = [ v ];
-          };
+        den.entityIncludes.leaf = [
+          (
+            { v }:
+            {
+              funny.names = [ v ];
+            }
+          )
+        ];
 
         imports = [
           {
