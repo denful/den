@@ -23,7 +23,7 @@ let
       };
       # Inject entity-level includes that previously came from den.entityIncludes/schema
       fooAspect = entity // {
-        rootIncludes = entity.rootIncludes ++ [
+        includes = entity.includes ++ [
           ({ x, y }@ctx: ev.config.den.lib.parametric.fixedTo ctx ev.config.den.aspects.foo)
         ];
       };

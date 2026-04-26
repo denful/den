@@ -55,8 +55,7 @@ let
     else if lib.hasAttrByPath [ "ful" head ] config.den then
       let
         ns = config.den.ful.${head};
-        # Strip legacy "provides" from paths like <ns/provides/X> during transition.
-        denfulTail = if tail != [ ] && lib.head tail == "provides" then lib.tail tail else tail;
+        denfulTail = tail;
       in
       if denfulTail == [ ] then
         ns

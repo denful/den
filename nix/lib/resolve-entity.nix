@@ -52,9 +52,7 @@ let
         provider = [ ];
         into = null;
       };
-      rootIncludes = selfProvide ++ hostFramework ++ schemaIncludes;
-      provides = { };
-      includes = [ ];
+      includes = selfProvide ++ hostFramework ++ schemaIncludes;
       __ctxStage = name;
       __scopeHandlers = scopeHandlers;
     };

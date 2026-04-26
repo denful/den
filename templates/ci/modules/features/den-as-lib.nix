@@ -104,7 +104,7 @@ in
                 let
                   entity = den.lib.resolveEntity "foo" { name = "good"; };
                 in
-                entity // { rootIncludes = entity.rootIncludes ++ fooIncludes; }
+                entity // { includes = entity.includes ++ fooIncludes; }
               )
             ];
           };

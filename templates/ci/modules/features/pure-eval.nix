@@ -70,7 +70,7 @@ in
         );
         entity = ev.config.den.lib.resolveEntity "a" { v = "x"; };
         asp = entity // {
-          rootIncludes = entity.rootIncludes ++ aIncludes;
+          includes = entity.includes ++ aIncludes;
         };
         mod = ev.config.den.lib.aspects.resolve "my" asp;
         ev2 = lib.evalModules {
