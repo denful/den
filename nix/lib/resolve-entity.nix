@@ -5,6 +5,9 @@
 }:
 let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
+  inherit (den.lib.aspects.fx.aspect) structuralKeysSet;
+
+  structuralKeys = builtins.attrNames structuralKeysSet;
 
   # Entity resolution — replaces resolveStage.
   #
@@ -22,12 +25,14 @@ let
       entityIncludes = den.entityIncludes.${name} or [ ];
       entityProvides = den.entityProvides.${name} or { };
 
-      # Stage fallback (transitional — will be removed).
+      # Stage fallback (transitional — will be removed with den.stages).
       stageNode = den.stages.${name} or { };
       stageIncludes = stageNode.includes or [ ];
       stageProvides = stageNode.provides or { };
+      classAttrs = builtins.removeAttrs stageNode structuralKeys;
     in
-    {
+    classAttrs
+    // {
       inherit name;
       meta = {
         handleWith = null;
