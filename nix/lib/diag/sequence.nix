@@ -2,7 +2,7 @@
 #
 # Maps the context resolution pipeline to a sequenceDiagram:
 #   - participants    = context stages (host, default, hm-host, hm-user, user)
-#   - messages        = stageEdges (normal or cross-provide)
+#   - messages        = entityEdges (normal or cross-provide)
 #   - notes           = aspect labels grouped per stage, truncated
 #
 # The pipeline is naturally sequential, so this view reveals causal flow
@@ -20,22 +20,22 @@ let
   # Stable alias for mermaid sequenceDiagram participants.
   aliasOf = makeIdSanitizer "p";
 
-  stageLabel = util.stageLabel { };
+  entityLabel = util.entityLabel { };
 
-  # Topologically order stages: roots (no incoming stageEdge) first, then rest
-  # in insertion order. We only need approximate order for readability.
-  orderStages =
-    stages: stageEdges:
+  # Topologically order entity kinds: roots (no incoming entityEdge) first,
+  # then rest in insertion order. We only need approximate order for readability.
+  orderEntityKinds =
+    entityKinds: entityEdges:
     let
       targets = lib.listToAttrs (
         map (e: {
           name = e.to;
           value = true;
-        }) stageEdges
+        }) entityEdges
       );
       isRoot = s: !(targets ? ${s.id});
     in
-    builtins.filter isRoot stages ++ builtins.filter (s: !(isRoot s)) stages;
+    builtins.filter isRoot entityKinds ++ builtins.filter (s: !(isRoot s)) entityKinds;
 
   nodeLabel =
     n:
@@ -62,13 +62,13 @@ let
       )
     );
 
-  mkStageById =
-    stages:
+  mkEntityById =
+    entityKinds:
     lib.listToAttrs (
       map (s: {
         name = s.id;
         value = s;
-      }) stages
+      }) entityKinds
     );
 
   policyNodesOf = nodes: builtins.filter (n: n.isPolicyDispatch or false) nodes;
@@ -83,41 +83,41 @@ let
       inherit (graph)
         rootName
         nodes
-        stages
-        stageEdges
+        entityKinds
+        entityEdges
         ;
-      ordered = orderStages stages stageEdges;
+      ordered = orderEntityKinds entityKinds entityEdges;
 
-      participantDecl = stage: "    participant ${aliasOf stage.name} as ${stageLabel stage}";
+      participantDecl = ek: "    participant ${aliasOf ek.name} as ${entityLabel ek}";
 
-      stageById = mkStageById stages;
+      entityById = mkEntityById entityKinds;
       messageDecl =
         edge:
         let
-          fromStage = stageById.${edge.from} or null;
-          toStage = stageById.${edge.to} or null;
-          fromAlias = if fromStage != null then aliasOf fromStage.name else edge.from;
-          toAlias = if toStage != null then aliasOf toStage.name else edge.to;
+          fromEntity = entityById.${edge.from} or null;
+          toEntity = entityById.${edge.to} or null;
+          fromAlias = if fromEntity != null then aliasOf fromEntity.name else edge.from;
+          toAlias = if toEntity != null then aliasOf toEntity.name else edge.to;
           label = if edge.label != null then edge.label else "resolve";
           arrow = if (edge.style or "normal") == "provide" then "-->>" else "->>";
         in
         "    ${fromAlias} ${arrow} ${toAlias}: ${label}";
 
-      # Drop self-reference stage transitions (edges where source and
+      # Drop self-reference entity kind transitions (edges where source and
       # target collapse to the same participant). They render as a
       # self-arrow in sequenceDiagram — confusing and conveys nothing
-      # the stage note doesn't already say.
-      nonSelfStageEdges = builtins.filter (e: e.from != e.to) stageEdges;
+      # the entity note doesn't already say.
+      nonSelfEntityEdges = builtins.filter (e: e.from != e.to) entityEdges;
 
       # Policy dispatch messages with context annotation.
       policyNodes = policyNodesOf nodes;
       policyMessages = lib.concatMap (
         pn:
         let
-          fromStage = pn.from or null;
-          toStage = pn.to or null;
-          fromAlias = if fromStage != null then aliasOf fromStage else null;
-          toAlias = if toStage != null then aliasOf toStage else null;
+          fromKind = pn.from or null;
+          toKind = pn.to or null;
+          fromAlias = if fromKind != null then aliasOf fromKind else null;
+          toAlias = if toKind != null then aliasOf toKind else null;
           policyName = pn.policyName or pn.label;
         in
         lib.optional (
@@ -125,17 +125,17 @@ let
         ) "    ${fromAlias} -->> ${toAlias}: ${policyName}"
       ) policyNodes;
 
-      # Per-stage aspect blocks: show parametric aspects with their args
+      # Per-entity-kind aspect blocks: show parametric aspects with their args
       # and non-parametric aspects grouped separately.
-      stageBlock =
-        stage:
+      entityBlock =
+        ek:
         let
-          alias = aliasOf stage.name;
-          stageNodes = builtins.filter (
-            n: n.stage == stage.name && meaningful n.label && !(n.isPolicyDispatch or false)
+          alias = aliasOf ek.name;
+          ekNodes = builtins.filter (
+            n: n.entityKind == ek.name && meaningful n.label && !(n.isPolicyDispatch or false)
           ) nodes;
-          parametric = builtins.filter (n: (n.fnArgNames or [ ]) != [ ]) stageNodes;
-          static = builtins.filter (n: (n.fnArgNames or [ ]) == [ ]) stageNodes;
+          parametric = builtins.filter (n: (n.fnArgNames or [ ]) != [ ]) ekNodes;
+          static = builtins.filter (n: (n.fnArgNames or [ ]) == [ ]) ekNodes;
           parametricLines = map (n: "    ${alias} ->> ${alias}: ${nodeLabel n}") parametric;
           staticLabels = map (n: n.label) static;
           staticNote = wrapLabels staticLabels;
@@ -148,7 +148,7 @@ let
         )
         ++ lib.optional (staticNote != "") "    Note over ${alias}: ${staticNote}";
     in
-    if stages == [ ] then
+    if entityKinds == [ ] then
       renderMermaid
         {
           inherit theme mermaidConfig;
@@ -156,7 +156,7 @@ let
         }
         [
           "    participant root as ${rootName}"
-          "    Note over root: no context stages captured"
+          "    Note over root: no entity kinds captured"
         ]
     else
       renderMermaid
@@ -167,25 +167,25 @@ let
         (
           map participantDecl ordered
           ++ [ "" ]
-          ++ map messageDecl nonSelfStageEdges
+          ++ map messageDecl nonSelfEntityEdges
           ++ (if policyMessages != [ ] then [ "" ] ++ policyMessages else [ ])
-          ++ lib.concatMap (s: [ "" ] ++ stageBlock s) ordered
+          ++ lib.concatMap (s: [ "" ] ++ entityBlock s) ordered
         );
 
-  # Expanded variant: same stage participants and inter-stage
+  # Expanded variant: same entity kind participants and inter-kind
   # transitions as the basic sequence view but with an UNTRUNCATED
-  # per-stage aspect list (rendered as a sequenceDiagram `Note over`)
-  # plus explicit cross-stage provide arrows for wrapper nodes.
+  # per-kind aspect list (rendered as a sequenceDiagram `Note over`)
+  # plus explicit cross-kind provide arrows for wrapper nodes.
   #
   # Aspects are NOT emitted as per-aspect self-arrows — those render
-  # as visible self-loops and bury the actual inter-stage flow. A note
+  # as visible self-loops and bury the actual inter-kind flow. A note
   # listing every aspect conveys the same detail without the loops.
   #
-  # Cross-stage projection hints: wrapper nodes matching
+  # Cross-kind projection hints: wrapper nodes matching
   # `<aspect>/<src>/(self-provide|cross-provide)(<dst>):<aspect>` become
-  # src→dst arrows (same-stage self-provides filtered out). Provider
-  # sub-aspects named `to-hosts` / `to-<stage>` bridge from the aspect's
-  # own stage to the target stage.
+  # src→dst arrows (same-kind self-provides filtered out). Provider
+  # sub-aspects named `to-hosts` / `to-<kind>` bridge from the aspect's
+  # own kind to the target kind.
   toSequenceMermaidExpandedWith =
     {
       theme ? themes.defaultTheme,
@@ -196,42 +196,42 @@ let
       inherit (graph)
         rootName
         nodes
-        stages
-        stageEdges
+        entityKinds
+        entityEdges
         ;
 
-      ordered = orderStages stages stageEdges;
-      stageById = mkStageById stages;
-      aspectsByStage =
-        stage:
+      ordered = orderEntityKinds entityKinds entityEdges;
+      entityById = mkEntityById entityKinds;
+      aspectsByEntityKind =
+        ek:
         lib.sort (a: b: a.label < b.label) (
-          builtins.filter (n: n.stage == stage.name && isUserAspect graph n) nodes
+          builtins.filter (n: n.entityKind == ek.name && isUserAspect graph n) nodes
         );
 
       allBridges = util.detectBridges graph;
 
-      participantDecl = stage: "    participant ${aliasOf stage.name} as ${stageLabel stage}";
+      participantDecl = ek: "    participant ${aliasOf ek.name} as ${entityLabel ek}";
 
-      # Per-stage block:
-      #   1. Header note marking the stage
-      #   2. Content note listing every user aspect in the stage (no
+      # Per-entity-kind block:
+      #   1. Header note marking the entity kind
+      #   2. Content note listing every user aspect in the kind (no
       #      truncation — that's the "expanded" bit)
-      #   3. Non-self cross-stage bridges originating in this stage
-      #   4. Non-self outgoing stage transitions from this stage
+      #   3. Non-self cross-kind bridges originating in this kind
+      #   4. Non-self outgoing kind transitions from this kind
       #
       # Self-reference arrows (src == dst) are filtered at every step.
-      # Policy nodes grouped by source stage for dispatch arrows.
-      policyNodesByStage =
-        stage: builtins.filter (n: (n.isPolicyDispatch or false) && (n.from or null) == stage.name) nodes;
+      # Policy nodes grouped by source entity kind for dispatch arrows.
+      policyNodesByEntityKind =
+        ek: builtins.filter (n: (n.isPolicyDispatch or false) && (n.from or null) == ek.name) nodes;
 
-      stageBlock =
-        stage:
+      entityBlock =
+        ek:
         let
-          alias = aliasOf stage.name;
-          aspects = aspectsByStage stage;
-          outgoing = builtins.filter (e: e.from == stage.id && e.to != stage.id) stageEdges;
-          bridgesFromHere = builtins.filter (b: b.src == stage.name && b.dst != stage.name) allBridges;
-          stagePolicies = policyNodesByStage stage;
+          alias = aliasOf ek.name;
+          aspects = aspectsByEntityKind ek;
+          outgoing = builtins.filter (e: e.from == ek.id && e.to != ek.id) entityEdges;
+          bridgesFromHere = builtins.filter (b: b.src == ek.name && b.dst != ek.name) allBridges;
+          ekPolicies = policyNodesByEntityKind ek;
 
           # Split aspects into parametric (with ctx args) and static.
           parametric = builtins.filter (n: (n.fnArgNames or [ ]) != [ ]) aspects;
@@ -253,16 +253,16 @@ let
           ) (if staticLabels == [ ] then 0 else (builtins.length staticLabels + noteWrapAt - 1) / noteWrapAt);
           staticNote = lib.concatStringsSep "<br/>" (builtins.filter (c: c != "") staticChunks);
 
-          # Policy dispatch arrows from this stage.
+          # Policy dispatch arrows from this entity kind.
           policyLines = lib.concatMap (
             pn:
             let
-              toStage = pn.to or null;
-              toAlias = if toStage != null then aliasOf toStage else null;
+              toKind = pn.to or null;
+              toAlias = if toKind != null then aliasOf toKind else null;
               policyName = pn.policyName or pn.label;
             in
             lib.optional (toAlias != null && toAlias != alias) "    ${alias} -->> ${toAlias}: ${policyName}"
-          ) stagePolicies;
+          ) ekPolicies;
 
           bridgeLine =
             b:
@@ -276,8 +276,8 @@ let
           transitionLine =
             edge:
             let
-              toStage' = stageById.${edge.to} or null;
-              toAlias = if toStage' != null then aliasOf toStage'.name else edge.to;
+              toEntity = entityById.${edge.to} or null;
+              toAlias = if toEntity != null then aliasOf toEntity.name else edge.to;
               label = if edge.label != null then edge.label else "resolve";
               arrow = if (edge.style or "normal") == "provide" then "-->>" else "->>";
             in
@@ -285,7 +285,7 @@ let
         in
         [
           ""
-          "    Note over ${alias}: ── ${stageLabel stage}"
+          "    Note over ${alias}: ── ${entityLabel ek}"
         ]
         ++ parametricLines
         ++ lib.optional (staticNote != "") "    Note over ${alias}: ${staticNote}"
@@ -296,7 +296,7 @@ let
         ++ (if outgoing != [ ] then [ "" ] else [ ])
         ++ map transitionLine outgoing;
     in
-    if stages == [ ] then
+    if entityKinds == [ ] then
       renderMermaid
         {
           inherit theme mermaidConfig;
@@ -304,19 +304,19 @@ let
         }
         [
           "    participant root as ${rootName}"
-          "    Note over root: no context stages captured"
+          "    Note over root: no entity kinds captured"
         ]
     else
       renderMermaid {
         inherit theme mermaidConfig;
         diagramKind = "sequenceDiagram";
-      } (map participantDecl ordered ++ lib.concatMap stageBlock ordered);
+      } (map participantDecl ordered ++ lib.concatMap entityBlock ordered);
 
   toSequenceMermaid = toSequenceMermaidWith { };
   toSequenceMermaidExpanded = toSequenceMermaidExpandedWith { };
 
-  # Stage topology: focused flowchart showing only pipeline stages and
-  # their transition edges. Answers "what is the resolution order?"
+  # Entity kind topology: focused flowchart showing only pipeline entity
+  # kinds and their transition edges. Answers "what is the resolution order?"
   # without any aspect-level detail.
   toStageEdgesMermaidWith =
     {
@@ -325,27 +325,27 @@ let
     }:
     graph:
     let
-      inherit (graph) stages stageEdges rootName;
-      ordered = orderStages stages stageEdges;
-      stageById = mkStageById stages;
-      nodeDecl = stage: "    ${aliasOf stage.name}([${stageLabel stage}])";
+      inherit (graph) entityKinds entityEdges rootName;
+      ordered = orderEntityKinds entityKinds entityEdges;
+      entityById = mkEntityById entityKinds;
+      nodeDecl = ek: "    ${aliasOf ek.name}([${entityLabel ek}])";
       edgeDecl =
         edge:
         let
-          fromStage = stageById.${edge.from} or null;
-          toStage = stageById.${edge.to} or null;
+          fromEntity = entityById.${edge.from} or null;
+          toEntity = entityById.${edge.to} or null;
         in
-        if fromStage == null || toStage == null then
+        if fromEntity == null || toEntity == null then
           null
         else
           let
             arrow = if (edge.style or "normal") == "provide" then "-.->" else "-->";
             lbl = if edge.label != null then "|${edge.label}|" else "";
           in
-          "    ${aliasOf fromStage.name} ${arrow}${lbl} ${aliasOf toStage.name}";
-      edgeLines = builtins.filter (l: l != null) (map edgeDecl stageEdges);
+          "    ${aliasOf fromEntity.name} ${arrow}${lbl} ${aliasOf toEntity.name}";
+      edgeLines = builtins.filter (l: l != null) (map edgeDecl entityEdges);
     in
-    if stages == [ ] then
+    if entityKinds == [ ] then
       renderMermaid {
         inherit theme mermaidConfig;
         diagramKind = "graph LR";
@@ -371,8 +371,8 @@ let
       inherit (graph)
         rootName
         nodes
-        stages
-        stageEdges
+        entityKinds
+        entityEdges
         ;
 
       policyNodes = lib.sort (
@@ -380,11 +380,11 @@ let
         (a.from or "") < (b.from or "") || ((a.from or "") == (b.from or "") && (a.to or "") < (b.to or ""))
       ) (builtins.filter (n: n.isPolicyDispatch or false) nodes);
 
-      # Aspects grouped by target stage.
-      aspectsByStage =
-        stageName:
+      # Aspects grouped by target entity kind.
+      aspectsByEntityKind =
+        kindName:
         builtins.filter (
-          n: n.stage == stageName && meaningful n.label && !(n.isPolicyDispatch or false)
+          n: n.entityKind == kindName && meaningful n.label && !(n.isPolicyDispatch or false)
         ) nodes;
 
       # Root entity participant.
@@ -410,17 +410,17 @@ let
         pn:
         let
           pAlias = aliasOf (pn.policyName or pn.label);
-          toStage = pn.to or null;
+          toKind = pn.to or null;
 
-          targetAspects = if toStage != null then aspectsByStage toStage else [ ];
+          targetAspects = if toKind != null then aspectsByEntityKind toKind else [ ];
 
-          # Top-level entities in this stage (parametric aspects with the
-          # stage's context args — alice, bob, deploy, etc.)
+          # Top-level entities in this kind (parametric aspects with the
+          # kind's context args — alice, bob, deploy, etc.)
           topEntities = builtins.filter (
             n:
             (n.fnArgNames or [ ]) != [ ]
             && !(lib.hasPrefix "provides/" n.label)
-            && !(lib.hasPrefix "${toStage}/" n.label)
+            && !(lib.hasPrefix "${toKind}/" n.label)
           ) targetAspects;
 
           # Group aspects by parent entity using edge relationships.
@@ -434,7 +434,7 @@ let
             [ "    Note over ${pAlias}: ${nodeLabel entity}" ]
             ++ map (l: "    ${pAlias} ->> ${pAlias}: ${l}") childLabels;
 
-          # Aspects not parented to any top entity (stage-level).
+          # Aspects not parented to any top entity (kind-level).
           topEntityIds = map (n: n.id) topEntities;
           allEntityChildIds = lib.concatMap (e: childrenOf.${e.id} or [ ]) topEntities;
           orphans = builtins.filter (
@@ -444,7 +444,7 @@ let
           orphanNote = wrapLabels orphanLabels;
 
           # Downstream policy chains.
-          downstream = builtins.filter (p2: (p2.from or null) == toStage && p2 != pn) policyNodes;
+          downstream = builtins.filter (p2: (p2.from or null) == toKind && p2 != pn) policyNodes;
           chainLines = map (
             p2: "    ${pAlias} -->> ${aliasOf (p2.policyName or p2.label)}: chains"
           ) downstream;

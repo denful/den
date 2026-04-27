@@ -1,10 +1,10 @@
 # Graph IR construction.
 #
 # Transforms structuredTrace entries into a format-agnostic graph IR
-# with nodes, edges, stages, and stage transitions. The IR is consumed
-# by the renderer modules (mermaid, dot, plantuml), which are responsible
-# for anything visual — theme, colors, layout, diagram config are all
-# render-time concerns and do not appear in the IR.
+# with nodes, edges, entity kinds, and entity kind transitions. The IR
+# is consumed by the renderer modules (mermaid, dot, plantuml), which
+# are responsible for anything visual — theme, colors, layout, diagram
+# config are all render-time concerns and do not appear in the IR.
 #
 # Filter/reshape operations over the IR live in `filters.nix`.
 { lib, util }:
@@ -31,7 +31,7 @@ let
     # should NOT use this for structural reasoning; use the structural
     # booleans below (`isExcluded`, `isReplaced`) instead.
     style = "default";
-    stage = null;
+    entityKind = null;
     classes = [ ];
     class = "";
     perClass = { };
@@ -62,8 +62,7 @@ let
     hasClass = false;
     isParametric = false;
     fnArgNames = [ ];
-    ctxStage = null;
-    ctxKind = null;
+    entityKind = null;
   };
 
   # Full path: "provider/sub/.../name". Used for stable IDs and edge
@@ -240,9 +239,11 @@ let
         }) (builtins.filter (e: (e.provider or [ ]) == [ ]) entries)
       );
 
-      # Context stages from __ctxTrace.
+      # Entity kinds from __ctxTrace.
       ctxItems = builtins.filter (i: i.selfName != "<anon>") ctxTrace;
-      stageNames = lib.unique (builtins.filter (s: s != null) (map (e: e.ctxStage or null) entries));
+      entityKindNames = lib.unique (
+        builtins.filter (s: s != null) (map (e: e.entityKind or null) entries)
+      );
 
       # Node shape classification.
       nodeShape =
@@ -314,7 +315,7 @@ let
           pathKey = fullName entry;
           shape = nodeShape entry;
           style = nodeStyle entry;
-          stage = entry.ctxStage or null;
+          entityKind = entry.entityKind or null;
           # `classes` is the set of classes this aspect contributes to
           # (hasClass = true for each). `class` is the legacy joined-
           # with-`+` single string for renderers that display it.
@@ -348,45 +349,45 @@ let
         label = if (edge.excluded or false) && (edge.replacedBy or null) != null then "replaced" else null;
       };
 
-      # Stage ids use `ctx_` prefix unconditionally (never collides with
+      # Entity kind ids use `ctx_` prefix unconditionally (never collides with
       # mermaid reserved words since the prefix always runs first).
-      mkStage = stageName: {
-        id = "ctx_${sanitizeChars stageName}";
-        name = stageName;
+      mkEntityKind = kindName: {
+        id = "ctx_${sanitizeChars kindName}";
+        name = kindName;
         ctxKeys =
           let
-            item = lib.findFirst (i: i.key == stageName) null ctxItems;
+            item = lib.findFirst (i: i.key == kindName) null ctxItems;
           in
           if item != null then item.ctxKeys else [ ];
       };
 
-      # Context stage transitions: derived from parent→child relationships
-      # that cross stage boundaries. If an entry in stage B has a parent
-      # in stage A (A ≠ B), there's a transition edge A→B.
-      entryStageMap = lib.listToAttrs (
+      # Entity kind transitions: derived from parent→child relationships
+      # that cross entity kind boundaries. If an entry in kind B has a parent
+      # in kind A (A ≠ B), there's a transition edge A→B.
+      entryEntityKindMap = lib.listToAttrs (
         builtins.concatMap (
           e:
           let
             fn = fullName e;
-            stage = e.ctxStage or null;
+            kind = e.entityKind or null;
           in
-          lib.optional (stage != null) {
+          lib.optional (kind != null) {
             name = sanitize fn;
-            value = stage;
+            value = kind;
           }
         ) entries
       );
-      stageEdges = dedupBy (e: "${e.from}->${e.to}") (
+      entityEdges = dedupBy (e: "${e.from}->${e.to}") (
         builtins.concatMap (
           e:
           let
             rawParent = e.parent or null;
-            parentStage = if rawParent == null then null else entryStageMap.${sanitize rawParent} or null;
-            childStage = e.ctxStage or null;
+            parentKind = if rawParent == null then null else entryEntityKindMap.${sanitize rawParent} or null;
+            childKind = e.entityKind or null;
           in
-          lib.optional (parentStage != null && childStage != null && parentStage != childStage) {
-            from = "ctx_${sanitizeChars parentStage}";
-            to = "ctx_${sanitizeChars childStage}";
+          lib.optional (parentKind != null && childKind != null && parentKind != childKind) {
+            from = "ctx_${sanitizeChars parentKind}";
+            to = "ctx_${sanitizeChars childKind}";
             style = "normal";
             label = null;
           }
@@ -423,20 +424,20 @@ let
       # a stub node for it so the provider-provenance edges have a
       # properly-labeled target.
       # Policy dispatch edges: connect policy trace entries to the target
-      # stage subgraph. Uses the stage subgraph ID (ctx_<stage>) so the
-      # edge connects to the stage boundary, not an individual entry.
+      # entity kind subgraph. Uses the entity kind ID (ctx_<kind>) so the
+      # edge connects to the kind boundary, not an individual entry.
       policyEdges = lib.concatMap (
         entry:
         let
           isPol = entry.isPolicyDispatch or false;
-          targetStage = entry.to or null;
-          targetStageId = if targetStage != null then "ctx_${sanitizeChars targetStage}" else null;
-          # Only emit if the target stage actually has entries (exists in the graph).
-          targetExists = targetStage != null && builtins.any (e: (e.ctxStage or null) == targetStage) nodes;
+          targetKind = entry.to or null;
+          targetKindId = if targetKind != null then "ctx_${sanitizeChars targetKind}" else null;
+          # Only emit if the target kind actually has entries (exists in the graph).
+          targetExists = targetKind != null && builtins.any (e: (e.entityKind or null) == targetKind) nodes;
         in
         lib.optional (isPol && targetExists) {
           from = entryId entry;
-          to = targetStageId;
+          to = targetKindId;
           style = "policy";
           label = null;
         }
@@ -483,8 +484,8 @@ let
         )
         ++ providerEdges
         ++ policyEdges;
-      stages = map mkStage stageNames;
-      inherit stageEdges;
+      entityKinds = map mkEntityKind entityKindNames;
+      inherit entityEdges;
     };
 
 in

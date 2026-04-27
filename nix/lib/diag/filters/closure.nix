@@ -30,8 +30,8 @@ let
     in
     nbhd
     // {
-      stages = [ ];
-      stageEdges = [ ];
+      entityKinds = [ ];
+      entityEdges = [ ];
     };
 
   # Handlers view: nodes with resolution handlers plus immediate neighbors.

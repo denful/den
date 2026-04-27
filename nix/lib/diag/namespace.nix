@@ -113,8 +113,8 @@ let
       inherit rootId direction;
       nodes = allNodes;
       edges = rootEdges ++ declEdges;
-      stages = [ ];
-      stageEdges = [ ];
+      entityKinds = [ ];
+      entityEdges = [ ];
     };
 in
 namespaceGraph

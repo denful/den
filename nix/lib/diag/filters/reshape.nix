@@ -10,44 +10,42 @@ let
   inherit (graphLib) emptyNode;
 in
 {
-  # Context hierarchy only: reshape the graph so the context pipeline stages
+  # Context hierarchy only: reshape the graph so the entity kinds
   # become the nodes. Aspect content is discarded. The host node is retained
-  # and connected to entry stages (those with no incoming stage transition)
-  # so the rendered graph reads "host -> first stage -> ...".
+  # and connected to entry kinds (those with no incoming entity edge)
+  # so the rendered graph reads "host -> first kind -> ...".
   contextOnly =
     graph:
     let
-      stageLabel_ =
-        stage:
-        stage.name
-        + (if stage.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " stage.ctxKeys} }" else "");
-      stageNodes = map (
-        stage:
+      kindLabel =
+        ek: ek.name + (if ek.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " ek.ctxKeys} }" else "");
+      kindNodes = map (
+        ek:
         emptyNode
         // {
-          id = stage.id;
-          label = stageLabel_ stage;
-          fullLabel = stageLabel_ stage;
-          stage = "context";
+          id = ek.id;
+          label = kindLabel ek;
+          fullLabel = kindLabel ek;
+          entityKind = "context";
           hasClass = true;
         }
-      ) graph.stages;
+      ) graph.entityKinds;
 
-      stageTargets = map (e: e.to) graph.stageEdges;
-      entryStages = builtins.filter (s: !(builtins.elem s.id stageTargets)) stageNodes;
+      kindTargets = map (e: e.to) graph.entityEdges;
+      entryKinds = builtins.filter (s: !(builtins.elem s.id kindTargets)) kindNodes;
       hostEdges = map (s: {
         from = graph.rootId;
         to = s.id;
         style = "normal";
         label = null;
-      }) entryStages;
+      }) entryKinds;
     in
     graph
     // {
-      nodes = stageNodes;
-      edges = hostEdges ++ graph.stageEdges;
-      stages = [ ];
-      stageEdges = [ ];
+      nodes = kindNodes;
+      edges = hostEdges ++ graph.entityEdges;
+      entityKinds = [ ];
+      entityEdges = [ ];
     };
 
   # Aspect hierarchy only: user aspects with context wrappers folded out
@@ -120,8 +118,8 @@ in
       direction = "TD";
       nodes = keptNodes;
       edges = treeEdges;
-      stages = [ ];
-      stageEdges = [ ];
+      entityKinds = [ ];
+      entityEdges = [ ];
     };
 
   # Attribution-based structural-decision view. Groups excluded nodes
@@ -182,8 +180,8 @@ in
     in
     result
     // {
-      stages = [ ];
-      stageEdges = [ ];
+      entityKinds = [ ];
+      entityEdges = [ ];
     };
 
   # Provider-resolved view: shows each provider aspect alongside its

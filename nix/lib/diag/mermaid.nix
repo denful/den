@@ -63,11 +63,11 @@ let
         rootId
         nodes
         edges
-        stages
-        stageEdges
+        entityKinds
+        entityEdges
         direction
         ;
-      hasStages = stages != [ ];
+      hasEntityKinds = entityKinds != [ ];
       nodeById = builtins.listToAttrs (
         map (n: {
           name = n.id;
@@ -83,18 +83,19 @@ let
       # views the stage is already visible via the subgraph cluster, so
       # no decoration is added there.
       #
-      # `stageSuffix` lives AFTER parametric fnArgs so hexagon labels
+      # `kindSuffix` lives AFTER parametric fnArgs so hexagon labels
       # read `name({ args }) · stage` (not `name · stage({ args })`).
-      stageSuffix = node: if !hasStages && (node.stage or null) != null then " · ${node.stage}" else "";
+      kindSuffix =
+        node: if !hasEntityKinds && (node.entityKind or null) != null then " · ${node.entityKind}" else "";
 
       mermaidShape =
         node:
         if node.shape == "hexagon" then
-          "{{\"${node.label}${stageSuffix node}\"}}"
+          "{{\"${node.label}${kindSuffix node}\"}}"
         else if node.shape == "trapezoid" then
-          "[/\"${node.label}${stageSuffix node}\"\\]"
+          "[/\"${node.label}${kindSuffix node}\"\\]"
         else
-          "[\"${node.label}${stageSuffix node}\"]";
+          "[\"${node.label}${kindSuffix node}\"]";
 
       # Every node gets its own per-node class. Excluded/replaced nodes
       # don't fall through to a flat `excluded` / `replaced` class —
@@ -119,30 +120,30 @@ let
       nodeDecl = node: "  ${node.id}${mermaidShape node}${mermaidStyle node}";
       edgeDecl = edge: "  ${edge.from} ${mermaidArrow edge} ${edge.to}";
 
-      stageSubgraph =
-        stage:
+      entitySubgraph =
+        ek:
         let
-          stageNodes = builtins.filter (n: n.stage == stage.name && n.id != rootId) nodes;
-          stageEdgesList = builtins.filter (
+          ekNodes = builtins.filter (n: n.entityKind == ek.name && n.id != rootId) nodes;
+          ekEdgesList = builtins.filter (
             e:
             let
               fromNode = nodeById.${e.from} or null;
               toNode = nodeById.${e.to} or null;
-              fromStage = if fromNode != null then fromNode.stage else null;
-              toStage = if toNode != null then toNode.stage else null;
+              fromKind = if fromNode != null then fromNode.entityKind else null;
+              toKind = if toNode != null then toNode.entityKind else null;
             in
             fromNode != null
-            && fromStage == stage.name
-            && (toStage == null || toStage == stage.name)
+            && fromKind == ek.name
+            && (toKind == null || toKind == ek.name)
             && (e.style or "normal") != "policy"
           ) edges;
-          ctxLabel = if stage.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " stage.ctxKeys} }" else "";
+          ctxLabel = if ek.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " ek.ctxKeys} }" else "";
         in
-        lib.optional (stageNodes != [ ]) (
-          "  subgraph ${stage.id}[\"${stage.name}${ctxLabel}\"]\n"
-          + lib.concatMapStringsSep "\n" nodeDecl stageNodes
+        lib.optional (ekNodes != [ ]) (
+          "  subgraph ${ek.id}[\"${ek.name}${ctxLabel}\"]\n"
+          + lib.concatMapStringsSep "\n" nodeDecl ekNodes
           + "\n"
-          + lib.concatMapStringsSep "\n" edgeDecl stageEdgesList
+          + lib.concatMapStringsSep "\n" edgeDecl ekEdgesList
           + "\n  end"
         );
 
@@ -151,8 +152,8 @@ let
       # When the graph has stage subgraphs, it's only the stage-null
       # nodes (the others get declared inside their subgraph block).
       topLevelNodes =
-        if hasStages then
-          builtins.filter (n: n.stage == null && n.id != rootId) nodes
+        if hasEntityKinds then
+          builtins.filter (n: n.entityKind == null && n.id != rootId) nodes
         else
           builtins.filter (n: n.id != rootId) nodes;
       # Edges not assigned to any subgraph: either from stage-null nodes,
@@ -162,35 +163,35 @@ let
         let
           fromNode = nodeById.${e.from} or null;
           toNode = nodeById.${e.to} or null;
-          fromStage = if fromNode != null then fromNode.stage else null;
-          toStage = if toNode != null then toNode.stage else null;
-          isCrossStage = fromStage != null && toStage != null && fromStage != toStage;
+          fromKind = if fromNode != null then fromNode.entityKind else null;
+          toKind = if toNode != null then toNode.entityKind else null;
+          isCrossKind = fromKind != null && toKind != null && fromKind != toKind;
         in
-        (fromNode != null && fromStage == null) || (isCrossStage && (e.style or "normal") != "policy")
+        (fromNode != null && fromKind == null) || (isCrossKind && (e.style or "normal") != "policy")
       ) edges;
 
       # Stages that would *not* get a subgraph declaration because they
-      # contain no user-visible nodes, yet are still referenced by stageEdges.
+      # contain no user-visible nodes, yet are still referenced by entityEdges.
       # Emit a stub node declaration so mermaid shows the friendly label
       # instead of rendering the raw sanitized ID.
-      nonEmptyStageIds = map (s: s.id) (
-        builtins.filter (s: builtins.any (n: n.stage == s.name) nodes) stages
+      nonEmptyEntityIds = map (s: s.id) (
+        builtins.filter (s: builtins.any (n: n.entityKind == s.name) nodes) entityKinds
       );
-      referencedStageIds = lib.unique (
+      referencedEntityIds = lib.unique (
         lib.concatMap (e: [
           e.from
           e.to
-        ]) stageEdges
+        ]) entityEdges
       );
-      stubStages = builtins.filter (
-        s: builtins.elem s.id referencedStageIds && !(builtins.elem s.id nonEmptyStageIds)
-      ) stages;
-      stubStageDecl =
-        stage:
+      stubEntities = builtins.filter (
+        s: builtins.elem s.id referencedEntityIds && !(builtins.elem s.id nonEmptyEntityIds)
+      ) entityKinds;
+      stubEntityDecl =
+        ek:
         let
-          ctxLabel = if stage.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " stage.ctxKeys} }" else "";
+          ctxLabel = if ek.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " ek.ctxKeys} }" else "";
         in
-        "  ${stage.id}[\"${stage.name}${ctxLabel}\"]";
+        "  ${ek.id}[\"${ek.name}${ctxLabel}\"]";
 
       # Per-node class declarations. Fill/stroke/text come from visualFor
       # so changing the theme reshuffles colors without IR rebuilding.
@@ -250,11 +251,11 @@ let
         ++ map nodeDecl topLevelNodes
         ++ [ "" ]
         ++ (
-          if hasStages then
-            lib.concatMap stageSubgraph stages
-            ++ map stubStageDecl stubStages
+          if hasEntityKinds then
+            lib.concatMap entitySubgraph entityKinds
+            ++ map stubEntityDecl stubEntities
             ++ [ "" ]
-            ++ map edgeDecl stageEdges
+            ++ map edgeDecl entityEdges
             ++ map edgeDecl (builtins.filter (e: (e.style or "normal") == "policy") edges)
             ++ map edgeDecl unmappedEdges
           else
@@ -265,10 +266,10 @@ let
           "  classDef root fill:${theme.rootFill},stroke:${theme.rootStroke},color:${theme.rootText},font-weight:bold"
         ]
         ++ nodeColorDefs
-        ++ lib.optionals hasStages (
+        ++ lib.optionals hasEntityKinds (
           map (
             s: "style ${s.id} fill:${theme.clusterBg},stroke:${theme.clusterBorder},stroke-width:2px"
-          ) stages
+          ) entityKinds
         )
       );
   # Back-compat: zero-config form stays the same shape the rest of the

@@ -162,14 +162,14 @@ in
       edges = keptEdges;
     };
 
-  # Drop stage subgraph grouping so nodes render as a single flat DAG.
-  flattenStages =
+  # Drop entity kind subgraph grouping so nodes render as a single flat DAG.
+  flattenEntityKinds =
     graph:
     graph
     // {
-      nodes = map (n: n // { stage = null; }) graph.nodes;
-      stages = [ ];
-      stageEdges = [ ];
+      nodes = map (n: n // { entityKind = null; }) graph.nodes;
+      entityKinds = [ ];
+      entityEdges = [ ];
     };
 
 }

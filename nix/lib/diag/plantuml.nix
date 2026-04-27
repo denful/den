@@ -44,14 +44,15 @@ let
         rootId
         nodes
         edges
-        stages
-        stageEdges
+        entityKinds
+        entityEdges
         ;
-      hasStages = stages != [ ];
+      hasEntityKinds = entityKinds != [ ];
       rootColor = theme.rootFill;
       vf = visualFor { inherit theme nodeColorFor; };
 
-      stageSuffix = node: if !hasStages && (node.stage or null) != null then " · ${node.stage}" else "";
+      kindSuffix =
+        node: if !hasEntityKinds && (node.entityKind or null) != null then " · ${node.entityKind}" else "";
 
       pumlShape =
         node:
@@ -72,9 +73,9 @@ let
           label = escapePuml node.label;
         in
         if node.isParametric then
-          "${label}\\n({ ${fmtArgs node.fnArgNames} })${stageSuffix node}"
+          "${label}\\n({ ${fmtArgs node.fnArgNames} })${kindSuffix node}"
         else
-          "${label}${stageSuffix node}";
+          "${label}${kindSuffix node}";
 
       # PlantUML: `#fill` sets background; `;line.dashed` appends a dashed
       # border. Chaining style directives with `;` is the supported form.
@@ -101,19 +102,17 @@ let
         in
         "${edge.from} ${arrow} ${edge.to}${label}";
 
-      stageSubgraph =
-        stage:
+      entitySubgraph =
+        ek:
         let
-          stageNodes = builtins.filter (n: n.stage == stage.name && n.id != rootId) nodes;
-          ctxLabel = if stage.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " stage.ctxKeys} }" else "";
-          safeName =
-            builtins.replaceStrings [ "-" " " "/" "." "(" ")" ] [ "_" "_" "__" "_" "_" "_" ]
-              stage.name;
-          pkgAlias = "stage_${safeName}";
+          ekNodes = builtins.filter (n: n.entityKind == ek.name && n.id != rootId) nodes;
+          ctxLabel = if ek.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " ek.ctxKeys} }" else "";
+          safeName = builtins.replaceStrings [ "-" " " "/" "." "(" ")" ] [ "_" "_" "__" "_" "_" "_" ] ek.name;
+          pkgAlias = "ek_${safeName}";
         in
-        lib.optional (stageNodes != [ ]) (
-          "package \"${stage.name}${ctxLabel}\" as ${pkgAlias} {\n"
-          + lib.concatMapStringsSep "\n" (n: "  ${nodeDecl n}") stageNodes
+        lib.optional (ekNodes != [ ]) (
+          "package \"${ek.name}${ctxLabel}\" as ${pkgAlias} {\n"
+          + lib.concatMapStringsSep "\n" (n: "  ${nodeDecl n}") ekNodes
           + "\n}"
         );
     in
@@ -128,11 +127,11 @@ let
         })
         "rectangle \"${rootName}\" as ${rootId} ${rootColor}"
       ]
-      ++ lib.concatMap stageSubgraph stages
-      ++ map nodeDecl (builtins.filter (n: n.stage == null && n.id != rootId) nodes)
+      ++ lib.concatMap entitySubgraph entityKinds
+      ++ map nodeDecl (builtins.filter (n: n.entityKind == null && n.id != rootId) nodes)
       ++ [ "" ]
       ++ map edgeDecl edges
-      ++ map edgeDecl stageEdges
+      ++ map edgeDecl entityEdges
       ++ [ "@enduml" ]
     );
   toPlantUML = toPlantUMLWith { };

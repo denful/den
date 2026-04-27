@@ -26,16 +26,17 @@ let
         rootId
         nodes
         edges
-        stages
+        entityKinds
         direction
         ;
-      hasStages = stages != [ ];
+      hasEntityKinds = entityKinds != [ ];
       rootColor = theme.rootFill;
       vf = visualFor { inherit theme nodeColorFor; };
 
       # When the graph is flat, append the node's stage to the label
-      # (matches mermaid.nix `stageSuffix`).
-      stageSuffix = node: if !hasStages && (node.stage or null) != null then " · ${node.stage}" else "";
+      # (matches mermaid.nix `kindSuffix`).
+      kindSuffix =
+        node: if !hasEntityKinds && (node.entityKind or null) != null then " · ${node.entityKind}" else "";
 
       dotShape =
         node:
@@ -60,9 +61,9 @@ let
       dotLabel =
         node:
         if node.isParametric then
-          "${node.label}\\n({ ${fmtArgs node.fnArgNames} })${stageSuffix node}"
+          "${node.label}\\n({ ${fmtArgs node.fnArgNames} })${kindSuffix node}"
         else
-          "${node.label}${stageSuffix node}";
+          "${node.label}${kindSuffix node}";
 
       nodeDecl =
         node:
@@ -88,20 +89,20 @@ let
         in
         "  ${edge.from} -> ${edge.to}${attrs};";
 
-      stageSubgraph =
-        stage:
+      entitySubgraph =
+        ek:
         let
-          stageNodes = builtins.filter (n: n.stage == stage.name && n.id != rootId) nodes;
-          ctxLabel = if stage.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " stage.ctxKeys} }" else "";
+          ekNodes = builtins.filter (n: n.entityKind == ek.name && n.id != rootId) nodes;
+          ctxLabel = if ek.ctxKeys != [ ] then " { ${lib.concatStringsSep ", " ek.ctxKeys} }" else "";
         in
-        lib.optional (stageNodes != [ ]) (
-          "  subgraph cluster_${stage.id} {\n"
-          + "    label=\"${stage.name}${ctxLabel}\";\n"
+        lib.optional (ekNodes != [ ]) (
+          "  subgraph cluster_${ek.id} {\n"
+          + "    label=\"${ek.name}${ctxLabel}\";\n"
           + "    style=dashed;\n"
           + "    color=\"${theme.clusterBorder}\";\n"
           + "    fontcolor=\"${theme.foreground}\";\n"
           + "    bgcolor=\"${theme.clusterBg}\";\n"
-          + lib.concatMapStringsSep "\n" nodeDecl stageNodes
+          + lib.concatMapStringsSep "\n" nodeDecl ekNodes
           + "\n  }"
         );
 
@@ -119,8 +120,8 @@ let
         # Stadium-ish rounded rectangle for the host. DOT has no stadium shape.
         "  ${rootId} [label=\"${rootName}\",shape=box,style=\"rounded,filled\",fillcolor=\"${rootColor}\",color=\"${theme.rootStroke}\",fontcolor=\"${theme.rootText}\"];"
       ]
-      ++ lib.concatMap stageSubgraph stages
-      ++ map nodeDecl (builtins.filter (n: n.stage == null && n.id != rootId) nodes)
+      ++ lib.concatMap entitySubgraph entityKinds
+      ++ map nodeDecl (builtins.filter (n: n.entityKind == null && n.id != rootId) nodes)
       ++ [ "" ]
       ++ map edgeDecl edges
       # Stage transitions are not emitted: they would reference cluster names,

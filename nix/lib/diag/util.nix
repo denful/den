@@ -142,9 +142,9 @@ let
     in
     if needsPrefix then "${prefix}_${sanitized}" else sanitized;
 
-  # Canonical stage label. If withCtxKeys is false the `{ a, b }` suffix is
-  # dropped — ishikawa uses this because its parser doesn't tolerate braces.
-  stageLabel =
+  # Canonical entity kind label. If withCtxKeys is false the `{ a, b }` suffix
+  # is dropped — ishikawa uses this because its parser doesn't tolerate braces.
+  entityLabel =
     {
       withCtxKeys ? true,
     }:
@@ -202,7 +202,7 @@ let
   # Shared helpers for filter/reshape functions in graph.nix and
   # filters.nix. Each one returns a graph record with nodes+edges
   # restricted to the specified subset, preserving everything else
-  # (rootName, rootId, direction, stages, stageEdges).
+  # (rootName, rootId, direction, entityKinds, entityEdges).
 
   # Build a `{ id = true; }` attrset from a list of nodes.
   idSetOfNodes =
@@ -275,18 +275,18 @@ let
     in
     subgraphByIds keptIds graph;
 
-  # Detect cross-stage bridges in a graph.
+  # Detect cross-entity-kind bridges in a graph.
   # Returns list of { aspect, src, dst, kind, node } records.
   # Two detection methods:
-  #   1. Provide wrappers: parse `<aspect>/<stage>/(self|cross)-provide(<dst>):<aspect>` labels
-  #   2. Stage bridges: `to-<stage>` provider sub-aspect naming convention
+  #   1. Provide wrappers: parse `<aspect>/<kind>/(self|cross)-provide(<dst>):<aspect>` labels
+  #   2. Entity bridges: `to-<kind>` provider sub-aspect naming convention
   detectBridges =
     graph:
     let
-      inherit (graph) nodes stages;
-      stageNames = map (s: s.name) stages;
+      inherit (graph) nodes entityKinds;
+      kindNames = map (s: s.name) entityKinds;
 
-      # Parse wrapper labels for cross-stage provide hints.
+      # Parse wrapper labels for cross-entity provide hints.
       # Patterns we care about (matched against `fullLabel`, not `label`,
       # so aspect names stay unambiguous even if the short form was
       # chosen for display):
@@ -319,11 +319,11 @@ let
         ) nodes
       );
 
-      # `alice/to-hosts` and similar provider-sub-aspects bridge stages
-      # implicitly — the sub-aspect lives in one stage but its content
+      # `alice/to-hosts` and similar provider-sub-aspects bridge entity
+      # kinds implicitly — the sub-aspect lives in one kind but its content
       # goes elsewhere via provides.* naming conventions. Detect the
-      # common `to-<stage>` / `to-hosts` sub-aspects as stage bridges.
-      stageBridges = lib.concatMap (
+      # common `to-<kind>` / `to-hosts` sub-aspects as entity bridges.
+      entityBridges = lib.concatMap (
         n:
         let
           pp = n.providerPath or [ ];
@@ -335,21 +335,21 @@ let
                 parts = lib.splitString "/" n.label;
               in
               if parts == [ ] then null else lib.last parts;
-          dstStage =
+          dstKind =
             if tail == null then
               null
             else if tail == "to-hosts" then
               "host"
-            else if lib.hasPrefix "to-" tail && builtins.elem (lib.removePrefix "to-" tail) stageNames then
+            else if lib.hasPrefix "to-" tail && builtins.elem (lib.removePrefix "to-" tail) kindNames then
               lib.removePrefix "to-" tail
             else
               null;
         in
-        if dstStage != null && (n.stage or null) != null then
+        if dstKind != null && (n.entityKind or null) != null then
           [
             {
-              src = n.stage;
-              dst = dstStage;
+              src = n.entityKind;
+              dst = dstKind;
               aspect = n.label;
               kind = "bridge";
               node = n;
@@ -359,7 +359,7 @@ let
           [ ]
       ) nodes;
     in
-    provideWrappers ++ stageBridges;
+    provideWrappers ++ entityBridges;
 
   # Symmetric to ancestorClosureBy. Not yet used — kept for API completeness.
   descendantClosureBy =
@@ -399,7 +399,7 @@ in
     isUserAspect
     makeIdSanitizer
     sanitizeChars
-    stageLabel
+    entityLabel
     styleOf
     isTombstone
     isAdapter

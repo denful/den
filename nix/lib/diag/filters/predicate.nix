@@ -56,7 +56,7 @@ in
     in
     pruned
     // {
-      stages = [ ];
-      stageEdges = [ ];
+      entityKinds = [ ];
+      entityEdges = [ ];
     };
 }

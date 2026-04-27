@@ -122,9 +122,12 @@ let
     sourceStage: targetKey:
     let
       policies = den.policies or { };
-      matching = lib.filter (p: p.from == sourceStage && p.to == targetKey) (
-        builtins.attrValues policies
-      );
+      # Only old-style policies have from/to/handlers fields.
+      # New-style policies (functions or __functor attrsets) are skipped.
+      oldStyle = builtins.filter (
+        p: builtins.isAttrs p && !builtins.isFunction p && !(p ? __functor) && p ? from
+      ) (builtins.attrValues policies);
+      matching = lib.filter (p: p.from == sourceStage && p.to == targetKey) oldStyle;
       allHandlers = builtins.foldl' (acc: p: acc // (p.handlers or { })) { } matching;
     in
     builtins.removeAttrs allHandlers coreEffects;

@@ -53,7 +53,7 @@ let
         into = null;
       };
       includes = selfProvide ++ hostFramework ++ schemaIncludes;
-      __ctxStage = name;
+      __entityKind = name;
       __scopeHandlers = scopeHandlers;
     };
 in

@@ -46,7 +46,7 @@ in
       direction = g.direction or "LR";
       nodes = map sanitizeNode (g.nodes or [ ]);
       edges = map sanitizeEdge (g.edges or [ ]);
-      stages = g.stages or [ ];
-      stageEdges = g.stageEdges or [ ];
+      entityKinds = g.entityKinds or [ ];
+      entityEdges = g.entityEdges or [ ];
     };
 }

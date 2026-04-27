@@ -19,6 +19,27 @@ let
     fnArgNames = [ ];
   };
 
+  # Derive the entity kind for the current node by walking the includes
+  # chain upward through accumulated entries to find the nearest ancestor
+  # with a non-null entityKind. O(chain × entries) — acceptable for
+  # diagnostic-only code path.
+  deriveEntityKind =
+    state:
+    let
+      chain = (state.includesChain or (_: [ ])) null;
+      entries = state.entries or [ ];
+      ancestorKinds = lib.filter (s: s != null) (
+        map (
+          id:
+          let
+            hit = lib.findFirst (e: (e.path or e.name) == id && e.entityKind != null) null entries;
+          in
+          if hit != null then hit.entityKind else null
+        ) (lib.reverseList chain)
+      );
+    in
+    if ancestorKinds != [ ] then lib.head ancestorKinds else null;
+
   # Derive parent from includesChain, filtering out self-references.
   # The chain contains raw identity strings from chain-push (pathKey of aspectPath).
   #
@@ -72,8 +93,7 @@ let
         entry = mkBaseEntry class param // {
           name = param.name or "<anon>";
           parent = chainParent ((state.includesChain or (_: [ ])) null) selfPath;
-          ctxStage = param.__ctxStage or null;
-          ctxKind = param.__ctxKind or null;
+          entityKind = param.__entityKind or null;
         };
       in
       {
@@ -88,15 +108,15 @@ let
   # Module collection is handled by classCollectorHandler via emit-class effects.
   # Use as extraHandlers with mkPipeline.
   #
-  # Disambiguates anonymous entries using context stage tags, matching the
-  # legacy structuredTrace adapter's naming: stage/kind(aspect):provider.
+  # Disambiguates anonymous entries using entity kind tags, matching the
+  # legacy structuredTrace adapter's naming: entityKind/kind(aspect):provider.
   tracingHandler = class: {
     "resolve-complete" =
       { param, state }:
       let
         rawName = param.meta.originalName or param.name or "<anon>";
         provPath = lib.concatStringsSep "/" (param.meta.provider or [ ]);
-        ctxStage = state.currentStage or null;
+        entityKind = deriveEntityKind state;
         # Derive ctxAspect from includes chain: nearest meaningful ancestor's
         # base name (strip provider path and ctxId suffix for readability).
         chain = (state.includesChain or (_: [ ])) null;
@@ -117,17 +137,17 @@ let
         name =
           if isAnon && constraintOwner != null then
             "filter:${constraintOwner}"
-          else if isAnon && ctxStage != null then
+          else if isAnon && entityKind != null then
             let
               aspectTag = if ctxAspect != null then "(${ctxAspect})" else "";
               provTag = lib.optionalString (provPath != "") ":${provPath}";
             in
-            "${ctxStage}/resolve${aspectTag}${provTag}"
+            "${entityKind}/resolve${aspectTag}${provTag}"
           else
             rawName;
         selfFullPath = if provPath != "" then "${provPath}/${name}" else name;
         entry = mkBaseEntry class param // {
-          inherit name ctxStage;
+          inherit name entityKind;
           parent = chainParent chain selfFullPath;
         };
       in
@@ -156,12 +176,12 @@ let
           # param is the original context sent by the transition handler.
           # We record the policy fire; the actual resume comes from the
           # policy handler via composeHandlers.
-          ctxStage = state.currentStage or null;
+          entityKind = deriveEntityKind state;
           chain = (state.includesChain or (_: [ ])) null;
           parent = if chain != [ ] then lib.last chain else null;
           entry = policyEntryDefaults // {
             name = "policy:${name}";
-            inherit ctxStage parent;
+            inherit entityKind parent;
             isPolicyDispatch = true;
             policyName = name;
             from = _policy.from;

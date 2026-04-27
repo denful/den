@@ -96,7 +96,11 @@ let
     entityKind:
     let
       policies = den.policies or { };
-      matching = lib.filter (policy: policy.from == entityKind) (builtins.attrValues policies);
+      # Only old-style policies have from/to fields. Skip new-style functions.
+      oldStyle = builtins.filter (p: builtins.isAttrs p && !builtins.isFunction p && p ? from) (
+        builtins.attrValues policies
+      );
+      matching = lib.filter (policy: policy.from == entityKind) oldStyle;
     in
     if matching == [ ] then
       null

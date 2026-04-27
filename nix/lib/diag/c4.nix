@@ -48,7 +48,7 @@ let
   # Strings inside C4 macros are double-quoted. Escape embedded quotes.
   esc = s: lib.replaceStrings [ "\"" ] [ "\\\"" ] s;
 
-  stageLabel = util.stageLabel { };
+  entityLabel = util.entityLabel { };
 
   # --- Shared body-builders ---
   #
@@ -58,8 +58,8 @@ let
   # @startuml / !include / @enduml; the Mermaid renderers pass it to
   # renderMermaid.
 
-  # Component view body: aspects grouped by stage inside one host.
-  # The host becomes a System_Boundary. Each context stage becomes a
+  # Component view body: aspects grouped by entity kind inside one host.
+  # The host becomes a System_Boundary. Each entity kind becomes a
   # Container_Boundary holding its aspects as Components. Aspect inclusions
   # become Rels.
   c4ComponentBody =
@@ -70,30 +70,30 @@ let
         rootId
         nodes
         edges
-        stages
+        entityKinds
         ;
 
       aspectNodes = builtins.filter (n: meaningful n.label && n.id != rootId) nodes;
-      byStage = stage: builtins.filter (n: n.stage == stage.name) aspectNodes;
-      unstagedNodes = builtins.filter (n: n.stage == null) aspectNodes;
+      byEntityKind = ek: builtins.filter (n: n.entityKind == ek.name) aspectNodes;
+      unkindedNodes = builtins.filter (n: n.entityKind == null) aspectNodes;
 
       componentDecl = node: ''Component(${node.id}, "${esc node.label}", "${esc (node.class or "")}")'';
 
       containerDecl =
-        stage:
+        ek:
         let
-          members = byStage stage;
+          members = byEntityKind ek;
           membersStr = lib.concatMapStringsSep "\n    " componentDecl members;
         in
         if members == [ ] then
           null
         else
           ''
-            Container_Boundary(${idOf stage.name}, "${esc (stageLabel stage)}") {
+            Container_Boundary(${idOf ek.name}, "${esc (entityLabel ek)}") {
                 ${membersStr}
             }'';
 
-      containerDecls = builtins.filter (x: x != null) (map containerDecl stages);
+      containerDecls = builtins.filter (x: x != null) (map containerDecl entityKinds);
 
       relDecl =
         edge:
@@ -120,16 +120,16 @@ let
       ''System_Boundary(${rootId}, "${esc rootName}") {''
     ]
     ++ map (s: "  ${s}") containerDecls
-    ++ map componentDecl unstagedNodes
+    ++ map componentDecl unkindedNodes
     ++ [
       "}"
       ""
     ]
     ++ map relDecl renderableEdges;
 
-  # Container view body: one box per ctx stage / class, no components inside.
-  # Each context stage becomes a Container with a count of aspects it holds.
-  # Stage transitions become Rels. The host is the System_Boundary.
+  # Container view body: one box per entity kind / class, no components inside.
+  # Each entity kind becomes a Container with a count of aspects it holds.
+  # Entity kind transitions become Rels. The host is the System_Boundary.
   c4ContainerBody =
     theme: graph:
     let
@@ -137,29 +137,27 @@ let
         rootName
         rootId
         nodes
-        stages
-        stageEdges
+        entityKinds
+        entityEdges
         ;
       aspectNodes = builtins.filter (n: meaningful n.label && n.id != rootId) nodes;
-      stageClassHint =
-        stage:
+      entityClassHint =
+        ek:
         let
-          stageNodes = builtins.filter (n: n.stage == stage.name) aspectNodes;
-          classes = lib.unique (
-            builtins.filter (c: c != null && c != "") (map (n: n.class or null) stageNodes)
-          );
+          ekNodes = builtins.filter (n: n.entityKind == ek.name) aspectNodes;
+          classes = lib.unique (builtins.filter (c: c != null && c != "") (map (n: n.class or null) ekNodes));
         in
         if classes == [ ] then "mixed" else lib.concatStringsSep "+" classes;
 
-      # Use stage.id for both container declaration and edge endpoints so
-      # they line up. stage.id is already a valid C4 identifier.
+      # Use ek.id for both container declaration and edge endpoints so
+      # they line up. ek.id is already a valid C4 identifier.
       containerDecl =
-        stage:
+        ek:
         let
-          count = builtins.length (builtins.filter (n: n.stage == stage.name) aspectNodes);
+          count = builtins.length (builtins.filter (n: n.entityKind == ek.name) aspectNodes);
           desc = "${toString count} aspect${lib.optionalString (count != 1) "s"}";
         in
-        ''Container(${stage.id}, "${esc (stageLabel stage)}", "${esc (stageClassHint stage)}", "${desc}")'';
+        ''Container(${ek.id}, "${esc (entityLabel ek)}", "${esc (entityClassHint ek)}", "${desc}")'';
 
       relDecl =
         edge:
@@ -168,11 +166,11 @@ let
         in
         ''Rel(${edge.from}, ${edge.to}, "${esc label}")'';
     in
-    if stages == [ ] then
+    if entityKinds == [ ] then
       [
         ''title Container view: ${esc rootName}''
         ""
-        ''System(${rootId}, "${esc rootName}", "no context stages captured")''
+        ''System(${rootId}, "${esc rootName}", "no entity kinds captured")''
       ]
     else
       [
@@ -180,12 +178,12 @@ let
         ""
         ''System_Boundary(${rootId}, "${esc rootName}") {''
       ]
-      ++ map (s: "  ${containerDecl s}") stages
+      ++ map (s: "  ${containerDecl s}") entityKinds
       ++ [
         "}"
         ""
       ]
-      ++ map relDecl stageEdges;
+      ++ map relDecl entityEdges;
 
   # Context view body: fleet-wide overview.
   # Expects a fleet record `{ flakeName, hosts, users, relations }` (built by

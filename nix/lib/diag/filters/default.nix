@@ -38,7 +38,7 @@ let
   diffMod = import ./diff.nix { inherit lib util graphLib; };
 
   # `simplified` composes across fold + reshape.
-  simplified = graph: foldMod.foldProviders (foldMod.flattenStages (reshape.aspectsOnly graph));
+  simplified = graph: foldMod.foldProviders (foldMod.flattenEntityKinds (reshape.aspectsOnly graph));
 
   # Fan-in / fan-out metrics.
   fanMetrics =
@@ -62,7 +62,7 @@ let
             id
             label
             fullLabel
-            stage
+            entityKind
             class
             ;
           inherit fanIn fanOut;

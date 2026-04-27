@@ -80,7 +80,7 @@
     // {
       nodes = taggedNodes;
       edges = taggedEdges;
-      stages = a.stages or [ ];
-      stageEdges = a.stageEdges or [ ];
+      entityKinds = a.entityKinds or [ ];
+      entityEdges = a.entityEdges or [ ];
     };
 }
