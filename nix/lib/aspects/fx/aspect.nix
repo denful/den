@@ -16,6 +16,7 @@ let
     "includes"
     "provides"
     "policies"
+    "policyFns"
     "into"
     "traits"
     "classes"
@@ -25,7 +26,7 @@ let
     "__functionArgs"
     "__scopeHandlers"
     "__ctxId"
-    "__ctxStage"
+    "__entityKind"
     "__parametricResolved"
     "_module"
     "_"
@@ -505,11 +506,11 @@ let
       # meta.into survives freeform deferredModule; aspect.into is the fallback.
       intoFn = aspect.meta.into or aspect.into or null;
       hasManualInto = intoFn != null && lib.isFunction intoFn;
-      # Only fire per-policy dispatch for stage roots (aspects with __ctxStage).
-      # Inner provides/includes share the stage name but are not transition points.
-      isStageRoot = aspect ? __ctxStage;
+      # Only fire per-policy dispatch for entity roots (aspects with __entityKind).
+      # Inner provides/includes share the entity kind but are not transition points.
+      isEntityRoot = aspect ? __entityKind;
       hasPolicies =
-        isStageRoot && den.lib.aspects.fx.handlers.policyEffectNamesFor (aspect.name or "") != [ ];
+        isEntityRoot && den.lib.aspects.fx.handlers.policyEffectNamesFor (aspect.name or "") != [ ];
     in
     if hasManualInto || hasPolicies then
       fx.send "into-transition" {
@@ -580,6 +581,29 @@ let
     // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
     // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
 
+  # Emit register-aspect-policy for each entry in aspect.policyFns.
+  # Each policy is stored with ownerIdentity for exclusion rollback.
+  emitAspectPolicies =
+    aspect:
+    let
+      policies = aspect.policyFns or { };
+      aspectName = aspect.name or "<anon>";
+      nodeIdentity = identity.pathKey (identity.aspectPath aspect);
+    in
+    if policies == { } then
+      fx.pure null
+    else
+      fx.seq (
+        lib.mapAttrsToList (
+          policyName: policyFn:
+          fx.send "register-aspect-policy" {
+            name = "${aspectName}/${policyName}";
+            fn = policyFn;
+            ownerIdentity = nodeIdentity;
+          }
+        ) policies
+      );
+
   emitSelfProvide =
     aspect:
     let
@@ -637,7 +661,6 @@ let
     if isMeaningful then
       fx.bind (fx.send "chain-push" {
         identity = nodeIdentity;
-        stage = aspect.__ctxStage or null;
       }) (_: fx.bind comp (result: fx.bind (fx.send "chain-pop" null) (_: fx.pure result)))
     else
       comp;
@@ -665,10 +688,13 @@ let
       # drain when context widens during transitions.
       childResolution = fx.bind (builtins.seq _ (emitSelfProvide aspect)) (
         selfProvResults:
-        fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
-          includeResults:
-          fx.bind (emitTransitions aspect) (
-            transitionResults: fx.pure (selfProvResults ++ includeResults ++ transitionResults)
+        fx.bind (emitAspectPolicies aspect) (
+          _:
+          fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
+            includeResults:
+            fx.bind (emitTransitions aspect) (
+              transitionResults: fx.pure (selfProvResults ++ includeResults ++ transitionResults)
+            )
           )
         )
       );

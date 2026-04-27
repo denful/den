@@ -391,6 +391,12 @@ let
             default = [ ];
           };
 
+          policyFns = lib.mkOption {
+            description = "Named policy functions included when this aspect resolves.";
+            type = lib.types.lazyAttrsOf lib.types.raw;
+            default = { };
+          };
+
           includes = lib.mkOption {
             description = "Providers to ask aspects from";
             type = lib.types.listOf (providerType typeCfg);

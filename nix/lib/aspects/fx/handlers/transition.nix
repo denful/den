@@ -9,6 +9,12 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects) isParametricWrapper;
   inherit (den.lib.aspects.fx.identity) pathKey aspectPath;
+  inherit (den.lib.policyTypes) policyFnArgs;
+
+  # Schema entity kinds — used to derive targetKey from aspect-policy resolve bindings.
+  schemaKinds = builtins.filter (
+    n: n != "conf" && !(lib.hasPrefix "_" n) && (den.schema.${n}.isEntity or false)
+  ) (builtins.attrNames (den.schema or { }));
 
   mkCtxId =
     ctx:
@@ -103,6 +109,7 @@ let
     "chain-pop"
     "check-constraint"
     "register-constraint"
+    "register-aspect-policy"
     "defer-include"
     "drain-deferred"
     "get-path-set"
@@ -443,12 +450,85 @@ let
               )
           )
         ) (fx.pure manualTransitions) policyEffects;
+
+        # Dispatch aspect-included policies from state.aspectPolicies.
+        # These are plain functions (not named effects) — call directly,
+        # partition results by __policyEffect tag, build transition entries.
+        dispatchAspectPolicies =
+          prevTransitions:
+          let
+            aspectPolicies = (state.aspectPolicies or (_: { })) null;
+            traits = (state.traits or (_: { })) null;
+            resolveCtx = traits // currentCtx;
+            entries = lib.attrsToList aspectPolicies;
+            matching = builtins.filter (
+              e:
+              let
+                fargs = policyFnArgs e.value.fn;
+                requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
+                traitNames = den.traits or { };
+              in
+              builtins.all (k: resolveCtx ? ${k} || traitNames ? ${k}) requiredArgs
+            ) entries;
+          in
+          builtins.foldl' (
+            acc: entry:
+            fx.bind acc (
+              transitions:
+              let
+                rawEffects =
+                  let
+                    result = entry.value.fn resolveCtx;
+                  in
+                  if builtins.isList result then result else [ result ];
+                resolveEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
+                ) rawEffects;
+                includeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "include"
+                ) rawEffects;
+                excludeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
+                ) rawEffects;
+                firstResolveKeys =
+                  if resolveEffects != [ ] then builtins.attrNames (builtins.head resolveEffects).value else [ ];
+                targetKey = lib.findFirst (k: builtins.elem k schemaKinds) (
+                  if firstResolveKeys != [ ] then builtins.head firstResolveKeys else sourceEntityKind
+                ) firstResolveKeys;
+                targets = map (e: e.value) resolveEffects;
+                includeAspects = map (e: e.value) includeEffects;
+                excludeAspects = map (e: e.value) excludeEffects;
+                hasEffects = rawEffects != [ ];
+              in
+              if !hasEffects then
+                fx.pure transitions
+              else
+                fx.pure (
+                  transitions
+                  ++ [
+                    {
+                      path = lib.splitString "." targetKey;
+                      contexts = targets;
+                      routing = {
+                        from = sourceEntityKind;
+                        to = targetKey;
+                        inherit targetKey;
+                        policyName = entry.name;
+                        aspects = includeAspects;
+                        excludes = excludeAspects;
+                        isolateFanOut = true;
+                      };
+                    }
+                  ]
+                )
+            )
+          ) (fx.pure prevTransitions) matching;
       in
       if depth >= maxTransitionDepth then
         throw "den: transition depth exceeded ${toString maxTransitionDepth} — likely a cycle in den.policies (${sourceAspect.name or "?"})"
       else
         {
-          resume = fx.bind dispatchPolicies (
+          resume = fx.bind (fx.bind dispatchPolicies dispatchAspectPolicies) (
             rawTransitions:
             let
               # Merge transitions targeting the same path — multiple policies

@@ -293,6 +293,7 @@
             "includes"
             "provides"
             "policies"
+            "policyFns"
             "traits"
             "classes"
             "_module"

@@ -78,6 +78,7 @@ let
     // handlers.ctxSeenHandler
     // identity.pathSetHandler
     // identity.collectPathsHandler
+    // handlers.registerAspectPolicyHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
     // resolveEntityHandler
@@ -121,6 +122,7 @@ let
     traits = _: { };
     deferredTraits = _: { };
     consumedTraits = _: { };
+    aspectPolicies = _: { };
   };
 
   mkPipeline =

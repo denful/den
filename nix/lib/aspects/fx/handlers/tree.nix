@@ -3,6 +3,7 @@
 #   State writes: constraintRegistry, constraintFilters
 # chainHandler: Handles chain-push, chain-pop
 #   State reads/writes: includesChain
+#   (stage tracking removed — trace derives entityKind from entries)
 # classCollectorHandler: Handles emit-class
 #   State reads/writes: imports
 {
@@ -117,54 +118,35 @@ let
           mkDecision "keep" { };
   };
 
-  chainHandler =
-    let
-      topStage = stack: if stack == [ ] then null else lib.last stack;
-    in
-    {
-      "chain-push" =
-        { param, state }:
-        let
-          stage = param.stage or null;
-          chain = (state.includesChain or (_: [ ])) null;
-          stages = (state.chainStages or (_: [ ])) null;
-          stageStack = (state.stageStack or (_: [ ])) null;
-          newStageStack = if stage != null then stageStack ++ [ stage ] else stageStack;
-        in
-        {
-          resume = null;
-          state = state // {
-            includesChain = _: chain ++ [ param.identity ];
-            chainStages = _: stages ++ [ stage ];
-            stageStack = _: newStageStack;
-            currentStage = topStage newStageStack;
-          };
+  chainHandler = {
+    "chain-push" =
+      { param, state }:
+      let
+        chain = (state.includesChain or (_: [ ])) null;
+      in
+      {
+        resume = null;
+        state = state // {
+          includesChain = _: chain ++ [ param.identity ];
         };
-      "chain-pop" =
-        { param, state }:
-        let
-          chain = (state.includesChain or (_: [ ])) null;
-          chainStages = (state.chainStages or (_: [ ])) null;
-          stageStack = (state.stageStack or (_: [ ])) null;
-          poppedStage = if chainStages != [ ] then lib.last chainStages else null;
-          newStageStack =
-            if poppedStage != null && stageStack != [ ] then lib.init stageStack else stageStack;
-        in
-        {
-          resume = null;
-          state = state // {
-            includesChain =
-              _:
-              if chain == [ ] then
-                throw "fx: chain-pop on empty includesChain — push/pop mismatch in aspect compiler"
-              else
-                lib.init chain;
-            chainStages = _: if chainStages == [ ] then [ ] else lib.init chainStages;
-            stageStack = _: newStageStack;
-            currentStage = topStage newStageStack;
-          };
+      };
+    "chain-pop" =
+      { param, state }:
+      let
+        chain = (state.includesChain or (_: [ ])) null;
+      in
+      {
+        resume = null;
+        state = state // {
+          includesChain =
+            _:
+            if chain == [ ] then
+              throw "fx: chain-pop on empty includesChain — push/pop mismatch in aspect compiler"
+            else
+              lib.init chain;
         };
-    };
+      };
+  };
 
   classCollectorHandler =
     {
@@ -220,6 +202,28 @@ let
       };
   };
 
+  registerAspectPolicyHandler = {
+    "register-aspect-policy" =
+      { param, state }:
+      let
+        registry = (state.aspectPolicies or (_: { })) null;
+        entry = {
+          inherit (param) fn ownerIdentity;
+        };
+      in
+      {
+        resume = null;
+        state = state // {
+          aspectPolicies =
+            _:
+            registry
+            // {
+              ${param.name} = entry;
+            };
+        };
+      };
+  };
+
   drainDeferredHandler = {
     "drain-deferred" =
       { param, state }:
@@ -252,6 +256,7 @@ in
     constraintRegistryHandler
     chainHandler
     classCollectorHandler
+    registerAspectPolicyHandler
     deferredIncludeHandler
     drainDeferredHandler
     ;
