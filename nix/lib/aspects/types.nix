@@ -137,7 +137,11 @@ let
     if subFns != [ ] then
       baseType.merge loc subFns
     else if builtins.length paramFns == 1 then
-      # Single bare parametric fn: return raw wrapper (cheap, no submodule eval).
+      # Single bare parametric fn: return raw wrapper.
+      # Avoid baseType.merge here — it triggers a full aspectSubmodule evaluation
+      # (module system fixed-point + den.schema.aspect import) which is expensive
+      # and causes OOM when applied to every single-def provides child in the tree.
+      # The pipeline handles raw wrappers identically via wrapChild normalization.
       let
         fn = (builtins.head paramFns).value;
       in
@@ -195,7 +199,11 @@ let
           let
             nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
           in
-          # Single wrapper with no other defs: return wrapper directly (cheap, no submodule eval).
+          # Single wrapper with no other defs: return wrapper directly.
+          # Avoid baseType.merge here — it triggers a full aspectSubmodule evaluation
+          # (module system fixed-point + den.schema.aspect import) which is expensive
+          # and causes OOM when applied to every single-def provides child in the tree.
+          # The pipeline handles raw wrappers identically via wrapChild normalization.
           # Multiple wrappers or mixed: coerce __fn to includes, merge through aspectType.
           if builtins.length parametrics == 1 && nonParametrics == [ ] then
             let
