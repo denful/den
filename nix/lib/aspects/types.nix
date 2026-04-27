@@ -127,7 +127,7 @@ let
     );
 
   # Merge branch: all-function defs — submodule fns merge through aspectType,
-  # bare parametric fns use last-wins.
+  # bare parametric fns: single-def returns raw wrapper, multi-def coerces to includes.
   mergeFunctions =
     baseType: typeCfg: loc: defs:
     let
@@ -185,10 +185,11 @@ let
       description = "aspect or function returning aspect";
       check = v: builtins.isAttrs v || lib.isFunction v;
       # Merge dispatch:
-      #   parametric wrappers (__fn/__args) → last-wins, preserve wrapper
+      #   parametric wrappers (__fn/__args) → single: preserve wrapper; multi: coerce to includes
       #   mixed fns + attrsets → coerce parametric fns to { includes = [fn]; }
       #   all fns, has submodule fns → merge through aspectType
-      #   all fns, bare parametric only → last-wins, wrap as { __fn, __args }
+      #   all fns, bare parametric only → single: raw wrapper; multi: coerce to includes
+      #   multiple __functor defs → error (ambiguous)
       #   all attrsets → merge through aspectType
       merge =
         loc: defs:

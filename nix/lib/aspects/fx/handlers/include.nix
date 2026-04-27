@@ -110,16 +110,11 @@ let
         tombstoneAll condNode.meta.aspects
     );
 
+  # Exclude an aspect from the subtree. When dedupKey is non-null, also
+  # unregisters it from includeSeen (dedup eagerly registered the key but
+  # the constraint check excluded the aspect — rollback so a later
+  # non-excluding parent can still resolve it).
   excludeChild =
-    child: owner:
-    let
-      tombstone = identity.tombstone child { excludedFrom = owner; };
-    in
-    fx.bind (fx.send "resolve-complete" tombstone) (_: fx.pure [ tombstone ]);
-
-  # Like excludeChild but also unregisters the dedupKey from includeSeen.
-  # Used when dedup eagerly registered a key but constraint check excluded the aspect.
-  excludeChildDedup =
     child: owner: dedupKey:
     let
       tombstone = identity.tombstone child { excludedFrom = owner; };
@@ -248,6 +243,8 @@ let
         seen = (state.includeSeen or (_: { })) null;
       in
       {
+        # null resume: the trampoline passes null to the sender's bind continuation.
+        # This is a state-only effect — the caller doesn't use the return value.
         resume = null;
         state = state // {
           includeSeen = _: builtins.removeAttrs seen [ key ];
@@ -307,7 +304,7 @@ let
               (
                 decision:
                 if decision.action == "exclude" then
-                  excludeChildDedup child decision.owner dedupKey
+                  excludeChild child decision.owner dedupKey
                 else if decision.action == "substitute" then
                   substituteChild child decision
                 else

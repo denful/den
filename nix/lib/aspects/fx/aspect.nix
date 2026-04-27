@@ -180,7 +180,7 @@ let
       in
       if hasMissingDenArgs then
         {
-          inherit module;
+          module = warnedModule;
           wrapped = false;
           unsatisfied = true;
           missingArgs = missingDenArgNames;
