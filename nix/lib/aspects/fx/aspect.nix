@@ -176,8 +176,16 @@ let
         warnedModule = builtins.foldl' (
           mod: k: lib.warn "den: class module requests '${k}' but no ${k} context is available" mod
         ) module missingDenArgNames;
+        hasMissingDenArgs = missingDenArgNames != [ ];
       in
-      if denArgNames == [ ] && traitArgNames == [ ] then
+      if hasMissingDenArgs then
+        {
+          inherit module;
+          wrapped = false;
+          unsatisfied = true;
+          missingArgs = missingDenArgNames;
+        }
+      else if denArgNames == [ ] && traitArgNames == [ ] then
         {
           module = warnedModule;
           wrapped = false;
@@ -428,7 +436,10 @@ let
             isContextDependent = true;
           };
         in
-        [ mainEmit ] ++ lib.optional (result ? validator) validatorEmit
+        if result.unsatisfied or false then
+          [ ]
+        else
+          [ mainEmit ] ++ lib.optional (result ? validator) validatorEmit
       ) classKeys
     );
 

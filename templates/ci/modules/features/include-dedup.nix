@@ -352,10 +352,12 @@
       }
     );
 
-    # Same module with user context — wraps and emits normally.
+    # Same module with user context via __scopeHandlers — wraps and emits.
+    # Produces 2 imports: wrapped main module + collision validator.
     test-guard-defers-then-emits = denTest (
       { den, ... }:
       let
+        handlers = den.lib.aspects.fx.handlers;
         aspect = {
           name = "nix-trusted";
           meta = { };
@@ -369,6 +371,7 @@
               nix.settings.trusted-users = [ user ];
             };
           includes = [ ];
+          __scopeHandlers = handlers.constantHandler { user = "tux"; };
         };
         result = den.lib.aspects.fx.pipeline.fxFullResolve {
           class = "nixos";
@@ -379,9 +382,9 @@
         };
       in
       {
-        # With user context: module wraps and emits → 1 import.
+        # With user context: module wraps (main + validator) → 2 imports.
         expr = builtins.length (result.state.imports null);
-        expected = 1;
+        expected = 2;
       }
     );
 
