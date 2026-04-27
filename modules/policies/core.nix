@@ -2,18 +2,17 @@
 #
 # Policy resolve functions can safely destructure context args because
 # synthesize-policies.nix validates entity keys before calling resolve.
-{ lib, ... }:
+{ lib, den, ... }:
 {
   den.policies = {
     host-to-users = {
       _core = true;
       from = "host";
-      to = "user";
-      resolve =
+      isolateFanOut = false;
+      __functor =
+        _:
         { host, ... }:
-        map (user: {
-          inherit host user;
-        }) (lib.attrValues host.users);
+        map (user: den.lib.policy.resolve { inherit host user; }) (lib.attrValues host.users);
     };
     host-to-default = {
       _core = true;

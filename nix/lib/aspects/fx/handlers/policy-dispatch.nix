@@ -97,7 +97,10 @@ let
       entityKind = param.entityKind;
       traits = (state.traits or (_: { })) null;
       resolveCtx = traits // ctx;
-      argsOk = resolveArgsSatisfied policy resolveCtx;
+      # Scope check: if policy carries a `from` field, validate context satisfies it.
+      fromKind = if builtins.isAttrs policy then policy.from or null else null;
+      scopeOk = fromKind == null || ctxSatisfies fromKind ctx;
+      argsOk = scopeOk && resolveArgsSatisfied policy resolveCtx;
 
       # Call policy function; returns list of typed effects.
       rawEffects = if argsOk then policy resolveCtx else [ ];
@@ -118,12 +121,17 @@ let
         e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
       ) effects;
 
-      # Derive targetKey from first resolve binding's schema-entity key.
+      # Derive targetKey: explicit `to` on policy attrset wins, then derive from bindings.
+      explicitTo = if builtins.isAttrs policy then policy.to or null else null;
       firstResolveKeys =
         if resolveEffects != [ ] then builtins.attrNames (builtins.head resolveEffects).value else [ ];
-      targetKey = lib.findFirst (k: builtins.elem k schemaKinds) (
-        if firstResolveKeys != [ ] then builtins.head firstResolveKeys else entityKind
-      ) firstResolveKeys;
+      targetKey =
+        if explicitTo != null then
+          explicitTo
+        else
+          lib.findFirst (k: builtins.elem k schemaKinds) (
+            if firstResolveKeys != [ ] then builtins.head firstResolveKeys else entityKind
+          ) firstResolveKeys;
 
       # Extract context attrsets from resolve effects.
       targets = map (e: e.value) resolveEffects;
@@ -148,7 +156,7 @@ let
               policyName = name;
               aspects = includeAspects;
               excludes = excludeAspects;
-              isolateFanOut = true;
+              isolateFanOut = if builtins.isAttrs policy then policy.isolateFanOut or true else true;
             };
           };
       inherit state;

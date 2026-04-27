@@ -184,8 +184,8 @@ let
             inherit entityKind parent;
             isPolicyDispatch = true;
             policyName = name;
-            from = _policy.from;
-            to = if _policy.as != "" then _policy.as else _policy.to;
+            from = _policy.from or "";
+            to = if _policy ? as && _policy.as != "" then _policy.as else _policy.to or "";
           };
         in
         {

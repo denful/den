@@ -96,8 +96,8 @@ let
     entityKind:
     let
       policies = den.policies or { };
-      # Only old-style policies have from/to fields. Skip new-style functions.
-      oldStyle = builtins.filter (p: builtins.isAttrs p && !builtins.isFunction p && p ? from) (
+      # Only old-style policies have from/to/resolve fields. Skip new-style (functions and __functor attrsets).
+      oldStyle = builtins.filter (p: den.lib.policyTypes.isOldStylePolicy p) (
         builtins.attrValues policies
       );
       matching = lib.filter (policy: policy.from == entityKind) oldStyle;

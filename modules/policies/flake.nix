@@ -8,6 +8,8 @@
   ...
 }:
 let
+  inherit (den.lib.policy) resolve include;
+
   systemOutputs = [
     "packages"
     "apps"
@@ -22,13 +24,13 @@ let
       _core = true;
       from = "flake-system";
       to = "flake-${output}";
-      aspects = [ den.aspects."flake-${output}" ];
-      isolateFanOut = true;
-      resolve =
+      __functor =
+        _:
         { system, ... }:
-        lib.singleton {
-          inherit system output;
-        };
+        [
+          (resolve { inherit system output; })
+          (include den.aspects."flake-${output}")
+        ];
     };
   }) systemOutputs;
 in
@@ -38,28 +40,39 @@ in
       _core = true;
       from = "flake";
       to = "flake-system";
-      isolateFanOut = true;
-      resolve = _: map (system: { inherit system; }) den.systems;
+      __functor = _: _: map (system: resolve { inherit system; }) den.systems;
     };
 
     flake-system-to-flake-os = {
       _core = true;
       from = "flake-system";
       to = "flake-os";
-      aspects = [ den.aspects."flake-os" ];
-      isolateFanOut = true;
-      resolve =
-        { system, ... }: map (host: { inherit host; }) (builtins.attrValues (den.hosts.${system} or { }));
+      __functor =
+        _:
+        { system, ... }:
+        let
+          hosts = den.hosts.${system} or { };
+        in
+        lib.concatMap (host: [
+          (resolve { inherit host; })
+          (include den.aspects."flake-os")
+        ]) (builtins.attrValues hosts);
     };
 
     flake-system-to-flake-hm = {
       _core = true;
       from = "flake-system";
       to = "flake-hm";
-      aspects = [ den.aspects."flake-hm" ];
-      isolateFanOut = true;
-      resolve =
-        { system, ... }: map (home: { inherit home; }) (builtins.attrValues (den.homes.${system} or { }));
+      __functor =
+        _:
+        { system, ... }:
+        let
+          homes = den.homes.${system} or { };
+        in
+        lib.concatMap (home: [
+          (resolve { inherit home; })
+          (include den.aspects."flake-hm")
+        ]) (builtins.attrValues homes);
     };
   };
 }

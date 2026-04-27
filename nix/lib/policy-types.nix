@@ -66,7 +66,7 @@ let
       let
         val = (builtins.head defs).value;
       in
-      if builtins.isFunction val then
+      if builtins.isFunction val || isFunctorAttrset val then
         # New-style: plain function or __functor attrset — pass through raw
         (lib.types.raw.merge loc defs)
       else
@@ -74,12 +74,14 @@ let
         (policyType.merge loc defs);
   };
 
-  # Detection: new-style policies are functions (plain or __functor).
-  # builtins.isFunction returns true for both.
-  isNewStylePolicy = policy: builtins.isFunction policy;
+  # __functor attrsets are callable but builtins.isFunction returns false for them.
+  isFunctorAttrset = v: builtins.isAttrs v && v ? __functor;
+
+  # Detection: new-style policies are plain functions or __functor attrsets.
+  isNewStylePolicy = policy: builtins.isFunction policy || isFunctorAttrset policy;
 
   isOldStylePolicy =
-    policy: builtins.isAttrs policy && !builtins.isFunction policy && policy ? from && policy ? resolve;
+    policy: builtins.isAttrs policy && !isFunctorAttrset policy && policy ? from && policy ? resolve;
 
   # Extract function args from a policy, handling __functor attrsets correctly.
   # lib.functionArgs on a __functor attrset returns {} (inspects __functionArgs attr).
@@ -95,6 +97,7 @@ in
   inherit
     policyType
     dualPolicyType
+    isFunctorAttrset
     isNewStylePolicy
     isOldStylePolicy
     policyFnArgs
