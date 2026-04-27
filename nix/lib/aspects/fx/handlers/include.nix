@@ -117,6 +117,21 @@ let
     in
     fx.bind (fx.send "resolve-complete" tombstone) (_: fx.pure [ tombstone ]);
 
+  # Like excludeChild but also unregisters the dedupKey from includeSeen.
+  # Used when dedup eagerly registered a key but constraint check excluded the aspect.
+  excludeChildDedup =
+    child: owner: dedupKey:
+    let
+      tombstone = identity.tombstone child { excludedFrom = owner; };
+    in
+    fx.bind (fx.send "resolve-complete" tombstone) (
+      _:
+      if dedupKey == null then
+        fx.pure [ tombstone ]
+      else
+        fx.bind (fx.send "include-unseen" dedupKey) (_: fx.pure [ tombstone ])
+    );
+
   substituteChild =
     child: decision:
     let
@@ -225,6 +240,20 @@ let
 
   # The handler. param is { child, idx, __parentScopeHandlers? } from emitIncludes.
   includeHandler = {
+    # Unregister a dedupKey from includeSeen (used when exclude fires after eager registration).
+    "include-unseen" =
+      { param, state }:
+      let
+        key = param;
+        seen = (state.includeSeen or (_: { })) null;
+      in
+      {
+        resume = null;
+        state = state // {
+          includeSeen = _: builtins.removeAttrs seen [ key ];
+        };
+      };
+
     "emit-include" =
       { param, state }:
       let
@@ -248,10 +277,24 @@ let
         isConditional = builtins.isAttrs child && child ? meta && child.meta ? guard;
         isForward =
           builtins.isAttrs child && child ? meta && builtins.isAttrs child.meta && child.meta ? __forward;
+        # Include-level dedup: skip re-resolution of aspects already processed.
+        # Record eagerly in handler state. If aspect is excluded, excludeChild
+        # unregisters it so a later non-excluding parent can still resolve it.
+        # Use the PRE-nameAnon name to decide dedup — nameAnon creates synthetic
+        # names like "parent/<anon>:0" which look meaningful but are positional.
+        # Also skip synthetic <...> names (e.g. "<includeIf>") which are shared
+        # across multiple structurally different nodes.
+        originalName = withScope.name or "<anon>";
+        isSyntheticName = lib.hasPrefix "<" originalName && lib.hasSuffix ">" originalName;
+        dedupKey = if isMeaningfulName originalName && !isSyntheticName then childIdentity else null;
+        seen = (state.includeSeen or (_: { })) null;
+        alreadyResolved = dedupKey != null && seen ? ${dedupKey};
       in
       {
         resume =
-          if isForward then
+          if alreadyResolved then
+            fx.pure [ ]
+          else if isForward then
             fx.bind (fx.send "emit-forward" child.meta.__forward) (_: fx.pure [ ])
           else if isConditional then
             resolveConditional child
@@ -264,13 +307,20 @@ let
               (
                 decision:
                 if decision.action == "exclude" then
-                  excludeChild child decision.owner
+                  excludeChildDedup child decision.owner dedupKey
                 else if decision.action == "substitute" then
                   substituteChild child decision
                 else
                   keepChild child decision
               );
-        inherit state;
+        state =
+          if alreadyResolved || dedupKey == null then
+            state
+          else
+            state
+            // {
+              includeSeen = _: seen // { ${dedupKey} = true; };
+            };
       };
   };
 
