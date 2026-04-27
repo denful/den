@@ -28,6 +28,7 @@ let
     nsTypes = ./namespace-types.nix;
     parametric = ./parametric.nix;
     take = ./take.nix;
+    policy = ./policy-effects.nix;
     policyTypes = ./policy-types.nix;
     resolveEntity = ./resolve-entity.nix;
     strict = ./strict.nix;
