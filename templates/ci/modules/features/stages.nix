@@ -2,7 +2,7 @@
 {
   flake.tests.stages = {
 
-    # Behavior set on den.stages.default appears in the resolved NixOS config.
+    # Behavior set on den.default appears in the resolved NixOS config.
     test-stage-default-nixos = denTest (
       { den, igloo, ... }:
       {
@@ -36,8 +36,8 @@
       }
     );
 
-    # Behavior set on den.stages.user appears in the resolved NixOS config
-    # for each user (user stage is reached from host via policies).
+    # Behavior set on den.schema.user appears in the resolved NixOS config
+    # for each user (user entity kind is reached from host via policies).
     test-stage-user-nixos = denTest (
       { den, igloo, ... }:
       {
@@ -52,8 +52,8 @@
       }
     );
 
-    # Bare function sugar: den.stages.greet = { hello }: ...
-    # is equivalent to den.stages.greet.provides.greet = { hello }: ...
+    # Bare function sugar: den.schema.greet = { hello }: ...
+    # is equivalent to den.schema.greet.provides.greet = { hello }: ...
     test-stage-function-sugar = denTest (
       { den, funnyNames, ... }:
       {

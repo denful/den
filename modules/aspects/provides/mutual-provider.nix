@@ -14,7 +14,7 @@ let
     ## Usage
 
       den.hosts.x86_64-linux.igloo.users.tux = { };
-      den.stages.user.includes = [ den.provides.mutual-provider ];
+      den.schema.user.includes = [ den.provides.mutual-provider ];
 
       # user aspect provides to specific host or to all where it lives
       den.aspects.tux = {
