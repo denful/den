@@ -230,10 +230,59 @@ let
       )
     ) (fx.pure results) (lib.imap0 (i: ctx: { inherit i ctx; }) transition.contexts);
 
+  # Register exclude constraints from policy routing before resolution.
+  registerExcludes =
+    policyName: excludes:
+    if excludes == [ ] then
+      fx.pure null
+    else
+      builtins.foldl' (
+        acc: aspectRef:
+        fx.bind acc (
+          _:
+          fx.send "register-constraint" {
+            type = "exclude";
+            scope = "subtree";
+            identity = pathKey (aspectPath aspectRef);
+            owner = policyName;
+          }
+        )
+      ) (fx.pure null) excludes;
+
+  # Process include-only transitions (no resolve targets) by emitting
+  # includes and registering excludes in the current context.
+  processIncludeOnly =
+    currentCtx: results: transition:
+    let
+      routing = transition.routing or { };
+      aspects = routing.aspects or [ ];
+      excludes = routing.excludes or [ ];
+      scopeHandlers = constantHandler currentCtx;
+      ctxNames = mkCtxId currentCtx;
+    in
+    fx.bind (registerExcludes (routing.policyName or "policy") excludes) (
+      _:
+      builtins.foldl' (
+        acc: aspect:
+        fx.bind acc (
+          prevResults:
+          fx.bind (fx.send "emit-include" {
+            child = aspect;
+            idx = null;
+            __parentScopeHandlers = scopeHandlers;
+            __parentCtxId = ctxNames;
+          }) (_: fx.pure prevResults)
+        )
+      ) (fx.pure results) aspects
+    );
+
   resolveTransition =
     targetClass: sourceAspect: currentCtx: results: transition:
     if isSiblingRoute transition then
       resolveSiblingTransition targetClass sourceAspect currentCtx results transition
+    else if transition.contexts == [ ] then
+      # Include/exclude-only transition — no resolve targets.
+      processIncludeOnly currentCtx results transition
     else
       let
         key = "${targetClass}/${lib.concatStringsSep "/" transition.path}";
@@ -242,99 +291,104 @@ let
         crossProvider = sourceProvides.${targetKey} or null;
         emitCross = emitCrossProvider { inherit crossProvider sourceAspect targetKey; };
         policyHandlers = collectPolicyHandlers (sourceAspect.name or "") targetKey;
+        excludes = (transition.routing or { }).excludes or [ ];
       in
-      fx.bind
-        (fx.send "resolve-entity" {
-          kind = lib.concatStringsSep "." transition.path;
-        })
-        (
-          rawTarget:
-          let
-            # Inject policy-declared aspects into the target's includes.
-            policyAspects = (transition.routing or { }).aspects or [ ];
-            effectiveTarget = rawTarget // {
-              includes = (rawTarget.includes or [ ]) ++ policyAspects;
-            };
-          in
-          let
-            isFanOut = builtins.length transition.contexts > 1;
-            # Pre-index contexts so fan-out dedup keys are unique even when
-            # policy-contributed contexts have identical attr names
-            # (e.g., {fromClass=_:"packages"} vs {fromClass=_:"files"}).
-            indexedContexts = lib.imap0 (i: ctx: {
-              inherit i;
-              ctx = ctx;
-            }) transition.contexts;
-          in
-          builtins.foldl' (
-            acc: indexed:
-            fx.bind acc (
-              innerResults:
-              let
-                newCtx = indexed.ctx;
-                scopedCtx = currentCtx // newCtx;
-                ctxNames = mkCtxId newCtx;
-                ctxKey = if isFanOut then "${key}/{${ctxNames}}" else key;
-                scopeHandlers = constantHandler scopedCtx;
-                updateCtx = fx.effects.state.modify (st: st // { currentCtx = _: scopedCtx; });
-                baseComputation =
-                  if isFanOut && ((transition.routing or { }).isolateFanOut or false) then
-                    resolveFanOut {
-                      inherit
-                        targetClass
-                        effectiveTarget
-                        scopedCtx
-                        scopeHandlers
-                        ctxNames
-                        ;
-                    } innerResults
-                  else
-                    resolveContextValue currentCtx effectiveTarget innerResults newCtx;
-                # Install policy handlers for aspects resolved under this transition.
-                # Fan-out sub-pipelines (fxFullResolve) create fresh handler scopes,
-                # so policy handlers don't propagate into them. Nested transitions
-                # that install handlers for the same effect name use innermost-wins
-                # semantics (standard scope.provide shadowing).
-                withTarget =
-                  if policyHandlers != { } then
-                    fx.effects.scope.provide policyHandlers baseComputation
-                  else
-                    baseComputation;
-              in
-              fx.bind
-                (fx.send "ctx-seen" {
-                  key = ctxKey;
-                  aspects = map (a: pathKey (aspectPath a)) policyAspects;
-                  aspectValues = policyAspects;
-                })
-                (
-                  { isFirst, newAspectValues }:
-                  if isFirst then
-                    fx.bind updateCtx (
-                      _: fx.bind withTarget (targetResults: emitCross scopedCtx scopeHandlers ctxNames targetResults)
-                    )
-                  else if newAspectValues != [ ] then
-                    # Supplemental aspects for an already-resolved entity:
-                    # emit each new aspect as an include with parent scope
-                    # so parametric aspects can resolve their args.
-                    builtins.foldl' (
-                      acc: aspect:
-                      fx.bind acc (
-                        prevResults:
-                        fx.bind (fx.send "emit-include" {
-                          child = aspect;
-                          idx = null;
-                          __parentScopeHandlers = scopeHandlers;
-                          __parentCtxId = ctxNames;
-                        }) (_: fx.pure prevResults)
+      # Register exclude constraints before resolving targets.
+      fx.bind (registerExcludes ((transition.routing or { }).policyName or "policy") excludes) (
+        _:
+        fx.bind
+          (fx.send "resolve-entity" {
+            kind = lib.concatStringsSep "." transition.path;
+          })
+          (
+            rawTarget:
+            let
+              # Inject policy-declared aspects into the target's includes.
+              policyAspects = (transition.routing or { }).aspects or [ ];
+              effectiveTarget = rawTarget // {
+                includes = (rawTarget.includes or [ ]) ++ policyAspects;
+              };
+            in
+            let
+              isFanOut = builtins.length transition.contexts > 1;
+              # Pre-index contexts so fan-out dedup keys are unique even when
+              # policy-contributed contexts have identical attr names
+              # (e.g., {fromClass=_:"packages"} vs {fromClass=_:"files"}).
+              indexedContexts = lib.imap0 (i: ctx: {
+                inherit i;
+                ctx = ctx;
+              }) transition.contexts;
+            in
+            builtins.foldl' (
+              acc: indexed:
+              fx.bind acc (
+                innerResults:
+                let
+                  newCtx = indexed.ctx;
+                  scopedCtx = currentCtx // newCtx;
+                  ctxNames = mkCtxId newCtx;
+                  ctxKey = if isFanOut then "${key}/{${ctxNames}}" else key;
+                  scopeHandlers = constantHandler scopedCtx;
+                  updateCtx = fx.effects.state.modify (st: st // { currentCtx = _: scopedCtx; });
+                  baseComputation =
+                    if isFanOut && ((transition.routing or { }).isolateFanOut or false) then
+                      resolveFanOut {
+                        inherit
+                          targetClass
+                          effectiveTarget
+                          scopedCtx
+                          scopeHandlers
+                          ctxNames
+                          ;
+                      } innerResults
+                    else
+                      resolveContextValue currentCtx effectiveTarget innerResults newCtx;
+                  # Install policy handlers for aspects resolved under this transition.
+                  # Fan-out sub-pipelines (fxFullResolve) create fresh handler scopes,
+                  # so policy handlers don't propagate into them. Nested transitions
+                  # that install handlers for the same effect name use innermost-wins
+                  # semantics (standard scope.provide shadowing).
+                  withTarget =
+                    if policyHandlers != { } then
+                      fx.effects.scope.provide policyHandlers baseComputation
+                    else
+                      baseComputation;
+                in
+                fx.bind
+                  (fx.send "ctx-seen" {
+                    key = ctxKey;
+                    aspects = map (a: pathKey (aspectPath a)) policyAspects;
+                    aspectValues = policyAspects;
+                  })
+                  (
+                    { isFirst, newAspectValues }:
+                    if isFirst then
+                      fx.bind updateCtx (
+                        _: fx.bind withTarget (targetResults: emitCross scopedCtx scopeHandlers ctxNames targetResults)
                       )
-                    ) (fx.pure innerResults) newAspectValues
-                  else
-                    fx.pure innerResults
-                )
-            )
-          ) (fx.pure results) indexedContexts
-        );
+                    else if newAspectValues != [ ] then
+                      # Supplemental aspects for an already-resolved entity:
+                      # emit each new aspect as an include with parent scope
+                      # so parametric aspects can resolve their args.
+                      builtins.foldl' (
+                        acc: aspect:
+                        fx.bind acc (
+                          prevResults:
+                          fx.bind (fx.send "emit-include" {
+                            child = aspect;
+                            idx = null;
+                            __parentScopeHandlers = scopeHandlers;
+                            __parentCtxId = ctxNames;
+                          }) (_: fx.pure prevResults)
+                        )
+                      ) (fx.pure innerResults) newAspectValues
+                    else
+                      fx.pure innerResults
+                  )
+              )
+            ) (fx.pure results) indexedContexts
+          )
+      );
 
   maxTransitionDepth = 50;
 
@@ -350,14 +404,14 @@ let
         currentCtx = rootCtx // aspectCtx;
         depth = state.transitionDepth or 0;
         targetClass = state.class or "nixos";
-        sourceStageName = sourceAspect.name or "";
+        sourceEntityKind = sourceAspect.name or "";
 
-        # Manual into transitions (from stage definition).
+        # Manual into transitions (from entity kind definition).
         manualIntoFn = param.intoFn;
         manualTransitions = if manualIntoFn != null then flattenInto (manualIntoFn currentCtx) [ ] else [ ];
 
         # Per-policy effects: send each matching policy effect, collect targets.
-        policyEffects = den.lib.aspects.fx.handlers.policyEffectNamesFor sourceStageName;
+        policyEffects = den.lib.aspects.fx.handlers.policyEffectNamesFor sourceEntityKind;
 
         dispatchPolicies = builtins.foldl' (
           acc: effectName:
@@ -366,7 +420,7 @@ let
             fx.bind
               (fx.send effectName {
                 ctx = currentCtx;
-                stageName = sourceStageName;
+                entityKind = sourceEntityKind;
               })
               (
                 result:

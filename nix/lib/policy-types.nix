@@ -55,7 +55,48 @@ let
       };
     };
   };
+  # Dual type: old-style attrsets go through policyType submodule,
+  # new-style functions (plain or __functor) pass through as raw.
+  dualPolicyType = lib.mkOptionType {
+    name = "dualPolicy";
+    description = "old-style policy submodule or new-style policy function";
+    check = v: builtins.isFunction v || builtins.isAttrs v;
+    merge =
+      loc: defs:
+      let
+        val = (builtins.head defs).value;
+      in
+      if builtins.isFunction val then
+        # New-style: plain function or __functor attrset — pass through raw
+        (lib.types.raw.merge loc defs)
+      else
+        # Old-style: attrset → evaluate through policyType submodule
+        (policyType.merge loc defs);
+  };
+
+  # Detection: new-style policies are functions (plain or __functor).
+  # builtins.isFunction returns true for both.
+  isNewStylePolicy = policy: builtins.isFunction policy;
+
+  isOldStylePolicy =
+    policy: builtins.isAttrs policy && !builtins.isFunction policy && policy ? from && policy ? resolve;
+
+  # Extract function args from a policy, handling __functor attrsets correctly.
+  # lib.functionArgs on a __functor attrset returns {} (inspects __functionArgs attr).
+  # We need to call __functor to get the actual function, then inspect its args.
+  policyFnArgs =
+    policy:
+    if builtins.isAttrs policy && policy ? __functor then
+      lib.functionArgs (policy.__functor policy)
+    else
+      lib.functionArgs policy;
 in
 {
-  inherit policyType;
+  inherit
+    policyType
+    dualPolicyType
+    isNewStylePolicy
+    isOldStylePolicy
+    policyFnArgs
+    ;
 }

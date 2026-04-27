@@ -1,13 +1,13 @@
 { den, lib, ... }:
 let
-  inherit (den.lib.policyTypes) policyType;
+  inherit (den.lib.policyTypes) dualPolicyType;
 in
 {
   options.den.policies = lib.mkOption {
     description = "Policies — declare directed edges between entity kinds with computed adjacency.";
     default = { };
     defaultText = lib.literalExpression "{ }";
-    type = lib.types.lazyAttrsOf policyType;
+    type = lib.types.lazyAttrsOf dualPolicyType;
   };
 
   # Global policy activation lives on den.default.policies (aspect schema).

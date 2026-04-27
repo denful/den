@@ -43,7 +43,8 @@ let
   resolveArgsSatisfied =
     policy: ctx:
     let
-      fargs = lib.functionArgs policy.resolve;
+      inherit (den.lib.policyTypes) isNewStylePolicy policyFnArgs;
+      fargs = if isNewStylePolicy policy then policyFnArgs policy else lib.functionArgs policy.resolve;
       requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
       # Trait names are satisfiable — traits get merged into resolve context
       # by policy-dispatch before calling policy.resolve.
@@ -82,17 +83,20 @@ let
       activeNames = defaultActive ++ entityActive;
       activeSet = lib.genAttrs activeNames (_: true);
     in
-    lib.filterAttrs (name: policy: policy._core or false || activeSet ? ${name}) policies;
+    lib.filterAttrs (
+      name: policy:
+      (if builtins.isAttrs policy then policy._core or false else false) || activeSet ? ${name}
+    ) policies;
 
   # NOTE: synthesize does not filter by activation model — all matching
   # policies fire. The pipeline uses per-policy named effects for
   # activation-aware dispatch. synthesize/mergePolicyInto are retained
   # for the policy-inspect utility and potential future direct callers.
   synthesize =
-    stageName:
+    entityKind:
     let
       policies = den.policies or { };
-      matching = lib.filter (policy: policy.from == stageName) (builtins.attrValues policies);
+      matching = lib.filter (policy: policy.from == entityKind) (builtins.attrValues policies);
     in
     if matching == [ ] then
       null
@@ -116,12 +120,12 @@ let
         if targetList == [ ] then acc else acc // { ${key} = (acc.${key} or [ ]) ++ targetList; }
       ) { } matching;
 
-  # Merge an existing into function with synthesized policies for a stage.
+  # Merge an existing into function with synthesized policies for an entity kind.
   # Existing into takes priority — policies fill in new target keys.
   mergePolicyInto =
-    stageName: existingInto:
+    entityKind: existingInto:
     let
-      policyInto = synthesize stageName;
+      policyInto = synthesize entityKind;
     in
     if existingInto != null && policyInto != null then
       rCtx:
