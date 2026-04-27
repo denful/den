@@ -219,7 +219,19 @@ let
         else
           let
             nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
-            hasFns = builtins.any (d: lib.isFunction d.value) nonParametrics;
+            # Error on conflicting __functor defs (callable aspect factories).
+            # Two factories at the same path is ambiguous — can't be mechanically composed.
+            explicitFunctors = builtins.filter (
+              d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
+            ) nonParametrics;
+            _functorCheck =
+              if builtins.length explicitFunctors > 1 then
+                throw "den: multiple __functor definitions at ${
+                  lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc)
+                } — merge is ambiguous. Use lib.mkForce to override."
+              else
+                null;
+            hasFns = builtins.seq _functorCheck (builtins.any (d: lib.isFunction d.value) nonParametrics);
             hasNonFns = builtins.any (d: !lib.isFunction d.value) nonParametrics;
           in
           if hasFns && hasNonFns then

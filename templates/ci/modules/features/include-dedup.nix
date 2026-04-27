@@ -45,6 +45,44 @@
       }
     );
 
+    # Two modules produce { host, ... }: fns at same provides path.
+    # Tests the providerType.merge multi-def path (Fix 1 target).
+    # Before fix: lib.last → only second fn. After fix: both coerced to includes.
+    test-provides-parametric-merge = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        imports = [
+          {
+            den.aspects.prov-parent.provides.shared-prov =
+              { host, ... }:
+              {
+                nixos.environment.variables.PROV_A = host.name;
+              };
+          }
+          {
+            den.aspects.prov-parent.provides.shared-prov =
+              { host, ... }:
+              {
+                nixos.environment.variables.PROV_B = "from-b";
+              };
+          }
+        ];
+        den.aspects.prov-parent.includes = [ ];
+        den.aspects.igloo.includes = [ den.aspects.prov-parent.provides.shared-prov ];
+
+        expr = {
+          a = igloo.environment.variables.PROV_A or "missing";
+          b = igloo.environment.variables.PROV_B or "missing";
+        };
+        expected = {
+          a = "igloo";
+          b = "from-b";
+        };
+      }
+    );
+
     # Mixed fn + attrset at same top-level aspect path — regression guard.
     # The existing mergeMixed path coerces fns to includes. Should still work.
     test-mixed-parametric-and-attrset = denTest (
@@ -75,10 +113,6 @@
     );
 
     # Two modules define __functor at same aspect — error on conflicting defs.
-    # The error fires in mergeWithAspectMeta when multiple explicitFunctors
-    # reach the all-attrsets merge path. Functor attrsets routed through
-    # mergeFunctions (hasFns path) don't currently reach this check.
-    # TODO: route functor conflicts through the error check in providerType.merge.
     test-functor-conflict-errors = denTest (
       { den, ... }:
       let
@@ -100,9 +134,9 @@
           }
         ];
 
-        # Currently lib.last silently wins. TODO: make this error.
+        # Multiple __functor at same path → error.
         expr = result.success;
-        expected = true;
+        expected = false;
       }
     );
 
