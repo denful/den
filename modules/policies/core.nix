@@ -10,9 +10,7 @@
       from = "host";
       isolateFanOut = false;
       __functor =
-        _:
-        { host, ... }:
-        map (user: den.lib.policy.resolve { inherit host user; }) (lib.attrValues host.users);
+        _: { host, ... }: map (user: den.lib.policy.resolve { inherit user; }) (lib.attrValues host.users);
     };
     host-to-default = {
       _core = true;

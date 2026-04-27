@@ -64,7 +64,9 @@ let
     parentCtx: targetAspect: results: newCtx:
     let
       scopedCtx = parentCtx // newCtx;
-      ctxId = mkCtxId newCtx;
+      # ctxId from merged context — new bindings alone may not be unique
+      # across different parent contexts (e.g., user "alice" on host A vs B).
+      ctxId = mkCtxId scopedCtx;
       scopeHandlers = constantHandler scopedCtx;
       tagged = targetAspect // {
         __scopeHandlers = scopeHandlers;
@@ -336,7 +338,9 @@ let
                 let
                   newCtx = indexed.ctx;
                   scopedCtx = currentCtx // newCtx;
-                  ctxNames = mkCtxId newCtx;
+                  # Use merged context for dedup — new bindings alone may not
+                  # be unique across parent contexts.
+                  ctxNames = mkCtxId scopedCtx;
                   ctxKey = if isFanOut then "${key}/{${ctxNames}}" else key;
                   scopeHandlers = constantHandler scopedCtx;
                   updateCtx = fx.effects.state.modify (st: st // { currentCtx = _: scopedCtx; });
