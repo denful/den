@@ -1,17 +1,10 @@
 { den, lib, ... }:
 let
   inherit (den.lib.aspects) mkAspectsType;
-  inherit (den.lib.stageTypes) stageTreeType;
 
   namespaceType = lib.types.submodule (
     nsArgs@{ name, ... }:
     {
-      options.stages = lib.mkOption {
-        description = "namespace stage scopes";
-        defaultText = lib.literalExpression "{ }";
-        default = { };
-        type = lib.types.lazyAttrsOf stageTreeType;
-      };
       options.schema = lib.mkOption {
         description = "namespace schema — freeform deferred modules per entity kind";
         defaultText = lib.literalExpression "{ }";
