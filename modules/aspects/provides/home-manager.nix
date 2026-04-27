@@ -23,10 +23,8 @@ let
 
 in
 {
-  den.aspects = result.aspects;
   den.schema.host.imports = [ result.hostConf ];
-  den.policies = result.policies;
-  den.schema.host.policies = result.schemaPolicies;
+  den.schema.host.includes = [ result.battery ];
 
   den.classes.homeManager.description = "Home Manager user environment";
 }

@@ -54,8 +54,9 @@ let
       };
     };
 
-  # Two-hop collapsed to single policy: host → user with aspects.
-  # Aspects are registered in den.aspects, attached via policy.aspects field.
+  # Self-contained battery: host → user routing via aspect-included policy.
+  # The battery is an aspect with policyFns — include it in den.schema.host.includes
+  # and its policy fires during host resolution without separate den.policies registration.
   makeHomeEnv =
     {
       className,
@@ -84,11 +85,34 @@ let
           intoPath = _: forwardPathFn { inherit host user; };
           fromAspect = _: den.lib.resolveEntity "user" { inherit host user; };
         };
+
+      policyFn =
+        { host, ... }:
+        let
+          enabled = mkDetectHost {
+            inherit className supportedOses optionPath;
+          } { inherit host; };
+          # mkIntoClassUsers returns [{ host, user }] pairs — extract just the user
+          # since host is already in the parent context and resolve effects carry
+          # only new bindings.
+          pairs = if enabled then mkIntoClassUsers className { inherit host; } else [ ];
+          # Emit one resolve per user, then includes once (not per-user) to avoid
+          # duplicate aspect declarations in isolated fan-out sub-pipelines.
+          resolves = map (pair: den.lib.policy.resolve { user = pair.user; }) pairs;
+          includes = [
+            (den.lib.policy.include hostModule)
+            (den.lib.policy.include userForward)
+          ]
+          ++ lib.optional (den.aspects ? os-user-fwd) (den.lib.policy.include den.aspects.os-user-fwd)
+          ++ lib.optional (den.aspects ? os-user-class-fwd) (
+            den.lib.policy.include den.aspects.os-user-class-fwd
+          );
+        in
+        resolves ++ includes;
     in
     {
-      aspects = {
-        "${ctxName}-host-module" = hostModule;
-        "${ctxName}-user-forward" = userForward;
+      battery = {
+        policyFns."host-to-${ctxName}-users" = policyFn;
       };
 
       hostConf = hostOptions {
@@ -98,29 +122,6 @@ let
           getModule
           ;
       };
-
-      policies = {
-        "host-to-${ctxName}-users" = {
-          from = "host";
-          to = "user";
-          aspects = [
-            hostModule
-            userForward
-          ]
-          ++ (lib.optional (den.aspects ? os-user-fwd) den.aspects.os-user-fwd)
-          ++ (lib.optional (den.aspects ? os-user-class-fwd) den.aspects.os-user-class-fwd);
-          resolve =
-            { host, ... }:
-            let
-              enabled = mkDetectHost {
-                inherit className supportedOses optionPath;
-              } { inherit host; };
-            in
-            if enabled then mkIntoClassUsers className { inherit host; } else [ ];
-        };
-      };
-
-      schemaPolicies = [ "host-to-${ctxName}-users" ];
     };
 
 in
