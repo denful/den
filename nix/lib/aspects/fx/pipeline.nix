@@ -355,8 +355,14 @@ let
         # exposed provideTo (only returns { imports }). provideTo from
         # forward sub-pipelines is handled by runSubPipeline callers.
         forwarded = applyForwardSpecs forwardSpecs rawClassImports;
+        # Dead letter queue diagnostics — warn about keys never claimed by any registry.
+        finalDLQ = (result.state.deadLetterQueue or (_: [ ])) null;
+        _dlqWarn = builtins.seq (map (
+          entry:
+          builtins.trace "den: dead letter — key '${entry.key}' from aspect '${entry.aspectName}' never matched a registered class or trait" null
+        ) finalDLQ) null;
       in
-      {
+      builtins.seq _dlqWarn {
         # Target class imports only — multi-class data accessible via
         # fxFullResolve (state.classImports null). Not exposed here because
         # fxResolve's return is used as a NixOS deferredModule by entity
