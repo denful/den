@@ -112,6 +112,7 @@ let
     "check-constraint"
     "register-constraint"
     "register-aspect-policy"
+    "dispatch-policy-includes"
     "defer-include"
     "drain-deferred"
     "get-path-set"
@@ -459,8 +460,10 @@ let
         ) (fx.pure manualTransitions) policyEffects;
 
         # Dispatch aspect-included policies from state.aspectPolicies.
-        # These are plain functions (not named effects) — call directly,
-        # partition results by __policyEffect tag, build transition entries.
+        # Processes resolve effects as transitions. Include/exclude effects
+        # travel WITH the transition when resolves exist (so they're injected
+        # into the child entity's resolution). Include-only policyFns are
+        # handled during tree-walk by dispatch-policy-includes (in aspect.nix).
         dispatchAspectPolicies =
           prevTransitions:
           let
@@ -505,9 +508,10 @@ let
                 targets = map (e: e.value) resolveEffects;
                 includeAspects = map (e: e.value) includeEffects;
                 excludeAspects = map (e: e.value) excludeEffects;
-                hasEffects = rawEffects != [ ];
               in
-              if !hasEffects then
+              # Only create transitions for policyFns with resolve effects.
+              # Include-only policyFns are handled by dispatch-policy-includes.
+              if resolveEffects == [ ] then
                 fx.pure transitions
               else
                 fx.pure (

@@ -500,6 +500,65 @@ let
     in
     go 0 (fx.pure [ ]);
 
+  # Dispatch policy include/exclude effects during tree-walk, BEFORE
+  # transitions. This ensures injected aspects participate in entity
+  # resolution and are visible to class forwarding sub-pipelines (HM forward).
+  dispatchPolicyIncludes =
+    aspect:
+    let
+      isEntityRoot = aspect ? __entityKind;
+    in
+    if !isEntityRoot then
+      fx.pure [ ]
+    else
+      let
+        ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
+      in
+      fx.bind (fx.send "dispatch-policy-includes" { inherit ctx; }) (
+        result:
+        let
+          incs = result.includes or [ ];
+          excs = result.excludes or [ ];
+          scopeHandlers = aspect.__scopeHandlers or null;
+          ctxId = aspect.__ctxId or null;
+          emitIncs =
+            if incs == [ ] then
+              fx.pure [ ]
+            else
+              builtins.foldl' (
+                acc: child:
+                fx.bind acc (
+                  prev:
+                  fx.bind (fx.send "emit-include" (
+                    {
+                      inherit child;
+                      idx = null;
+                    }
+                    // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
+                    // lib.optionalAttrs (ctxId != null) { __parentCtxId = ctxId; }
+                  )) (r: fx.pure (prev ++ r))
+                )
+              ) (fx.pure [ ]) incs;
+          regExcludes =
+            if excs == [ ] then
+              fx.pure null
+            else
+              builtins.foldl' (
+                acc: aspectRef:
+                fx.bind acc (
+                  _:
+                  fx.send "register-constraint" {
+                    type = "exclude";
+                    scope = "subtree";
+                    identity = identity.pathKey (identity.aspectPath aspectRef);
+                    owner = "policy";
+                  }
+                )
+              ) (fx.pure null) excs;
+        in
+        fx.bind emitIncs (incResults: fx.bind regExcludes (_: fx.pure incResults))
+      );
+
   emitTransitions =
     aspect:
     let
@@ -512,13 +571,21 @@ let
       hasPolicies =
         isEntityRoot && den.lib.aspects.fx.handlers.policyEffectNamesFor (aspect.name or "") != [ ];
     in
-    if hasManualInto || hasPolicies then
-      fx.send "into-transition" {
-        intoFn = if hasManualInto then intoFn else null;
-        self = aspect;
-      }
-    else
-      fx.pure [ ];
+    # Dispatch policy include/exclude effects during tree-walk first.
+    fx.bind (dispatchPolicyIncludes aspect) (
+      policyIncResults:
+      let
+        doTransition =
+          if hasManualInto || hasPolicies then
+            fx.send "into-transition" {
+              intoFn = if hasManualInto then intoFn else null;
+              self = aspect;
+            }
+          else
+            fx.pure [ ];
+      in
+      fx.bind doTransition (transResults: fx.pure (policyIncResults ++ transResults))
+    );
 
   mkPositionalInclude =
     {

@@ -92,23 +92,23 @@ let
           enabled = mkDetectHost {
             inherit className supportedOses optionPath;
           } { inherit host; };
-          # mkIntoClassUsers returns [{ host, user }] pairs — extract just the user
-          # since host is already in the parent context and resolve effects carry
-          # only new bindings.
-          pairs = if enabled then mkIntoClassUsers className { inherit host; } else [ ];
-          # Emit one resolve per user, then includes once (not per-user) to avoid
-          # duplicate aspect declarations in isolated fan-out sub-pipelines.
-          resolves = map (pair: den.lib.policy.resolve { user = pair.user; }) pairs;
-          includes = [
-            (den.lib.policy.include hostModule)
-            (den.lib.policy.include userForward)
-          ]
-          ++ lib.optional (den.aspects ? os-user-fwd) (den.lib.policy.include den.aspects.os-user-fwd)
-          ++ lib.optional (den.aspects ? os-user-class-fwd) (
-            den.lib.policy.include den.aspects.os-user-class-fwd
-          );
         in
-        resolves ++ includes;
+        if !enabled then
+          [ ]
+        else
+          let
+            pairs = mkIntoClassUsers className { inherit host; };
+            resolves = map (pair: den.lib.policy.resolve { user = pair.user; }) pairs;
+            includes = [
+              (den.lib.policy.include hostModule)
+              (den.lib.policy.include userForward)
+            ]
+            ++ lib.optional (den.aspects ? os-user-fwd) (den.lib.policy.include den.aspects.os-user-fwd)
+            ++ lib.optional (den.aspects ? os-user-class-fwd) (
+              den.lib.policy.include den.aspects.os-user-class-fwd
+            );
+          in
+          resolves ++ includes;
     in
     {
       battery = {
