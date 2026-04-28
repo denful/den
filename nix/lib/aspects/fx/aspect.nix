@@ -836,24 +836,19 @@ let
             nestedKeys
             unregisteredClassKeys
             ;
-          # Unregistered keys are ignored with a trace warning.
-          # targetClass recognition ensures forward-scoped class aliases are not dropped.
-          allClassKeys = classKeys;
-          _warn = builtins.seq (map (
-            k:
-            builtins.trace "den: ignoring unregistered key '${k}' in aspect '${rawName}' — register in den.classes or den.traits" null
-          ) unregisteredClassKeys) null;
+          # Unregistered keys default to class — with multi-class collection,
+          # they collect into their own bucket harmlessly. Forward routing or
+          # fxResolve's target class extraction handles consumption.
+          allClassKeys = classKeys ++ unregisteredClassKeys;
         in
-        builtins.seq _warn (
-          fx.bind (fx.seq (
-            [
-              (emitClasses aspect allClassKeys nodeIdentity)
-              (emitTraits aspect traitKeys nodeIdentity)
-              (registerConstraints aspect)
-            ]
-            ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
-          )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
-        )
+        (fx.bind (fx.seq (
+          [
+            (emitClasses aspect allClassKeys nodeIdentity)
+            (emitTraits aspect traitKeys nodeIdentity)
+            (registerConstraints aspect)
+          ]
+          ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
+        )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; }))
       )
     );
 
