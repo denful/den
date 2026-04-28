@@ -31,7 +31,12 @@
 
         den.aspects.igloo.nixos.networking.hostName = "igloo";
         den.aspects.tux.homeManager =
-          { host, pkgs, lib, ... }:
+          {
+            host,
+            pkgs,
+            lib,
+            ...
+          }:
           lib.optionalAttrs (host.class != "darwin") {
             home.sessionVariables.HOST_CLASS = host.class;
             home.sessionVariables.SYSTEM = pkgs.system;

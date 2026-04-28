@@ -17,6 +17,41 @@ let
     n: n != "conf" && !(lib.hasPrefix "_" n) && (den.schema.${n}.isEntity or false)
   ) (builtins.attrNames (den.schema or { }));
 
+  # Classify a resolve effect into schema transition vs enrichment.
+  # Schema keys create child entities; non-schema keys enrich the current context.
+  classifyResolve =
+    e:
+    let
+      keys = builtins.attrNames e.value;
+      schemaKeys = builtins.filter (k: builtins.elem k schemaKinds) keys;
+      enrichKeys = builtins.filter (k: !builtins.elem k schemaKinds) keys;
+      hasTarget = e.__targetKind or null != null;
+    in
+    if hasTarget then
+      {
+        schema = e;
+        enrichment = null;
+      }
+    else if schemaKeys == [ ] then
+      {
+        schema = null;
+        enrichment = e.value;
+      }
+    else if enrichKeys == [ ] then
+      {
+        schema = e;
+        enrichment = null;
+      }
+    else
+      {
+        schema = e // {
+          value = lib.filterAttrs (k: _: builtins.elem k schemaKinds) e.value;
+        };
+        enrichment = lib.filterAttrs (k: _: !builtins.elem k schemaKinds) e.value;
+      };
+
+  maxEnrichmentIterations = 10;
+
   mkCtxId =
     ctx:
     lib.concatStringsSep "," (
@@ -406,101 +441,115 @@ let
         resolveCtx = traits // currentCtx // { __entityKind = sourceEntityKind; };
         allPolicies = den.policies or { };
 
-        policyTransitions = lib.concatLists (
-          lib.mapAttrsToList (
-            name: policy:
-            let
-              argsOk = resolveArgsSatisfied policy resolveCtx;
-            in
-            if !argsOk then
-              [ ]
-            else
-              let
-                rawEffects =
-                  let
-                    result = policy resolveCtx;
-                  in
-                  if builtins.isList result then result else [ result ];
-                resolveEffects = builtins.filter (
-                  e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
-                ) rawEffects;
-                includeEffects = builtins.filter (
-                  e: builtins.isAttrs e && (e.__policyEffect or "") == "include"
-                ) rawEffects;
-                excludeEffects = builtins.filter (
-                  e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
-                ) rawEffects;
-                firstResolveEffect = if resolveEffects != [ ] then builtins.head resolveEffects else null;
-                effectTargetKind =
-                  if firstResolveEffect != null then firstResolveEffect.__targetKind or null else null;
-                firstResolveKeys =
-                  if resolveEffects != [ ] then builtins.attrNames firstResolveEffect.value else [ ];
-                targetKey =
-                  if effectTargetKind != null then
-                    effectTargetKind
-                  else
-                    lib.findFirst (k: builtins.elem k schemaKinds) (
-                      if firstResolveKeys != [ ] then builtins.head firstResolveKeys else sourceEntityKind
-                    ) firstResolveKeys;
-                targets = map (e: e.value) resolveEffects;
-                includeAspects = map (e: e.value) includeEffects;
-                excludeAspects = map (e: e.value) excludeEffects;
-                isolateFanOut =
-                  if resolveEffects != [ ] && ((builtins.head resolveEffects).__shared or false) then false else true;
-              in
-              if rawEffects == [ ] then
-                [ ]
-              else
-                [
-                  {
-                    path = lib.splitString "." targetKey;
-                    contexts = targets;
-                    routing = {
-                      from = sourceEntityKind;
-                      to = targetKey;
-                      inherit targetKey;
-                      policyName = name;
-                      aspects = includeAspects;
-                      excludes = excludeAspects;
-                      inherit isolateFanOut;
-                    };
-                  }
-                ]
-          ) allPolicies
-        );
-
-        dispatchPolicies = fx.pure (manualTransitions ++ policyTransitions);
-
-        # Dispatch aspect-included policies from state.aspectPolicies.
-        # Processes resolve effects as transitions. Include/exclude effects
-        # travel WITH the transition when resolves exist (so they're injected
-        # into the child entity's resolution). Include-only policies are
-        # handled during tree-walk by dispatch-policy-includes (in aspect.nix).
-        dispatchAspectPolicies =
-          prevTransitions:
+        # Dispatch all policies (global + aspect) against a given context,
+        # classifying resolve effects into schema transitions vs enrichment.
+        # Returns { transitions, enrichment } where enrichment is an attrset
+        # of non-schema key bindings to install into the current context.
+        mkDispatch =
+          resolveCtx':
           let
-            aspectPolicies = (state.aspectPolicies or (_: { })) null;
-            traits = (state.traits or (_: { })) null;
-            resolveCtx = traits // currentCtx // { __entityKind = sourceEntityKind; };
-            entries = lib.attrsToList aspectPolicies;
-            matching = builtins.filter (
+            # --- Global policies ---
+            globalResults = lib.concatLists (
+              lib.mapAttrsToList (
+                name: policy:
+                let
+                  argsOk = resolveArgsSatisfied policy resolveCtx';
+                in
+                if !argsOk then
+                  [ ]
+                else
+                  let
+                    rawEffects =
+                      let
+                        result = policy resolveCtx';
+                      in
+                      if builtins.isList result then result else [ result ];
+                    resolveEffects = builtins.filter (
+                      e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
+                    ) rawEffects;
+                    includeEffects = builtins.filter (
+                      e: builtins.isAttrs e && (e.__policyEffect or "") == "include"
+                    ) rawEffects;
+                    excludeEffects = builtins.filter (
+                      e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
+                    ) rawEffects;
+                    includeAspects = map (e: e.value) includeEffects;
+                    excludeAspects = map (e: e.value) excludeEffects;
+                    isolateFanOut =
+                      if schemaResolves != [ ] && ((builtins.head schemaResolves).__shared or false) then false else true;
+                    # Classify each resolve effect.
+                    classified = map classifyResolve resolveEffects;
+                    schemaEffects = builtins.filter (c: c.schema != null) classified;
+                    enrichEffects = builtins.filter (c: c.enrichment != null) classified;
+                    mergedEnrichment = builtins.foldl' (acc: c: acc // c.enrichment) { } enrichEffects;
+                    # Build transition from schema effects (if any).
+                    schemaResolves = map (c: c.schema) schemaEffects;
+                    firstSchemaEffect = if schemaResolves != [ ] then builtins.head schemaResolves else null;
+                    effectTargetKind =
+                      if firstSchemaEffect != null then firstSchemaEffect.__targetKind or null else null;
+                    firstSchemaKeys = if schemaResolves != [ ] then builtins.attrNames firstSchemaEffect.value else [ ];
+                    targetKey =
+                      if effectTargetKind != null then
+                        effectTargetKind
+                      else
+                        lib.findFirst (k: builtins.elem k schemaKinds) (
+                          if firstSchemaKeys != [ ] then builtins.head firstSchemaKeys else sourceEntityKind
+                        ) firstSchemaKeys;
+                    targets = map (e: e.value) schemaResolves;
+                    # Include/exclude-only policies (no resolve effects) still
+                    # need a transition with empty contexts so processIncludeOnly
+                    # can register their aspects and excludes.
+                    hasRouting = includeAspects != [ ] || excludeAspects != [ ];
+                    transition =
+                      if schemaResolves == [ ] && !hasRouting then
+                        [ ]
+                      else
+                        [
+                          {
+                            path = lib.splitString "." targetKey;
+                            contexts = targets;
+                            routing = {
+                              from = sourceEntityKind;
+                              to = targetKey;
+                              inherit targetKey;
+                              policyName = name;
+                              aspects = includeAspects;
+                              excludes = excludeAspects;
+                              inherit isolateFanOut;
+                            };
+                          }
+                        ];
+                  in
+                  if rawEffects == [ ] then
+                    [ ]
+                  else
+                    [
+                      {
+                        inherit transition mergedEnrichment;
+                        policyName = name;
+                      }
+                    ]
+              ) allPolicies
+            );
+
+            # --- Aspect policies ---
+            aspectPoliciesVal = (state.aspectPolicies or (_: { })) null;
+            aspectEntries = lib.attrsToList aspectPoliciesVal;
+            aspectTraitNames = den.traits or { };
+            matchingAspect = builtins.filter (
               e:
               let
                 fargs = policyFnArgs e.value.fn;
                 requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
-                traitNames = den.traits or { };
               in
-              builtins.all (k: resolveCtx ? ${k} || traitNames ? ${k}) requiredArgs
-            ) entries;
-          in
-          builtins.foldl' (
-            acc: entry:
-            fx.bind acc (
-              transitions:
+              builtins.all (k: resolveCtx' ? ${k} || aspectTraitNames ? ${k}) requiredArgs
+            ) aspectEntries;
+            aspectResults = map (
+              entry:
               let
                 rawEffects =
                   let
-                    result = entry.value.fn resolveCtx;
+                    result = entry.value.fn resolveCtx';
                   in
                   if builtins.isList result then result else [ result ];
                 resolveEffects = builtins.filter (
@@ -512,55 +561,142 @@ let
                 excludeEffects = builtins.filter (
                   e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
                 ) rawEffects;
-                firstResolveKeys =
-                  if resolveEffects != [ ] then builtins.attrNames (builtins.head resolveEffects).value else [ ];
-                targetKey = lib.findFirst (k: builtins.elem k schemaKinds) (
-                  if firstResolveKeys != [ ] then builtins.head firstResolveKeys else sourceEntityKind
-                ) firstResolveKeys;
-                targets = map (e: e.value) resolveEffects;
                 includeAspects = map (e: e.value) includeEffects;
                 excludeAspects = map (e: e.value) excludeEffects;
+                classified = map classifyResolve resolveEffects;
+                schemaEffects = builtins.filter (c: c.schema != null) classified;
+                enrichEffects = builtins.filter (c: c.enrichment != null) classified;
+                mergedEnrichment = builtins.foldl' (acc: c: acc // c.enrichment) { } enrichEffects;
+                schemaResolves = map (c: c.schema) schemaEffects;
+                firstSchemaKeys =
+                  if schemaResolves != [ ] then builtins.attrNames (builtins.head schemaResolves).value else [ ];
+                targetKey = lib.findFirst (k: builtins.elem k schemaKinds) (
+                  if firstSchemaKeys != [ ] then builtins.head firstSchemaKeys else sourceEntityKind
+                ) firstSchemaKeys;
+                targets = map (e: e.value) schemaResolves;
+                transition =
+                  if schemaResolves == [ ] then
+                    [ ]
+                  else
+                    [
+                      {
+                        path = lib.splitString "." targetKey;
+                        contexts = targets;
+                        routing = {
+                          from = sourceEntityKind;
+                          to = targetKey;
+                          inherit targetKey;
+                          policyName = entry.name;
+                          aspects = includeAspects;
+                          excludes = excludeAspects;
+                          isolateFanOut =
+                            if schemaResolves != [ ] then !((builtins.head schemaResolves).__shared or false) else true;
+                        };
+                      }
+                    ];
               in
               # Only create transitions for policies with resolve effects.
               # Include-only policies are handled by dispatch-policy-includes.
               if resolveEffects == [ ] then
-                fx.pure transitions
+                {
+                  transition = [ ];
+                  inherit mergedEnrichment;
+                  policyName = entry.name;
+                }
               else
-                fx.pure (
-                  transitions
-                  ++ [
-                    {
-                      path = lib.splitString "." targetKey;
-                      contexts = targets;
-                      routing = {
-                        from = sourceEntityKind;
-                        to = targetKey;
-                        inherit targetKey;
-                        policyName = entry.name;
-                        aspects = includeAspects;
-                        excludes = excludeAspects;
-                        isolateFanOut =
-                          if resolveEffects != [ ] then !((builtins.head resolveEffects).__shared or false) else true;
-                      };
-                    }
-                  ]
+                {
+                  inherit transition mergedEnrichment;
+                  policyName = entry.name;
+                }
+            ) matchingAspect;
+
+            # --- Combine ---
+            allResults = globalResults ++ aspectResults;
+            allTransitions = builtins.concatLists (map (r: r.transition) allResults);
+            allEnrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } allResults;
+          in
+          {
+            transitions = allTransitions;
+            enrichment = allEnrichment;
+          };
+
+        # Fixed-point enrichment loop: dispatch policies, collect enrichment,
+        # install enrichment into context, re-dispatch until stable.
+        iterateEnrichment =
+          iteration: accTransitions: accEnrichment: firedPolicies: currentResolveCtx:
+          let
+            dispatched = mkDispatch currentResolveCtx;
+            # Filter out transitions from already-fired policies.
+            newTransitions = builtins.filter (
+              t: !(builtins.elem ((t.routing or { }).policyName or "") firedPolicies)
+            ) dispatched.transitions;
+            newFired = firedPolicies ++ map (t: (t.routing or { }).policyName or "") newTransitions;
+            combinedTransitions = accTransitions ++ newTransitions;
+            # Only enrichment keys not already accumulated count as new.
+            newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
+              builtins.attrNames dispatched.enrichment
+            );
+            combinedEnrichment = accEnrichment // dispatched.enrichment;
+          in
+          if newEnrichKeys == [ ] then
+            # Stable — no new enrichment, return accumulated results.
+            fx.pure {
+              transitions = combinedTransitions;
+              enrichment = combinedEnrichment;
+            }
+          else if iteration >= maxEnrichmentIterations then
+            throw "den: enrichment iteration exceeded ${toString maxEnrichmentIterations} — likely a cycle in enrichment policies (${sourceAspect.name or "?"})"
+          else
+            # Apply enrichment: update state, install handlers, drain deferred.
+            let
+              enrichedCtx = currentCtx // combinedEnrichment;
+              enrichHandlers = constantHandler combinedEnrichment;
+            in
+            fx.bind (fx.effects.state.modify (st: st // { currentCtx = _: enrichedCtx; })) (
+              _:
+              fx.bind
+                (fx.effects.scope.provide enrichHandlers (
+                  fx.bind (fx.send "drain-deferred" enrichedCtx) (
+                    satisfiable:
+                    fx.bind (fx.send "drain-dead-letters" null) (
+                      _:
+                      builtins.foldl' (
+                        acc: deferred:
+                        fx.bind acc (
+                          _:
+                          let
+                            scopeHandlers = constantHandler enrichedCtx;
+                            ctxId = mkCtxId enrichedCtx;
+                            deferredTagged = deferred.child // {
+                              __scopeHandlers = scopeHandlers;
+                              __ctxId = ctxId;
+                            };
+                          in
+                          fx.bind (aspectToEffect deferredTagged) (_: fx.pure null)
+                        )
+                      ) (fx.pure null) satisfiable
+                    )
+                  )
+                ))
+                (
+                  _:
+                  let
+                    nextResolveCtx = traits // enrichedCtx // { __entityKind = sourceEntityKind; };
+                  in
+                  iterateEnrichment (iteration + 1) combinedTransitions combinedEnrichment newFired nextResolveCtx
                 )
-            )
-          ) (fx.pure prevTransitions) matching;
+            );
       in
       if depth >= maxTransitionDepth then
         throw "den: transition depth exceeded ${toString maxTransitionDepth} — likely a cycle in den.policies (${sourceAspect.name or "?"})"
       else
         {
-          resume = fx.bind (fx.bind dispatchPolicies dispatchAspectPolicies) (
-            rawTransitions:
+          resume = fx.bind (iterateEnrichment 0 manualTransitions { } [ ] resolveCtx) (
+            result:
             let
-              # Merge transitions targeting the same path — multiple policies
-              # may produce separate contexts for the same target stage.
-              # Concatenating contexts restores the fan-out behavior that
-              # separate policy dispatch provides naturally.
-              # Routing metadata is kept from the first transition per path —
-              # same-path policies must have consistent from/to pairs.
+              rawTransitions = result.transitions;
+              enrichment = result.enrichment;
+              effectiveCtx = currentCtx // enrichment;
               # Merge transitions targeting the same path + aspect set.
               # Different aspect sets stay separate — they represent
               # distinct resolution configurations for the same target.
@@ -590,7 +726,7 @@ let
               acc: transition:
               fx.bind acc (
                 results:
-                resolveTransition targetClass sourceAspect currentCtx (state.aspectPolicies or (_: { })
+                resolveTransition targetClass sourceAspect effectiveCtx (state.aspectPolicies or (_: { })
                 ) results transition
               )
             ) (fx.pure [ ]) allTransitions
