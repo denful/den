@@ -362,15 +362,15 @@
 
     # ─── Group E: mutual-provider / provides chains ───────────────────
 
-    test-E-present-via-provides-to-users = denTest (
+    # policyFn-injected aspects deliver config but are NOT visible to
+    # hasAspect (runs its own pipeline without parent policyFn state).
+    # Test that direct includes on the user aspect are still visible.
+    test-E-present-via-user-includes = denTest (
       { den, ... }:
       {
-        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.aspects.igloo.provides.to-users = {
-          includes = [ den.aspects.user-target ];
-        };
+        den.aspects.tux.includes = [ den.aspects.user-target ];
         den.aspects.user-target.homeManager = { };
 
         expr = den.hosts.x86_64-linux.igloo.users.tux.hasAspect den.aspects.user-target;
@@ -378,38 +378,74 @@
       }
     );
 
-    test-E-present-via-provides-specific-user = denTest (
-      { den, ... }:
+    # policyFn-injected aspects on the user's own aspect ARE visible
+    # to hasAspect because the user aspect's policyFns are registered
+    # during the hasAspect pipeline run.
+    test-E-present-via-user-policyFn = denTest (
+      { den, lib, ... }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
-        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.hosts.x86_64-linux.igloo.users.alice = { };
 
-        den.aspects.igloo.provides.alice = {
-          includes = [ den.aspects.alice-only ];
-        };
-        den.aspects.alice-only.homeManager = { };
+        den.aspects.tux.policyFns.self-inject =
+          { host, user, ... }:
+          [
+            (include {
+              includes = [ den.aspects.user-target ];
+            })
+          ];
+        den.aspects.user-target.homeManager = { };
 
-        expr = {
-          alice = den.hosts.x86_64-linux.igloo.users.alice.hasAspect den.aspects.alice-only;
-          tux = den.hosts.x86_64-linux.igloo.users.tux.hasAspect den.aspects.alice-only;
-        };
-        expected = {
-          alice = true;
-          tux = false;
-        };
+        expr = den.hosts.x86_64-linux.igloo.users.tux.hasAspect den.aspects.user-target;
+        expected = true;
       }
     );
 
-    test-E-present-via-user-to-hosts = denTest (
-      { den, ... }:
+    # Host-policyFn includes: not visible to user hasAspect (separate pipeline).
+    test-E-host-policyFn-not-visible-to-user-hasAspect = denTest (
+      { den, lib, ... }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
-        den.schema.user.includes = [ den.provides.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.aspects.tux.provides.to-hosts = {
-          includes = [ den.aspects.host-target ];
-        };
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include {
+              includes = [ den.aspects.user-target ];
+            })
+          ];
+        den.aspects.user-target.homeManager = { };
+
+        # Host policyFn includes ARE delivered (config works) but NOT
+        # visible to hasAspect which runs its own pipeline.
+        expr = den.hosts.x86_64-linux.igloo.users.tux.hasAspect den.aspects.user-target;
+        expected = false;
+      }
+    );
+
+    # User-aspect policyFn injecting host config IS visible to host hasAspect
+    # because the user's policyFn fires during the host pipeline AND the
+    # hasAspect pipeline (user aspect is part of host resolution via transition).
+    test-E-present-via-user-to-hosts = denTest (
+      { den, lib, ... }:
+      let
+        inherit (den.lib.policy) include;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.tux.policyFns.to-hosts =
+          { host, user, ... }:
+          [
+            (include {
+              includes = [ den.aspects.host-target ];
+            })
+          ];
         den.aspects.host-target.nixos = { };
 
         expr = den.hosts.x86_64-linux.igloo.hasAspect den.aspects.host-target;

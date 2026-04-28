@@ -62,6 +62,9 @@
         config,
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
         den.homes.x86_64-linux."tux@igloo" = { };
 
@@ -71,18 +74,19 @@
           home.keyboard.model = if args ? osConfig then "os-bound" else "standalone";
         };
 
-        den.schema.home.includes = [ den.provides.mutual-provider ];
-        den.aspects.tux.provides.igloo = {
-          homeManager.home.keyboard.layout = "enthium";
-          includes = [
-            (den.lib.perHome (
-              { home }:
-              {
-                homeManager.home.keyboard.variant = home.name;
-              }
-            ))
-          ];
-        };
+        den.aspects.tux.policyFns.to-igloo =
+          { home, ... }:
+          lib.optional (home.hostName == "igloo") (include {
+            homeManager.home.keyboard.layout = "enthium";
+            includes = [
+              (den.lib.perHome (
+                { home }:
+                {
+                  homeManager.home.keyboard.variant = home.name;
+                }
+              ))
+            ];
+          });
 
         expr = {
           homeSchema = {

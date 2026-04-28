@@ -14,6 +14,7 @@
     }:
     let
       inherit (den.lib) parametric take;
+      inherit (den.lib.policy) include;
 
       keys = ctx: "{${builtins.concatStringsSep "," (builtins.attrNames ctx)}}";
     in
@@ -36,45 +37,51 @@
           }
         ))
       ];
-      den.aspects.igloo.provides.to-users.includes = [
-        { funny.names = [ "host-static" ]; }
+      den.aspects.igloo.policyFns.to-users =
+        { host, user, ... }:
+        [
+          (include {
+            includes = [
+              { funny.names = [ "host-static" ]; }
 
-        (
-          { host, ... }@ctx:
-          {
-            funny.names = [ "host-lax ${keys ctx}" ];
-          }
-        )
-        (take.atLeast (
-          { host, never }:
-          {
-            funny.names = throw "unreachable";
-          }
-        ))
+              (
+                { host, ... }@ctx:
+                {
+                  funny.names = [ "host-lax ${keys ctx}" ];
+                }
+              )
+              (take.atLeast (
+                { host, never }:
+                {
+                  funny.names = throw "unreachable";
+                }
+              ))
 
-        (
-          { host, user, ... }@ctx:
-          {
-            funny.names = [ "host+user-lax ${keys ctx}" ];
-          }
-        )
-        (take.exactly (
-          { host, user }:
-          {
-            funny.names = [ "host+user-exact" ];
-          }
-        ))
-        (take.atLeast (
-          {
-            host,
-            user,
-            never,
-          }:
-          {
-            funny.names = throw "unreachable";
-          }
-        ))
-      ];
+              (
+                { host, user, ... }@ctx:
+                {
+                  funny.names = [ "host+user-lax ${keys ctx}" ];
+                }
+              )
+              (take.exactly (
+                { host, user }:
+                {
+                  funny.names = [ "host+user-exact" ];
+                }
+              ))
+              (take.atLeast (
+                {
+                  host,
+                  user,
+                  never,
+                }:
+                {
+                  funny.names = throw "unreachable";
+                }
+              ))
+            ];
+          })
+        ];
 
       den.aspects.tux.funny.names = [ "user-owned" ];
       den.aspects.tux.includes = [
@@ -115,7 +122,6 @@
       ];
 
       den.schema.user.includes = [
-        den.provides.mutual-provider
         (
           { host, user, ... }@ctx:
           {

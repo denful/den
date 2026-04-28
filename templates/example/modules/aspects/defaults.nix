@@ -16,9 +16,6 @@
 
   # These are functions that produce configs
   den.default.includes = [
-    # ${user}.provides.${host} and ${host}.provides.${user}
-    <den/mutual-provider>
-
     # Automatically set hostname
     <den/hostname>
 

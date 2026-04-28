@@ -1,4 +1,9 @@
-{ den, eg, ... }:
+{
+  den,
+  lib,
+  eg,
+  ...
+}:
 {
   den.aspects.alice = {
 
@@ -46,12 +51,14 @@
         home.packages = [ pkgs.htop ];
       };
 
-    # <user>.provides.<host>, via den.provides.mutual-provider
-    provides.igloo =
-      { host, ... }:
-      {
-        nixos.programs.nh.enable = true;
-      };
+    # <user>.policyFns.<name>, aspect-included policy
+    policyFns.to-igloo =
+      { host, user, ... }:
+      lib.optional (host.name == "igloo") (
+        den.lib.policy.include {
+          nixos.programs.nh.enable = true;
+        }
+      );
   };
 
   # This is a context-aware aspect, that emits configurations

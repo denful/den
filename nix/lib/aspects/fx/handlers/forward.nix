@@ -221,10 +221,17 @@ let
         hasOwnContext = sourceScopeHandlers != { };
         resolveCtx = if hasOwnContext then sourceCtx else entityCtx;
 
+        # Propagate aspect-included policies to sub-pipeline so
+        # policyFns registered in the parent pipeline (e.g., host-level
+        # policyFns) fire during sub-pipeline entity tree-walk.
+        parentAspectPolicies = state.aspectPolicies or (_: { });
         sub = den.lib.aspects.fx.pipeline.runSubPipeline {
           class = spec.fromClass;
           self = normalizedSource;
           ctx = resolveCtx;
+          extraState = {
+            aspectPolicies = parentAspectPolicies;
+          };
         };
 
         rawSourceModule = {

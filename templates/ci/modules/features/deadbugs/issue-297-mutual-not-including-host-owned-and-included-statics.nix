@@ -10,11 +10,19 @@
         tuxHm, # tuxHm = igloo.home-manager.users.tux
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.schema.user.includes = [ den.provides.mutual-provider ];
 
-        den.aspects.igloo.provides.to-users.homeManager.home.keyboard.model = "denkbd";
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include {
+              homeManager.home.keyboard.model = "denkbd";
+            })
+          ];
 
         expr = tuxHm.home.keyboard.model;
         expected = "denkbd";
@@ -29,12 +37,20 @@
         tuxHm, # tuxHm = igloo.home-manager.users.tux
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.schema.user.includes = [ den.provides.mutual-provider ];
 
         den.aspects.base.homeManager.home.keyboard.model = "denkbd";
-        den.aspects.igloo.provides.to-users.includes = [ den.aspects.base ];
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include {
+              includes = [ den.aspects.base ];
+            })
+          ];
 
         expr = tuxHm.home.keyboard.model;
         expected = "denkbd";
@@ -49,11 +65,21 @@
         tuxHm, # tuxHm = igloo.home-manager.users.tux
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.schema.user.includes = [ den.provides.mutual-provider ];
 
-        den.aspects.igloo.provides.to-users.homeManager.options.foo = lib.mkOption { default = "foo"; };
+        # Named aspect for dedup: policyFns fire per-user but the option
+        # declaration should only be included once.
+        den.aspects.igloo-foo-option.homeManager.options.foo = lib.mkOption { default = "foo"; };
+
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include den.aspects.igloo-foo-option)
+          ];
 
         expr = tuxHm.foo;
         expected = "foo";
@@ -70,12 +96,8 @@
       }:
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
-        den.schema.user.includes = [ den.provides.mutual-provider ];
 
-        # NOTE: this causes an error: Option already defined!
-        # This is because mutuality includes host configs again.
-        # den.aspects.igloo.nixos.options.foo = lib.mkOption { default = "foo"; };
-        # NOTE: Under mutuality, use perHost
+        # NOTE: Under policyFns, use perHost for host-only options
         den.aspects.igloo.includes = [
           (den.lib.perHost {
             nixos.options.foo = lib.mkOption { default = "foo"; };

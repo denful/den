@@ -186,6 +186,7 @@ let
       scopedCtx,
       scopeHandlers,
       ctxNames,
+      aspectPolicies ? (_: { }),
     }:
     innerResults:
     let
@@ -197,6 +198,11 @@ let
         class = targetClass;
         self = tagged;
         ctx = scopedCtx;
+        # Propagate aspect-included policies so policyFns from
+        # parent pipeline fire in isolated fan-out sub-pipelines.
+        extraState = {
+          inherit aspectPolicies;
+        };
       };
       subImports = sub.imports;
       # state.modify reads st.imports at the modify call site. This is safe
@@ -290,7 +296,7 @@ let
     );
 
   resolveTransition =
-    targetClass: sourceAspect: currentCtx: results: transition:
+    targetClass: sourceAspect: currentCtx: aspectPolicies: results: transition:
     if isSiblingRoute transition then
       resolveSiblingTransition targetClass sourceAspect currentCtx results transition
     else if transition.contexts == [ ] then
@@ -355,6 +361,7 @@ let
                           scopeHandlers
                           ctxNames
                           ;
+                        inherit aspectPolicies;
                       } innerResults
                     else
                       resolveContextValue currentCtx effectiveTarget innerResults newCtx;
@@ -575,7 +582,11 @@ let
             in
             builtins.foldl' (
               acc: transition:
-              fx.bind acc (results: resolveTransition targetClass sourceAspect currentCtx results transition)
+              fx.bind acc (
+                results:
+                resolveTransition targetClass sourceAspect currentCtx (state.aspectPolicies or (_: { })
+                ) results transition
+              )
             ) (fx.pure [ ]) allTransitions
           );
           state = state // {

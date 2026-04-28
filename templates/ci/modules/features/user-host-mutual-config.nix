@@ -32,18 +32,27 @@
     test-host-owned-mutual = denTest (
       {
         den,
+        lib,
         tuxHm,
         pinguHm,
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
         den.hosts.x86_64-linux.igloo.users = {
           tux = { };
           pingu = { };
         };
 
-        den.schema.user.includes = [ den.provides.mutual-provider ];
-        den.aspects.igloo.provides.to-users.homeManager.programs.direnv.enable = true;
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include {
+              homeManager.programs.direnv.enable = true;
+            })
+          ];
 
         expr = [
           tuxHm.programs.direnv.enable
@@ -59,23 +68,31 @@
     test-host-mutual-static-includes-configures-all-users = denTest (
       {
         den,
+        lib,
         tuxHm,
         pinguHm,
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
         den.hosts.x86_64-linux.igloo.users = {
           tux = { };
           pingu = { };
         };
 
-        den.schema.user.includes = [ den.provides.mutual-provider ];
-
-        den.aspects.igloo.provides.to-users.includes = [
-          {
-            homeManager.programs.direnv.enable = true;
-          }
-        ];
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include {
+              includes = [
+                {
+                  homeManager.programs.direnv.enable = true;
+                }
+              ];
+            })
+          ];
 
         expr = [
           tuxHm.programs.direnv.enable
@@ -125,10 +142,14 @@
     test-host-parametric-mutual = denTest (
       {
         den,
+        lib,
         tuxHm,
         pinguHm,
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
 
         den.hosts.x86_64-linux.igloo.users = {
@@ -136,16 +157,20 @@
           pingu = { };
         };
 
-        den.schema.user.includes = [ den.provides.mutual-provider ];
-
-        den.aspects.igloo.provides.to-users.includes = [
-          (
-            { host, user }:
-            {
-              homeManager.programs.direnv.enable = true;
-            }
-          )
-        ];
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include {
+              includes = [
+                (
+                  { host, user }:
+                  {
+                    homeManager.programs.direnv.enable = true;
+                  }
+                )
+              ];
+            })
+          ];
 
         expr = [
           tuxHm.programs.direnv.enable
@@ -251,9 +276,10 @@
         igloo,
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
-        den.schema.user.includes = [ den.provides.mutual-provider ];
-
         den.hosts.x86_64-linux.igloo.users = {
           tux = { };
           alice = { };
@@ -261,15 +287,17 @@
           carl = { };
         };
 
-        den.aspects.tux.provides.to-users =
-          { user, ... }:
-          {
+        den.aspects.tux.policyFns.to-users =
+          { host, user, ... }:
+          lib.optional (user.name != "tux") (include {
             homeManager.programs.vim.enable = true;
-          };
+          });
 
-        den.aspects.tux.provides.alice = {
-          homeManager.programs.tmux.enable = true;
-        };
+        den.aspects.tux.policyFns.to-alice =
+          { host, user, ... }:
+          lib.optional (user.name == "alice") (include {
+            homeManager.programs.tmux.enable = true;
+          });
 
         expr = with igloo.home-manager.users; {
           tux = tux.programs.vim.enable;

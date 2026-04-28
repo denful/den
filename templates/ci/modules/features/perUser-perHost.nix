@@ -82,35 +82,42 @@
         lib,
         ...
       }:
+      let
+        inherit (den.lib.policy) include;
+      in
       {
         den.hosts.x86_64-linux.igloo.users = {
           tux = { };
           pingu = { };
         };
 
-        den.schema.user.includes = [ den.provides.mutual-provider ];
-
         den.aspects.igloo.nixos.options.funny = lib.mkOption {
           default = [ ];
           type = lib.types.listOf lib.types.str;
         };
 
-        den.aspects.igloo.provides.to-users.includes = [
-          (den.lib.perHost { nixos.funny = [ (throw "atHost perHost static") ]; })
-          (den.lib.perHost (
-            { host }:
-            {
-              nixos.funny = [ (throw "atHost perHost ${host.name} fun") ];
-            }
-          ))
-          (den.lib.perUser { nixos.funny = [ "atHost perUser static" ]; })
-          (den.lib.perUser (
-            { user, host }:
-            {
-              nixos.funny = [ "atHost perUser ${user.name}@${host.name} fun" ];
-            }
-          ))
-        ];
+        den.aspects.igloo.policyFns.to-users =
+          { host, user, ... }:
+          [
+            (include {
+              includes = [
+                (den.lib.perHost { nixos.funny = [ (throw "atHost perHost static") ]; })
+                (den.lib.perHost (
+                  { host }:
+                  {
+                    nixos.funny = [ (throw "atHost perHost ${host.name} fun") ];
+                  }
+                ))
+                (den.lib.perUser { nixos.funny = [ "atHost perUser static" ]; })
+                (den.lib.perUser (
+                  { user, host }:
+                  {
+                    nixos.funny = [ "atHost perUser ${user.name}@${host.name} fun" ];
+                  }
+                ))
+              ];
+            })
+          ];
 
         den.aspects.tux.includes = [
           (den.lib.perHost { nixos.funny = [ "atUser ignored perHost static" ]; })

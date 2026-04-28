@@ -1,3 +1,4 @@
+{ den, lib, ... }:
 {
   den.aspects.igloo = {
     # igloo host provides some home-manager defaults to its users.
@@ -10,11 +11,13 @@
         environment.systemPackages = [ pkgs.hello ];
       };
 
-    # <host>.provides.<user>, via den.provides.mutual-provider
-    provides.alice =
-      { user, ... }:
-      {
-        homeManager.programs.tmux.enable = user.name == "alice";
-      };
+    # <host>.policyFns.<name>, aspect-included policy
+    policyFns.to-alice =
+      { host, user, ... }:
+      lib.optional (user.name == "alice") (
+        den.lib.policy.include {
+          homeManager.programs.tmux.enable = user.name == "alice";
+        }
+      );
   };
 }

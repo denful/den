@@ -164,8 +164,9 @@ let
       class,
       self,
       ctx,
+      extraState ? { },
     }:
-    mkPipeline { inherit class; } { inherit self ctx; };
+    mkPipeline { inherit class extraState; } { inherit self ctx; };
 
   # Thin wrapper: runs sub-pipeline, materializes state thunks.
   # Each call site does its own post-processing.
@@ -174,9 +175,17 @@ let
       class,
       self,
       ctx,
+      extraState ? { },
     }:
     let
-      result = fxFullResolve { inherit class self ctx; };
+      result = fxFullResolve {
+        inherit
+          class
+          self
+          ctx
+          extraState
+          ;
+      };
     in
     {
       imports = result.state.imports null;

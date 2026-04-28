@@ -6,7 +6,6 @@
     includes = [
       den.provides.hostname
       den.provides.define-user
-      den.provides.mutual-provider
     ];
     # Stub boot config so NixOS evaluation doesn't fail
     nixos.boot.loader.grub.enable = false;
