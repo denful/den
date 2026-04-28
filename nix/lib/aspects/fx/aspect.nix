@@ -937,24 +937,34 @@ let
             nestedKeys
             unregisteredClassKeys
             ;
-          # Unregistered keys are ignored with a trace warning.
+          # Unregistered keys enter the dead letter queue for deferred re-classification.
           # targetClass recognition ensures forward-scoped class aliases are not dropped.
           allClassKeys = classKeys;
-          _warn = builtins.seq (map (
+          ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
+          aspectPolicy = aspect.meta.collisionPolicy or null;
+          globalPolicy = den.config.classModuleCollisionPolicy or "error";
+          deadLetterEffects = map (
             k:
-            builtins.trace "den: ignoring unregistered key '${k}' in aspect '${rawName}' — register in den.classes or den.traits" null
-          ) unregisteredClassKeys) null;
+            fx.send "dead-letter" {
+              key = k;
+              rawValue = aspect.${k};
+              aspectIdentity = nodeIdentity;
+              aspectName = rawName;
+              inherit ctx aspectPolicy globalPolicy;
+              parametricResolved = aspect.__parametricResolved or false;
+              contextDependent = aspect.meta.contextDependent or false;
+            }
+          ) unregisteredClassKeys;
         in
-        builtins.seq _warn (
-          fx.bind (fx.seq (
-            [
-              (emitClasses aspect allClassKeys nodeIdentity)
-              (emitTraits aspect traitKeys nodeIdentity)
-              (registerConstraints aspect)
-            ]
-            ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
-          )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
-        )
+        fx.bind (fx.seq (
+          [
+            (emitClasses aspect allClassKeys nodeIdentity)
+            (emitTraits aspect traitKeys nodeIdentity)
+            (registerConstraints aspect)
+          ]
+          ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
+          ++ deadLetterEffects
+        )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
       )
     );
 
