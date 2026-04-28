@@ -13,7 +13,6 @@
         den.schema.test-flat.includes = [ ];
 
         den.policies.host-to-test-flat = {
-          to = "test-flat";
           __functor =
             _:
             {
@@ -53,7 +52,6 @@
         den.schema.test-twolayer.includes = [ ];
 
         den.policies.host-to-test-twolayer = {
-          to = "test-twolayer";
           __functor =
             _:
             {
@@ -96,7 +94,6 @@
         den.schema.test-multi-args.includes = [ ];
 
         den.policies.host-to-test-multi-args = {
-          to = "test-multi-args";
           __functor =
             _:
             {
@@ -110,7 +107,7 @@
             if __entityKind != "host" then
               [ ]
             else
-              map (user: resolve { inherit user; }) (builtins.attrValues host.users)
+              map (user: resolve.to "test-multi-args" { inherit user; }) (builtins.attrValues host.users)
               ++ [
                 (include {
                   nixos =
@@ -168,7 +165,6 @@
         den.schema.test-functor.includes = [ ];
 
         den.policies.host-to-test-functor = {
-          to = "test-functor";
           __functor =
             _:
             {
@@ -213,7 +209,6 @@
         den.schema.test-funcargs.includes = [ ];
 
         den.policies.host-to-test-funcargs = {
-          to = "test-funcargs";
           __functor =
             _:
             {
@@ -307,7 +302,6 @@
         den.schema.test-static-flat.includes = [ ];
 
         den.policies.host-to-test-static-flat = {
-          to = "test-static-flat";
           __functor =
             _:
             {
@@ -341,7 +335,6 @@
         den.schema.test-cross-param.includes = [ ];
 
         den.policies.host-to-test-cross-param = {
-          to = "test-cross-param";
           __functor =
             _:
             {
@@ -355,7 +348,7 @@
             if __entityKind != "host" then
               [ ]
             else
-              map (user: resolve { inherit user; }) (builtins.attrValues host.users)
+              map (user: resolve.to "test-cross-param" { inherit user; }) (builtins.attrValues host.users)
               ++ [
                 (include (
                   { host, ... }:
@@ -386,7 +379,6 @@
         den.schema.test-paren.includes = [ ];
 
         den.policies.host-to-test-paren = {
-          to = "test-paren";
           __functor =
             _:
             {
@@ -430,7 +422,6 @@
         den.schema.test-full-apply.includes = [ ];
 
         den.policies.host-to-test-full-apply = {
-          to = "test-full-apply";
           __functor =
             _:
             {
@@ -506,7 +497,6 @@
         den.schema.test-collision-err-int.includes = [ ];
 
         den.policies.host-to-collision-err-int = {
-          to = "test-collision-err-int";
           __functor =
             _:
             {
@@ -548,7 +538,6 @@
         den.schema.test-collision-dw.includes = [ ];
 
         den.policies.host-to-collision-dw = {
-          to = "test-collision-dw";
           __functor =
             _:
             {
@@ -589,7 +578,6 @@
         den.schema.test-collision-global.includes = [ ];
 
         den.policies.host-to-collision-global = {
-          to = "test-collision-global";
           __functor =
             _:
             {
@@ -629,7 +617,6 @@
         den.schema.test-collision-cw.includes = [ ];
 
         den.policies.host-to-collision-cw = {
-          to = "test-collision-cw";
           __functor =
             _:
             {

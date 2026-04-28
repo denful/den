@@ -1,8 +1,8 @@
 # Flake output policies — traversal from flake-level entity kinds.
 #
-# Policies use __entityKind body guards for scoping and `to` for
-# targetKey derivation (resolve binding keys don't match schema kind
-# names).
+# Policies use __entityKind body guards for scoping and resolve.to
+# for targetKey derivation (resolve binding keys don't match schema
+# kind names — e.g. `host` resolves to `flake-os`).
 {
   den,
   lib,
@@ -22,7 +22,6 @@ let
   systemOutputPolicies = map (output: {
     name = "flake-system-to-flake-${output}";
     value = {
-      to = "flake-${output}";
       __functor =
         _:
         {
@@ -34,7 +33,7 @@ let
           [ ]
         else
           [
-            (resolve { inherit system output; })
+            (resolve.to "flake-${output}" { inherit system output; })
             (include den.aspects."flake-${output}")
           ];
     };
@@ -43,18 +42,19 @@ in
 {
   den.policies = lib.listToAttrs systemOutputPolicies // {
     flake-to-flake-system = {
-      to = "flake-system";
       __functor =
         _:
         {
           __entityKind ? null,
           ...
         }:
-        if __entityKind != "flake" then [ ] else map (system: resolve { inherit system; }) den.systems;
+        if __entityKind != "flake" then
+          [ ]
+        else
+          map (system: resolve.to "flake-system" { inherit system; }) den.systems;
     };
 
     flake-system-to-flake-os = {
-      to = "flake-os";
       __functor =
         _:
         {
@@ -69,13 +69,12 @@ in
             hosts = den.hosts.${system} or { };
           in
           lib.concatMap (host: [
-            (resolve { inherit host; })
+            (resolve.to "flake-os" { inherit host; })
             (include den.aspects."flake-os")
           ]) (builtins.attrValues hosts);
     };
 
     flake-system-to-flake-hm = {
-      to = "flake-hm";
       __functor =
         _:
         {
@@ -90,7 +89,7 @@ in
             homes = den.homes.${system} or { };
           in
           lib.concatMap (home: [
-            (resolve { inherit home; })
+            (resolve.to "flake-hm" { inherit home; })
             (include den.aspects."flake-hm")
           ]) (builtins.attrValues homes);
     };

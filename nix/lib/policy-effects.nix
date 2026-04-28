@@ -13,10 +13,22 @@
         __shared = shared;
         value = bindings;
       };
+      mkResolveTo = shared: kind: bindings: {
+        __policyEffect = "resolve";
+        __shared = shared;
+        __targetKind = kind;
+        value = bindings;
+      };
     in
     {
       __functor = _: mkResolve false;
-      shared = mkResolve true;
+      shared = {
+        __functor = _: mkResolve true;
+        # resolve.shared.to "kind" { bindings } — shared fan-out with explicit target.
+        to = mkResolveTo true;
+      };
+      # resolve.to "kind" { bindings } — explicit target kind for routing.
+      to = mkResolveTo false;
     };
 
   # Inject an aspect into the current resolution context.

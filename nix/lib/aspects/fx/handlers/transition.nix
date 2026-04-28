@@ -190,7 +190,7 @@ let
     in
     fx.bind mergeImports (_: fx.pure innerResults);
 
-  # Routing decision: sibling targets (policy.from == policy.to) route
+  # Routing decision: sibling targets (routing.from == routing.to) route
   # through provide-to for cross-entity distribution. Child targets
   # resolve locally. Manual into transitions always resolve locally.
   isSiblingRoute =
@@ -274,11 +274,11 @@ let
 
   resolveTransition =
     targetClass: sourceAspect: currentCtx: aspectPolicies: results: transition:
-    if isSiblingRoute transition then
-      resolveSiblingTransition targetClass sourceAspect currentCtx results transition
-    else if transition.contexts == [ ] then
+    if transition.contexts == [ ] then
       # Include/exclude-only transition — no resolve targets.
       processIncludeOnly currentCtx results transition
+    else if isSiblingRoute transition then
+      resolveSiblingTransition targetClass sourceAspect currentCtx results transition
     else
       let
         key = "${targetClass}/${lib.concatStringsSep "/" transition.path}";
@@ -427,12 +427,14 @@ let
                 excludeEffects = builtins.filter (
                   e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
                 ) rawEffects;
-                explicitTo = if builtins.isAttrs policy then policy.to or null else null;
+                firstResolveEffect = if resolveEffects != [ ] then builtins.head resolveEffects else null;
+                effectTargetKind =
+                  if firstResolveEffect != null then firstResolveEffect.__targetKind or null else null;
                 firstResolveKeys =
-                  if resolveEffects != [ ] then builtins.attrNames (builtins.head resolveEffects).value else [ ];
+                  if resolveEffects != [ ] then builtins.attrNames firstResolveEffect.value else [ ];
                 targetKey =
-                  if explicitTo != null then
-                    explicitTo
+                  if effectTargetKind != null then
+                    effectTargetKind
                   else
                     lib.findFirst (k: builtins.elem k schemaKinds) (
                       if firstResolveKeys != [ ] then builtins.head firstResolveKeys else sourceEntityKind

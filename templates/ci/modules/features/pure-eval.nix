@@ -53,7 +53,6 @@ in
           { den, ... }:
           {
             den.policies.a-to-b = {
-              to = "b";
               __functor =
                 _:
                 {
@@ -67,7 +66,7 @@ in
                   [ ]
                 else if ctx ? v then
                   [
-                    (resolve { v = "${ctx.v}!"; })
+                    (resolve.to "b" { v = "${ctx.v}!"; })
                     (include (
                       { v }:
                       {

@@ -39,7 +39,6 @@
         den.schema.test-into-target.includes = [ ];
 
         den.policies.host-to-into-target = {
-          to = "test-into-target";
           __functor =
             _:
             {

@@ -20,7 +20,6 @@
         ];
         den.schema.child.includes = [ ];
         den.policies.test-parent-to-child = {
-          to = "child";
           __functor =
             _:
             {
@@ -34,7 +33,7 @@
               [ ]
             else
               [
-                (resolve { y = "derived"; })
+                (resolve.to "child" { y = "derived"; })
                 (include (
                   { x, y }:
                   {
@@ -76,7 +75,6 @@
         ];
         den.schema.dst.includes = [ ];
         den.policies.test-src-to-dst = {
-          to = "dst";
           __functor =
             _:
             {
@@ -90,8 +88,8 @@
               [ ]
             else
               [
-                (resolve { i = 1; })
-                (resolve { i = 2; })
+                (resolve.to "dst" { i = 1; })
+                (resolve.to "dst" { i = 2; })
                 (include (
                   { x, i }:
                   {
@@ -135,7 +133,6 @@
         ];
         den.schema.dst.includes = [ ];
         den.policies.test-src-to-dst-no-cross = {
-          to = "dst";
           __functor =
             _:
             {
@@ -149,7 +146,7 @@
               [ ]
             else
               [
-                (resolve { y = ctx.x; })
+                (resolve.to "dst" { y = ctx.x; })
                 (include (
                   { y }:
                   {

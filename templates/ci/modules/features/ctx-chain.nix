@@ -23,7 +23,6 @@ let
         if i + 1 < n then
           {
             den.policies."${name}-to-${next}" = {
-              to = next;
               __functor =
                 _:
                 {
@@ -33,7 +32,7 @@ let
                 if __entityKind != name || !(ctx ? x) then
                   [ ]
                 else
-                  [ (den.lib.policy.resolve { x = "${ctx.x}+${toString i}"; }) ];
+                  [ (den.lib.policy.resolve.to next { x = "${ctx.x}+${toString i}"; }) ];
             };
           }
         else
@@ -88,7 +87,6 @@ in
               ];
               den.schema.leaf.includes = [ ];
               den.policies.root-to-leaf = {
-                to = "leaf";
                 __functor =
                   _:
                   {
@@ -101,7 +99,7 @@ in
                   if __entityKind != "root" || !(ctx ? x) then
                     [ ]
                   else
-                    map (i: resolve { x = "${ctx.x}-${toString i}"; }) (lib.genList (i: i) 20)
+                    map (i: resolve.to "leaf" { x = "${ctx.x}-${toString i}"; }) (lib.genList (i: i) 20)
                     ++ [
                       (include (
                         { x }:

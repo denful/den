@@ -34,7 +34,6 @@
         den.hosts.x86_64-linux.iceberg = { };
 
         den.policies.test-host-to-peer = {
-          to = "host";
           __functor =
             _:
             {

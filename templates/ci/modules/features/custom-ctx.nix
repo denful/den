@@ -20,7 +20,6 @@
         ];
         den.schema.shout.includes = [ ];
         den.policies.test-greeting-to-shout = {
-          to = "shout";
           __functor =
             _:
             {
@@ -34,7 +33,7 @@
               [ ]
             else
               [
-                (resolve { shout = lib.toUpper ctx.hello; })
+                (resolve.to "shout" { shout = lib.toUpper ctx.hello; })
                 (include (
                   { shout }:
                   {

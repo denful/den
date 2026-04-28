@@ -100,7 +100,6 @@
         den.hosts.x86_64-linux.iceberg.users.tux = { };
 
         den.policies.host-to-peers = {
-          to = "host";
           __functor =
             _:
             {

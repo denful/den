@@ -81,7 +81,6 @@ in
           { den, lib, ... }:
           {
             den.policies.foo-to-bar = {
-              to = "bar";
               __functor =
                 _:
                 {
@@ -95,7 +94,7 @@ in
                   [ ]
                 else if ctx ? name then
                   [
-                    (resolve { shout = lib.toUpper ctx.name; })
+                    (resolve.to "bar" { shout = lib.toUpper ctx.name; })
                     (include (
                       { shout }:
                       {

@@ -188,7 +188,6 @@
         };
 
         den.policies.flake-system-to-host = {
-          to = "host";
           __functor =
             _:
             {

@@ -65,7 +65,6 @@
         den.schema.test-insp-tgt.includes = [ ];
 
         den.policies.test-insp-pol = {
-          to = "test-insp-tgt";
           __functor =
             _:
             {
@@ -75,7 +74,7 @@
             let
               inherit (den.lib.policy) resolve;
             in
-            if __entityKind != "test-insp-src" then [ ] else [ (resolve { }) ];
+            if __entityKind != "test-insp-src" then [ ] else [ (resolve.to "test-insp-tgt" { }) ];
         };
 
         expr =
@@ -95,7 +94,6 @@
       { den, ... }:
       {
         den.policies.test-insp-sibling = {
-          to = "host";
           __functor =
             _:
             {
@@ -105,7 +103,7 @@
             let
               inherit (den.lib.policy) resolve;
             in
-            if __entityKind != "host" then [ ] else [ (resolve { }) ];
+            if __entityKind != "host" then [ ] else [ (resolve.to "host" { }) ];
         };
 
         den.hosts.x86_64-linux.igloo = { };

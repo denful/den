@@ -59,7 +59,6 @@
 
         den.schema.other.includes = [ ];
         den.policies.test-greet-to-other = {
-          to = "other";
           __functor =
             _:
             {
@@ -73,7 +72,7 @@
               [ ]
             else
               [
-                (resolve ctx)
+                (resolve.to "other" ctx)
                 (include (
                   { who }:
                   {
@@ -108,7 +107,6 @@
         ];
         den.schema.yell.includes = [ ];
         den.policies.test-greet-to-yell = {
-          to = "yell";
           __functor =
             _:
             {
@@ -122,7 +120,7 @@
               [ ]
             else
               [
-                (resolve { shout = lib.toUpper ctx.who; })
+                (resolve.to "yell" { shout = lib.toUpper ctx.who; })
                 (include (
                   { shout }:
                   {
@@ -159,7 +157,6 @@
         den.schema.size.includes = [ ];
         den.schema.num.includes = [ ];
         den.policies.test-greet-to-yell-fn = {
-          to = "yell";
           __functor =
             _:
             {
@@ -173,7 +170,7 @@
               [ ]
             else
               [
-                (resolve { shout = lib.toUpper ctx.who; })
+                (resolve.to "yell" { shout = lib.toUpper ctx.who; })
                 (include (
                   { shout }:
                   {
@@ -183,7 +180,6 @@
               ];
         };
         den.policies.test-greet-to-size = {
-          to = "size";
           __functor =
             _:
             {
@@ -197,7 +193,7 @@
               [ ]
             else
               [
-                (resolve { length = lib.stringLength ctx.who; })
+                (resolve.to "size" { length = lib.stringLength ctx.who; })
                 (include (
                   { length }:
                   {
@@ -207,7 +203,6 @@
               ];
         };
         den.policies.test-greet-to-num = {
-          to = "num";
           __functor =
             _:
             {
@@ -221,7 +216,7 @@
               [ ]
             else
               [
-                (resolve { number = lib.stringLength ctx.who; })
+                (resolve.to "num" { number = lib.stringLength ctx.who; })
                 (include (
                   { number }:
                   {

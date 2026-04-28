@@ -10,7 +10,6 @@
         den.schema.flat.includes = [ ];
 
         den.policies.test-root-to-flat = {
-          to = "flat";
           __functor =
             _:
             {
@@ -24,7 +23,7 @@
               [ ]
             else
               [
-                (resolve ctx)
+                (resolve.to "flat" ctx)
                 (include (
                   { x }:
                   {
@@ -55,7 +54,6 @@
             { den, ... }:
             {
               den.policies.test-root-to-leaf-a = {
-                to = "leaf";
                 __functor =
                   _:
                   {
@@ -65,7 +63,7 @@
                   let
                     inherit (den.lib.policy) resolve;
                   in
-                  if __entityKind != "root" then [ ] else [ (resolve { v = "a"; }) ];
+                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "a"; }) ];
               };
             }
           )
@@ -74,7 +72,6 @@
             { den, ... }:
             {
               den.policies.test-root-to-leaf-b = {
-                to = "leaf";
                 __functor =
                   _:
                   {
@@ -84,7 +81,7 @@
                   let
                     inherit (den.lib.policy) resolve;
                   in
-                  if __entityKind != "root" then [ ] else [ (resolve { v = "b"; }) ];
+                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "b"; }) ];
               };
             }
           )
@@ -93,7 +90,6 @@
             { den, ... }:
             {
               den.policies.test-root-to-leaf-c = {
-                to = "leaf";
                 __functor =
                   _:
                   {
@@ -103,7 +99,7 @@
                   let
                     inherit (den.lib.policy) resolve;
                   in
-                  if __entityKind != "root" then [ ] else [ (resolve { v = "c"; }) ];
+                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "c"; }) ];
               };
             }
           )
@@ -112,7 +108,6 @@
             { den, ... }:
             {
               den.policies.test-root-to-leaf-d = {
-                to = "leaf";
                 __functor =
                   _:
                   {
@@ -122,7 +117,7 @@
                   let
                     inherit (den.lib.policy) resolve;
                   in
-                  if __entityKind != "root" then [ ] else [ (resolve { v = "d"; }) ];
+                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "d"; }) ];
               };
             }
           )

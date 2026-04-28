@@ -123,7 +123,6 @@
         ];
         den.schema.b.includes = [ ];
         den.policies.a-to-b = {
-          to = "b";
           __functor =
             _:
             {
@@ -137,7 +136,7 @@
               [ ]
             else
               [
-                (resolve { host = "${ctx.host}!"; })
+                (resolve.to "b" { host = "${ctx.host}!"; })
                 (include (
                   { host }:
                   {

@@ -65,7 +65,6 @@
           )
         ];
         den.policies.src-to-tgt = {
-          to = "tgt";
           __functor =
             _:
             {
@@ -73,7 +72,10 @@
               v,
               ...
             }:
-            if __entityKind != "src" then [ ] else [ (den.lib.policy.resolve.shared { v = "${v}!"; }) ];
+            if __entityKind != "src" then
+              [ ]
+            else
+              [ (den.lib.policy.resolve.shared.to "tgt" { v = "${v}!"; }) ];
         };
         expr = funnyNames (den.lib.resolveEntity "src" { v = "x"; });
         expected = [
@@ -105,7 +107,6 @@
           )
         ];
         den.policies.src2-to-tgt2 = {
-          to = "tgt2";
           __functor =
             _:
             {
@@ -113,7 +114,7 @@
               v,
               ...
             }:
-            if __entityKind != "src2" then [ ] else [ (den.lib.policy.resolve { v = "${v}!"; }) ];
+            if __entityKind != "src2" then [ ] else [ (den.lib.policy.resolve.to "tgt2" { v = "${v}!"; }) ];
         };
         expr = funnyNames (den.lib.resolveEntity "src2" { v = "x"; });
         expected = [

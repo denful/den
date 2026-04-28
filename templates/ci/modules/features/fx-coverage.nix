@@ -510,7 +510,6 @@
 
         # New-style policy with include effect resolves normally.
         den.policies.host-to-test-filter = {
-          to = "test-filter";
           __functor =
             _:
             {
@@ -524,7 +523,7 @@
               [ ]
             else
               [
-                (resolve { })
+                (resolve.to "test-filter" { })
                 (include { nixos.users.users.tux.description = "from-stage"; })
               ];
         };

@@ -10,7 +10,6 @@
         den.schema.test-rel-target.includes = [ ];
 
         den.policies.host-to-test-rel = {
-          to = "test-rel-target";
           __functor =
             _:
             {
@@ -45,7 +44,6 @@
         den.default.nixos.users.users.tux.description = "from-default-stage";
 
         den.policies.host-to-test-rel-coexist = {
-          to = "test-rel-coexist";
           __functor =
             _:
             {

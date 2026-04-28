@@ -25,18 +25,24 @@ let
         e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
       ) effects;
       targets = map (e: e.value) resolveEffects;
-      firstKeys =
-        if resolveEffects != [ ] then builtins.attrNames (builtins.head resolveEffects).value else [ ];
+      firstResolveEffect = if resolveEffects != [ ] then builtins.head resolveEffects else null;
+      effectTargetKind =
+        if firstResolveEffect != null then firstResolveEffect.__targetKind or null else null;
+      firstKeys = if resolveEffects != [ ] then builtins.attrNames firstResolveEffect.value else [ ];
       # Prefer keys that differ from source kind — those are the new bindings.
       newKeys = builtins.filter (k: k != kind) firstKeys;
-      targetKey = lib.findFirst (k: builtins.elem k schemaKinds) (
-        if newKeys != [ ] then
-          builtins.head newKeys
-        else if firstKeys != [ ] then
-          builtins.head firstKeys
+      targetKey =
+        if effectTargetKind != null then
+          effectTargetKind
         else
-          kind
-      ) (if newKeys != [ ] then newKeys else firstKeys);
+          lib.findFirst (k: builtins.elem k schemaKinds) (
+            if newKeys != [ ] then
+              builtins.head newKeys
+            else if firstKeys != [ ] then
+              builtins.head firstKeys
+            else
+              kind
+          ) (if newKeys != [ ] then newKeys else firstKeys);
     in
     {
       inherit targetKey targets;
