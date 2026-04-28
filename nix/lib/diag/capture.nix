@@ -20,12 +20,10 @@ let
       comp = fxLib.aspect.aspectToEffect root;
     in
     nxFx.handle {
-      handlers = fxLib.pipeline.composeHandlers (fxLib.trace.policyTraceHandlers) (
-        fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {
-          inherit class;
-          ctx = { };
-        }) (fxLib.trace.tracingHandler class)
-      );
+      handlers = fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {
+        inherit class;
+        ctx = { };
+      }) (fxLib.trace.tracingHandler class);
       state = fxLib.pipeline.defaultState // {
         entries = [ ];
         ctxTrace = [ ];
@@ -49,12 +47,10 @@ let
           comp = fxLib.aspect.aspectToEffect root;
         in
         nxFx.handle {
-          handlers = fxLib.pipeline.composeHandlers (fxLib.trace.policyTraceHandlers) (
-            fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {
-              inherit class;
-              ctx = { };
-            }) (fxLib.trace.tracingHandler class // extraHandlers)
-          );
+          handlers = fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {
+            inherit class;
+            ctx = { };
+          }) (fxLib.trace.tracingHandler class // extraHandlers);
           state = fxLib.pipeline.defaultState // {
             entries = [ ];
             ctxTrace = [ ];

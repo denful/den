@@ -98,44 +98,6 @@ let
       )
     );
 
-  # Core pipeline effects that policy handlers must not shadow.
-  # Per-policy effects use "policy:<name>" prefix and are dispatched
-  # by the transition handler — they are NOT in this list.
-  coreEffects = [
-    "into-transition"
-    "ctx-seen"
-    "resolve-complete"
-    "emit-class"
-    "emit-include"
-    "emit-forward"
-    "chain-push"
-    "chain-pop"
-    "check-constraint"
-    "register-constraint"
-    "register-aspect-policy"
-    "dispatch-policy-includes"
-    "defer-include"
-    "drain-deferred"
-    "get-path-set"
-    "has-handler"
-    "provide-to"
-    "resolve-entity"
-  ];
-
-  collectPolicyHandlers =
-    sourceStage: targetKey:
-    let
-      policies = den.policies or { };
-      # Only old-style policies have from/to/handlers fields.
-      # New-style policies (functions or __functor attrsets) are skipped.
-      oldStyle = builtins.filter (
-        p: builtins.isAttrs p && !builtins.isFunction p && !(p ? __functor) && p ? from
-      ) (builtins.attrValues policies);
-      matching = lib.filter (p: p.from == sourceStage && p.to == targetKey) oldStyle;
-      allHandlers = builtins.foldl' (acc: p: acc // (p.handlers or { })) { } matching;
-    in
-    builtins.removeAttrs allHandlers coreEffects;
-
   emitCrossProvider =
     {
       crossProvider,
@@ -310,7 +272,6 @@ let
         sourceProvides = sourceAspect.provides or { };
         crossProvider = sourceProvides.${targetKey} or null;
         emitCross = emitCrossProvider { inherit crossProvider sourceAspect targetKey; };
-        policyHandlers = collectPolicyHandlers (sourceAspect.name or "") targetKey;
         excludes = (transition.routing or { }).excludes or [ ];
       in
       # Register exclude constraints before resolving targets.
@@ -366,16 +327,6 @@ let
                       } innerResults
                     else
                       resolveContextValue currentCtx effectiveTarget innerResults newCtx;
-                  # Install policy handlers for aspects resolved under this transition.
-                  # Fan-out sub-pipelines (fxFullResolve) create fresh handler scopes,
-                  # so policy handlers don't propagate into them. Nested transitions
-                  # that install handlers for the same effect name use innermost-wins
-                  # semantics (standard scope.provide shadowing).
-                  withTarget =
-                    if policyHandlers != { } then
-                      fx.effects.scope.provide policyHandlers baseComputation
-                    else
-                      baseComputation;
                 in
                 fx.bind
                   (fx.send "ctx-seen" {
@@ -387,7 +338,7 @@ let
                     { isFirst, newAspectValues }:
                     if isFirst then
                       fx.bind updateCtx (
-                        _: fx.bind withTarget (targetResults: emitCross scopedCtx scopeHandlers ctxNames targetResults)
+                        _: fx.bind baseComputation (targetResults: emitCross scopedCtx scopeHandlers ctxNames targetResults)
                       )
                     else if newAspectValues != [ ] then
                       # Supplemental aspects for an already-resolved entity:

@@ -159,45 +159,7 @@ let
       };
   };
 
-  # Policy dispatch trace: compose with compilePolicyHandlers to record
-  # policy fire events. Uses composeHandlers so the policy handler
-  # provides the resume (targets/routing) and this handler appends a
-  # trace entry to state.entries.
-  policyTraceHandlers =
-    let
-      policies = den.policies or { };
-    in
-    lib.mapAttrs' (name: _policy: {
-      name = "policy:${name}";
-      value =
-        { param, state }:
-        let
-          # The composed handler runs after the policy handler.
-          # param is the original context sent by the transition handler.
-          # We record the policy fire; the actual resume comes from the
-          # policy handler via composeHandlers.
-          entityKind = deriveEntityKind state;
-          chain = (state.includesChain or (_: [ ])) null;
-          parent = if chain != [ ] then lib.last chain else null;
-          entry = policyEntryDefaults // {
-            name = "policy:${name}";
-            inherit entityKind parent;
-            isPolicyDispatch = true;
-            policyName = name;
-            from = _policy.from or "";
-            to = if _policy ? as && _policy.as != "" then _policy.as else _policy.to or "";
-          };
-        in
-        {
-          # Resume is overridden by composeHandlers — policy handler wins.
-          resume = null;
-          state = state // {
-            entries = (state.entries or [ ]) ++ [ entry ];
-          };
-        };
-    }) policies;
-
 in
 {
-  inherit structuredTraceHandler tracingHandler policyTraceHandlers;
+  inherit structuredTraceHandler tracingHandler;
 }
