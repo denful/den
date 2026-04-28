@@ -174,7 +174,7 @@ let
               [ root.name ] ++ buildTree rootName entries;
         in
         {
-          imports = result.state.imports null;
+          imports = (result.state.classImports null).${class} or [ ];
           trace = traceTree;
         };
 

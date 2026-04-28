@@ -235,7 +235,7 @@ let
         };
 
         rawSourceModule = {
-          imports = sub.imports;
+          imports = sub.classImports.${spec.fromClass} or [ ];
         };
         sourceModule = spec.mapModule rawSourceModule;
         forwardAspect = buildForwardAspect spec sourceModule;

@@ -552,7 +552,7 @@
         };
 
         expr = {
-          importsCount = builtins.length (result.state.imports null);
+          importsCount = builtins.length ((result.state.classImports null).nixos or [ ]);
           name = result.value.name;
           hasTraitData = (result.state.traits null) ? firewall;
         };

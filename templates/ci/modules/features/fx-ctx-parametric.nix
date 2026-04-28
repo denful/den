@@ -118,7 +118,7 @@
         } comp;
       in
       {
-        expr = builtins.length (result.state.imports null) > 0;
+        expr = builtins.length ((result.state.classImports null).user or [ ]) > 0;
         expected = true;
       }
     );

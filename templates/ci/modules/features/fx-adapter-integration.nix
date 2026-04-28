@@ -57,7 +57,7 @@ in
         result = runPipeline den { } root;
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 3; # root + child1 + child2 (emit-class fires for each)
       }
     );
@@ -103,7 +103,7 @@ in
         result = runPipeline den { } root;
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );
@@ -154,7 +154,7 @@ in
       {
         # Tombstone (~old) + replacement (new) both in tree, only new's module collected.
         expr = {
-          importCount = builtins.length (result.state.imports null);
+          importCount = builtins.length ((result.state.classImports null).nixos or [ ]);
           hasTombstone = builtins.any (n: n == "~old") names;
           hasReplacement = builtins.any (n: n == "new") names;
         };
@@ -198,7 +198,7 @@ in
         result = runPipeline den { } root;
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1; # sopsConf.nixos
       }
     );
@@ -252,7 +252,7 @@ in
         result = runPipeline den { } root;
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1; # only x11.nixos
       }
     );
@@ -319,7 +319,7 @@ in
       in
       {
         # web.nixos (hostName) + keep.nixos (y), skip is tombstoned
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 2;
       }
     );

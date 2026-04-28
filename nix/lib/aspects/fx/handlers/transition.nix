@@ -167,12 +167,26 @@ let
           inherit aspectPolicies;
         };
       };
-      subImports = sub.imports;
-      # state.modify reads st.imports at the modify call site. This is safe
+      subClassImports = sub.classImports;
+      # state.modify reads st.classImports at the modify call site. This is safe
       # because fxFullResolve above is a separate pipeline whose results are
       # fully materialized before the modify runs. No concurrent handlers
-      # can append to imports between construction and handling.
-      mergeImports = fx.effects.state.modify (st: st // { imports = x: (st.imports x) ++ subImports; });
+      # can append to classImports between construction and handling.
+      mergeImports = fx.effects.state.modify (
+        st:
+        st
+        // {
+          classImports =
+            x:
+            let
+              current = st.classImports x;
+            in
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              current
+              subClassImports
+            ];
+        }
+      );
     in
     fx.bind mergeImports (_: fx.pure innerResults);
 

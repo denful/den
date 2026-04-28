@@ -5,7 +5,7 @@
 #   State reads/writes: includesChain
 #   (stage tracking removed — trace derives entityKind from entries)
 # classCollectorHandler: Handles emit-class
-#   State reads/writes: imports
+#   State reads/writes: classImports
 {
   lib,
   den,
@@ -148,48 +148,46 @@ let
       };
   };
 
-  classCollectorHandler =
-    {
-      targetClass,
-    }:
-    {
-      "emit-class" =
-        { param, state }:
-        if param.class != targetClass then
-          {
-            resume = null;
-            inherit state;
-          }
-        else
-          let
-            nodeIdentity = param.identity or "<anon>";
-            baseIdentity =
-              if param.isContextDependent or false then
-                nodeIdentity
-              else
-                lib.head (lib.splitString "/{" nodeIdentity);
-            loc = "${param.class}@${baseIdentity}";
-            isAnon =
-              !(den.lib.aspects.isMeaningfulName nodeIdentity)
-              || lib.hasPrefix "<root>/" nodeIdentity
-              || lib.hasInfix "/<anon>:" nodeIdentity;
-            mod =
-              if isAnon then
-                lib.setDefaultModuleLocation loc param.module
-              else
-                {
-                  key = loc;
-                  _file = loc;
-                  imports = [ param.module ];
-                };
-          in
-          {
-            resume = null;
-            state = state // {
-              imports = x: (state.imports x) ++ [ mod ];
+  classCollectorHandler = {
+    "emit-class" =
+      { param, state }:
+      let
+        nodeIdentity = param.identity or "<anon>";
+        baseIdentity =
+          if param.isContextDependent or false then
+            nodeIdentity
+          else
+            lib.head (lib.splitString "/{" nodeIdentity);
+        loc = "${param.class}@${baseIdentity}";
+        isAnon =
+          !(den.lib.aspects.isMeaningfulName nodeIdentity)
+          || lib.hasPrefix "<root>/" nodeIdentity
+          || lib.hasInfix "/<anon>:" nodeIdentity;
+        mod =
+          if isAnon then
+            lib.setDefaultModuleLocation loc param.module
+          else
+            {
+              key = loc;
+              _file = loc;
+              imports = [ param.module ];
             };
-          };
-    };
+      in
+      {
+        resume = null;
+        state = state // {
+          classImports =
+            x:
+            let
+              current = state.classImports x;
+            in
+            current
+            // {
+              ${param.class} = (current.${param.class} or [ ]) ++ [ mod ];
+            };
+        };
+      };
+  };
 
   deferredIncludeHandler = {
     "defer-include" =

@@ -26,7 +26,7 @@
         };
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );
@@ -59,7 +59,7 @@
         };
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 2;
       }
     );
@@ -132,6 +132,51 @@
       }
     );
 
+    # Multi-class collection: emissions for two classes collected in one pass.
+    test-multi-class-collection = denTest (
+      { den, ... }:
+      let
+        self = {
+          name = "host";
+          meta = { };
+          nixos = {
+            networking.hostName = "test";
+          };
+          homeManager = {
+            programs.git.enable = true;
+          };
+          includes = [ ];
+        };
+        # Use fxFullResolve to access raw state (fxResolve returns a module shape).
+        result = den.lib.aspects.fx.pipeline.fxFullResolve {
+          class = "nixos";
+          inherit self;
+          ctx = { };
+        };
+        classImports = result.state.classImports null;
+        # Also verify fxResolve backwards compat
+        resolveResult = den.lib.aspects.fx.pipeline.fxResolve {
+          class = "nixos";
+          inherit self;
+          ctx = { };
+        };
+      in
+      {
+        expr = {
+          # fxResolve backwards compat: imports has nixos content
+          hasImports = builtins.length resolveResult.imports > 0;
+          # Multi-class: both classes collected
+          hasNixos = classImports ? nixos && classImports.nixos != [ ];
+          hasHomeManager = classImports ? homeManager && classImports.homeManager != [ ];
+        };
+        expected = {
+          hasImports = true;
+          hasNixos = true;
+          hasHomeManager = true;
+        };
+      }
+    );
+
     # Parametric child through full pipeline.
     test-parametric-through-pipeline = denTest (
       { den, ... }:
@@ -163,7 +208,7 @@
         };
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );

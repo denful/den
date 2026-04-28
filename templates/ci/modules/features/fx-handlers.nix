@@ -320,14 +320,14 @@
           })
         ];
         result = fx.handle {
-          handlers = handlers.classCollectorHandler { targetClass = "nixos"; };
+          handlers = handlers.classCollectorHandler;
           state = {
-            imports = _: [ ];
+            classImports = _: { };
           };
         } comp;
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 2;
       }
     );

@@ -102,7 +102,7 @@
         };
 
         expr = {
-          hasImports = builtins.length (result.state.imports null) > 0;
+          hasImports = builtins.length ((result.state.classImports null).nixos or [ ]) > 0;
           hasTraitData = (result.state.traits null) ? firewall;
           traitValue = (result.state.traits null).firewall;
         };

@@ -183,7 +183,7 @@
         } comp;
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );
@@ -581,7 +581,7 @@
         } comp;
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );

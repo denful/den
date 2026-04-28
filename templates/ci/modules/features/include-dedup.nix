@@ -180,7 +180,7 @@
       in
       {
         # Without dedup: 2 imports. With dedup: 1 import.
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );
@@ -224,7 +224,7 @@
         };
       in
       {
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );
@@ -257,7 +257,7 @@
       in
       {
         # Different contexts → different dedup keys → both resolve.
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 2;
       }
     );
@@ -357,7 +357,7 @@
       {
         # shared excluded in treeA, included in treeB → 1 import.
         # If exclude pollutes includeSeen (bug): 0 imports.
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 1;
       }
     );
@@ -391,7 +391,7 @@
       {
         # Before fix: 1 (module passes through unwrapped).
         # After fix: 0 (unsatisfied guard skips emission).
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 0;
       }
     );
@@ -427,7 +427,7 @@
       in
       {
         # With user context: module wraps (main + validator) → 2 imports.
-        expr = builtins.length (result.state.imports null);
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
         expected = 2;
       }
     );

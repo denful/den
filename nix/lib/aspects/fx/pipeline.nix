@@ -70,7 +70,7 @@ let
       // ctx
     )
     // handlers.traitCollectorHandler { inherit ctx traitSchemas; }
-    // handlers.classCollectorHandler { targetClass = class; }
+    // handlers.classCollectorHandler
     // handlers.constraintRegistryHandler
     // handlers.chainHandler
     // handlers.includeHandler
@@ -112,7 +112,7 @@ let
   # deepSeq directly.
   defaultState = {
     seen = _: { };
-    imports = _: [ ];
+    classImports = _: { };
     constraintRegistry = _: { };
     constraintFilters = _: [ ];
     pathSet = _: { };
@@ -187,7 +187,7 @@ let
       };
     in
     {
-      imports = result.state.imports null;
+      classImports = result.state.classImports null;
       traits = result.state.traits null;
       provideTo = (result.state.provideTo or (_: [ ])) null;
     };
@@ -270,7 +270,12 @@ let
       throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
     else
       {
-        imports = (result.state.imports null) ++ lib.optional hasTraitSchemas traitModule;
+        # Target class imports only — multi-class data accessible via
+        # fxFullResolve (state.classImports null). Not exposed here because
+        # fxResolve's return is used as a NixOS deferredModule by entity
+        # types — extra attrs would error.
+        imports =
+          ((result.state.classImports null).${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in
 {
