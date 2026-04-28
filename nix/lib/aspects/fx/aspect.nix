@@ -115,14 +115,18 @@ let
         policy = resolveCollisionPolicy { inherit ctx aspectPolicy globalPolicy; };
         denArgNames = builtins.attrNames ctx;
         advertisedArgs = lib.genAttrs denArgNames (_: true);
+        validatorAdvertisedArgs = {
+          config = true;
+        };
         validator =
           moduleArgs:
           let
             collisionChecks = lib.concatMap (
               name:
               let
-                tryResult = builtins.tryEval (builtins.seq moduleArgs.${name} true);
-                hasReal = tryResult.value or false;
+                mArgs = moduleArgs.config._module.args or { };
+                hasReal =
+                  (builtins.tryEval (builtins.seq (mArgs.${name} or null) (mArgs ? ${name}))).value or false;
                 p = policy name;
               in
               if !hasReal then
@@ -150,7 +154,7 @@ let
         inherit (result) wrapped;
       }
       // lib.optionalAttrs (result.wrapped && ctx != { }) {
-        inherit validator advertisedArgs;
+        inherit validator validatorAdvertisedArgs advertisedArgs;
       }
     else if !builtins.isFunction module then
       {
@@ -225,20 +229,24 @@ let
               warnedModule (
                 classWinsDen // moduleArgs // denWinsDen // lib.mapAttrs (_: thunk: thunk moduleArgs) traitThunks
               );
-            # Validate(X): collision detector. Receives same moduleArgs from
-            # NixOS but only produces warnings/errors. The check is inside
-            # the warnings value — a thunk that's only forced after the
-            # module system's fixed point converges, avoiding recursion.
+            # Validate(X): collision detector. Only advertises module-system
+            # args + config. Checks den arg collisions by probing
+            # config._module.args rather than advertising den args (which
+            # fails when the class module system lacks those keys).
+            validatorAdvertisedArgs = remainingArgs // {
+              config = true;
+            };
             validator =
               moduleArgs:
               let
                 collisionChecks = lib.concatMap (
                   name:
                   let
-                    # Only evaluates moduleArgs.${name} when config.warnings
-                    # is consumed — after fixed point. tryEval catches the
-                    # thunk failure when nobody set _module.args.${name}.
-                    hasReal = (builtins.tryEval (builtins.seq moduleArgs.${name} true)).value or false;
+                    # Probe _module.args for den arg names — a collision means
+                    # both den and the module system provide the same key.
+                    mArgs = moduleArgs.config._module.args or { };
+                    hasReal =
+                      (builtins.tryEval (builtins.seq (mArgs.${name} or null) (mArgs ? ${name}))).value or false;
                     p = policy name;
                   in
                   if !hasReal then
@@ -258,13 +266,14 @@ let
               {
                 warnings = collisionChecks;
               };
-            # Both advertise den args + trait args as optional so NixOS passes thunks.
+            # Wrapper advertises den args + trait args so NixOS passes thunks
+            # (shadowed lazily by den values without evaluation).
             advertisedArgs = remainingArgs // lib.genAttrs (denArgNames ++ traitArgNames) (_: true);
           in
           {
             module = lib.setFunctionArgs wrapper advertisedArgs;
             # Validator emitted separately via emitClasses
-            inherit validator advertisedArgs;
+            inherit validator validatorAdvertisedArgs;
             wrapped = true;
           };
 
@@ -429,7 +438,9 @@ let
         validatorEmit = fx.send "emit-class" {
           class = entry.key;
           identity = "${elemIdentity}/<collision-validator>";
-          module = lib.setFunctionArgs result.validator result.advertisedArgs;
+          module = lib.setFunctionArgs result.validator (
+            result.validatorAdvertisedArgs or result.advertisedArgs
+          );
           isContextDependent = true;
         };
       in
@@ -513,9 +524,16 @@ let
               rawValue
             else if builtins.isAttrs rawValue && rawValue ? __contentValues then
               let
-                vals = map (d: d.value) rawValue.__contentValues;
+                vals = builtins.filter (v: !(builtins.isAttrs v && v == { })) (
+                  map (d: d.value) rawValue.__contentValues
+                );
               in
-              if builtins.length vals == 1 then [ (builtins.head vals) ] else [ { imports = vals; } ]
+              if builtins.length vals == 0 then
+                [ { } ]
+              else if builtins.length vals == 1 then
+                [ (builtins.head vals) ]
+              else
+                [ { imports = vals; } ]
             else
               [ rawValue ];
           # Process each module element independently.
@@ -545,7 +563,9 @@ let
             validatorEmit = fx.send "emit-class" {
               class = k;
               identity = "${elemIdentity}/<collision-validator>";
-              module = lib.setFunctionArgs result.validator result.advertisedArgs;
+              module = lib.setFunctionArgs result.validator (
+                result.validatorAdvertisedArgs or result.advertisedArgs
+              );
               isContextDependent = true;
             };
           in

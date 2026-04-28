@@ -445,10 +445,14 @@
           aspectPolicy = null;
           globalPolicy = "error";
         };
-        # Call the validator with a colliding host value.
+        # Call the validator with a colliding host value via _module.args.
         # The validator throws inside warnings when error policy is active.
-        validatorFn = lib.setFunctionArgs result.validator result.advertisedArgs;
-        validatorResult = validatorFn { host = "from-specialArgs"; };
+        validatorFn = lib.setFunctionArgs result.validator result.validatorAdvertisedArgs;
+        validatorResult = validatorFn {
+          config._module.args = {
+            host = "from-specialArgs";
+          };
+        };
         # Force the warnings to trigger the throw.
         callResult = builtins.tryEval (builtins.deepSeq validatorResult.warnings true);
       in
