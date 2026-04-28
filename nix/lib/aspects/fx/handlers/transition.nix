@@ -82,19 +82,22 @@ let
       # original deferral will apply — this is intentional (constraints are global).
       fx.bind (fx.send "drain-deferred" scopedCtx) (
         satisfiable:
-        builtins.foldl' (
-          acc: deferred:
-          fx.bind acc (
-            prevResults:
-            let
-              deferredTagged = deferred.child // {
-                __scopeHandlers = scopeHandlers;
-                __ctxId = ctxId;
-              };
-            in
-            fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prevResults ++ [ resolved ]))
-          )
-        ) (fx.pure (results ++ [ childResult ])) satisfiable
+        fx.bind (fx.send "drain-dead-letters" null) (
+          _:
+          builtins.foldl' (
+            acc: deferred:
+            fx.bind acc (
+              prevResults:
+              let
+                deferredTagged = deferred.child // {
+                  __scopeHandlers = scopeHandlers;
+                  __ctxId = ctxId;
+                };
+              in
+              fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prevResults ++ [ resolved ]))
+            )
+          ) (fx.pure (results ++ [ childResult ])) satisfiable
+        )
       )
     );
 
