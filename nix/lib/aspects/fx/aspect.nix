@@ -406,41 +406,53 @@ let
           rawValue = aspect.${k};
           # aspectContentType wraps values with __contentValues/__provider.
           # Unwrap to recover the original module value for wrapClassModule.
-          module =
-            if builtins.isAttrs rawValue && rawValue ? __contentValues then
+          # Lists are coerced to per-element processing; bare values become singletons.
+          modules =
+            if builtins.isList rawValue then
+              rawValue
+            else if builtins.isAttrs rawValue && rawValue ? __contentValues then
               let
                 vals = map (d: d.value) rawValue.__contentValues;
               in
-              if builtins.length vals == 1 then builtins.head vals else { imports = vals; }
+              if builtins.length vals == 1 then [ (builtins.head vals) ] else [ { imports = vals; } ]
             else
-              rawValue;
-          result = wrapClassModule {
-            inherit
-              module
-              ctx
-              aspectPolicy
-              globalPolicy
-              ;
-            traitNames = traitRegistry;
-          };
-          mainEmit = fx.send "emit-class" {
-            class = k;
-            identity = nodeIdentity;
-            inherit (result) module;
-            isContextDependent =
-              result.wrapped || (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
-          };
-          validatorEmit = fx.send "emit-class" {
-            class = k;
-            identity = "${nodeIdentity}/<collision-validator>";
-            module = lib.setFunctionArgs result.validator result.advertisedArgs;
-            isContextDependent = true;
-          };
+              [ rawValue ];
+          # Process each module element independently.
+          indexed = lib.imap0 (idx: module: { inherit idx module; }) modules;
+          isMulti = builtins.length modules > 1;
         in
-        if result.unsatisfied or false then
-          [ ]
-        else
-          [ mainEmit ] ++ lib.optional (result ? validator) validatorEmit
+        lib.concatMap (
+          { idx, module }:
+          let
+            result = wrapClassModule {
+              inherit
+                module
+                ctx
+                aspectPolicy
+                globalPolicy
+                ;
+              traitNames = traitRegistry;
+            };
+            elemIdentity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
+            mainEmit = fx.send "emit-class" {
+              class = k;
+              identity = elemIdentity;
+              inherit (result) module;
+              isContextDependent =
+                result.wrapped || (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
+            };
+            validatorEmit = fx.send "emit-class" {
+              class = k;
+              identity = "${elemIdentity}/<collision-validator>";
+              module = lib.setFunctionArgs result.validator result.advertisedArgs;
+              isContextDependent = true;
+            };
+          in
+          if result.unsatisfied or false then
+            [ ]
+          else
+            [ mainEmit ] ++ lib.optional (result ? validator) validatorEmit
+        ) indexed
       ) classKeys
     );
 

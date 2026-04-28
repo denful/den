@@ -213,5 +213,101 @@
       }
     );
 
+    # List class key: multiple modules emitted from a single class key.
+    test-list-class-key = denTest (
+      { den, ... }:
+      let
+        self = {
+          name = "host";
+          meta = { };
+          nixos = [
+            { test-static = true; }
+            { test-static-2 = true; }
+          ];
+          includes = [ ];
+        };
+        result = den.lib.aspects.fx.pipeline.fxFullResolve {
+          class = "nixos";
+          inherit self;
+          ctx = { };
+        };
+      in
+      {
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expected = 2;
+      }
+    );
+
+    # List class key with mixed static + function modules.
+    # The function is a NixOS module function (takes config/lib/etc),
+    # not a den-context function. Both forms coexist in the same list.
+    test-list-class-key-mixed = denTest (
+      { den, ... }:
+      let
+        self = {
+          name = "host";
+          meta = { };
+          nixos = [
+            { test-static = true; }
+            (
+              { config, ... }:
+              {
+                networking.hostName = "from-fn";
+              }
+            )
+          ];
+          includes = [ ];
+        };
+        result = den.lib.aspects.fx.pipeline.fxFullResolve {
+          class = "nixos";
+          inherit self;
+          ctx = { };
+        };
+      in
+      {
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expected = 2;
+      }
+    );
+
+    # Outer parametric aspect with list class key.
+    test-parametric-with-list-class-key = denTest (
+      { den, ... }:
+      let
+        self = {
+          name = "host";
+          meta = { };
+          includes = [
+            {
+              name = "web";
+              meta = { };
+              __fn =
+                { host, ... }:
+                {
+                  nixos = [
+                    { networking.hostName = host; }
+                    { services.nginx.enable = true; }
+                  ];
+                };
+              __args = {
+                host = false;
+              };
+            }
+          ];
+        };
+        result = den.lib.aspects.fx.pipeline.fxFullResolve {
+          class = "nixos";
+          inherit self;
+          ctx = {
+            host = "igloo";
+          };
+        };
+      in
+      {
+        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expected = 2;
+      }
+    );
+
   };
 }
