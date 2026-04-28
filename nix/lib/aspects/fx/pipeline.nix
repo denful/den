@@ -123,6 +123,7 @@ let
     deferredTraits = _: { };
     consumedTraits = _: { };
     aspectPolicies = _: { };
+    forwardSpecs = _: [ ];
   };
 
   mkPipeline =
@@ -167,6 +168,59 @@ let
     }:
     mkPipeline { inherit class extraState; } { inherit self ctx; };
 
+  inherit (den.lib.aspects) normalizeRoot;
+
+  # Forward post-processing: for each registered forward spec, resolve the
+  # source aspect via sub-pipeline, wrap results via buildForwardAspect, and
+  # merge into the target class bucket.
+  #
+  # collectClassMods recursively extracts all intoClass modules from a
+  # forward aspect and its includes (mkAdapterAspect nests a companion
+  # mkDirectAspect in includes).
+  collectClassMods =
+    cls: aspect:
+    let
+      own = if aspect ? ${cls} then [ aspect.${cls} ] else [ ];
+      nested = builtins.concatMap (collectClassMods cls) (aspect.includes or [ ]);
+    in
+    own ++ nested;
+
+  # Returns { classImports, provideTo } with forwarded content merged.
+  applyForwardSpecs =
+    forwardSpecs: classImports:
+    builtins.foldl'
+      (
+        acc: spec:
+        let
+          normalizedSource = normalizeRoot spec.sourceAspect;
+          sub = runSubPipeline {
+            class = spec.fromClass;
+            self = normalizedSource;
+            ctx = spec.__resolveCtx;
+            extraState = {
+              aspectPolicies = spec.__aspectPolicies;
+            };
+          };
+          rawSourceModule = {
+            imports = sub.classImports.${spec.fromClass} or [ ];
+          };
+          sourceModule = spec.mapModule rawSourceModule;
+          forwardAspect = handlers.buildForwardAspect spec sourceModule;
+          newMods = collectClassMods spec.intoClass forwardAspect;
+        in
+        {
+          classImports = acc.classImports // {
+            ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
+          };
+          provideTo = acc.provideTo ++ sub.provideTo;
+        }
+      )
+      {
+        inherit classImports;
+        provideTo = [ ];
+      }
+      forwardSpecs;
+
   # Thin wrapper: runs sub-pipeline, materializes state thunks.
   # Each call site does its own post-processing.
   runSubPipeline =
@@ -186,10 +240,16 @@ let
           ;
       };
     in
+    let
+      rawClassImports = result.state.classImports null;
+      forwardSpecs = result.state.forwardSpecs null;
+      forwarded = applyForwardSpecs forwardSpecs rawClassImports;
+      pipelineProvideTo = (result.state.provideTo or (_: [ ])) null;
+    in
     {
-      classImports = result.state.classImports null;
+      inherit (forwarded) classImports;
       traits = result.state.traits null;
-      provideTo = (result.state.provideTo or (_: [ ])) null;
+      provideTo = pipelineProvideTo ++ forwarded.provideTo;
     };
 
   # Drop-in resolve shape: returns { imports = [...] }.
@@ -269,13 +329,20 @@ let
     if partialOkViolations != [ ] then
       throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
     else
+      let
+        rawClassImports = result.state.classImports null;
+        forwardSpecs = result.state.forwardSpecs null;
+        # forwarded.provideTo intentionally ignored — fxResolve never
+        # exposed provideTo (only returns { imports }). provideTo from
+        # forward sub-pipelines is handled by runSubPipeline callers.
+        forwarded = applyForwardSpecs forwardSpecs rawClassImports;
+      in
       {
         # Target class imports only — multi-class data accessible via
         # fxFullResolve (state.classImports null). Not exposed here because
         # fxResolve's return is used as a NixOS deferredModule by entity
         # types — extra attrs would error.
-        imports =
-          ((result.state.classImports null).${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
+        imports = (forwarded.classImports.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in
 {

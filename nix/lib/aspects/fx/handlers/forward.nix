@@ -1,16 +1,13 @@
 # Handles: emit-forward
-# Resolves forwarded source in a sub-pipeline (fxFullResolve) for state
-# isolation, wraps the result in an adapter aspect, and re-emits as an
-# include. Provide-to emissions from the sub-pipeline are spliced into
-# the parent's provideTo thunk chain for phase 2 distribution.
+# Registers forward spec in pipeline state with captured context.
+# Post-processing in pipeline.nix resolves sources and wraps results
+# via buildForwardAspect.
 {
   lib,
   den,
   ...
 }:
 let
-  fx = den.lib.fx;
-  inherit (den.lib.aspects) normalizeRoot;
 
   mkDirectAspect =
     {
@@ -201,60 +198,37 @@ let
     in
     base // body;
 
+  # Register forward spec in state with captured context for post-processing.
+  # Post-processing in pipeline.nix runs sub-pipelines and wraps results.
   forwardHandler = {
     "emit-forward" =
       { param, state }:
       let
         spec = param;
-        normalizedSource = normalizeRoot spec.sourceAspect;
-
-        # Propagate parent entity context (host, user, etc.) to the
-        # sub-pipeline so parametric includes can resolve. Sources with
-        # explicit context (fromCtx / __scopeHandlers) keep theirs;
-        # sources without context inherit parent entities (attrset
-        # values only -- scalars and functions like class/aspect-chain
-        # are pipeline-internal and excluded).
+        # Capture parent entity context at handler time for post-processing.
+        # Sources with explicit context (__scopeHandlers) keep theirs;
+        # sources without context inherit parent entities.
         parentCtx = (state.currentCtx or (_: { })) null;
         entityCtx = lib.filterAttrs (_: builtins.isAttrs) parentCtx;
         sourceScopeHandlers = spec.sourceAspect.__scopeHandlers or { };
         sourceCtx = den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers;
         hasOwnContext = sourceScopeHandlers != { };
         resolveCtx = if hasOwnContext then sourceCtx else entityCtx;
-
-        # Propagate aspect-included policies to sub-pipeline so
-        # policies registered in the parent pipeline (e.g., host-level
-        # policies) fire during sub-pipeline entity tree-walk.
         parentAspectPolicies = state.aspectPolicies or (_: { });
-        sub = den.lib.aspects.fx.pipeline.runSubPipeline {
-          class = spec.fromClass;
-          self = normalizedSource;
-          ctx = resolveCtx;
-          extraState = {
-            aspectPolicies = parentAspectPolicies;
-          };
+        enrichedSpec = spec // {
+          __resolveCtx = resolveCtx;
+          __aspectPolicies = parentAspectPolicies;
         };
-
-        rawSourceModule = {
-          imports = sub.classImports.${spec.fromClass} or [ ];
-        };
-        sourceModule = spec.mapModule rawSourceModule;
-        forwardAspect = buildForwardAspect spec sourceModule;
-
-        # provideTo is now a plain list (already materialized by runSubPipeline)
-        subProvideTo = sub.provideTo;
       in
       {
-        resume = fx.send "emit-include" {
-          child = forwardAspect;
-          idx = null;
-        };
+        resume = null;
         state = state // {
-          provideTo = _: ((state.provideTo or (_: [ ])) null) ++ subProvideTo;
+          forwardSpecs = x: (state.forwardSpecs x) ++ [ enrichedSpec ];
         };
       };
   };
 
 in
 {
-  inherit forwardHandler;
+  inherit forwardHandler buildForwardAspect;
 }
