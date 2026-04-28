@@ -6,7 +6,7 @@
 let
   fx = den.lib.fx;
   identity = den.lib.aspects.fx.identity;
-  inherit (den.lib.aspects.fx.handlers) constantHandler;
+  inherit (den.lib.aspects.fx.handlers) constantHandler emitCrossProvideShims;
   inherit (den.lib.aspects) isParametricWrapper isMeaningfulName;
 
   structuralKeysSet = lib.genAttrs [
@@ -751,29 +751,23 @@ let
     let
       scopeHandlers = aspect.__scopeHandlers or null;
       ctxId = aspect.__ctxId or null;
-      # Deprecation trace: warn when provides has non-self-provide keys.
-      # Self-provide (provides.${self.name}) is the established pattern — skip it.
-      aspectName = aspect.name or "<anon>";
-      providesKeys = builtins.filter (k: k != aspectName) (builtins.attrNames (aspect.provides or { }));
-      _ =
-        if providesKeys != [ ] then
-          builtins.trace "den: aspect '${aspectName}' uses 'provides.{${builtins.concatStringsSep "," providesKeys}}' — migrate to direct nesting" null
-        else
-          null;
       emitCtx = {
         __parentScopeHandlers = scopeHandlers;
         __parentCtxId = ctxId;
       };
       # Includes resolve before transitions so deferred parametric includes
       # drain when context widens during transitions.
-      childResolution = fx.bind (builtins.seq _ (emitSelfProvide aspect)) (
+      childResolution = fx.bind (emitSelfProvide aspect) (
         selfProvResults:
-        fx.bind (emitAspectPolicies aspect) (
+        fx.bind (emitCrossProvideShims aspect) (
           _:
-          fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
-            includeResults:
-            fx.bind (emitTransitions aspect) (
-              transitionResults: fx.pure (selfProvResults ++ includeResults ++ transitionResults)
+          fx.bind (emitAspectPolicies aspect) (
+            _:
+            fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
+              includeResults:
+              fx.bind (emitTransitions aspect) (
+                transitionResults: fx.pure (selfProvResults ++ includeResults ++ transitionResults)
+              )
             )
           )
         )
