@@ -84,15 +84,23 @@ in
               from = "foo";
               to = "bar";
               _core = true;
-              resolve = ctx: if ctx ? name then lib.singleton { shout = lib.toUpper ctx.name; } else [ ];
-              aspects = [
-                (
-                  { shout }:
-                  {
-                    my.names = [ "bar ${shout}" ];
-                  }
-                )
-              ];
+              __functor =
+                _: ctx:
+                let
+                  inherit (den.lib.policy) resolve include;
+                in
+                if ctx ? name then
+                  [
+                    (resolve { shout = lib.toUpper ctx.name; })
+                    (include (
+                      { shout }:
+                      {
+                        my.names = [ "bar ${shout}" ];
+                      }
+                    ))
+                  ]
+                else
+                  [ ];
             };
 
             den.aspects.foobar.includes = [

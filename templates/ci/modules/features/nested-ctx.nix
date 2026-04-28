@@ -12,15 +12,23 @@
         den.policies.test-root-to-flat = {
           from = "root";
           to = "flat";
-          resolve = ctx: if !(builtins.isAttrs ctx) then [ ] else [ ctx ];
-          aspects = [
-            (
-              { x }:
-              {
-                funny.names = [ x ];
-              }
-            )
-          ];
+          __functor =
+            _: ctx:
+            let
+              inherit (den.lib.policy) resolve include;
+            in
+            if !(builtins.isAttrs ctx) then
+              [ ]
+            else
+              [
+                (resolve ctx)
+                (include (
+                  { x }:
+                  {
+                    funny.names = [ x ];
+                  }
+                ))
+              ];
         };
         den.default.policies = [ "test-root-to-flat" ];
 
@@ -42,37 +50,69 @@
         ];
 
         imports = [
-          {
-            den.policies.test-root-to-leaf-a = {
-              from = "root";
-              to = "leaf";
-              resolve = _: [ { v = "a"; } ];
-            };
-          }
+          (
+            { den, ... }:
+            {
+              den.policies.test-root-to-leaf-a = {
+                from = "root";
+                to = "leaf";
+                __functor =
+                  _: _:
+                  let
+                    inherit (den.lib.policy) resolve;
+                  in
+                  [ (resolve { v = "a"; }) ];
+              };
+            }
+          )
 
-          {
-            den.policies.test-root-to-leaf-b = {
-              from = "root";
-              to = "leaf";
-              resolve = _: [ { v = "b"; } ];
-            };
-          }
+          (
+            { den, ... }:
+            {
+              den.policies.test-root-to-leaf-b = {
+                from = "root";
+                to = "leaf";
+                __functor =
+                  _: _:
+                  let
+                    inherit (den.lib.policy) resolve;
+                  in
+                  [ (resolve { v = "b"; }) ];
+              };
+            }
+          )
 
-          {
-            den.policies.test-root-to-leaf-c = {
-              from = "root";
-              to = "leaf";
-              resolve = _: [ { v = "c"; } ];
-            };
-          }
+          (
+            { den, ... }:
+            {
+              den.policies.test-root-to-leaf-c = {
+                from = "root";
+                to = "leaf";
+                __functor =
+                  _: _:
+                  let
+                    inherit (den.lib.policy) resolve;
+                  in
+                  [ (resolve { v = "c"; }) ];
+              };
+            }
+          )
 
-          {
-            den.policies.test-root-to-leaf-d = {
-              from = "root";
-              to = "leaf";
-              resolve = _: [ { v = "d"; } ];
-            };
-          }
+          (
+            { den, ... }:
+            {
+              den.policies.test-root-to-leaf-d = {
+                from = "root";
+                to = "leaf";
+                __functor =
+                  _: _:
+                  let
+                    inherit (den.lib.policy) resolve;
+                  in
+                  [ (resolve { v = "d"; }) ];
+              };
+            }
+          )
         ];
         den.default.policies = [
           "test-root-to-leaf-a"

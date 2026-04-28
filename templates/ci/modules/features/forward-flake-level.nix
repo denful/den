@@ -190,10 +190,13 @@
         den.policies.flake-system-to-host = {
           from = "flake-system";
           to = "host";
-          resolve =
-            ctx:
+          __functor =
+            _: ctx:
+            let
+              inherit (den.lib.policy) resolve;
+            in
             if ctx ? system then
-              map (host: { inherit host; }) (lib.attrValues den.hosts.${ctx.system})
+              map (host: resolve { inherit host; }) (lib.attrValues den.hosts.${ctx.system})
             else
               [ ];
         };

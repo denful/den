@@ -56,15 +56,23 @@ in
               from = "a";
               to = "b";
               _core = true;
-              resolve = ctx: if ctx ? v then [ { v = "${ctx.v}!"; } ] else [ ];
-              aspects = [
-                (
-                  { v }:
-                  {
-                    my.val = [ v ];
-                  }
-                )
-              ];
+              __functor =
+                _: ctx:
+                let
+                  inherit (den.lib.policy) resolve include;
+                in
+                if ctx ? v then
+                  [
+                    (resolve { v = "${ctx.v}!"; })
+                    (include (
+                      { v }:
+                      {
+                        my.val = [ v ];
+                      }
+                    ))
+                  ]
+                else
+                  [ ];
             };
           }
         );

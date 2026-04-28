@@ -22,31 +22,29 @@
         den.policies.test-parent-to-child = {
           from = "parent";
           to = "child";
-          resolve =
-            ctx:
+          __functor =
+            _: ctx:
+            let
+              inherit (den.lib.policy) resolve include;
+            in
             if !(ctx ? x) then
               [ ]
             else
               [
-                {
-                  inherit (ctx) x;
-                  y = "derived";
-                }
+                (resolve { y = "derived"; })
+                (include (
+                  { x, y }:
+                  {
+                    funny.names = [ "child-${y}" ];
+                  }
+                ))
+                (include (
+                  { x, y }:
+                  {
+                    funny.names = [ "parent-for-child-${x}-${y}" ];
+                  }
+                ))
               ];
-          aspects = [
-            (
-              { x, y }:
-              {
-                funny.names = [ "child-${y}" ];
-              }
-            )
-            (
-              { x, y }:
-              {
-                funny.names = [ "parent-for-child-${x}-${y}" ];
-              }
-            )
-          ];
         };
         den.default.policies = [ "test-parent-to-child" ];
 
@@ -79,35 +77,30 @@
         den.policies.test-src-to-dst = {
           from = "src";
           to = "dst";
-          resolve =
-            ctx:
+          __functor =
+            _: ctx:
+            let
+              inherit (den.lib.policy) resolve include;
+            in
             if !(ctx ? x) then
               [ ]
             else
               [
-                {
-                  inherit (ctx) x;
-                  i = 1;
-                }
-                {
-                  inherit (ctx) x;
-                  i = 2;
-                }
+                (resolve { i = 1; })
+                (resolve { i = 2; })
+                (include (
+                  { x, i }:
+                  {
+                    funny.names = [ "dst-${toString i}" ];
+                  }
+                ))
+                (include (
+                  { x, i }:
+                  {
+                    funny.names = [ "src-for-${x}-${toString i}" ];
+                  }
+                ))
               ];
-          aspects = [
-            (
-              { x, i }:
-              {
-                funny.names = [ "dst-${toString i}" ];
-              }
-            )
-            (
-              { x, i }:
-              {
-                funny.names = [ "src-for-${x}-${toString i}" ];
-              }
-            )
-          ];
         };
         den.default.policies = [ "test-src-to-dst" ];
 
@@ -142,15 +135,23 @@
         den.policies.test-src-to-dst-no-cross = {
           from = "src";
           to = "dst";
-          resolve = ctx: if !(ctx ? x) then [ ] else [ { y = ctx.x; } ];
-          aspects = [
-            (
-              { y }:
-              {
-                funny.names = [ "dst-${y}" ];
-              }
-            )
-          ];
+          __functor =
+            _: ctx:
+            let
+              inherit (den.lib.policy) resolve include;
+            in
+            if !(ctx ? x) then
+              [ ]
+            else
+              [
+                (resolve { y = ctx.x; })
+                (include (
+                  { y }:
+                  {
+                    funny.names = [ "dst-${y}" ];
+                  }
+                ))
+              ];
         };
         den.default.policies = [ "test-src-to-dst-no-cross" ];
 

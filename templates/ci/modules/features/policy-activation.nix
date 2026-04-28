@@ -27,7 +27,12 @@
         den.policies.test-act-src-to-tgt = {
           from = "test-act-src";
           to = "test-act-tgt";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         expr =
@@ -49,7 +54,12 @@
         den.policies.test-dflt-src-to-tgt = {
           from = "test-dflt-src";
           to = "test-dflt-tgt";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         den.default.policies = [ "test-dflt-src-to-tgt" ];
@@ -73,7 +83,12 @@
         den.policies.test-skind-host-pol = {
           from = "host";
           to = "user";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         # Schema-level: applies to all hosts via module merge
@@ -99,7 +114,12 @@
         den.policies.test-scope-host-only = {
           from = "host";
           to = "user";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         den.schema.host.policies = [ "test-scope-host-only" ];
@@ -125,7 +145,12 @@
         den.policies.test-inst-host-pol = {
           from = "host";
           to = "user";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         expr =
@@ -150,7 +175,12 @@
         den.policies.test-inst-scoped-pol = {
           from = "host";
           to = "user";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         # iceberg does NOT have the policy — only igloo does.

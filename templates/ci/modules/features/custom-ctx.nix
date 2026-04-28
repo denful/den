@@ -22,15 +22,23 @@
         den.policies.test-greeting-to-shout = {
           from = "greeting";
           to = "shout";
-          resolve = ctx: if !(ctx ? hello) then [ ] else [ { shout = lib.toUpper ctx.hello; } ];
-          aspects = [
-            (
-              { shout }:
-              {
-                funny.names = [ shout ];
-              }
-            )
-          ];
+          __functor =
+            _: ctx:
+            let
+              inherit (den.lib.policy) resolve include;
+            in
+            if !(ctx ? hello) then
+              [ ]
+            else
+              [
+                (resolve { shout = lib.toUpper ctx.hello; })
+                (include (
+                  { shout }:
+                  {
+                    funny.names = [ shout ];
+                  }
+                ))
+              ];
         };
         den.default.policies = [ "test-greeting-to-shout" ];
 

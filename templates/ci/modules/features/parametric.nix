@@ -125,16 +125,24 @@
         den.policies.a-to-b = {
           from = "a";
           to = "b";
-          resolve = ctx: if ctx ? host then [ { host = "${ctx.host}!"; } ] else [ ];
-          aspects = [
-            (
-              { host }:
-              {
-                funny.names = [ "b-${host}" ];
-              }
-            )
-            shared
-          ];
+          __functor =
+            _: ctx:
+            let
+              inherit (den.lib.policy) resolve include;
+            in
+            if ctx ? host then
+              [
+                (resolve { host = "${ctx.host}!"; })
+                (include (
+                  { host }:
+                  {
+                    funny.names = [ "b-${host}" ];
+                  }
+                ))
+                (include shared)
+              ]
+            else
+              [ ];
         };
         den.default.policies = [ "a-to-b" ];
 

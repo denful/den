@@ -41,10 +41,14 @@
         den.policies.host-to-into-target = {
           from = "host";
           to = "test-into-target";
-          resolve = _: [ { } ];
-          aspects = [
-            { nixos.users.users.tux.description = "from-into-target"; }
-          ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) include;
+            in
+            [
+              (include { nixos.users.users.tux.description = "from-into-target"; })
+            ];
         };
         den.default.policies = [ "host-to-into-target" ];
 

@@ -12,10 +12,14 @@
         den.policies.host-to-test-rel = {
           from = "host";
           to = "test-rel-target";
-          resolve = _: [ { } ];
-          aspects = [
-            { nixos.users.users.tux.description = "from-rel-target-stage"; }
-          ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) include;
+            in
+            [
+              (include { nixos.users.users.tux.description = "from-rel-target-stage"; })
+            ];
         };
 
         den.default.policies = [ "host-to-test-rel" ];
@@ -39,10 +43,14 @@
         den.policies.host-to-test-rel-coexist = {
           from = "host";
           to = "test-rel-coexist";
-          resolve = _: [ { } ];
-          aspects = [
-            { nixos.networking.hostName = "from-rel-stage"; }
-          ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) include;
+            in
+            [
+              (include { nixos.networking.hostName = "from-rel-stage"; })
+            ];
         };
 
         den.default.policies = [ "host-to-test-rel-coexist" ];

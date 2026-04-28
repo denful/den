@@ -69,7 +69,12 @@
         den.policies.test-insp-inactive = {
           from = "test-insp-src";
           to = "test-insp-tgt";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         # Not activated — should not appear in inspect
@@ -95,7 +100,12 @@
         den.policies.test-insp-act-pol = {
           from = "test-insp-act-src";
           to = "test-insp-act-tgt";
-          resolve = _: [ { } ];
+          __functor =
+            _: _:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            [ (resolve { }) ];
         };
 
         den.default.policies = [ "test-insp-act-pol" ];
