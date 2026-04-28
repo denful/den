@@ -392,6 +392,107 @@ let
       ) traitKeys
     );
 
+  emitClassFromDLQ =
+    entry:
+    let
+      rawValue = entry.rawValue;
+      modules =
+        if builtins.isList rawValue then
+          rawValue
+        else if builtins.isAttrs rawValue && rawValue ? __contentValues then
+          let
+            vals = map (d: d.value) rawValue.__contentValues;
+          in
+          if builtins.length vals == 1 then [ (builtins.head vals) ] else [ { imports = vals; } ]
+        else
+          [ rawValue ];
+      indexed = lib.imap0 (idx: module: { inherit idx module; }) modules;
+      isMulti = builtins.length modules > 1;
+    in
+    lib.concatMap (
+      { idx, module }:
+      let
+        result = wrapClassModule {
+          inherit module;
+          ctx = entry.ctx;
+          aspectPolicy = entry.aspectPolicy;
+          globalPolicy = entry.globalPolicy;
+          traitNames = traitRegistry;
+        };
+        elemIdentity = if isMulti then "${entry.aspectIdentity}[${toString idx}]" else entry.aspectIdentity;
+        mainEmit = fx.send "emit-class" {
+          class = entry.key;
+          identity = elemIdentity;
+          inherit (result) module;
+          isContextDependent = result.wrapped || entry.parametricResolved || entry.contextDependent;
+        };
+        validatorEmit = fx.send "emit-class" {
+          class = entry.key;
+          identity = "${elemIdentity}/<collision-validator>";
+          module = lib.setFunctionArgs result.validator result.advertisedArgs;
+          isContextDependent = true;
+        };
+      in
+      if result.unsatisfied or false then
+        [ ]
+      else
+        [ mainEmit ] ++ lib.optional (result ? validator) validatorEmit
+    ) indexed;
+
+  emitTraitFromDLQ =
+    entry:
+    let
+      rawValue = entry.rawValue;
+      contentValues =
+        if builtins.isAttrs rawValue && rawValue ? __contentValues then
+          rawValue.__contentValues
+        else
+          [
+            {
+              value = rawValue;
+              file = "<unknown>";
+            }
+          ];
+    in
+    map (
+      cv:
+      fx.send "emit-trait" {
+        trait = entry.key;
+        inherit (cv) value;
+        chain = entry.aspectIdentity;
+      }
+    ) contentValues;
+
+  drainDeadLettersHandler = {
+    "drain-dead-letters" =
+      { param, state }:
+      let
+        queue = (state.deadLetterQueue or (_: [ ])) null;
+      in
+      if queue == [ ] then
+        {
+          resume = null;
+          inherit state;
+        }
+      else
+        let
+          classified = builtins.partition (
+            entry: classRegistry ? ${entry.key} || traitRegistry ? ${entry.key}
+          ) queue;
+          matched = classified.right;
+          remaining = classified.wrong;
+          reEmits = lib.concatMap (
+            entry: if classRegistry ? ${entry.key} then emitClassFromDLQ entry else emitTraitFromDLQ entry
+          ) matched;
+        in
+        {
+          resume = fx.seq reEmits;
+          state = state // {
+            deadLetterQueue = _: remaining;
+          };
+        };
+  };
+
   emitClasses =
     aspect: classKeys: nodeIdentity:
     let
@@ -962,6 +1063,7 @@ in
 {
   inherit
     aspectToEffect
+    drainDeadLettersHandler
     emitIncludes
     emitTransitions
     emitSelfProvide
