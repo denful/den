@@ -107,8 +107,7 @@ in
           handlers = collectHandlers;
           state = { };
         } comp;
-        # myTrait is unregistered — with multi-class collection, unregistered
-        # keys default to class (they collect harmlessly into their own bucket).
+        # myTrait is unregistered — ignored by freeform-ignore
         emitted = builtins.filter (c: c.class == "myTrait") (result.state.classes or [ ]);
       in
       {
@@ -117,13 +116,13 @@ in
           resolvedOk = result.value.name == "dataTest";
         };
         expected = {
-          emitCount = 1;
+          emitCount = 0;
           resolvedOk = true;
         };
       }
     );
 
-    # Unregistered list keys default to class with multi-class collection.
+    # Unregistered list keys are ignored (not emitted as classes).
     test-plain-data-list = denTest (
       { den, ... }:
       let
@@ -145,7 +144,7 @@ in
       in
       {
         expr = builtins.length emitted;
-        expected = 2;
+        expected = 0;
       }
     );
 
