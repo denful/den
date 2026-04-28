@@ -156,7 +156,13 @@ let
               policyName = name;
               aspects = includeAspects;
               excludes = excludeAspects;
-              isolateFanOut = if builtins.isAttrs policy then policy.isolateFanOut or true else true;
+              isolateFanOut =
+                if resolveEffects != [ ] && ((builtins.head resolveEffects).__shared or false) then
+                  false
+                else if builtins.isAttrs policy then
+                  policy.isolateFanOut or true
+                else
+                  true;
             };
           };
       inherit state;

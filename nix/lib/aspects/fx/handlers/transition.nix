@@ -534,7 +534,8 @@ let
                         policyName = entry.name;
                         aspects = includeAspects;
                         excludes = excludeAspects;
-                        isolateFanOut = true;
+                        isolateFanOut =
+                          if resolveEffects != [ ] then !((builtins.head resolveEffects).__shared or false) else true;
                       };
                     }
                   ]
