@@ -107,8 +107,6 @@
             { host, ... }: lib.filter (h: h.hostName != host.hostName) (lib.attrValues den.hosts.x86_64-linux);
         };
 
-        den.schema.host.policies = [ "host-to-peers" ];
-
         expr =
           let
             result = den.lib.policyInspect.inspect {
@@ -137,7 +135,6 @@
     test-doc-policy-inspect-shape = denTest (
       { den, lib, ... }:
       {
-        den.default.policies = [ "host-to-users" ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         expr =

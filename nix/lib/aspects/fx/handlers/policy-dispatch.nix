@@ -13,7 +13,6 @@ let
   inherit (den.lib.synthesizePolicies)
     ctxSatisfies
     resolveArgsSatisfied
-    activePoliciesFor
     ;
   inherit (den.lib.policyTypes)
     isNewStylePolicy
@@ -58,9 +57,7 @@ let
       # can destructure trait data (entity context wins on collision).
       traits = (state.traits or (_: { })) null;
       resolveCtx = traits // ctx;
-      active = activePoliciesFor entityKind ctx;
-      isActive = active ? ${name};
-      scopeOk = isActive && ctxSatisfies policy.from ctx;
+      scopeOk = ctxSatisfies policy.from ctx;
       argsOk = scopeOk && resolveArgsSatisfied policy resolveCtx;
       rawResult = if argsOk then policy.resolve resolveCtx else [ ];
       targets =

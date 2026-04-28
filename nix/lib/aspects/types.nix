@@ -385,12 +385,6 @@ let
             default = { };
           };
 
-          policies = lib.mkOption {
-            description = "Policy names activated when this aspect is the resolution root.";
-            type = lib.types.listOf lib.types.str;
-            default = [ ];
-          };
-
           policyFns = lib.mkOption {
             description = "Named policy functions included when this aspect resolves.";
             type = lib.types.lazyAttrsOf lib.types.raw;

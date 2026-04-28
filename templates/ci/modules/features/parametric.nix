@@ -144,8 +144,6 @@
             else
               [ ];
         };
-        den.default.policies = [ "a-to-b" ];
-
         expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { host = "v"; }));
         expected = 6;
       }

@@ -46,8 +46,6 @@
                 ))
               ];
         };
-        den.default.policies = [ "test-parent-to-child" ];
-
         expr = funnyNames (den.lib.resolveEntity "parent" { x = "hello"; });
         expected = [
           "child-derived"
@@ -102,8 +100,6 @@
                 ))
               ];
         };
-        den.default.policies = [ "test-src-to-dst" ];
-
         expr = funnyNames (den.lib.resolveEntity "src" { x = "a"; });
         expected = [
           "a"
@@ -153,8 +149,6 @@
                 ))
               ];
         };
-        den.default.policies = [ "test-src-to-dst-no-cross" ];
-
         expr = funnyNames (den.lib.resolveEntity "src" { x = "val"; });
         expected = [
           "dst-val"

@@ -22,8 +22,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-test-rel" ];
-
         expr = igloo.users.users.tux.description;
         expected = "from-rel-target-stage";
       }
@@ -53,8 +51,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-test-rel-coexist" ];
-
         expr = [
           igloo.networking.hostName
           igloo.users.users.tux.description
@@ -75,8 +71,6 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.schema.test-scoped.includes = [ ];
-
-        den.default.policies = [ "host-to-test-scoped" ];
 
         den.policies.host-to-test-scoped = {
           from = "host";
@@ -112,8 +106,6 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.schema.test-handler-target.includes = [ ];
-
-        den.default.policies = [ "host-to-test-handler" ];
 
         den.policies.host-to-test-handler = {
           from = "host";

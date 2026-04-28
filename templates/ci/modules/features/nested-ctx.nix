@@ -30,8 +30,6 @@
                 ))
               ];
         };
-        den.default.policies = [ "test-root-to-flat" ];
-
         expr = funnyNames (den.lib.resolveEntity "root" { x = "hi"; });
         expected = [ "hi" ];
       }
@@ -113,12 +111,6 @@
               };
             }
           )
-        ];
-        den.default.policies = [
-          "test-root-to-leaf-a"
-          "test-root-to-leaf-b"
-          "test-root-to-leaf-c"
-          "test-root-to-leaf-d"
         ];
 
         expr = funnyNames (den.lib.resolveEntity "root" { });

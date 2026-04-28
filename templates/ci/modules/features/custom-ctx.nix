@@ -40,8 +40,6 @@
                 ))
               ];
         };
-        den.default.policies = [ "test-greeting-to-shout" ];
-
         expr = funnyNames (den.lib.resolveEntity "greeting" { hello = "world"; });
         expected = [
           "WORLD"

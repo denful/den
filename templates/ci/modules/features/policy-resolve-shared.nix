@@ -69,8 +69,6 @@
           to = "tgt";
           __functor = _: { v, ... }: [ (den.lib.policy.resolve.shared { v = "${v}!"; }) ];
         };
-        den.default.policies = [ "src-to-tgt" ];
-
         expr = funnyNames (den.lib.resolveEntity "src" { v = "x"; });
         expected = [
           "src-x"
@@ -105,8 +103,6 @@
           to = "tgt2";
           __functor = _: { v, ... }: [ (den.lib.policy.resolve { v = "${v}!"; }) ];
         };
-        den.default.policies = [ "src2-to-tgt2" ];
-
         expr = funnyNames (den.lib.resolveEntity "src2" { v = "x"; });
         expected = [
           "src2-x"

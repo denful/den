@@ -1,4 +1,4 @@
-# Returns null when no policies match (callers decide default).
+# Policy scope and argument checking utilities.
 {
   lib,
   den,
@@ -53,45 +53,9 @@ let
     in
     builtins.all requiredArgSatisfied requiredArgs;
 
-  # Build the set of active policies for a given stage and context.
-  #
-  # Activation levels (all additive):
-  #   1. Core: policy._core == true → always active
-  #   2. Default: policy name in den.default.policies → active globally
-  #   3. Schema-kind + entity-instance: entity.policies (merged by module system)
-  #      Setting den.schema.host.policies = [...] applies to all hosts.
-  #      Setting den.hosts.*.policies = [...] applies to one host.
-  #      Both merge via the NixOS module system into entity.policies.
-  #
-  # Context-aware: when ctx contains entity attrsets, their `.policies`
-  # lists are checked for activation.
-  #
-  # A policy not activated at any level is excluded from the returned set.
-  activePoliciesFor =
-    kind: ctx:
-    let
-      policies = den.policies or { };
-      defaultActive = den.default.policies or [ ];
-      # Entity activation: read from the entity in context.
-      # Schema-kind policies merge into entity.policies via module system.
-      isEntityKind = builtins.elem kind schemaKinds;
-      entityActive =
-        if isEntityKind && ctx ? ${kind} && builtins.isAttrs ctx.${kind} then
-          ctx.${kind}.policies or [ ]
-        else
-          [ ];
-      activeNames = defaultActive ++ entityActive;
-      activeSet = lib.genAttrs activeNames (_: true);
-    in
-    lib.filterAttrs (
-      name: policy:
-      (if builtins.isAttrs policy then policy._core or false else false) || activeSet ? ${name}
-    ) policies;
-
 in
 {
   inherit
-    activePoliciesFor
     ctxSatisfies
     resolveArgsSatisfied
     ;

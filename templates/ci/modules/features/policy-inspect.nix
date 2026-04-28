@@ -6,10 +6,6 @@
     test-inspect-core-policies = denTest (
       { den, lib, ... }:
       {
-        den.default.policies = [
-          "host-to-users"
-          "host-to-default"
-        ];
         den.hosts.x86_64-linux.igloo = {
           users.tux = { };
         };
@@ -43,7 +39,6 @@
     test-inspect-returns-targets = denTest (
       { den, lib, ... }:
       {
-        den.default.policies = [ "host-to-users" ];
         den.hosts.x86_64-linux.igloo = {
           users.tux = { };
           users.alice = { };
@@ -64,14 +59,14 @@
       }
     );
 
-    # inspect only returns active policies.
-    test-inspect-respects-activation = denTest (
+    # All registered policies appear in inspect (no activation gating).
+    test-inspect-all-policies-visible = denTest (
       { den, ... }:
       {
         den.schema.test-insp-src.includes = [ ];
         den.schema.test-insp-tgt.includes = [ ];
 
-        den.policies.test-insp-inactive = {
+        den.policies.test-insp-pol = {
           from = "test-insp-src";
           to = "test-insp-tgt";
           __functor =
@@ -82,7 +77,6 @@
             [ (resolve { }) ];
         };
 
-        # Not activated — should not appear in inspect
         expr =
           let
             result = den.lib.policyInspect.inspect {
@@ -90,39 +84,7 @@
               context = { };
             };
           in
-          result ? test-insp-inactive;
-        expected = false;
-      }
-    );
-
-    # inspect shows activated policy.
-    test-inspect-shows-activated = denTest (
-      { den, ... }:
-      {
-        den.schema.test-insp-act-src.includes = [ ];
-        den.schema.test-insp-act-tgt.includes = [ ];
-
-        den.policies.test-insp-act-pol = {
-          from = "test-insp-act-src";
-          to = "test-insp-act-tgt";
-          __functor =
-            _: _:
-            let
-              inherit (den.lib.policy) resolve;
-            in
-            [ (resolve { }) ];
-        };
-
-        den.default.policies = [ "test-insp-act-pol" ];
-
-        expr =
-          let
-            result = den.lib.policyInspect.inspect {
-              kind = "test-insp-act-src";
-              context = { };
-            };
-          in
-          result ? test-insp-act-pol;
+          result ? test-insp-pol;
         expected = true;
       }
     );
@@ -131,7 +93,6 @@
     test-inspect-sibling-routing = denTest (
       { den, ... }:
       {
-        den.default.policies = [ "test-insp-sibling" ];
         den.policies.test-insp-sibling = {
           from = "host";
           to = "host";

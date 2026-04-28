@@ -79,8 +79,6 @@
                 ))
               ];
         };
-        den.default.policies = [ "test-greet-to-other" ];
-
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "nix"; });
         expected = [
           "hello-nix"
@@ -127,8 +125,6 @@
                 ))
               ];
         };
-        den.default.policies = [ "test-greet-to-yell" ];
-
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });
         expected = [
           "WORLD"
@@ -219,12 +215,6 @@
                 ))
               ];
         };
-        den.default.policies = [
-          "test-greet-to-yell-fn"
-          "test-greet-to-size"
-          "test-greet-to-num"
-        ];
-
         expr = funnyNames (den.lib.resolveEntity "greet" { who = "world"; });
         expected = [
           "5"

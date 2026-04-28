@@ -33,7 +33,6 @@
         den.hosts.x86_64-linux.igloo = { };
         den.hosts.x86_64-linux.iceberg = { };
 
-        den.default.policies = [ "test-host-to-peer" ];
         den.policies.test-host-to-peer = {
           from = "host";
           to = "host";

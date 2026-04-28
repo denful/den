@@ -7,7 +7,7 @@
   ...
 }:
 let
-  inherit (den.lib.synthesizePolicies) ctxSatisfies resolveArgsSatisfied activePoliciesFor;
+  inherit (den.lib.synthesizePolicies) ctxSatisfies resolveArgsSatisfied;
   inherit (den.lib.policyTypes) isNewStylePolicy;
 
   # Schema entity kinds — used to derive targetKey from new-style resolve bindings.
@@ -68,14 +68,14 @@ let
   inspect =
     { kind, context }:
     let
-      active = activePoliciesFor kind context;
+      policies = den.policies or { };
       matching = lib.filterAttrs (
         _: policy:
         let
           from = if builtins.isAttrs policy then policy.from or null else null;
         in
         (from == kind || from == null) && ctxSatisfies kind context && resolveArgsSatisfied policy context
-      ) active;
+      ) policies;
     in
     lib.mapAttrs (
       _name: policy:

@@ -50,8 +50,6 @@
               (include { nixos.users.users.tux.description = "from-into-target"; })
             ];
         };
-        den.default.policies = [ "host-to-into-target" ];
-
         expr = igloo.users.users.tux.description;
         expected = "from-into-target";
       }

@@ -31,8 +31,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-test-flat" ];
-
         expr = igloo.networking.hostName;
         expected = "igloo";
       }
@@ -69,8 +67,6 @@
               ))
             ];
         };
-
-        den.default.policies = [ "host-to-test-twolayer" ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -112,8 +108,6 @@
               })
             ];
         };
-
-        den.default.policies = [ "host-to-test-multi-args" ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";
@@ -178,8 +172,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-test-functor" ];
-
         expr = igloo.networking.hostName;
         expected = "from-functor";
       }
@@ -220,8 +212,6 @@
               })
             ];
         };
-
-        den.default.policies = [ "host-to-test-funcargs" ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo";
@@ -299,8 +289,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-test-static-flat" ];
-
         expr = igloo.networking.hostName;
         expected = "igloo";
       }
@@ -340,8 +328,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-test-cross-param" ];
-
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";
       }
@@ -380,8 +366,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-test-paren" ];
-
         expr = igloo.networking.hostName;
         expected = "igloo";
       }
@@ -418,8 +402,6 @@
               })
             ];
         };
-
-        den.default.policies = [ "host-to-test-full-apply" ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -489,8 +471,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-collision-err-int" ];
-
         # The throw from the validator propagates when any part of igloo
         # config that depends on warnings is accessed. tryEval catches it.
         expr = !(builtins.tryEval (builtins.seq igloo.warnings null)).success;
@@ -527,8 +507,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-collision-dw" ];
-
         # Den value wins — host is the den entity, not the string.
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -564,8 +542,6 @@
             ];
         };
 
-        den.default.policies = [ "host-to-collision-global" ];
-
         expr = igloo.networking.hostName;
         expected = "igloo";
       }
@@ -599,8 +575,6 @@
               })
             ];
         };
-
-        den.default.policies = [ "host-to-collision-cw" ];
 
         expr = igloo.networking.hostName;
         expected = "from-module-system";
