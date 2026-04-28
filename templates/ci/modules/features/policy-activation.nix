@@ -2,10 +2,14 @@
 {
   flake.tests.policy-activation = {
 
-    # Core policies (_core = true) appear in activePoliciesFor without opt-in.
-    test-core-policies-always-active = denTest (
+    # Core policies require explicit activation via den.default.policies.
+    test-core-policies-active-via-default = denTest (
       { den, ... }:
       {
+        den.default.policies = [
+          "host-to-users"
+          "host-to-default"
+        ];
         den.hosts.x86_64-linux.igloo = { };
 
         expr =

@@ -137,6 +137,7 @@
     test-doc-policy-inspect-shape = denTest (
       { den, lib, ... }:
       {
+        den.default.policies = [ "host-to-users" ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         expr =

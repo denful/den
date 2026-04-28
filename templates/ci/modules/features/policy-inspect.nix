@@ -6,6 +6,10 @@
     test-inspect-core-policies = denTest (
       { den, lib, ... }:
       {
+        den.default.policies = [
+          "host-to-users"
+          "host-to-default"
+        ];
         den.hosts.x86_64-linux.igloo = {
           users.tux = { };
         };
@@ -39,6 +43,7 @@
     test-inspect-returns-targets = denTest (
       { den, lib, ... }:
       {
+        den.default.policies = [ "host-to-users" ];
         den.hosts.x86_64-linux.igloo = {
           users.tux = { };
           users.alice = { };
