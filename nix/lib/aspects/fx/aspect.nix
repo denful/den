@@ -421,33 +421,22 @@ let
     lib.concatMap (
       { idx, module }:
       let
-        result = wrapClassModule {
+        elemIdentity = if isMulti then "${entry.aspectIdentity}[${toString idx}]" else entry.aspectIdentity;
+        isFunc = builtins.isFunction module;
+      in
+      [
+        (fx.send "emit-class" {
+          class = entry.key;
+          identity = elemIdentity;
           inherit module;
           ctx = entry.ctx;
           aspectPolicy = entry.aspectPolicy;
           globalPolicy = entry.globalPolicy;
           traitNames = traitRegistry;
-        };
-        elemIdentity = if isMulti then "${entry.aspectIdentity}[${toString idx}]" else entry.aspectIdentity;
-        mainEmit = fx.send "emit-class" {
-          class = entry.key;
-          identity = elemIdentity;
-          inherit (result) module;
-          isContextDependent = result.wrapped || entry.parametricResolved || entry.contextDependent;
-        };
-        validatorEmit = fx.send "emit-class" {
-          class = entry.key;
-          identity = "${elemIdentity}/<collision-validator>";
-          module = lib.setFunctionArgs result.validator (
-            result.validatorAdvertisedArgs or result.advertisedArgs
-          );
-          isContextDependent = true;
-        };
-      in
-      if result.unsatisfied or false then
-        [ ]
-      else
-        [ mainEmit ] ++ lib.optional (result ? validator) validatorEmit
+          __rawEntry = true;
+          isContextDependent = isFunc || entry.parametricResolved || entry.contextDependent;
+        })
+      ]
     ) indexed;
 
   emitTraitFromDLQ =
@@ -543,7 +532,13 @@ let
         lib.concatMap (
           { idx, module }:
           let
-            result = wrapClassModule {
+            elemIdentity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
+            isFunc = builtins.isFunction module;
+          in
+          [
+            (fx.send "emit-class" {
+              class = k;
+              identity = elemIdentity;
               inherit
                 module
                 ctx
@@ -551,28 +546,11 @@ let
                 globalPolicy
                 ;
               traitNames = traitRegistry;
-            };
-            elemIdentity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
-            mainEmit = fx.send "emit-class" {
-              class = k;
-              identity = elemIdentity;
-              inherit (result) module;
+              __rawEntry = true;
               isContextDependent =
-                result.wrapped || (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
-            };
-            validatorEmit = fx.send "emit-class" {
-              class = k;
-              identity = "${elemIdentity}/<collision-validator>";
-              module = lib.setFunctionArgs result.validator (
-                result.validatorAdvertisedArgs or result.advertisedArgs
-              );
-              isContextDependent = true;
-            };
-          in
-          if result.unsatisfied or false then
-            [ ]
-          else
-            [ mainEmit ] ++ lib.optional (result ? validator) validatorEmit
+                isFunc || (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
+            })
+          ]
         ) indexed
       ) classKeys
     );
