@@ -9,7 +9,8 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects) isParametricWrapper;
   inherit (den.lib.aspects.fx.identity) pathKey aspectPath;
-  inherit (den.lib.policyTypes) policyFnArgs;
+  inherit (den.lib.policyTypes) policyFnArgs isNewStylePolicy;
+  inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
 
   # Schema entity kinds — used to derive targetKey from aspect-policy resolve bindings.
   schemaKinds = builtins.filter (
@@ -432,39 +433,107 @@ let
         manualIntoFn = param.intoFn;
         manualTransitions = if manualIntoFn != null then flattenInto (manualIntoFn currentCtx) [ ] else [ ];
 
-        # Per-policy effects: send each matching policy effect, collect targets.
-        policyEffects = den.lib.aspects.fx.handlers.policyEffectNamesFor sourceEntityKind;
+        # Direct policy dispatch: iterate den.policies, check scope + args, call directly.
+        traits = (state.traits or (_: { })) null;
+        resolveCtx = traits // currentCtx;
+        allPolicies = den.policies or { };
 
-        dispatchPolicies = builtins.foldl' (
-          acc: effectName:
-          fx.bind acc (
-            prevTransitions:
-            fx.bind
-              (fx.send effectName {
-                ctx = currentCtx;
-                entityKind = sourceEntityKind;
-              })
-              (
-                result:
-                if result == null then
-                  fx.pure prevTransitions
-                else
+        policyTransitions = lib.concatLists (
+          lib.mapAttrsToList (
+            name: policy:
+            let
+              isNew = isNewStylePolicy policy;
+
+              # Scope check: from field filters by entity kind.
+              fromKind = if builtins.isAttrs policy then policy.from or null else null;
+              scopeOk = fromKind == null || fromKind == sourceEntityKind;
+              argsOk = scopeOk && resolveArgsSatisfied policy resolveCtx;
+            in
+            if !argsOk then
+              [ ]
+            else if isNew then
+              let
+                rawEffects =
                   let
-                    targetPath = lib.splitString "." result.routing.targetKey;
+                    result = policy resolveCtx;
                   in
-                  fx.pure (
-                    prevTransitions
-                    ++ [
-                      {
-                        path = targetPath;
-                        contexts = result.targets;
-                        routing = result.routing;
-                      }
-                    ]
-                  )
-              )
-          )
-        ) (fx.pure manualTransitions) policyEffects;
+                  if builtins.isList result then result else [ result ];
+                resolveEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
+                ) rawEffects;
+                includeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "include"
+                ) rawEffects;
+                excludeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
+                ) rawEffects;
+                explicitTo = if builtins.isAttrs policy then policy.to or null else null;
+                firstResolveKeys =
+                  if resolveEffects != [ ] then builtins.attrNames (builtins.head resolveEffects).value else [ ];
+                targetKey =
+                  if explicitTo != null then
+                    explicitTo
+                  else
+                    lib.findFirst (k: builtins.elem k schemaKinds) (
+                      if firstResolveKeys != [ ] then builtins.head firstResolveKeys else sourceEntityKind
+                    ) firstResolveKeys;
+                targets = map (e: e.value) resolveEffects;
+                includeAspects = map (e: e.value) includeEffects;
+                excludeAspects = map (e: e.value) excludeEffects;
+                isolateFanOut =
+                  if resolveEffects != [ ] && ((builtins.head resolveEffects).__shared or false) then
+                    false
+                  else if builtins.isAttrs policy then
+                    policy.isolateFanOut or true
+                  else
+                    true;
+              in
+              if rawEffects == [ ] then
+                [ ]
+              else
+                [
+                  {
+                    path = lib.splitString "." targetKey;
+                    contexts = targets;
+                    routing = {
+                      from = sourceEntityKind;
+                      to = targetKey;
+                      inherit targetKey;
+                      policyName = name;
+                      aspects = includeAspects;
+                      excludes = excludeAspects;
+                      inherit isolateFanOut;
+                    };
+                  }
+                ]
+            else
+              # Old-style policy: attrset with from/to/resolve fields.
+              let
+                rawResult = policy.resolve resolveCtx;
+                targets = if builtins.isList rawResult then rawResult else [ rawResult ];
+                targetKey = if policy.as or "" != "" then policy.as else policy.to;
+              in
+              if targets == [ ] then
+                [ ]
+              else
+                [
+                  {
+                    path = lib.splitString "." targetKey;
+                    contexts = targets;
+                    routing = {
+                      inherit (policy) from to;
+                      inherit targetKey;
+                      policyName = name;
+                      aspects = policy.aspects or [ ];
+                      excludes = [ ];
+                      isolateFanOut = policy.isolateFanOut or false;
+                    };
+                  }
+                ]
+          ) allPolicies
+        );
+
+        dispatchPolicies = fx.pure (manualTransitions ++ policyTransitions);
 
         # Dispatch aspect-included policies from state.aspectPolicies.
         # Processes resolve effects as transitions. Include/exclude effects

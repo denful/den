@@ -13,7 +13,6 @@
       let
         hostSelf = {
           name = "host";
-          into = _: { };
           provides = { };
           nixos = {
             networking.hostName = "igloo";
@@ -32,9 +31,7 @@
         result = den.lib.aspects.fx.pipeline.fxResolve {
           class = "nixos";
           self = hostSelf;
-          ctx = {
-            host = "igloo";
-          };
+          ctx = { };
         };
       in
       {
