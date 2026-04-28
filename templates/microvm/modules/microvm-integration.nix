@@ -6,6 +6,8 @@
   ...
 }:
 let
+  inherit (den.lib.policy) resolve include;
+
   # extends den.schema.host with MicroVM specific options
   extendHostSchema =
     { host, ... }:
@@ -106,29 +108,39 @@ in
   ];
 
   den.policies = {
-    host-to-microvm-host = {
-      from = "host";
-      to = "microvm-host";
-      resolve = { host, ... }: lib.optional (host.microvm.guests != [ ]) { inherit host; };
-      aspects = [
-        (
-          { host }:
-          {
-            ${host.class}.imports = [ host.microvm.hostModule ];
-          }
-        )
-      ];
-    };
-    microvm-host-to-microvm-guest = {
-      from = "microvm-host";
-      to = "microvm-guest";
-      resolve =
-        { host, ... }:
-        map (vm: {
-          inherit host vm;
-        }) host.microvm.guests;
-      aspects = [ microvmGuestProvide ];
-    };
+    host-to-microvm-host =
+      {
+        __entityKind ? null,
+        host,
+        ...
+      }:
+      if __entityKind != "host" then
+        [ ]
+      else
+        lib.optionals (host.microvm.guests != [ ]) [
+          (resolve.to "microvm-host" { inherit host; })
+          (include (
+            { host }:
+            {
+              ${host.class}.imports = [ host.microvm.hostModule ];
+            }
+          ))
+        ];
+    microvm-host-to-microvm-guest =
+      {
+        __entityKind ? null,
+        host,
+        ...
+      }:
+      if __entityKind != "microvm-host" then
+        [ ]
+      else
+        lib.concatMap (vm: [
+          (resolve.to "microvm-guest" {
+            inherit host vm;
+          })
+          (include microvmGuestProvide)
+        ]) host.microvm.guests;
   };
   den.schema.microvm-host.includes = [ ];
   den.schema.microvm-guest.includes = [ ];

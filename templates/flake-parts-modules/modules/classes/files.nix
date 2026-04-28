@@ -1,10 +1,16 @@
-{ inputs, ... }:
+{ den, inputs, ... }:
+let
+  inherit (den.lib.policy) resolve;
+in
 {
   imports = [ inputs.files.flakeModules.default ];
-  den.policies.flake-parts-to-flake-parts-system-files = {
-    _core = true;
-    from = "flake-parts";
-    to = "flake-parts-system";
-    resolve = _: [ { fromClass = _: "files"; } ];
-  };
+  den.policies.flake-parts-to-flake-parts-system-files =
+    {
+      __entityKind ? null,
+      ...
+    }:
+    if __entityKind != "flake-parts" then
+      [ ]
+    else
+      [ (resolve.to "flake-parts-system" { fromClass = _: "files"; }) ];
 }
