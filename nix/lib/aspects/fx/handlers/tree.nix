@@ -325,6 +325,17 @@ let
         };
   };
 
+  deadLetterHandler = {
+    "dead-letter" =
+      { param, state }:
+      {
+        resume = null;
+        state = state // {
+          deadLetterQueue = x: (state.deadLetterQueue x) ++ [ param ];
+        };
+      };
+  };
+
 in
 {
   inherit
@@ -335,5 +346,6 @@ in
     dispatchPolicyIncludesHandler
     deferredIncludeHandler
     drainDeferredHandler
+    deadLetterHandler
     ;
 }
