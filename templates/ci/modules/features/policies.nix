@@ -9,23 +9,20 @@
 
         den.schema.test-rel-target.includes = [ ];
 
-        den.policies.host-to-test-rel = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }:
-            let
-              inherit (den.lib.policy) include;
-            in
-            if __entityKind != "host" then
-              [ ]
-            else
-              [
-                (include { nixos.users.users.tux.description = "from-rel-target-stage"; })
-              ];
-        };
+        den.policies.host-to-test-rel =
+          {
+            __entityKind ? null,
+            ...
+          }:
+          let
+            inherit (den.lib.policy) include;
+          in
+          if __entityKind != "host" then
+            [ ]
+          else
+            [
+              (include { nixos.users.users.tux.description = "from-rel-target-stage"; })
+            ];
 
         expr = igloo.users.users.tux.description;
         expected = "from-rel-target-stage";
@@ -43,23 +40,20 @@
 
         den.default.nixos.users.users.tux.description = "from-default-stage";
 
-        den.policies.host-to-test-rel-coexist = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }:
-            let
-              inherit (den.lib.policy) include;
-            in
-            if __entityKind != "host" then
-              [ ]
-            else
-              [
-                (include { nixos.networking.hostName = "from-rel-stage"; })
-              ];
-        };
+        den.policies.host-to-test-rel-coexist =
+          {
+            __entityKind ? null,
+            ...
+          }:
+          let
+            inherit (den.lib.policy) include;
+          in
+          if __entityKind != "host" then
+            [ ]
+          else
+            [
+              (include { nixos.networking.hostName = "from-rel-stage"; })
+            ];
 
         expr = [
           igloo.networking.hostName

@@ -11,8 +11,8 @@ let
   resolveArgsSatisfied =
     policy: ctx:
     let
-      inherit (den.lib.policyTypes) isNewStylePolicy policyFnArgs;
-      fargs = if isNewStylePolicy policy then policyFnArgs policy else lib.functionArgs policy.resolve;
+      inherit (den.lib.policyTypes) policyFnArgs;
+      fargs = policyFnArgs policy;
       requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
       # Trait names are satisfiable — traits get merged into resolve context
       # by policy-dispatch before calling policy.resolve.

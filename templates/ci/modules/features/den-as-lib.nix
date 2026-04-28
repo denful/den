@@ -80,31 +80,28 @@ in
         module =
           { den, lib, ... }:
           {
-            den.policies.foo-to-bar = {
-              __functor =
-                _:
-                {
-                  __entityKind ? null,
-                  ...
-                }@ctx:
-                let
-                  inherit (den.lib.policy) resolve include;
-                in
-                if __entityKind != "foo" then
-                  [ ]
-                else if ctx ? name then
-                  [
-                    (resolve.to "bar" { shout = lib.toUpper ctx.name; })
-                    (include (
-                      { shout }:
-                      {
-                        my.names = [ "bar ${shout}" ];
-                      }
-                    ))
-                  ]
-                else
-                  [ ];
-            };
+            den.policies.foo-to-bar =
+              {
+                __entityKind ? null,
+                ...
+              }@ctx:
+              let
+                inherit (den.lib.policy) resolve include;
+              in
+              if __entityKind != "foo" then
+                [ ]
+              else if ctx ? name then
+                [
+                  (resolve.to "bar" { shout = lib.toUpper ctx.name; })
+                  (include (
+                    { shout }:
+                    {
+                      my.names = [ "bar ${shout}" ];
+                    }
+                  ))
+                ]
+              else
+                [ ];
 
             den.aspects.foobar.includes = [
               # resolveEntity results carry __scopeHandlers which are

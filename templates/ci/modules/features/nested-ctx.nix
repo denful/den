@@ -9,29 +9,26 @@
       {
         den.schema.flat.includes = [ ];
 
-        den.policies.test-root-to-flat = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }@ctx:
-            let
-              inherit (den.lib.policy) resolve include;
-            in
-            if __entityKind != "root" then
-              [ ]
-            else
-              [
-                (resolve.to "flat" ctx)
-                (include (
-                  { x }:
-                  {
-                    funny.names = [ x ];
-                  }
-                ))
-              ];
-        };
+        den.policies.test-root-to-flat =
+          {
+            __entityKind ? null,
+            ...
+          }@ctx:
+          let
+            inherit (den.lib.policy) resolve include;
+          in
+          if __entityKind != "root" then
+            [ ]
+          else
+            [
+              (resolve.to "flat" ctx)
+              (include (
+                { x }:
+                {
+                  funny.names = [ x ];
+                }
+              ))
+            ];
         expr = funnyNames (den.lib.resolveEntity "root" { x = "hi"; });
         expected = [ "hi" ];
       }
@@ -53,72 +50,60 @@
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-a = {
-                __functor =
-                  _:
-                  {
-                    __entityKind ? null,
-                    ...
-                  }:
-                  let
-                    inherit (den.lib.policy) resolve;
-                  in
-                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "a"; }) ];
-              };
+              den.policies.test-root-to-leaf-a =
+                {
+                  __entityKind ? null,
+                  ...
+                }:
+                let
+                  inherit (den.lib.policy) resolve;
+                in
+                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "a"; }) ];
             }
           )
 
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-b = {
-                __functor =
-                  _:
-                  {
-                    __entityKind ? null,
-                    ...
-                  }:
-                  let
-                    inherit (den.lib.policy) resolve;
-                  in
-                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "b"; }) ];
-              };
+              den.policies.test-root-to-leaf-b =
+                {
+                  __entityKind ? null,
+                  ...
+                }:
+                let
+                  inherit (den.lib.policy) resolve;
+                in
+                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "b"; }) ];
             }
           )
 
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-c = {
-                __functor =
-                  _:
-                  {
-                    __entityKind ? null,
-                    ...
-                  }:
-                  let
-                    inherit (den.lib.policy) resolve;
-                  in
-                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "c"; }) ];
-              };
+              den.policies.test-root-to-leaf-c =
+                {
+                  __entityKind ? null,
+                  ...
+                }:
+                let
+                  inherit (den.lib.policy) resolve;
+                in
+                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "c"; }) ];
             }
           )
 
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-d = {
-                __functor =
-                  _:
-                  {
-                    __entityKind ? null,
-                    ...
-                  }:
-                  let
-                    inherit (den.lib.policy) resolve;
-                  in
-                  if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "d"; }) ];
-              };
+              den.policies.test-root-to-leaf-d =
+                {
+                  __entityKind ? null,
+                  ...
+                }:
+                let
+                  inherit (den.lib.policy) resolve;
+                in
+                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "d"; }) ];
             }
           )
         ];

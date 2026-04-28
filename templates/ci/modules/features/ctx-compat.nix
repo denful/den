@@ -38,23 +38,20 @@
 
         den.schema.test-into-target.includes = [ ];
 
-        den.policies.host-to-into-target = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }:
-            let
-              inherit (den.lib.policy) include;
-            in
-            if __entityKind != "host" then
-              [ ]
-            else
-              [
-                (include { nixos.users.users.tux.description = "from-into-target"; })
-              ];
-        };
+        den.policies.host-to-into-target =
+          {
+            __entityKind ? null,
+            ...
+          }:
+          let
+            inherit (den.lib.policy) include;
+          in
+          if __entityKind != "host" then
+            [ ]
+          else
+            [
+              (include { nixos.users.users.tux.description = "from-into-target"; })
+            ];
         expr = igloo.users.users.tux.description;
         expected = "from-into-target";
       }

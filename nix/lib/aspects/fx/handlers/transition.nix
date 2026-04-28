@@ -443,12 +443,7 @@ let
                 includeAspects = map (e: e.value) includeEffects;
                 excludeAspects = map (e: e.value) excludeEffects;
                 isolateFanOut =
-                  if resolveEffects != [ ] && ((builtins.head resolveEffects).__shared or false) then
-                    false
-                  else if builtins.isAttrs policy then
-                    policy.isolateFanOut or true
-                  else
-                    true;
+                  if resolveEffects != [ ] && ((builtins.head resolveEffects).__shared or false) then false else true;
               in
               if rawEffects == [ ] then
                 [ ]

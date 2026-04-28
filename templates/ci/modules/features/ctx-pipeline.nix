@@ -22,18 +22,15 @@ let
       lib.recursiveUpdate baseStage (
         if i + 1 < n then
           {
-            den.policies."${name}-to-${next}" = {
-              __functor =
-                _:
-                {
-                  __entityKind ? null,
-                  ...
-                }@ctx:
-                if __entityKind != name || !(ctx ? x) then
-                  [ ]
-                else
-                  [ (den.lib.policy.resolve.to next { x = "${ctx.x}+${toString i}"; }) ];
-            };
+            den.policies."${name}-to-${next}" =
+              {
+                __entityKind ? null,
+                ...
+              }@ctx:
+              if __entityKind != name || !(ctx ? x) then
+                [ ]
+              else
+                [ (den.lib.policy.resolve.to next { x = "${ctx.x}+${toString i}"; }) ];
           }
         else
           { }
@@ -53,29 +50,26 @@ let
         )
       ];
       den.schema.leaf.includes = [ ];
-      den.policies.root-to-leaf = {
-        __functor =
-          _:
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
-          let
-            inherit (den.lib.policy) resolve include;
-          in
-          if __entityKind != "root" || !(ctx ? x) then
-            [ ]
-          else
-            map (i: resolve.to "leaf" { x = "${ctx.x}-${toString i}"; }) (lib.genList (i: i) n)
-            ++ [
-              (include (
-                { x }:
-                {
-                  funny.names = [ "leaf-${x}" ];
-                }
-              ))
-            ];
-      };
+      den.policies.root-to-leaf =
+        {
+          __entityKind ? null,
+          ...
+        }@ctx:
+        let
+          inherit (den.lib.policy) resolve include;
+        in
+        if __entityKind != "root" || !(ctx ? x) then
+          [ ]
+        else
+          map (i: resolve.to "leaf" { x = "${ctx.x}-${toString i}"; }) (lib.genList (i: i) n)
+          ++ [
+            (include (
+              { x }:
+              {
+                funny.names = [ "leaf-${x}" ];
+              }
+            ))
+          ];
     };
 
   mkCrossProviders =
@@ -96,35 +90,32 @@ let
           den.policies = lib.listToAttrs (
             map (tgt: {
               name = "src-to-${tgt}";
-              value = {
-                __functor =
-                  _:
-                  {
-                    __entityKind ? null,
-                    ...
-                  }@ctx:
-                  let
-                    inherit (den.lib.policy) resolve include;
-                  in
-                  if __entityKind != "src" || !(ctx ? v) then
-                    [ ]
-                  else
-                    [
-                      (resolve.to tgt { v = "${ctx.v}!"; })
-                      (include (
-                        { v }:
-                        {
-                          funny.names = [ "${tgt}-${v}" ];
-                        }
-                      ))
-                      (include (
-                        { v }:
-                        {
-                          funny.names = [ "cross-${tgt}-${v}" ];
-                        }
-                      ))
-                    ];
-              };
+              value =
+                {
+                  __entityKind ? null,
+                  ...
+                }@ctx:
+                let
+                  inherit (den.lib.policy) resolve include;
+                in
+                if __entityKind != "src" || !(ctx ? v) then
+                  [ ]
+                else
+                  [
+                    (resolve.to tgt { v = "${ctx.v}!"; })
+                    (include (
+                      { v }:
+                      {
+                        funny.names = [ "${tgt}-${v}" ];
+                      }
+                    ))
+                    (include (
+                      { v }:
+                      {
+                        funny.names = [ "cross-${tgt}-${v}" ];
+                      }
+                    ))
+                  ];
             }) targetNames
           );
         };

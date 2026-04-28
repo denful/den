@@ -8,15 +8,14 @@
 }:
 let
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
-  inherit (den.lib.policyTypes) isNewStylePolicy;
 
-  # Schema entity kinds — used to derive targetKey from new-style resolve bindings.
+  # Schema entity kinds — used to derive targetKey from resolve bindings.
   schemaKinds = builtins.filter (
     n: n != "conf" && !(lib.hasPrefix "_" n) && (den.schema.${n}.isEntity or false)
   ) (builtins.attrNames (den.schema or { }));
 
-  # Inspect a new-style policy: call as function, parse typed effects.
-  inspectNewStyle =
+  # Inspect a policy: call as function, parse typed effects.
+  inspectPolicy =
     policy: context: kind:
     let
       rawEffects = policy context;
@@ -52,21 +51,6 @@ let
       routing = if kind == targetKey then "sibling" else "child";
     };
 
-  # Inspect an old-style policy: access from/to/resolve fields directly.
-  inspectOldStyle =
-    policy: context:
-    let
-      targetKey = if policy.as != "" then policy.as else policy.to;
-      rawResult = policy.resolve context;
-      targets = if builtins.isList rawResult then rawResult else [ rawResult ];
-    in
-    {
-      inherit targetKey targets;
-      inherit (policy) from to;
-      as = policy.as;
-      routing = if policy.from == policy.to then "sibling" else "child";
-    };
-
   # Inspect all applicable policies for a given entity kind and context.
   # Returns: { policyName = { targetKey, targets, from, to, as, routing }; }
   #
@@ -80,11 +64,7 @@ let
       ) policies;
     in
     lib.mapAttrs (
-      _name: policy:
-      if isNewStylePolicy policy then
-        inspectNewStyle policy (context // { __entityKind = kind; }) kind
-      else
-        inspectOldStyle policy context
+      _name: policy: inspectPolicy policy (context // { __entityKind = kind; }) kind
     ) matching;
 in
 {

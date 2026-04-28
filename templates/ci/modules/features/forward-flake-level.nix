@@ -187,21 +187,18 @@
             };
         };
 
-        den.policies.flake-system-to-host = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }@ctx:
-            let
-              inherit (den.lib.policy) resolve;
-            in
-            if __entityKind != "flake-system" || !(ctx ? system) then
-              [ ]
-            else
-              map (host: resolve { inherit host; }) (lib.attrValues den.hosts.${ctx.system});
-        };
+        den.policies.flake-system-to-host =
+          {
+            __entityKind ? null,
+            ...
+          }@ctx:
+          let
+            inherit (den.lib.policy) resolve;
+          in
+          if __entityKind != "flake-system" || !(ctx ? system) then
+            [ ]
+          else
+            map (host: resolve { inherit host; }) (lib.attrValues den.hosts.${ctx.system});
 
         expr = {
           package = lib.getName config.flake.packages.x86_64-linux.hello;

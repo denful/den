@@ -122,30 +122,27 @@
           shared
         ];
         den.schema.b.includes = [ ];
-        den.policies.a-to-b = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }@ctx:
-            let
-              inherit (den.lib.policy) resolve include;
-            in
-            if __entityKind != "a" || !(ctx ? host) then
-              [ ]
-            else
-              [
-                (resolve.to "b" { host = "${ctx.host}!"; })
-                (include (
-                  { host }:
-                  {
-                    funny.names = [ "b-${host}" ];
-                  }
-                ))
-                (include shared)
-              ];
-        };
+        den.policies.a-to-b =
+          {
+            __entityKind ? null,
+            ...
+          }@ctx:
+          let
+            inherit (den.lib.policy) resolve include;
+          in
+          if __entityKind != "a" || !(ctx ? host) then
+            [ ]
+          else
+            [
+              (resolve.to "b" { host = "${ctx.host}!"; })
+              (include (
+                { host }:
+                {
+                  funny.names = [ "b-${host}" ];
+                }
+              ))
+              (include shared)
+            ];
         expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { host = "v"; }));
         expected = 6;
       }

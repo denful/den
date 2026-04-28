@@ -52,31 +52,28 @@ in
         ev = evalPure (
           { den, ... }:
           {
-            den.policies.a-to-b = {
-              __functor =
-                _:
-                {
-                  __entityKind ? null,
-                  ...
-                }@ctx:
-                let
-                  inherit (den.lib.policy) resolve include;
-                in
-                if __entityKind != "a" then
-                  [ ]
-                else if ctx ? v then
-                  [
-                    (resolve.to "b" { v = "${ctx.v}!"; })
-                    (include (
-                      { v }:
-                      {
-                        my.val = [ v ];
-                      }
-                    ))
-                  ]
-                else
-                  [ ];
-            };
+            den.policies.a-to-b =
+              {
+                __entityKind ? null,
+                ...
+              }@ctx:
+              let
+                inherit (den.lib.policy) resolve include;
+              in
+              if __entityKind != "a" then
+                [ ]
+              else if ctx ? v then
+                [
+                  (resolve.to "b" { v = "${ctx.v}!"; })
+                  (include (
+                    { v }:
+                    {
+                      my.val = [ v ];
+                    }
+                  ))
+                ]
+              else
+                [ ];
           }
         );
         entity = ev.config.den.lib.resolveEntity "a" { v = "x"; };

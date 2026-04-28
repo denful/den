@@ -64,18 +64,15 @@
         den.schema.test-insp-src.includes = [ ];
         den.schema.test-insp-tgt.includes = [ ];
 
-        den.policies.test-insp-pol = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }:
-            let
-              inherit (den.lib.policy) resolve;
-            in
-            if __entityKind != "test-insp-src" then [ ] else [ (resolve.to "test-insp-tgt" { }) ];
-        };
+        den.policies.test-insp-pol =
+          {
+            __entityKind ? null,
+            ...
+          }:
+          let
+            inherit (den.lib.policy) resolve;
+          in
+          if __entityKind != "test-insp-src" then [ ] else [ (resolve.to "test-insp-tgt" { }) ];
 
         expr =
           let
@@ -93,18 +90,15 @@
     test-inspect-sibling-routing = denTest (
       { den, ... }:
       {
-        den.policies.test-insp-sibling = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              ...
-            }:
-            let
-              inherit (den.lib.policy) resolve;
-            in
-            if __entityKind != "host" then [ ] else [ (resolve.to "host" { }) ];
-        };
+        den.policies.test-insp-sibling =
+          {
+            __entityKind ? null,
+            ...
+          }:
+          let
+            inherit (den.lib.policy) resolve;
+          in
+          if __entityKind != "host" then [ ] else [ (resolve.to "host" { }) ];
 
         den.hosts.x86_64-linux.igloo = { };
 

@@ -33,21 +33,18 @@
         den.hosts.x86_64-linux.igloo = { };
         den.hosts.x86_64-linux.iceberg = { };
 
-        den.policies.test-host-to-peer = {
-          __functor =
-            _:
-            {
-              __entityKind ? null,
-              host,
-              ...
-            }:
-            if __entityKind != "host" then
-              [ ]
-            else
-              map (h: den.lib.policy.resolve { host = h; }) (
-                lib.filter (h: h.name != host.name) (lib.attrValues (den.hosts.x86_64-linux or { }))
-              );
-        };
+        den.policies.test-host-to-peer =
+          {
+            __entityKind ? null,
+            host,
+            ...
+          }:
+          if __entityKind != "host" then
+            [ ]
+          else
+            map (h: den.lib.policy.resolve { host = h; }) (
+              lib.filter (h: h.name != host.name) (lib.attrValues (den.hosts.x86_64-linux or { }))
+            );
 
         expr =
           let
