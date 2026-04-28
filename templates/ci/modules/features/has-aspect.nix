@@ -360,7 +360,7 @@
       }
     );
 
-    # ─── Group E: mutual-provider / provides chains ───────────────────
+    # ─── Group E: policyFn-injected aspects ───────────────────────────
 
     # policyFn-injected aspects deliver config but are NOT visible to
     # hasAspect (runs its own pipeline without parent policyFn state).

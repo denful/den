@@ -88,65 +88,9 @@ let
       (if builtins.isAttrs policy then policy._core or false else false) || activeSet ? ${name}
     ) policies;
 
-  # NOTE: synthesize does not filter by activation model — all matching
-  # policies fire. The pipeline uses per-policy named effects for
-  # activation-aware dispatch. synthesize/mergePolicyInto are retained
-  # for the policy-inspect utility and potential future direct callers.
-  synthesize =
-    entityKind:
-    let
-      policies = den.policies or { };
-      # Only old-style policies have from/to/resolve fields. Skip new-style (functions and __functor attrsets).
-      oldStyle = builtins.filter (p: den.lib.policyTypes.isOldStylePolicy p) (
-        builtins.attrValues policies
-      );
-      matching = lib.filter (policy: policy.from == entityKind) oldStyle;
-    in
-    if matching == [ ] then
-      null
-    else
-      rCtx:
-      builtins.foldl' (
-        acc: policy:
-        let
-          scopeOk = ctxSatisfies policy.from rCtx;
-          argsOk = resolveArgsSatisfied policy rCtx;
-          targets = if scopeOk && argsOk then policy.resolve rCtx else [ ];
-          targetList =
-            if builtins.isList targets then
-              targets
-            else
-              builtins.trace
-                "den: policy ${policy.from}->${policy.to}: resolve returned a non-list; coercing to singleton"
-                [ targets ];
-          key = if policy.as != "" then policy.as else policy.to;
-        in
-        if targetList == [ ] then acc else acc // { ${key} = (acc.${key} or [ ]) ++ targetList; }
-      ) { } matching;
-
-  # Merge an existing into function with synthesized policies for an entity kind.
-  # Existing into takes priority — policies fill in new target keys.
-  mergePolicyInto =
-    entityKind: existingInto:
-    let
-      policyInto = synthesize entityKind;
-    in
-    if existingInto != null && policyInto != null then
-      rCtx:
-      let
-        existing = existingInto rCtx;
-        fromPolicies = policyInto rCtx;
-      in
-      existing // (builtins.removeAttrs fromPolicies (builtins.attrNames existing))
-    else if existingInto != null then
-      existingInto
-    else
-      policyInto;
 in
 {
   inherit
-    synthesize
-    mergePolicyInto
     activePoliciesFor
     ctxSatisfies
     resolveArgsSatisfied

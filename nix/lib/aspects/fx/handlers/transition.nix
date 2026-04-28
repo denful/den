@@ -552,7 +552,7 @@ let
               # Merge transitions targeting the same path — multiple policies
               # may produce separate contexts for the same target stage.
               # Concatenating contexts restores the fan-out behavior that
-              # the old mergePolicyInto path provided naturally.
+              # separate policy dispatch provides naturally.
               # Routing metadata is kept from the first transition per path —
               # same-path policies must have consistent from/to pairs.
               # Merge transitions targeting the same path + aspect set.

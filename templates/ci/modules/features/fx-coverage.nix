@@ -1,6 +1,6 @@
 # Tests covering pipeline features identified in coverage audit.
-# Groups: deferred drain, depth limits, normalizeRoot, mergePolicyInto,
-# tagParametricResult, mutual-standalone-home, composeHandlers effectful
+# Groups: deferred drain, depth limits, normalizeRoot,
+# tagParametricResult, self-provide scopeHandlers, composeHandlers effectful
 # resume, resolveFanOut, isAnon dedup, policy handler edge cases.
 {
   denTest,
@@ -337,41 +337,7 @@
       }
     );
 
-    # --- 5. mergePolicyInto ---
-
-    test-mergePolicyInto-no-policies-no-existing = denTest (
-      { den, ... }:
-      {
-        expr = den.lib.synthesizePolicies.mergePolicyInto "nonexistent-stage" null;
-        expected = null;
-      }
-    );
-
-    test-mergePolicyInto-only-existing = denTest (
-      { den, ... }:
-      let
-        existingInto = _: {
-          user = [ { } ];
-        };
-        result = den.lib.synthesizePolicies.mergePolicyInto "nonexistent-stage" existingInto;
-      in
-      {
-        # When no policies match, returns existingInto unchanged
-        expr = (result { }) ? user;
-        expected = true;
-      }
-    );
-
-    test-mergePolicyInto-only-policy = denTest (
-      { den, ... }:
-      {
-        # host-to-users policy exists in batteries — synthesize for "host"
-        expr = (den.lib.synthesizePolicies.mergePolicyInto "host" null) != null;
-        expected = true;
-      }
-    );
-
-    # --- 6. tagParametricResult (scope handler merge) ---
+    # --- 5. tagParametricResult (scope handler merge) ---
 
     test-scope-handler-merge-parent-and-child = denTest (
       { den, igloo, ... }:
@@ -397,16 +363,13 @@
       }
     );
 
-    # --- 7. mutual-standalone-home __scopeHandlers ---
+    # --- 7. self-provide __scopeHandlers ---
 
-    # Test that mutual-standalone-home injects __scopeHandlers so the
-    # host-named provider can resolve { host } in the home pipeline.
-    test-mutual-standalone-home-host-provider = denTest (
+    # Test that self-provide (provides.${name}) propagates __scopeHandlers
+    # so the host-named provider can resolve { host } in the home pipeline.
+    test-self-provide-host-provider = denTest (
       { den, ... }:
       let
-        # Directly test the mutual-provider's standalone-home path.
-        # mutual-standalone-home returns home.aspect.provides.${hostName}
-        # tagged with __scopeHandlers from the home entity's bound host.
         home = den.homes.x86_64-linux."tux@igloo";
         provResult = home.aspect.provides.igloo or null;
       in
