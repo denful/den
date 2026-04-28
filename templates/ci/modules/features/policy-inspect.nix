@@ -131,8 +131,8 @@
     test-inspect-sibling-routing = denTest (
       { den, ... }:
       {
+        den.default.policies = [ "test-insp-sibling" ];
         den.policies.test-insp-sibling = {
-          _core = true;
           from = "host";
           to = "host";
           as = "peer";

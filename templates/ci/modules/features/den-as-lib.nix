@@ -83,7 +83,6 @@ in
             den.policies.foo-to-bar = {
               from = "foo";
               to = "bar";
-              _core = true;
               __functor =
                 _: ctx:
                 let

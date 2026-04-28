@@ -55,7 +55,6 @@ in
             den.policies.a-to-b = {
               from = "a";
               to = "b";
-              _core = true;
               __functor =
                 _: ctx:
                 let
