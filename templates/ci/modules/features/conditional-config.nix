@@ -43,7 +43,7 @@
           users.tux.hasBar = true;
         };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -78,7 +78,7 @@
         };
 
         den.default.homeManager.home.stateVersion = "25.11";
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {

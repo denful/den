@@ -28,7 +28,7 @@
     in
     {
       den.hosts.x86_64-linux.igloo.users.tux = { };
-      den.aspects.igloo.policyFns.to-users =
+      den.aspects.igloo.policies.to-users =
         { host, user, ... }:
         [
           (include {

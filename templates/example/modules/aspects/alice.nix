@@ -51,8 +51,8 @@
         home.packages = [ pkgs.htop ];
       };
 
-    # <user>.policyFns.<name>, aspect-included policy
-    policyFns.to-igloo =
+    # <user>.policies.<name>, aspect-included policy
+    policies.to-igloo =
       { host, user, ... }:
       lib.optional (host.name == "igloo") (
         den.lib.policy.include {

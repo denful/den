@@ -16,7 +16,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -44,7 +44,7 @@
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
 
         den.aspects.base.homeManager.home.keyboard.model = "denkbd";
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -71,11 +71,11 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
 
-        # Named aspect for dedup: policyFns fire per-user but the option
+        # Named aspect for dedup: policies fire per-user but the option
         # declaration should only be included once.
         den.aspects.igloo-foo-option.homeManager.options.foo = lib.mkOption { default = "foo"; };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include den.aspects.igloo-foo-option)
@@ -97,7 +97,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
 
-        # NOTE: Under policyFns, use perHost for host-only options
+        # NOTE: Under policies, use perHost for host-only options
         den.aspects.igloo.includes = [
           (den.lib.perHost {
             nixos.options.foo = lib.mkOption { default = "foo"; };

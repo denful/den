@@ -11,8 +11,8 @@
         environment.systemPackages = [ pkgs.hello ];
       };
 
-    # <host>.policyFns.<name>, aspect-included policy
-    policyFns.to-alice =
+    # <host>.policies.<name>, aspect-included policy
+    policies.to-alice =
       { host, user, ... }:
       lib.optional (user.name == "alice") (
         den.lib.policy.include {

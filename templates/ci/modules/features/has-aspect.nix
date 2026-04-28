@@ -379,7 +379,7 @@
     );
 
     # policyFn-injected aspects on the user's own aspect ARE visible
-    # to hasAspect because the user aspect's policyFns are registered
+    # to hasAspect because the user aspect's policies are registered
     # during the hasAspect pipeline run.
     test-E-present-via-user-policyFn = denTest (
       { den, lib, ... }:
@@ -389,7 +389,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.aspects.tux.policyFns.self-inject =
+        den.aspects.tux.policies.self-inject =
           { host, user, ... }:
           [
             (include {
@@ -412,7 +412,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -439,7 +439,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.aspects.tux.policyFns.to-hosts =
+        den.aspects.tux.policies.to-hosts =
           { host, user, ... }:
           [
             (include {

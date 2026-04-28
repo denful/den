@@ -90,7 +90,7 @@
           ];
         };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -147,7 +147,7 @@
           ];
         };
         den.aspects.helper.includes = [ den.aspects.second-with-owned ];
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -191,7 +191,7 @@
           ];
         };
         den.aspects.helper.includes = [ den.aspects.second.provides.with-owned ];
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {

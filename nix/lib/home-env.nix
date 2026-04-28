@@ -55,7 +55,7 @@ let
     };
 
   # Self-contained battery: host → user routing via aspect-included policy.
-  # The battery is an aspect with policyFns — include it in den.schema.host.includes
+  # The battery is an aspect with policies — include it in den.schema.host.includes
   # and its policy fires during host resolution without separate den.policies registration.
   makeHomeEnv =
     {
@@ -112,7 +112,7 @@ let
     in
     {
       battery = {
-        policyFns."host-to-${ctxName}-users" = policyFn;
+        policies."host-to-${ctxName}-users" = policyFn;
       };
 
       hostConf = hostOptions {

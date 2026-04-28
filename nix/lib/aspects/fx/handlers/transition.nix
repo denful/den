@@ -161,7 +161,7 @@ let
         class = targetClass;
         self = tagged;
         ctx = scopedCtx;
-        # Propagate aspect-included policies so policyFns from
+        # Propagate aspect-included policies so policies from
         # parent pipeline fire in isolated fan-out sub-pipelines.
         extraState = {
           inherit aspectPolicies;
@@ -489,7 +489,7 @@ let
         # Dispatch aspect-included policies from state.aspectPolicies.
         # Processes resolve effects as transitions. Include/exclude effects
         # travel WITH the transition when resolves exist (so they're injected
-        # into the child entity's resolution). Include-only policyFns are
+        # into the child entity's resolution). Include-only policies are
         # handled during tree-walk by dispatch-policy-includes (in aspect.nix).
         dispatchAspectPolicies =
           prevTransitions:
@@ -536,8 +536,8 @@ let
                 includeAspects = map (e: e.value) includeEffects;
                 excludeAspects = map (e: e.value) excludeEffects;
               in
-              # Only create transitions for policyFns with resolve effects.
-              # Include-only policyFns are handled by dispatch-policy-includes.
+              # Only create transitions for policies with resolve effects.
+              # Include-only policies are handled by dispatch-policy-includes.
               if resolveEffects == [ ] then
                 fx.pure transitions
               else

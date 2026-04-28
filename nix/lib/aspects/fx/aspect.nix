@@ -16,7 +16,7 @@ let
     "includes"
     "provides"
     "policies"
-    "policyFns"
+    "policies"
     "into"
     "traits"
     "classes"
@@ -660,12 +660,12 @@ let
     // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
     // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
 
-  # Emit register-aspect-policy for each entry in aspect.policyFns.
+  # Emit register-aspect-policy for each entry in aspect.policies.
   # Each policy is stored with ownerIdentity for exclusion rollback.
   emitAspectPolicies =
     aspect:
     let
-      policies = aspect.policyFns or { };
+      policies = aspect.policies or { };
       aspectName = aspect.name or "<anon>";
       nodeIdentity = identity.pathKey (identity.aspectPath aspect);
     in

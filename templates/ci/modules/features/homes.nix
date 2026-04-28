@@ -74,7 +74,7 @@
           home.keyboard.model = if args ? osConfig then "os-bound" else "standalone";
         };
 
-        den.aspects.tux.policyFns.to-igloo =
+        den.aspects.tux.policies.to-igloo =
           { home, ... }:
           lib.optional (home.hostName == "igloo") (include {
             homeManager.home.keyboard.layout = "enthium";

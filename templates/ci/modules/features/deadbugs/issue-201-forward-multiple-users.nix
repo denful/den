@@ -22,7 +22,7 @@
           pingu = { };
         };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {

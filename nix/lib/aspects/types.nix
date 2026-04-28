@@ -385,7 +385,7 @@ let
             default = { };
           };
 
-          policyFns = lib.mkOption {
+          policies = lib.mkOption {
             description = "Named policy functions included when this aspect resolves.";
             type = lib.types.lazyAttrsOf lib.types.raw;
             default = { };

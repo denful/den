@@ -46,7 +46,7 @@
           pingu = { };
         };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -82,7 +82,7 @@
           pingu = { };
         };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -157,7 +157,7 @@
           pingu = { };
         };
 
-        den.aspects.igloo.policyFns.to-users =
+        den.aspects.igloo.policies.to-users =
           { host, user, ... }:
           [
             (include {
@@ -287,13 +287,13 @@
           carl = { };
         };
 
-        den.aspects.tux.policyFns.to-users =
+        den.aspects.tux.policies.to-users =
           { host, user, ... }:
           lib.optional (user.name != "tux") (include {
             homeManager.programs.vim.enable = true;
           });
 
-        den.aspects.tux.policyFns.to-alice =
+        den.aspects.tux.policies.to-alice =
           { host, user, ... }:
           lib.optional (user.name == "alice") (include {
             homeManager.programs.tmux.enable = true;

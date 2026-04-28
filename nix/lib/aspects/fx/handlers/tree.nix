@@ -228,7 +228,7 @@ let
   # Called by emitTransitions BEFORE into-transition so injected aspects
   # participate in entity resolution (visible to class forwarding sub-pipelines).
   #
-  # Only processes policyFns that return NO resolve effects (include/exclude only).
+  # Only processes policies that return NO resolve effects (include/exclude only).
   # PolicyFns with resolve effects are handled by dispatchAspectPolicies in
   # transition.nix — their includes travel with the transition's routing.aspects
   # so they're injected into the child entity's resolution scope.
@@ -236,11 +236,11 @@ let
   # Called by emitTransitions BEFORE into-transition so injected aspects
   # participate in entity resolution (visible to class forwarding sub-pipelines).
   #
-  # Only processes policyFns that return NO resolve effects (include/exclude only).
+  # Only processes policies that return NO resolve effects (include/exclude only).
   # PolicyFns with resolve effects are handled by dispatchAspectPolicies in
   # transition.nix — their includes travel with the transition's routing.aspects.
   #
-  # No dedup tracking: include-only policyFns must fire for every entity context
+  # No dedup tracking: include-only policies must fire for every entity context
   # (e.g., per-user). Cross-level double-firing is prevented by arg matching —
   # a { host, user } policyFn won't match at host level where user is absent.
   dispatchPolicyIncludesHandler = {
@@ -263,7 +263,7 @@ let
           builtins.all (k: resolveCtx ? ${k} || traitNames ? ${k}) requiredArgs
         ) entries;
 
-        # Call matching policyFns, keep only include-only results.
+        # Call matching policies, keep only include-only results.
         perPolicy = map (
           entry:
           let
