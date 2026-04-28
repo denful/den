@@ -78,7 +78,13 @@ in
           homes = den.homes.${system} or { };
         in
         lib.concatMap (home: [
-          (resolve.to "flake-hm" { inherit home; })
+          (resolve.to "flake-hm" (
+            {
+              inherit home;
+            }
+            // lib.optionalAttrs (home.host != null) { inherit (home) host; }
+            // lib.optionalAttrs (home.user != null) { inherit (home) user; }
+          ))
           (include den.aspects."flake-hm")
         ]) (builtins.attrValues homes);
   };
