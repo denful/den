@@ -9,7 +9,7 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects) isParametricWrapper;
   inherit (den.lib.aspects.fx.identity) pathKey aspectPath;
-  inherit (den.lib.policyTypes) policyFnArgs isNewStylePolicy;
+  inherit (den.lib.policyTypes) policyFnArgs;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
 
   # Schema entity kinds — used to derive targetKey from aspect-policy resolve bindings.
@@ -400,23 +400,18 @@ let
 
         # Direct policy dispatch: iterate den.policies, check scope + args, call directly.
         traits = (state.traits or (_: { })) null;
-        resolveCtx = traits // currentCtx;
+        resolveCtx = traits // currentCtx // { __entityKind = sourceEntityKind; };
         allPolicies = den.policies or { };
 
         policyTransitions = lib.concatLists (
           lib.mapAttrsToList (
             name: policy:
             let
-              isNew = isNewStylePolicy policy;
-
-              # Scope check: from field filters by entity kind.
-              fromKind = if builtins.isAttrs policy then policy.from or null else null;
-              scopeOk = fromKind == null || fromKind == sourceEntityKind;
-              argsOk = scopeOk && resolveArgsSatisfied policy resolveCtx;
+              argsOk = resolveArgsSatisfied policy resolveCtx;
             in
             if !argsOk then
               [ ]
-            else if isNew then
+            else
               let
                 rawEffects =
                   let
@@ -471,30 +466,6 @@ let
                     };
                   }
                 ]
-            else
-              # Old-style policy: attrset with from/to/resolve fields.
-              let
-                rawResult = policy.resolve resolveCtx;
-                targets = if builtins.isList rawResult then rawResult else [ rawResult ];
-                targetKey = if policy.as or "" != "" then policy.as else policy.to;
-              in
-              if targets == [ ] then
-                [ ]
-              else
-                [
-                  {
-                    path = lib.splitString "." targetKey;
-                    contexts = targets;
-                    routing = {
-                      inherit (policy) from to;
-                      inherit targetKey;
-                      policyName = name;
-                      aspects = policy.aspects or [ ];
-                      excludes = [ ];
-                      isolateFanOut = policy.isolateFanOut or false;
-                    };
-                  }
-                ]
           ) allPolicies
         );
 
@@ -510,7 +481,7 @@ let
           let
             aspectPolicies = (state.aspectPolicies or (_: { })) null;
             traits = (state.traits or (_: { })) null;
-            resolveCtx = traits // currentCtx;
+            resolveCtx = traits // currentCtx // { __entityKind = sourceEntityKind; };
             entries = lib.attrsToList aspectPolicies;
             matching = builtins.filter (
               e:

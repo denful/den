@@ -23,10 +23,17 @@ let
         if i + 1 < n then
           {
             den.policies."${name}-to-${next}" = {
-              from = name;
               to = next;
               __functor =
-                _: ctx: if ctx ? x then [ (den.lib.policy.resolve { x = "${ctx.x}+${toString i}"; }) ] else [ ];
+                _:
+                {
+                  __entityKind ? null,
+                  ...
+                }@ctx:
+                if __entityKind != name || !(ctx ? x) then
+                  [ ]
+                else
+                  [ (den.lib.policy.resolve { x = "${ctx.x}+${toString i}"; }) ];
             };
           }
         else
@@ -81,17 +88,28 @@ in
               ];
               den.schema.leaf.includes = [ ];
               den.policies.root-to-leaf = {
-                from = "root";
                 to = "leaf";
-                resolve = ctx: if ctx ? x then lib.genList (i: { x = "${ctx.x}-${toString i}"; }) 20 else [ ];
-                aspects = [
-                  (
-                    { x }:
-                    {
-                      funny.names = [ "leaf-${x}" ];
-                    }
-                  )
-                ];
+                __functor =
+                  _:
+                  {
+                    __entityKind ? null,
+                    ...
+                  }@ctx:
+                  let
+                    inherit (den.lib.policy) resolve include;
+                  in
+                  if __entityKind != "root" || !(ctx ? x) then
+                    [ ]
+                  else
+                    map (i: resolve { x = "${ctx.x}-${toString i}"; }) (lib.genList (i: i) 20)
+                    ++ [
+                      (include (
+                        { x }:
+                        {
+                          funny.names = [ "leaf-${x}" ];
+                        }
+                      ))
+                    ];
               };
             }
           )

@@ -81,14 +81,19 @@ in
           { den, lib, ... }:
           {
             den.policies.foo-to-bar = {
-              from = "foo";
               to = "bar";
               __functor =
-                _: ctx:
+                _:
+                {
+                  __entityKind ? null,
+                  ...
+                }@ctx:
                 let
                   inherit (den.lib.policy) resolve include;
                 in
-                if ctx ? name then
+                if __entityKind != "foo" then
+                  [ ]
+                else if ctx ? name then
                   [
                     (resolve { shout = lib.toUpper ctx.name; })
                     (include (

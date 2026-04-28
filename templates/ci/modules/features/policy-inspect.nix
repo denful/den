@@ -65,14 +65,17 @@
         den.schema.test-insp-tgt.includes = [ ];
 
         den.policies.test-insp-pol = {
-          from = "test-insp-src";
           to = "test-insp-tgt";
           __functor =
-            _: _:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }:
             let
               inherit (den.lib.policy) resolve;
             in
-            [ (resolve { }) ];
+            if __entityKind != "test-insp-src" then [ ] else [ (resolve { }) ];
         };
 
         expr =
@@ -92,10 +95,17 @@
       { den, ... }:
       {
         den.policies.test-insp-sibling = {
-          from = "host";
           to = "host";
-          as = "peer";
-          resolve = _: [ { } ];
+          __functor =
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }:
+            let
+              inherit (den.lib.policy) resolve;
+            in
+            if __entityKind != "host" then [ ] else [ (resolve { }) ];
         };
 
         den.hosts.x86_64-linux.igloo = { };
@@ -113,12 +123,10 @@
           {
             routing = result.test-insp-sibling.routing;
             targetKey = result.test-insp-sibling.targetKey;
-            as = result.test-insp-sibling.as;
           };
         expected = {
           routing = "sibling";
-          targetKey = "peer";
-          as = "peer";
+          targetKey = "host";
         };
       }
     );

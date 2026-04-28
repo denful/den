@@ -20,14 +20,17 @@
         ];
         den.schema.shout.includes = [ ];
         den.policies.test-greeting-to-shout = {
-          from = "greeting";
           to = "shout";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? hello) then
+            if __entityKind != "greeting" then
               [ ]
             else
               [

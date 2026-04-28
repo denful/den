@@ -7,7 +7,7 @@
   ...
 }:
 let
-  inherit (den.lib.synthesizePolicies) ctxSatisfies resolveArgsSatisfied;
+  inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (den.lib.policyTypes) isNewStylePolicy;
 
   # Schema entity kinds — used to derive targetKey from new-style resolve bindings.
@@ -17,7 +17,7 @@ let
 
   # Inspect a new-style policy: call as function, parse typed effects.
   inspectNewStyle =
-    policy: context:
+    policy: context: kind:
     let
       rawEffects = policy context;
       effects = if builtins.isList rawEffects then rawEffects else [ rawEffects ];
@@ -25,25 +25,25 @@ let
         e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
       ) effects;
       targets = map (e: e.value) resolveEffects;
-      from = policy.from or "unknown";
       firstKeys =
         if resolveEffects != [ ] then builtins.attrNames (builtins.head resolveEffects).value else [ ];
-      # Prefer keys that differ from `from` — those are the new bindings.
-      newKeys = builtins.filter (k: k != from) firstKeys;
+      # Prefer keys that differ from source kind — those are the new bindings.
+      newKeys = builtins.filter (k: k != kind) firstKeys;
       targetKey = lib.findFirst (k: builtins.elem k schemaKinds) (
         if newKeys != [ ] then
           builtins.head newKeys
         else if firstKeys != [ ] then
           builtins.head firstKeys
         else
-          from
+          kind
       ) (if newKeys != [ ] then newKeys else firstKeys);
     in
     {
-      inherit targetKey targets from;
+      inherit targetKey targets;
+      from = kind;
       to = targetKey;
       as = "";
-      routing = if from == targetKey then "sibling" else "child";
+      routing = if kind == targetKey then "sibling" else "child";
     };
 
   # Inspect an old-style policy: access from/to/resolve fields directly.
@@ -70,16 +70,15 @@ let
     let
       policies = den.policies or { };
       matching = lib.filterAttrs (
-        _: policy:
-        let
-          from = if builtins.isAttrs policy then policy.from or null else null;
-        in
-        (from == kind || from == null) && ctxSatisfies kind context && resolveArgsSatisfied policy context
+        _: policy: resolveArgsSatisfied policy (context // { __entityKind = kind; })
       ) policies;
     in
     lib.mapAttrs (
       _name: policy:
-      if isNewStylePolicy policy then inspectNewStyle policy context else inspectOldStyle policy context
+      if isNewStylePolicy policy then
+        inspectNewStyle policy (context // { __entityKind = kind; }) kind
+      else
+        inspectOldStyle policy context
     ) matching;
 in
 {

@@ -10,9 +10,17 @@ in
 {
   den.policies = {
     host-to-users = {
-      from = "host";
       __functor =
-        _: { host, ... }: map (user: resolve.shared { inherit user; }) (lib.attrValues host.users);
+        _:
+        {
+          __entityKind ? null,
+          host,
+          ...
+        }:
+        if __entityKind != "host" then
+          [ ]
+        else
+          map (user: resolve.shared { inherit user; }) (lib.attrValues host.users);
     };
   };
 }

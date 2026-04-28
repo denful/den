@@ -20,14 +20,17 @@
         ];
         den.schema.child.includes = [ ];
         den.policies.test-parent-to-child = {
-          from = "parent";
           to = "child";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? x) then
+            if __entityKind != "parent" || !(ctx ? x) then
               [ ]
             else
               [
@@ -73,14 +76,17 @@
         ];
         den.schema.dst.includes = [ ];
         den.policies.test-src-to-dst = {
-          from = "src";
           to = "dst";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? x) then
+            if __entityKind != "src" || !(ctx ? x) then
               [ ]
             else
               [
@@ -129,14 +135,17 @@
         ];
         den.schema.dst.includes = [ ];
         den.policies.test-src-to-dst-no-cross = {
-          from = "src";
           to = "dst";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? x) then
+            if __entityKind != "src" || !(ctx ? x) then
               [ ]
             else
               [

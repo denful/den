@@ -123,14 +123,19 @@
         ];
         den.schema.b.includes = [ ];
         den.policies.a-to-b = {
-          from = "a";
           to = "b";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if ctx ? host then
+            if __entityKind != "a" || !(ctx ? host) then
+              [ ]
+            else
               [
                 (resolve { host = "${ctx.host}!"; })
                 (include (
@@ -140,9 +145,7 @@
                   }
                 ))
                 (include shared)
-              ]
-            else
-              [ ];
+              ];
         };
         expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { host = "v"; }));
         expected = 6;

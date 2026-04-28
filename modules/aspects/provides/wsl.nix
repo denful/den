@@ -66,12 +66,17 @@ in
 
   den.policies.host-to-wsl-host = {
     _core = true;
-    from = "host";
     to = "wsl-host";
     __functor =
       _:
-      { host, ... }:
-      if host.class == "nixos" && (host.wsl or { }).enable or false then
+      {
+        __entityKind ? null,
+        host,
+        ...
+      }:
+      if __entityKind != "host" then
+        [ ]
+      else if host.class == "nixos" && (host.wsl or { }).enable or false then
         [
           (den.lib.policy.resolve { inherit host; })
           (den.lib.policy.include wsl-host-aspect)

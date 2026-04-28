@@ -59,14 +59,17 @@
 
         den.schema.other.includes = [ ];
         den.policies.test-greet-to-other = {
-          from = "greet";
           to = "other";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? who) then
+            if __entityKind != "greet" || !(ctx ? who) then
               [ ]
             else
               [
@@ -105,14 +108,17 @@
         ];
         den.schema.yell.includes = [ ];
         den.policies.test-greet-to-yell = {
-          from = "greet";
           to = "yell";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? who) then
+            if __entityKind != "greet" || !(ctx ? who) then
               [ ]
             else
               [
@@ -153,14 +159,17 @@
         den.schema.size.includes = [ ];
         den.schema.num.includes = [ ];
         den.policies.test-greet-to-yell-fn = {
-          from = "greet";
           to = "yell";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? who) then
+            if __entityKind != "greet" || !(ctx ? who) then
               [ ]
             else
               [
@@ -174,14 +183,17 @@
               ];
         };
         den.policies.test-greet-to-size = {
-          from = "greet";
           to = "size";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? who) then
+            if __entityKind != "greet" || !(ctx ? who) then
               [ ]
             else
               [
@@ -195,14 +207,17 @@
               ];
         };
         den.policies.test-greet-to-num = {
-          from = "greet";
           to = "num";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve include;
             in
-            if !(ctx ? who) then
+            if __entityKind != "greet" || !(ctx ? who) then
               [ ]
             else
               [

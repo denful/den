@@ -34,11 +34,20 @@
         den.hosts.x86_64-linux.iceberg = { };
 
         den.policies.test-host-to-peer = {
-          from = "host";
           to = "host";
-          as = "peer";
-          resolve =
-            { host, ... }: lib.filter (h: h.name != host.name) (lib.attrValues (den.hosts.x86_64-linux or { }));
+          __functor =
+            _:
+            {
+              __entityKind ? null,
+              host,
+              ...
+            }:
+            if __entityKind != "host" then
+              [ ]
+            else
+              map (h: den.lib.policy.resolve { host = h; }) (
+                lib.filter (h: h.name != host.name) (lib.attrValues (den.hosts.x86_64-linux or { }))
+              );
         };
 
         expr =

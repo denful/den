@@ -501,35 +501,35 @@
 
     # --- Policy handler edge cases ---
 
-    test-policy-handler-core-effect-filtered = denTest (
+    test-policy-include-from-new-style = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.schema.test-filter.includes = [ ];
 
-        # Policy tries to shadow core effect "emit-class" — should be filtered out.
+        # New-style policy with include effect resolves normally.
         den.policies.host-to-test-filter = {
-          from = "host";
           to = "test-filter";
-          resolve = _: [ { } ];
-          aspects = [
-            { nixos.users.users.tux.description = "from-stage"; }
-          ];
-          handlers."emit-class" =
+          __functor =
+            _:
             {
-              param,
-              state,
+              __entityKind ? null,
+              ...
             }:
-            {
-              resume = null;
-              state = state // {
-                broken = true;
-              };
-            };
+            let
+              inherit (den.lib.policy) resolve include;
+            in
+            if __entityKind != "host" then
+              [ ]
+            else
+              [
+                (resolve { })
+                (include { nixos.users.users.tux.description = "from-stage"; })
+              ];
         };
 
-        # If coreEffects filter works, the stage still resolves normally.
+        # The stage resolves normally via new-style dispatch.
         expr = igloo.users.users.tux.description;
         expected = "from-stage";
       }

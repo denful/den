@@ -188,17 +188,20 @@
         };
 
         den.policies.flake-system-to-host = {
-          from = "flake-system";
           to = "host";
           __functor =
-            _: ctx:
+            _:
+            {
+              __entityKind ? null,
+              ...
+            }@ctx:
             let
               inherit (den.lib.policy) resolve;
             in
-            if ctx ? system then
-              map (host: resolve { inherit host; }) (lib.attrValues den.hosts.${ctx.system})
+            if __entityKind != "flake-system" || !(ctx ? system) then
+              [ ]
             else
-              [ ];
+              map (host: resolve { inherit host; }) (lib.attrValues den.hosts.${ctx.system});
         };
 
         expr = {

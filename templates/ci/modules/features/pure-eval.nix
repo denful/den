@@ -53,14 +53,19 @@ in
           { den, ... }:
           {
             den.policies.a-to-b = {
-              from = "a";
               to = "b";
               __functor =
-                _: ctx:
+                _:
+                {
+                  __entityKind ? null,
+                  ...
+                }@ctx:
                 let
                   inherit (den.lib.policy) resolve include;
                 in
-                if ctx ? v then
+                if __entityKind != "a" then
+                  [ ]
+                else if ctx ? v then
                   [
                     (resolve { v = "${ctx.v}!"; })
                     (include (

@@ -568,20 +568,9 @@ let
       # Only fire per-policy dispatch for entity roots (aspects with __entityKind).
       # Inner provides/includes share the entity kind but are not transition points.
       isEntityRoot = aspect ? __entityKind;
-      # Check if any den.policies entry has from == this entity kind, or
-      # is a plain function (no from — fires unconditionally). Must match
-      # old policyEffectNamesFor behavior to avoid dispatching transitions
-      # at entity levels that previously had none (e.g., "default").
-      hasPolicies =
-        isEntityRoot
-        && builtins.any (
-          policy:
-          let
-            isNew = den.lib.policyTypes.isNewStylePolicy policy;
-            from = if builtins.isAttrs policy then policy.from or null else null;
-          in
-          if isNew then from == null || from == (aspect.name or "") else from == (aspect.name or "")
-        ) (builtins.attrValues (den.policies or { }));
+      # Fire transition dispatch for any entity root when policies exist.
+      # Body guards inside each policy determine applicability per entity kind.
+      hasPolicies = isEntityRoot && (den.policies or { }) != { };
     in
     # Dispatch policy include/exclude effects during tree-walk first.
     fx.bind (dispatchPolicyIncludes aspect) (
