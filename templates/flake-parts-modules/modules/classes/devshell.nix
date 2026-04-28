@@ -4,6 +4,7 @@ let
 in
 {
   imports = [ inputs.devshell.flakeModule ];
+  den.classes.devshell = { };
   den.policies.flake-parts-to-flake-parts-system-devshell =
     {
       __entityKind ? null,

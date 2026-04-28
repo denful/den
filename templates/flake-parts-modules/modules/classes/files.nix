@@ -4,6 +4,7 @@ let
 in
 {
   imports = [ inputs.files.flakeModules.default ];
+  den.classes.files = { };
   den.policies.flake-parts-to-flake-parts-system-files =
     {
       __entityKind ? null,

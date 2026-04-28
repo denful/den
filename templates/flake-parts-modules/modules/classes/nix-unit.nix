@@ -9,6 +9,7 @@ let
 in
 {
   imports = [ inputs.nix-unit.modules.flake.default ];
+  den.classes.tests = { };
 
   # some globals
   perSystem.nix-unit = {
