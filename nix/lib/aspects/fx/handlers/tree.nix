@@ -153,25 +153,40 @@ let
       { param, state }:
       let
         nodeIdentity = param.identity or "<anon>";
+        isRawEntry = param.__rawEntry or false;
+        # Raw entries always use full identity (conservative dedup).
+        # Post-pipeline wrapping may relax identity if module turns out
+        # not context-dependent, but the collector can't know that yet.
+        # Using full identity is always safe: same-identity entries in
+        # the same context are true duplicates regardless.
         baseIdentity =
-          if param.isContextDependent or false then
+          if isRawEntry then
+            nodeIdentity
+          else if param.isContextDependent or false then
             nodeIdentity
           else
             lib.head (lib.splitString "/{" nodeIdentity);
         loc = "${param.class}@${baseIdentity}";
-        isAnon =
-          !(den.lib.aspects.isMeaningfulName nodeIdentity)
-          || lib.hasPrefix "<root>/" nodeIdentity
-          || lib.hasInfix "/<anon>:" nodeIdentity;
         mod =
-          if isAnon then
-            lib.setDefaultModuleLocation loc param.module
+          if isRawEntry then
+            # Store full param for post-pipeline wrapping
+            param // { __loc = loc; }
           else
-            {
-              key = loc;
-              _file = loc;
-              imports = [ param.module ];
-            };
+            # Legacy path: construct module location wrapper
+            let
+              isAnon =
+                !(den.lib.aspects.isMeaningfulName nodeIdentity)
+                || lib.hasPrefix "<root>/" nodeIdentity
+                || lib.hasInfix "/<anon>:" nodeIdentity;
+            in
+            if isAnon then
+              lib.setDefaultModuleLocation loc param.module
+            else
+              {
+                key = loc;
+                _file = loc;
+                imports = [ param.module ];
+              };
       in
       {
         resume = null;
