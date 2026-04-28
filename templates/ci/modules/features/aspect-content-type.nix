@@ -49,6 +49,14 @@ let
         resume = param;
         inherit state;
       };
+    "dead-letter" =
+      { param, state }:
+      {
+        resume = null;
+        state = state // {
+          deadLetterQueue = (state.deadLetterQueue or [ ]) ++ [ param ];
+        };
+      };
   };
 in
 {
