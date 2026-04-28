@@ -65,13 +65,18 @@ in
   den.schema.host.imports = [ hostConf ];
 
   den.policies.host-to-wsl-host = {
+    _core = true;
     from = "host";
     to = "wsl-host";
-    aspects = [ wsl-host-aspect ];
-    resolve =
+    __functor =
+      _:
       { host, ... }:
-      lib.optional (host.class == "nixos" && (host.wsl or { }).enable or false) { inherit host; };
+      if host.class == "nixos" && (host.wsl or { }).enable or false then
+        [
+          (den.lib.policy.resolve { inherit host; })
+          (den.lib.policy.include wsl-host-aspect)
+        ]
+      else
+        [ ];
   };
-
-  den.schema.host.policies = [ "host-to-wsl-host" ];
 }

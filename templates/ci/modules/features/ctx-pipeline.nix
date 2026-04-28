@@ -17,20 +17,21 @@ let
             )
           ];
         };
-        withPolicy =
-          if i + 1 < n then
-            {
-              den.policies."${name}-to-${next}" = {
-                from = name;
-                to = next;
-                resolve = ctx: if ctx ? x then [ { x = "${ctx.x}+${toString i}"; } ] else [ ];
-              };
-            }
-          else
-            { };
       in
       { den, ... }:
-      lib.recursiveUpdate baseStage withPolicy
+      lib.recursiveUpdate baseStage (
+        if i + 1 < n then
+          {
+            den.policies."${name}-to-${next}" = {
+              from = name;
+              to = next;
+              __functor =
+                _: ctx: if ctx ? x then [ (den.lib.policy.resolve { x = "${ctx.x}+${toString i}"; }) ] else [ ];
+            };
+          }
+        else
+          { }
+      )
     ) n;
 
   mkFanOut =

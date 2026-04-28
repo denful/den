@@ -1,7 +1,7 @@
 # Core entity policies — fundamental traversal between entity kinds.
 #
-# Policy resolve functions can safely destructure context args because
-# synthesize-policies.nix validates entity keys before calling resolve.
+# All policies use new-style __functor shape with typed effects.
+# *-to-default policies pass context through with explicit `to = "default"`.
 { lib, den, ... }:
 {
   den.policies = {
@@ -16,19 +16,19 @@
       _core = true;
       from = "host";
       to = "default";
-      resolve = lib.singleton;
+      __functor = _: ctx: [ (den.lib.policy.resolve ctx) ];
     };
     user-to-default = {
       _core = true;
       from = "user";
       to = "default";
-      resolve = lib.singleton;
+      __functor = _: ctx: [ (den.lib.policy.resolve ctx) ];
     };
     home-to-default = {
       _core = true;
       from = "home";
       to = "default";
-      resolve = lib.singleton;
+      __functor = _: ctx: [ (den.lib.policy.resolve ctx) ];
     };
   };
 }
