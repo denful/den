@@ -1,7 +1,8 @@
 # Flake output policies — traversal from flake-level entity kinds.
 #
-# Scope guard handled by synthesize-policies.nix: flake-* policies
-# only fire when no entity attrset values are in context.
+# All policies retain `from` for entity-kind scoping and `to` for
+# targetKey derivation (resolve binding keys don't match schema kind
+# names). Removed: _core (new-style handler skips activation).
 {
   den,
   lib,
@@ -21,7 +22,6 @@ let
   systemOutputPolicies = map (output: {
     name = "flake-system-to-flake-${output}";
     value = {
-      _core = true;
       from = "flake-system";
       to = "flake-${output}";
       __functor =
@@ -37,14 +37,12 @@ in
 {
   den.policies = lib.listToAttrs systemOutputPolicies // {
     flake-to-flake-system = {
-      _core = true;
       from = "flake";
       to = "flake-system";
       __functor = _: _: map (system: resolve { inherit system; }) den.systems;
     };
 
     flake-system-to-flake-os = {
-      _core = true;
       from = "flake-system";
       to = "flake-os";
       __functor =
@@ -60,7 +58,6 @@ in
     };
 
     flake-system-to-flake-hm = {
-      _core = true;
       from = "flake-system";
       to = "flake-hm";
       __functor =
