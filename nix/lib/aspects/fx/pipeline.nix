@@ -89,15 +89,31 @@ let
 
   # resolve-entity resolves an entity by kind using resolveEntity.
   # Always returns a valid entity — existence gating removed.
+  # Strips den.default from child entity includes to prevent
+  # cross-context duplicate resolution: den.default is resolved once
+  # at the root entity level; child entities resolved during transitions
+  # must not re-resolve it in a different context (which would produce
+  # duplicate NixOS module definitions).
+  # Note: filter uses pointer identity — den.default in schemaIncludes
+  # is the same fixpoint value as denDefault here (no normalization).
+  denDefault = den.default or null;
   resolveEntityHandler = {
     "resolve-entity" =
       { param, state }:
       let
         kind = param.kind;
         currentCtx = (state.currentCtx or (_: { })) null;
+        entity = den.lib.resolveEntity kind currentCtx;
+        strippedIncludes =
+          if denDefault != null then
+            builtins.filter (inc: inc != denDefault) entity.includes
+          else
+            entity.includes;
       in
       {
-        resume = den.lib.resolveEntity kind currentCtx;
+        resume = entity // {
+          includes = strippedIncludes;
+        };
         inherit state;
       };
   };

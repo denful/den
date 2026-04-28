@@ -22,13 +22,11 @@
           in
           {
             hasHostToUsers = result ? host-to-users;
-            hasHostToDefault = result ? host-to-default;
             hostToUsersRouting = result.host-to-users.routing;
             hostToUsersTargetKey = result.host-to-users.targetKey;
           };
         expected = {
           hasHostToUsers = true;
-          hasHostToDefault = true;
           hostToUsersRouting = "child";
           hostToUsersTargetKey = "user";
         };
