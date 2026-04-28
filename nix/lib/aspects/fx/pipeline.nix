@@ -7,7 +7,7 @@ let
   fx = den.lib.fx;
   handlers = den.lib.aspects.fx.handlers;
   identity = den.lib.aspects.fx.identity;
-  inherit (den.lib.aspects.fx.aspect) aspectToEffect;
+  inherit (den.lib.aspects.fx.aspect) aspectToEffect drainDeadLettersHandler;
 
   # Compose two handler sets, chaining handlers for shared effect names.
   # For overlapping keys: b's resume wins, a's state wins (a runs on b's output state).
@@ -82,6 +82,8 @@ let
     // handlers.dispatchPolicyIncludesHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
+    // handlers.deadLetterHandler
+    // drainDeadLettersHandler
     // resolveEntityHandler
     // handlers.forwardHandler
     // handlers.provideToHandler
@@ -140,6 +142,7 @@ let
     consumedTraits = _: { };
     aspectPolicies = _: { };
     forwardSpecs = _: [ ];
+    deadLetterQueue = _: [ ];
   };
 
   mkPipeline =
