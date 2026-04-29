@@ -598,6 +598,7 @@ in
     defaultHandlers
     defaultState
     mkPipeline
+    mkScopeId
     fxFullResolve
     runSubPipeline
     fxResolve

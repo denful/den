@@ -9,6 +9,7 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects) isParametricWrapper;
   inherit (den.lib.aspects.fx.identity) pathKey aspectPath;
+  inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   inherit (den.lib.policyTypes) policyFnArgs;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
 
@@ -103,35 +104,71 @@ let
       # ctxId from merged context — new bindings alone may not be unique
       # across different parent contexts (e.g., user "alice" on host A vs B).
       ctxId = mkCtxId scopedCtx;
+      newScopeId = mkScopeId scopedCtx;
       scopeHandlers = constantHandler scopedCtx;
       tagged = targetAspect // {
         __scopeHandlers = scopeHandlers;
         __ctxId = ctxId;
       };
+      pushScope = fx.effects.state.modify (
+        st:
+        let
+          parentScope = st.currentScope;
+        in
+        st
+        // {
+          currentScope = newScopeId;
+          scopeStack = _: (st.scopeStack null) ++ [ parentScope ];
+          scopeContexts = _: (st.scopeContexts null) // { ${newScopeId} = scopedCtx; };
+          scopeParent = _: (st.scopeParent null) // { ${newScopeId} = parentScope; };
+          scopeChildren =
+            _:
+            let
+              all = st.scopeChildren null;
+            in
+            all // { ${parentScope} = (all.${parentScope} or [ ]) ++ [ newScopeId ]; };
+        }
+      );
+      popScope = fx.effects.state.modify (
+        st:
+        let
+          stack = st.scopeStack null;
+        in
+        st
+        // {
+          currentScope = lib.last stack;
+          scopeStack = _: lib.init stack;
+        }
+      );
     in
-    fx.bind (aspectToEffect tagged) (
-      childResult:
-      # Drain deferred includes now satisfiable with the new context.
-      # Note: drained includes go through aspectToEffect which re-checks
-      # constraints via check-constraint. Constraints registered AFTER the
-      # original deferral will apply — this is intentional (constraints are global).
-      fx.bind (fx.send "drain-deferred" scopedCtx) (
-        satisfiable:
-        fx.bind (fx.send "drain-dead-letters" null) (
-          _:
-          builtins.foldl' (
-            acc: deferred:
-            fx.bind acc (
-              prevResults:
-              let
-                deferredTagged = deferred.child // {
-                  __scopeHandlers = scopeHandlers;
-                  __ctxId = ctxId;
-                };
-              in
-              fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prevResults ++ [ resolved ]))
-            )
-          ) (fx.pure (results ++ [ childResult ])) satisfiable
+    fx.bind pushScope (
+      _:
+      fx.bind (aspectToEffect tagged) (
+        childResult:
+        # Drain deferred includes now satisfiable with the new context.
+        # Note: drained includes go through aspectToEffect which re-checks
+        # constraints via check-constraint. Constraints registered AFTER the
+        # original deferral will apply — this is intentional (constraints are global).
+        fx.bind (fx.send "drain-deferred" scopedCtx) (
+          satisfiable:
+          fx.bind (fx.send "drain-dead-letters" null) (
+            _:
+            fx.bind
+              (builtins.foldl' (
+                acc: deferred:
+                fx.bind acc (
+                  prevResults:
+                  let
+                    deferredTagged = deferred.child // {
+                      __scopeHandlers = scopeHandlers;
+                      __ctxId = ctxId;
+                    };
+                  in
+                  fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prevResults ++ [ resolved ]))
+                )
+              ) (fx.pure (results ++ [ childResult ])) satisfiable)
+              (allResults: fx.bind popScope (_: fx.pure allResults))
+          )
         )
       )
     );
@@ -191,6 +228,7 @@ let
     }:
     innerResults:
     let
+      newScopeId = mkScopeId scopedCtx;
       tagged = effectiveTarget // {
         __scopeHandlers = scopeHandlers;
         __ctxId = ctxNames;
@@ -206,6 +244,26 @@ let
         };
       };
       subClassImports = sub.classImports;
+      # Push scope, merge sub-pipeline results, pop scope.
+      pushScope = fx.effects.state.modify (
+        st:
+        let
+          parentScope = st.currentScope;
+        in
+        st
+        // {
+          currentScope = newScopeId;
+          scopeStack = _: (st.scopeStack null) ++ [ parentScope ];
+          scopeContexts = _: (st.scopeContexts null) // { ${newScopeId} = scopedCtx; };
+          scopeParent = _: (st.scopeParent null) // { ${newScopeId} = parentScope; };
+          scopeChildren =
+            _:
+            let
+              all = st.scopeChildren null;
+            in
+            all // { ${parentScope} = (all.${parentScope} or [ ]) ++ [ newScopeId ]; };
+        }
+      );
       # state.modify reads st.classImports at the modify call site. This is safe
       # because fxFullResolve above is a separate pipeline whose results are
       # fully materialized before the modify runs. No concurrent handlers
@@ -225,8 +283,19 @@ let
             ];
         }
       );
+      popScope = fx.effects.state.modify (
+        st:
+        let
+          stack = st.scopeStack null;
+        in
+        st
+        // {
+          currentScope = lib.last stack;
+          scopeStack = _: lib.init stack;
+        }
+      );
     in
-    fx.bind mergeImports (_: fx.pure innerResults);
+    fx.bind pushScope (_: fx.bind mergeImports (_: fx.bind popScope (_: fx.pure innerResults)));
 
   # Routing decision: sibling targets (routing.from == routing.to) route
   # through provide-to for cross-entity distribution. Child targets
