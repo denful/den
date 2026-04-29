@@ -312,12 +312,48 @@ let
             # For wrapped function modules, strip enrichment-only keys from
             # the advertised args. setFunctionArgs returns an attrset with
             # __functor + __functionArgs, so check __functionArgs presence.
-            hasAdvertisedArgs = builtins.isAttrs result.module && result.module ? __functionArgs;
-            finalModule =
-              if result.wrapped && enrichmentOnlyKeys != [ ] && hasAdvertisedArgs then
-                result.module // { __functionArgs = removeAttrs result.module.__functionArgs enrichmentOnlyKeys; }
+            # Strip args that NixOS can't resolve from the module's advertised
+            # functionArgs.  Without this, NixOS tries _module.args.${name} for
+            # every advertised arg and crashes when the key doesn't exist —
+            # even when the arg has a default in the Nix function.
+            #
+            # For wrapped modules: enrichment-only keys were injected by den
+            # and don't exist in _module.args.
+            # For unwrapped modules: any arg with a default that isn't in ctx
+            # and isn't a standard module-system arg should be hidden so NixOS
+            # uses the function's native default instead of probing _module.args.
+            # Strip args that NixOS can't resolve from the module's advertised
+            # functionArgs.  Without this, NixOS tries _module.args.${name} for
+            # every advertised arg and crashes when the key doesn't exist —
+            # even when the arg has a default in the Nix function.
+            #
+            # For wrapped modules (setFunctionArgs attrset): enrichment-only
+            # keys were injected by den and don't exist in _module.args.
+            # For unwrapped raw functions: any arg with a default that isn't
+            # in ctx should be hidden so NixOS uses the function's native
+            # default instead of probing _module.args.
+            isWrappedAttrset = builtins.isAttrs result.module && result.module ? __functionArgs;
+            rawFuncArgs =
+              if isWrappedAttrset then
+                result.module.__functionArgs
+              else if builtins.isFunction result.module then
+                builtins.functionArgs result.module
               else
-                result.module;
+                { };
+            argsToStrip =
+              if result.wrapped then
+                enrichmentOnlyKeys
+              else
+                # For unwrapped modules, strip args with defaults that aren't
+                # in ctx (they're unknown to both den and NixOS).
+                builtins.filter (k: rawFuncArgs.${k} or false && !(ctx ? ${k})) (builtins.attrNames rawFuncArgs);
+            finalModule =
+              if argsToStrip == [ ] then
+                result.module
+              else if isWrappedAttrset then
+                result.module // { __functionArgs = removeAttrs rawFuncArgs argsToStrip; }
+              else
+                lib.setFunctionArgs result.module (removeAttrs rawFuncArgs argsToStrip);
             nodeIdentity = entry.identity or "<anon>";
             isAnon =
               !(den.lib.aspects.isMeaningfulName nodeIdentity)
