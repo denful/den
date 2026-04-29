@@ -307,8 +307,6 @@ let
     }:
     mkPipeline { inherit class extraState; } { inherit self ctx; };
 
-  inherit (den.lib.aspects) normalizeRoot;
-
   # Forward post-processing: for each registered forward spec, resolve the
   # source aspect via sub-pipeline, wrap results via buildForwardAspect, and
   # merge into the target class bucket.
@@ -324,7 +322,71 @@ let
     in
     own ++ nested;
 
+  inherit (den.lib.aspects) normalizeRoot;
+
+  # Resolve a forward spec's source aspect via inline sub-pipeline.
+  # Returns { classImports, traits } with wrapped content.
+  resolveForwardSource =
+    spec:
+    let
+      normalizedSource = normalizeRoot spec.sourceAspect;
+      subResult = fxFullResolve {
+        class = spec.fromClass;
+        self = normalizedSource;
+        ctx = spec.__resolveCtx;
+        extraState = {
+          aspectPolicies = spec.__aspectPolicies;
+        };
+      };
+      rawClassImports = subResult.state.classImports null;
+      forwardSpecs = subResult.state.forwardSpecs null;
+      subRootScope = mkScopeId spec.__resolveCtx;
+      finalCtx = (subResult.state.scopeContexts null).${subRootScope} or spec.__resolveCtx;
+      wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
+      # Recursively apply any forwards within the sub-pipeline.
+      forwarded =
+        if forwardSpecs == [ ] then
+          wrappedClassImports
+        else
+          let
+            fwd = applyForwardSpecs {
+              inherit forwardSpecs;
+              classImports = wrappedClassImports;
+              traitModule = null;
+              hasTraitSchemas = false;
+            };
+          in
+          fwd.classImports;
+      subTraitSchemas = den.traits or { };
+      subHasTraitSchemas = subTraitSchemas != { };
+      subTraits = subResult.state.traits null;
+      subTraitModule =
+        { ... }:
+        {
+          options._den.traits = lib.mkOption {
+            type = lib.types.attrsOf lib.types.anything;
+            default = { };
+            internal = true;
+          };
+          config._den.traits = lib.mapAttrs (
+            traitName: schema:
+            let
+              strategy = schema.collection or "list";
+              raw = subTraits.${traitName} or (if strategy == "map" then { } else [ ]);
+            in
+            raw
+          ) subTraitSchemas;
+        };
+    in
+    {
+      classImports = forwarded;
+      traits = subResult.state.traits null;
+      traitModule = if subHasTraitSchemas then subTraitModule else null;
+      inherit subHasTraitSchemas;
+    };
+
   # Returns { classImports } with forwarded content merged.
+  # Resolves forward sources via inline sub-pipelines.
   applyForwardSpecs =
     {
       forwardSpecs,
@@ -335,41 +397,11 @@ let
     builtins.foldl' (
       acc: spec:
       let
-        normalizedSource = normalizeRoot spec.sourceAspect;
-        sub = runSubPipeline {
-          class = spec.fromClass;
-          self = normalizedSource;
-          ctx = spec.__resolveCtx;
-          extraState = {
-            aspectPolicies = spec.__aspectPolicies;
-          };
-        };
-        # Sub-pipeline has its own trait state — synthesize a traitModule for it
-        # so evalConfig forwards can access config._den.traits.
-        subTraitSchemas = den.traits or { };
-        subHasTraitSchemas = subTraitSchemas != { };
-        subTraits = sub.traits;
-        subTraitModule =
-          { ... }:
-          {
-            options._den.traits = lib.mkOption {
-              type = lib.types.attrsOf lib.types.anything;
-              default = { };
-              internal = true;
-            };
-            # Tier 1/2 only — no deferred data in sub-pipeline scope.
-            config._den.traits = lib.mapAttrs (
-              traitName: schema:
-              let
-                strategy = schema.collection or "list";
-                raw = subTraits.${traitName} or (if strategy == "map" then { } else [ ]);
-              in
-              raw
-            ) subTraitSchemas;
-          };
+        resolved = resolveForwardSource spec;
         rawSourceModule = {
           imports =
-            (sub.classImports.${spec.fromClass} or [ ]) ++ lib.optional subHasTraitSchemas subTraitModule;
+            (resolved.classImports.${spec.fromClass} or [ ])
+            ++ lib.optional resolved.subHasTraitSchemas resolved.traitModule;
         };
         sourceModule = spec.mapModule rawSourceModule;
         forwardAspect = handlers.buildForwardAspect spec sourceModule;
@@ -381,43 +413,6 @@ let
         };
       }
     ) { inherit classImports; } forwardSpecs;
-
-  # Thin wrapper: runs sub-pipeline, materializes state thunks.
-  # Each call site does its own post-processing.
-  runSubPipeline =
-    {
-      class,
-      self,
-      ctx,
-      extraState ? { },
-    }:
-    let
-      result = fxFullResolve {
-        inherit
-          class
-          self
-          ctx
-          extraState
-          ;
-      };
-    in
-    let
-      rawClassImports = result.state.classImports null;
-      forwardSpecs = result.state.forwardSpecs null;
-      subRootScope = mkScopeId ctx;
-      finalCtx = (result.state.scopeContexts null).${subRootScope} or ctx;
-      wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
-      forwarded = applyForwardSpecs {
-        inherit forwardSpecs;
-        classImports = wrappedClassImports;
-        traitModule = null;
-        hasTraitSchemas = false;
-      };
-    in
-    {
-      classImports = forwarded.classImports;
-      traits = result.state.traits null;
-    };
 
   # Post-pipeline wrapping pass: wrap raw class entries (__rawEntry = true)
   # using wrapClassModule with the full enriched context they carry.
@@ -546,13 +541,12 @@ let
     }:
     let
       result = mkPipeline { inherit class; } { inherit self ctx; };
-      traitSchemas = den.traits or { };
-      traits = result.state.traits null;
-      deferredTraits = result.state.deferredTraits null;
-      consumedTraits = (result.state.consumedTraits or (_: { })) null;
+      traitSchemas = result.state.traitSchemas null;
+      hasTraitSchemas = traitSchemas != { };
 
-      # partialOk validation: error when trait consumed at pipeline time
-      # AND has deferred emissions, unless schema says partialOk = true.
+      # partialOk validation
+      consumedTraits = (result.state.consumedTraits or (_: { })) null;
+      deferredTraits = result.state.deferredTraits null;
       partialOkViolations = builtins.filter (
         traitName:
         consumedTraits ? ${traitName}
@@ -560,48 +554,18 @@ let
         && !(traitSchemas.${traitName}.partialOk or false)
       ) (builtins.attrNames consumedTraits);
 
-      # Synthetic module injecting _den.traits into evalModules fixpoint.
-      # Only added when trait schemas exist — zero overhead otherwise.
+      # Trait module via scoped reads with inheritance.
+      rootScopeId = mkScopeId ctx;
+      scopeParent = result.state.scopeParent null;
       traitModule =
-        {
-          config,
-          lib,
-          pkgs,
-          options,
-          modulesPath,
-          ...
-        }@moduleArgs:
-        {
-          options._den.traits = lib.mkOption {
-            type = lib.types.attrsOf lib.types.anything;
-            default = { };
-            internal = true;
-          };
-          config._den.traits = lib.mapAttrs (
-            traitName: schema:
-            let
-              strategy = schema.collection or "list";
-              raw = traits.${traitName} or (if strategy == "map" then { } else [ ]);
-              deferred = deferredTraits.${traitName} or [ ];
-              deferredData = map (e: e.value moduleArgs) deferred;
-              mergeMaps =
-                base: extras:
-                builtins.foldl' (
-                  acc: d:
-                  let
-                    dupes = builtins.filter (k: acc ? ${k}) (builtins.attrNames d);
-                  in
-                  if dupes != [ ] then
-                    throw "den: trait '${traitName}' map collection: duplicate key '${builtins.head dupes}'"
-                  else
-                    acc // d
-                ) base extras;
-            in
-            if strategy == "map" then mergeMaps raw deferredData else raw ++ deferredData
-          ) traitSchemas;
-        };
-
-      hasTraitSchemas = traitSchemas != { };
+        if hasTraitSchemas then
+          traitModuleForScope {
+            scopedTraits = result.state.scopedTraits null;
+            scopedDeferredTraits = result.state.scopedDeferredTraits null;
+            inherit scopeParent traitSchemas;
+          } rootScopeId
+        else
+          null;
     in
     if partialOkViolations != [ ] then
       throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
@@ -610,19 +574,15 @@ let
         rawClassImports = result.state.classImports null;
         forwardSpecs = result.state.forwardSpecs null;
         # Extract enriched context from pipeline state for post-pipeline wrapping.
-        # Enrichment policies inject non-schema bindings (isNixos, isDarwin, etc.)
-        # that may not have been available at class module emit time.
-        rootScopeId' = mkScopeId ctx;
-        finalCtx = (result.state.scopeContexts null).${rootScopeId'} or ctx;
+        finalCtx = (result.state.scopeContexts null).${rootScopeId} or ctx;
         # Wrap BEFORE forwards — forward source modules need wrapped class data + traitModule.
         wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
         # Apply forwards AFTER wrapping + traitModule synthesis.
-        # Forward source modules now include traitModule, fixing Tier 3 trait delivery.
         forwarded = applyForwardSpecs {
           inherit forwardSpecs traitModule hasTraitSchemas;
           classImports = wrappedClassImports;
         };
-        # Dead letter queue diagnostics — warn about keys never claimed by any registry.
+        # Dead letter queue diagnostics.
         finalDLQ = (result.state.deadLetterQueue or (_: [ ])) null;
         _dlqWarn = builtins.seq (map (
           entry:
@@ -630,10 +590,6 @@ let
         ) finalDLQ) null;
       in
       builtins.seq _dlqWarn {
-        # Target class imports only — multi-class data accessible via
-        # fxFullResolve (state.classImports null). Not exposed here because
-        # fxResolve's return is used as a NixOS deferredModule by entity
-        # types — extra attrs would error.
         imports = (forwarded.classImports.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in
@@ -647,7 +603,8 @@ in
     mkPipeline
     mkScopeId
     fxFullResolve
-    runSubPipeline
     fxResolve
+    wrapCollectedClasses
+    applyForwardSpecs
     ;
 }

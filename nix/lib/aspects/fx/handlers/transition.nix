@@ -233,17 +233,29 @@ let
         __scopeHandlers = scopeHandlers;
         __ctxId = ctxNames;
       };
-      sub = den.lib.aspects.fx.pipeline.runSubPipeline {
+      # Inline sub-pipeline: isolated resolution with fresh state.
+      # Replaces the old runSubPipeline call — each fan-out entity
+      # gets its own pipeline with forward application.
+      subResult = den.lib.aspects.fx.pipeline.fxFullResolve {
         class = targetClass;
         self = tagged;
         ctx = scopedCtx;
-        # Propagate aspect-included policies so policies from
-        # parent pipeline fire in isolated fan-out sub-pipelines.
         extraState = {
           inherit aspectPolicies;
         };
       };
-      subClassImports = sub.classImports;
+      subRootScope = mkScopeId scopedCtx;
+      subFinalCtx = (subResult.state.scopeContexts null).${subRootScope} or scopedCtx;
+      subRawClassImports = subResult.state.classImports null;
+      subForwardSpecs = subResult.state.forwardSpecs null;
+      subWrapped = den.lib.aspects.fx.pipeline.wrapCollectedClasses subFinalCtx subRawClassImports;
+      subForwarded = den.lib.aspects.fx.pipeline.applyForwardSpecs {
+        forwardSpecs = subForwardSpecs;
+        classImports = subWrapped;
+        traitModule = null;
+        hasTraitSchemas = false;
+      };
+      subClassImports = subForwarded.classImports;
       # Push scope, merge sub-pipeline results, pop scope.
       pushScope = fx.effects.state.modify (
         st:
@@ -262,12 +274,15 @@ let
               all = st.scopeChildren null;
             in
             all // { ${parentScope} = (all.${parentScope} or [ ]) ++ [ newScopeId ]; };
+          scopedAspectPolicies =
+            _:
+            let
+              all = st.scopedAspectPolicies null;
+              parentPolicies = all.${parentScope} or { };
+            in
+            all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
         }
       );
-      # state.modify reads st.classImports at the modify call site. This is safe
-      # because fxFullResolve above is a separate pipeline whose results are
-      # fully materialized before the modify runs. No concurrent handlers
-      # can append to classImports between construction and handling.
       mergeImports = fx.effects.state.modify (
         st:
         st
