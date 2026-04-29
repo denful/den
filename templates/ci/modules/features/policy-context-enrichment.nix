@@ -93,15 +93,21 @@
       }
     );
 
+    # Mixed resolve: schema key (user) + non-schema key (isNixos) in same
+    # resolve call.  The schema key should create a child entity transition,
+    # the non-schema key should enrich the current context.
     test-mixed-resolve-split = denTest (
       { den, igloo, ... }:
       {
-        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.igloo = { };
 
-        den.policies.host-guards =
+        den.policies.mixed =
           { host, ... }:
           [
             (den.lib.policy.resolve {
+              user = {
+                name = "tux";
+              };
               isNixos = host.class == "nixos";
             })
           ];
@@ -164,6 +170,9 @@
       }
     );
 
+    # Enrichment + user fan-out coexist.  Class module takes both isNixos
+    # (enrichment) and user (fan-out) in the same function signature.
+    # Should fire once per user with correct values for both.
     test-enrichment-fan-out = denTest (
       { den, igloo, ... }:
       {
@@ -180,54 +189,49 @@
             })
           ];
 
-        den.aspects.host-env = {
+        den.aspects.user-config = {
           nixos =
             {
               isNixos,
+              user,
               lib,
               ...
             }:
             lib.optionalAttrs isNixos {
-              environment.variables.ENRICHED = "yes";
+              users.users.${user.name}.shell = "/bin/zsh";
             };
         };
 
-        den.aspects.igloo.includes = [ den.aspects.host-env ];
+        den.aspects.igloo.includes = [ den.aspects.user-config ];
 
-        expr = igloo.environment.variables.ENRICHED;
-        expected = "yes";
+        expr = igloo.users.users.alice.shell;
+        expected = "/bin/zsh";
       }
     );
 
-    test-enrichment-optional-default = denTest (
+    # Module requests an arg no policy ever provides.
+    # Should use the default value, not crash or infinite-recurse.
+    test-enrichment-never-provided = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.policies.host-guards =
-          { host, ... }:
-          [
-            (den.lib.policy.resolve {
-              isNixos = host.class == "nixos";
-            })
-          ];
-
-        den.aspects.optional-enrich = {
+        den.aspects.noop = {
           nixos =
             {
-              isNixos ? false,
+              neverProvided ? "default",
               lib,
               ...
             }:
-            lib.optionalAttrs isNixos {
-              environment.variables.TEST = "enriched";
+            {
+              environment.variables.TEST = neverProvided;
             };
         };
 
-        den.aspects.igloo.includes = [ den.aspects.optional-enrich ];
+        den.aspects.igloo.includes = [ den.aspects.noop ];
 
         expr = igloo.environment.variables.TEST;
-        expected = "enriched";
+        expected = "default";
       }
     );
 
@@ -295,15 +299,14 @@
       }
     );
 
+    # Trait arg and enrichment arg coexist in the same class module
+    # function signature.  Both should resolve correctly.
     test-enrichment-with-traits = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.traits.firewall = {
-          description = "Firewall rules";
-          collection = "list";
-        };
+        den.traits.greeting = { };
 
         den.policies.host-guards =
           { host, ... }:
@@ -313,25 +316,26 @@
             })
           ];
 
-        den.aspects.netstack = {
-          firewall = {
-            port = 80;
-          };
+        den.aspects.greeter = {
+          traits.greeting = "hello";
           nixos =
             {
               isNixos,
+              greeting,
               lib,
               ...
             }:
             lib.optionalAttrs isNixos {
-              services.openssh.enable = true;
+              environment.variables.GREETING = builtins.head (
+                if builtins.isList greeting then greeting else [ greeting ]
+              );
             };
         };
 
-        den.aspects.igloo.includes = [ den.aspects.netstack ];
+        den.aspects.igloo.includes = [ den.aspects.greeter ];
 
-        expr = igloo.services.openssh.enable;
-        expected = true;
+        expr = igloo.environment.variables.GREETING;
+        expected = "hello";
       }
     );
 
