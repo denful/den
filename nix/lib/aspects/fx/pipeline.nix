@@ -206,7 +206,12 @@ let
 
   # Returns { classImports, provideTo } with forwarded content merged.
   applyForwardSpecs =
-    forwardSpecs: classImports:
+    {
+      forwardSpecs,
+      classImports,
+      traitModule,
+      hasTraitSchemas,
+    }:
     builtins.foldl'
       (
         acc: spec:
@@ -220,8 +225,32 @@ let
               aspectPolicies = spec.__aspectPolicies;
             };
           };
+          # Sub-pipeline has its own trait state — synthesize a traitModule for it
+          # so evalConfig forwards can access config._den.traits.
+          subTraitSchemas = den.traits or { };
+          subHasTraitSchemas = subTraitSchemas != { };
+          subTraits = sub.traits;
+          subTraitModule =
+            { ... }:
+            {
+              options._den.traits = lib.mkOption {
+                type = lib.types.attrsOf lib.types.anything;
+                default = { };
+                internal = true;
+              };
+              # Tier 1/2 only — no deferred or cross-entity data in sub-pipeline scope.
+              config._den.traits = lib.mapAttrs (
+                traitName: schema:
+                let
+                  strategy = schema.collection or "list";
+                  raw = subTraits.${traitName} or (if strategy == "map" then { } else [ ]);
+                in
+                raw
+              ) subTraitSchemas;
+            };
           rawSourceModule = {
-            imports = sub.classImports.${spec.fromClass} or [ ];
+            imports =
+              (sub.classImports.${spec.fromClass} or [ ]) ++ lib.optional subHasTraitSchemas subTraitModule;
           };
           sourceModule = spec.mapModule rawSourceModule;
           forwardAspect = handlers.buildForwardAspect spec sourceModule;
@@ -262,13 +291,18 @@ let
     let
       rawClassImports = result.state.classImports null;
       forwardSpecs = result.state.forwardSpecs null;
-      forwarded = applyForwardSpecs forwardSpecs rawClassImports;
       finalCtx = (result.state.currentCtx or (_: { })) null;
-      wrappedClassImports = wrapCollectedClasses finalCtx forwarded.classImports;
+      wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
+      forwarded = applyForwardSpecs {
+        inherit forwardSpecs;
+        classImports = wrappedClassImports;
+        traitModule = null;
+        hasTraitSchemas = false;
+      };
       pipelineProvideTo = (result.state.provideTo or (_: [ ])) null;
     in
     {
-      classImports = wrappedClassImports;
+      classImports = forwarded.classImports;
       traits = result.state.traits null;
       provideTo = pipelineProvideTo ++ forwarded.provideTo;
     };
@@ -471,15 +505,21 @@ let
       let
         rawClassImports = result.state.classImports null;
         forwardSpecs = result.state.forwardSpecs null;
-        # forwarded.provideTo intentionally ignored — fxResolve never
-        # exposed provideTo (only returns { imports }). provideTo from
-        # forward sub-pipelines is handled by runSubPipeline callers.
-        forwarded = applyForwardSpecs forwardSpecs rawClassImports;
         # Extract enriched context from pipeline state for post-pipeline wrapping.
         # Enrichment policies inject non-schema bindings (isNixos, isDarwin, etc.)
         # that may not have been available at class module emit time.
         finalCtx = (result.state.currentCtx or (_: { })) null;
-        wrappedClassImports = wrapCollectedClasses finalCtx forwarded.classImports;
+        # Wrap BEFORE forwards — forward source modules need wrapped class data + traitModule.
+        wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
+        # Apply forwards AFTER wrapping + traitModule synthesis.
+        # Forward source modules now include traitModule, fixing Tier 3 trait delivery.
+        # forwarded.provideTo intentionally ignored — fxResolve never
+        # exposed provideTo (only returns { imports }). provideTo from
+        # forward sub-pipelines is handled by runSubPipeline callers.
+        forwarded = applyForwardSpecs {
+          inherit forwardSpecs traitModule hasTraitSchemas;
+          classImports = wrappedClassImports;
+        };
         # Dead letter queue diagnostics — warn about keys never claimed by any registry.
         finalDLQ = (result.state.deadLetterQueue or (_: [ ])) null;
         _dlqWarn = builtins.seq (map (
@@ -492,7 +532,7 @@ let
         # fxFullResolve (state.classImports null). Not exposed here because
         # fxResolve's return is used as a NixOS deferredModule by entity
         # types — extra attrs would error.
-        imports = (wrappedClassImports.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
+        imports = (forwarded.classImports.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in
 {

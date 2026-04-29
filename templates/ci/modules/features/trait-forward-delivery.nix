@@ -71,7 +71,7 @@
         };
 
         den.aspects.igloo = {
-          greeting = "hello from igloo";
+          greeting = "igloo-greeting";
           custom =
             { config, ... }:
             {
@@ -79,10 +79,10 @@
             };
         };
 
-        # If traits are delivered, hostName = "hello from igloo".
+        # If traits are delivered, hostName = "igloo-greeting".
         # If traits are lost (the bug), hostName = "MISSING".
         expr = igloo.networking.hostName;
-        expected = "hello from igloo";
+        expected = "igloo-greeting";
       }
     );
 
