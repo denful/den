@@ -155,5 +155,111 @@
       }
     );
 
+    # Mixed collision policies: lib has class-wins (from pipelineOnly),
+    # custom enrichment has default policy. Each arg resolves independently.
+    test-mixed-collision-policies = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.default.includes = [ den.provides.flake-scope ];
+
+        den.policies.custom-enrichment =
+          { host, ... }:
+          [
+            (den.lib.policy.resolve {
+              myArg = host.class;
+            })
+          ];
+
+        den.aspects.mixed-collision = {
+          nixos =
+            { lib, myArg, ... }:
+            {
+              environment.variables.MIXED_LIB = if lib ? mkIf then "yes" else "no";
+              environment.variables.MIXED_ARG = myArg;
+            };
+        };
+
+        den.aspects.igloo.includes = [ den.aspects.mixed-collision ];
+
+        expr = {
+          lib = igloo.environment.variables.MIXED_LIB;
+          arg = igloo.environment.variables.MIXED_ARG;
+        };
+        expected = {
+          lib = "yes";
+          arg = "nixos";
+        };
+      }
+    );
+
+    # Forward sub-pipelines re-dispatch policies (parent aspectPolicies
+    # injected via extraState). Enrichment from flake-scope should be
+    # available in the forwarded custom class resolved via evalConfig.
+    test-forward-sub-pipeline-receives-enrichment = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.default.includes = [ den.provides.flake-scope ];
+
+        den.classes.variables = {
+          description = "Custom variables class for forward enrichment test";
+        };
+
+        den.schema.host.includes = [
+          (
+            { host, ... }:
+            den._.forward {
+              each = [ "nixos" ];
+              fromClass = _: "variables";
+              intoClass = _: host.class;
+              intoPath = _: [
+                "environment"
+                "sessionVariables"
+              ];
+              fromAspect = _: host.aspect;
+              evalConfig = true;
+            }
+          )
+        ];
+
+        den.aspects.igloo.variables =
+          { lib, ... }:
+          {
+            FORWARD_LIB = if lib ? mkIf then "yes" else "no";
+          };
+
+        expr = igloo.environment.sessionVariables.FORWARD_LIB;
+        expected = "yes";
+      }
+    );
+
+    # Enrichment-only keys (lib from flake-scope) must be handled correctly
+    # when both parametric wrapper and class module use lib. The wrapper
+    # gets pipeline-injected lib (with collisionPolicy), the class module
+    # gets NixOS-native lib.
+    test-enrichment-stripping-at-class-boundary = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.default.includes = [ den.provides.flake-scope ];
+
+        den.aspects.layered =
+          { host, lib, ... }:
+          {
+            nixos =
+              { config, lib, ... }:
+              {
+                environment.variables.LAYERED = lib.optionalString (host.class == "nixos") "yes";
+              };
+          };
+
+        den.aspects.igloo.includes = [ den.aspects.layered ];
+
+        expr = igloo.environment.variables.LAYERED;
+        expected = "yes";
+      }
+    );
+
   };
 }
