@@ -303,10 +303,10 @@ let
   # When both registries are empty (no batteries), fall back to treating
   # all non-structural keys as classes for backward compatibility.
   classifyKeys =
-    targetClass: aspect:
+    dynamicTraitRegistry: targetClass: aspect:
     let
       allKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
-      isEmpty = classRegistry == { } && traitRegistry == { };
+      isEmpty = classRegistry == { } && dynamicTraitRegistry == { };
     in
     if isEmpty then
       {
@@ -323,7 +323,7 @@ let
               acc: k:
               if classRegistry ? ${k} || (targetClass != null && k == targetClass) then
                 acc // { classKeys = acc.classKeys ++ [ k ]; }
-              else if traitRegistry ? ${k} then
+              else if dynamicTraitRegistry ? ${k} then
                 acc // { traitKeys = acc.traitKeys ++ [ k ]; }
               else
                 let
@@ -350,7 +350,7 @@ let
                     && builtins.any (
                       sk:
                       classRegistry ? ${sk}
-                      || traitRegistry ? ${sk}
+                      || dynamicTraitRegistry ? ${sk}
                       || (depth > 0 && hasRecognizedSubKeysAt (depth - 1) (val.${sk}))
                     ) (builtins.attrNames val);
                   hasRecognizedSubKeys = hasRecognizedSubKeysAt 3 innerValue;
@@ -402,7 +402,7 @@ let
     );
 
   emitClassFromDLQ =
-    entry:
+    dynamicTraitSchemas: entry:
     let
       rawValue = entry.rawValue;
       modules =
@@ -431,7 +431,7 @@ let
           ctx = entry.ctx;
           aspectPolicy = entry.aspectPolicy;
           globalPolicy = entry.globalPolicy;
-          traitNames = traitRegistry;
+          traitNames = dynamicTraitSchemas;
           __rawEntry = true;
           isContextDependent = entry.parametricResolved || entry.contextDependent;
         })
@@ -467,6 +467,7 @@ let
       { param, state }:
       let
         queue = (state.deadLetterQueue or (_: [ ])) null;
+        dynamicTraitSchemas = state.traitSchemas null;
       in
       if queue == [ ] then
         {
@@ -476,12 +477,16 @@ let
       else
         let
           classified = builtins.partition (
-            entry: classRegistry ? ${entry.key} || traitRegistry ? ${entry.key}
+            entry: classRegistry ? ${entry.key} || dynamicTraitSchemas ? ${entry.key}
           ) queue;
           matched = classified.right;
           remaining = classified.wrong;
           reEmits = lib.concatMap (
-            entry: if classRegistry ? ${entry.key} then emitClassFromDLQ entry else emitTraitFromDLQ entry
+            entry:
+            if classRegistry ? ${entry.key} then
+              emitClassFromDLQ dynamicTraitSchemas entry
+            else
+              emitTraitFromDLQ entry
           ) matched;
         in
         {
@@ -493,7 +498,7 @@ let
   };
 
   emitClasses =
-    aspect: classKeys: nodeIdentity:
+    dynamicTraitSchemas: aspect: classKeys: nodeIdentity:
     let
       ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
       aspectPolicy = aspect.meta.collisionPolicy or null;
@@ -543,7 +548,7 @@ let
                 aspectPolicy
                 globalPolicy
                 ;
-              traitNames = traitRegistry;
+              traitNames = dynamicTraitSchemas;
               __rawEntry = true;
               isContextDependent =
                 (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
@@ -758,6 +763,30 @@ let
     // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
     // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
 
+  # Emit register-trait-schema for each entry in aspect.traits.
+  # Registered schemas become visible to classifyKeys via get-trait-schemas.
+  # Fires a drain-dead-letters after registration so queued keys that
+  # now match a trait schema get reclassified immediately.
+  emitTraitSchemas =
+    aspect:
+    let
+      schemas = aspect.traits or { };
+      nodeIdentity = identity.pathKey (identity.aspectPath aspect);
+    in
+    if schemas == { } then
+      fx.pure null
+    else
+      fx.bind (fx.seq (
+        lib.mapAttrsToList (
+          traitName: schema:
+          fx.send "register-trait-schema" {
+            name = traitName;
+            inherit schema;
+            ownerIdentity = nodeIdentity;
+          }
+        ) schemas
+      )) (_: fx.send "drain-dead-letters" null);
+
   # Emit register-aspect-policy for each entry in aspect.policies.
   # Each policy is stored with ownerIdentity for exclusion rollback.
   emitAspectPolicies =
@@ -858,12 +887,15 @@ let
         selfProvResults:
         fx.bind (emitCrossProvideShims aspect) (
           _:
-          fx.bind (emitAspectPolicies aspect) (
+          fx.bind (emitTraitSchemas aspect) (
             _:
-            fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
-              includeResults:
-              fx.bind (emitTransitions aspect) (
-                transitionResults: fx.pure (selfProvResults ++ includeResults ++ transitionResults)
+            fx.bind (emitAspectPolicies aspect) (
+              _:
+              fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
+                includeResults:
+                fx.bind (emitTransitions aspect) (
+                  transitionResults: fx.pure (selfProvResults ++ includeResults ++ transitionResults)
+                )
               )
             )
           )
@@ -925,42 +957,49 @@ let
       hasClassHandler:
       fx.bind (if hasClassHandler then fx.send "class" null else fx.pure null) (
         targetClass:
-        let
-          classified = classifyKeys targetClass aspect;
-          inherit (classified)
-            classKeys
-            traitKeys
-            nestedKeys
-            unregisteredClassKeys
-            ;
-          # Unregistered keys enter the dead letter queue for deferred re-classification.
-          # targetClass recognition ensures forward-scoped class aliases are not dropped.
-          allClassKeys = classKeys;
-          ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
-          aspectPolicy = aspect.meta.collisionPolicy or null;
-          globalPolicy = den.config.classModuleCollisionPolicy or "error";
-          deadLetterEffects = map (
-            k:
-            fx.send "dead-letter" {
-              key = k;
-              rawValue = aspect.${k};
-              aspectIdentity = nodeIdentity;
-              aspectName = rawName;
-              inherit ctx aspectPolicy globalPolicy;
-              parametricResolved = aspect.__parametricResolved or false;
-              contextDependent = aspect.meta.contextDependent or false;
-            }
-          ) unregisteredClassKeys;
-        in
-        fx.bind (fx.seq (
-          [
-            (emitClasses aspect allClassKeys nodeIdentity)
-            (emitTraits aspect traitKeys nodeIdentity)
-            (registerConstraints aspect)
-          ]
-          ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
-          ++ deadLetterEffects
-        )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
+        fx.bind (fx.effects.hasHandler "get-trait-schemas") (
+          hasTraitSchemasHandler:
+          fx.bind (if hasTraitSchemasHandler then fx.send "get-trait-schemas" null else fx.pure traitRegistry)
+            (
+              dynamicTraitSchemas:
+              let
+                classified = classifyKeys dynamicTraitSchemas targetClass aspect;
+                inherit (classified)
+                  classKeys
+                  traitKeys
+                  nestedKeys
+                  unregisteredClassKeys
+                  ;
+                # Unregistered keys enter the dead letter queue for deferred re-classification.
+                # targetClass recognition ensures forward-scoped class aliases are not dropped.
+                allClassKeys = classKeys;
+                ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
+                aspectPolicy = aspect.meta.collisionPolicy or null;
+                globalPolicy = den.config.classModuleCollisionPolicy or "error";
+                deadLetterEffects = map (
+                  k:
+                  fx.send "dead-letter" {
+                    key = k;
+                    rawValue = aspect.${k};
+                    aspectIdentity = nodeIdentity;
+                    aspectName = rawName;
+                    inherit ctx aspectPolicy globalPolicy;
+                    parametricResolved = aspect.__parametricResolved or false;
+                    contextDependent = aspect.meta.contextDependent or false;
+                  }
+                ) unregisteredClassKeys;
+              in
+              fx.bind (fx.seq (
+                [
+                  (emitClasses dynamicTraitSchemas aspect allClassKeys nodeIdentity)
+                  (emitTraits aspect traitKeys nodeIdentity)
+                  (registerConstraints aspect)
+                ]
+                ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
+                ++ deadLetterEffects
+              )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
+            )
+        )
       )
     );
 

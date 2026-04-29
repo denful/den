@@ -357,7 +357,7 @@ let
         traits = (state.traits or (_: { })) null;
         currentCtx = param.ctx;
         resolveCtx = traits // currentCtx;
-        traitNames = den.traits or { };
+        traitNames = state.traitSchemas null;
 
         entries = lib.attrsToList aspectPolicies;
         matching = builtins.filter (
@@ -454,6 +454,29 @@ let
       };
   };
 
+  registerTraitSchemaHandler = {
+    "register-trait-schema" =
+      { param, state }:
+      let
+        current = state.traitSchemas null;
+      in
+      {
+        resume = null;
+        state = state // {
+          traitSchemas = _: current // { ${param.name} = param.schema; };
+        };
+      };
+  };
+
+  getTraitSchemasHandler = {
+    "get-trait-schemas" =
+      { param, state }:
+      {
+        resume = state.traitSchemas null;
+        inherit state;
+      };
+  };
+
 in
 {
   inherit
@@ -465,5 +488,7 @@ in
     deferredIncludeHandler
     drainDeferredHandler
     deadLetterHandler
+    registerTraitSchemaHandler
+    getTraitSchemasHandler
     ;
 }

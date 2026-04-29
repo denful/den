@@ -79,6 +79,8 @@ let
     // identity.pathSetHandler
     // identity.collectPathsHandler
     // handlers.registerAspectPolicyHandler
+    // handlers.registerTraitSchemaHandler
+    // handlers.getTraitSchemasHandler
     // handlers.dispatchPolicyIncludesHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
@@ -194,7 +196,7 @@ let
     scopeProvenance = _: { };
 
     # --- Global state ---
-    traitSchemas = _: { };
+    traitSchemas = _: den.traits or { };
   };
 
   mkPipeline =
