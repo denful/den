@@ -365,5 +365,47 @@
       }
     );
 
+    # Regression: fully-applied class modules (all args are den args,
+    # no remaining module-system args) are plain attrsets. The post-pipeline
+    # stripping must not call lib.setFunctionArgs on them — that injects
+    # __functionArgs into the config, crashing the module system.
+    # Regression: fully-applied class modules (all args are den args,
+    # no remaining module-system args) produce plain attrsets with
+    # wrapped=true.  Post-pipeline stripping must not call
+    # lib.setFunctionArgs on plain attrsets — that injects
+    # __functionArgs into the config, crashing the module system.
+    test-fully-applied-hm-no-functionargs-leak = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.policies.host-guards =
+          { host, ... }:
+          [
+            (den.lib.policy.resolve {
+              isDarwin = host.class == "darwin";
+              isNixos = host.class == "nixos";
+            })
+          ];
+
+        # Parametric wrapper with only den args → fully applied.
+        # The inner homeManager value is a plain attrset.
+        den.aspects.jujutsu =
+          { isNixos }:
+          {
+            homeManager.programs.fish.enable = true;
+          };
+
+        den.aspects.igloo.includes = [ den.aspects.jujutsu ];
+
+        # If __functionArgs leaks, this crashes with:
+        # "The option `__functionArgs' does not exist"
+        # Just verify no crash — the parametric wrapper defers until
+        # enrichment provides isNixos, then fully applies.
+        expr = igloo.networking.hostName;
+        expected = "nixos";
+      }
+    );
+
   };
 }

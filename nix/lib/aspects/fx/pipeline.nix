@@ -347,8 +347,9 @@ let
                 # For unwrapped modules, strip args with defaults that aren't
                 # in ctx (they're unknown to both den and NixOS).
                 builtins.filter (k: rawFuncArgs.${k} or false && !(ctx ? ${k})) (builtins.attrNames rawFuncArgs);
+            isFunction = builtins.isFunction result.module;
             finalModule =
-              if argsToStrip == [ ] then
+              if argsToStrip == [ ] || (!isWrappedAttrset && !isFunction) then
                 result.module
               else if isWrappedAttrset then
                 result.module // { __functionArgs = removeAttrs rawFuncArgs argsToStrip; }
