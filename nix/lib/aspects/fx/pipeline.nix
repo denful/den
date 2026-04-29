@@ -128,7 +128,32 @@ let
   #
   # Plain fields (class, transitionDepth, etc.) are small and safe to
   # deepSeq directly.
+
+  # mkScopeId: injective scope identity from a context attrset.
+  # Produces a canonical comma-separated "key=value" string, sorted by key.
+  mkScopeId =
+    ctx:
+    lib.concatStringsSep "," (
+      lib.sort (a: b: a < b) (
+        map (
+          k:
+          let
+            v = ctx.${k};
+          in
+          "${k}=${
+            if builtins.isAttrs v && v ? name then
+              v.name
+            else if builtins.isString v then
+              v
+            else
+              "<${builtins.typeOf v}:${k}>"
+          }"
+        ) (builtins.attrNames ctx)
+      )
+    );
+
   defaultState = {
+    # --- Existing flat state (handlers still write here until Task 1+) ---
     seen = _: { };
     classImports = _: { };
     constraintRegistry = _: { };
@@ -143,6 +168,33 @@ let
     aspectPolicies = _: { };
     forwardSpecs = _: [ ];
     deadLetterQueue = _: [ ];
+
+    # --- Scope-partitioned output state (future: handlers write here) ---
+    scopedClassImports = _: { };
+    scopedTraits = _: { };
+    scopedDeferredTraits = _: { };
+    scopedConsumedTraits = _: { };
+    scopedForwardSpecs = _: { };
+    scopedAspectPolicies = _: { };
+    scopedDeferredIncludes = _: { };
+    scopedDeadLetterQueue = _: { };
+    scopedIncludesChain = _: { };
+    scopedConstraintRegistry = _: { };
+    scopedConstraintFilters = _: { };
+
+    # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
+    includeSeen = _: { };
+
+    # --- Scope tree tracking ---
+    currentScope = null;
+    scopeStack = _: [ ];
+    scopeContexts = _: { };
+    scopeParent = _: { };
+    scopeChildren = _: { };
+    scopeProvenance = _: { };
+
+    # --- Global state ---
+    traitSchemas = _: { };
   };
 
   mkPipeline =
@@ -164,6 +216,8 @@ let
           "aspect-chain" = [ self ];
         };
       };
+      rootScopeId = mkScopeId ctx;
+      traitSchemasVal = den.traits or { };
     in
     fx.handle {
       handlers = composeHandlers rootHandlers extraHandlers;
@@ -174,6 +228,9 @@ let
         // {
           currentCtx = _: ctx;
           inherit class;
+          currentScope = rootScopeId;
+          scopeContexts = _: { ${rootScopeId} = ctx; };
+          traitSchemas = _: traitSchemasVal;
         };
     } bootstrapAndResolve;
 
