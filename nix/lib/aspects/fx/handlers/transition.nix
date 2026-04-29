@@ -399,7 +399,13 @@ let
                   ctxNames = mkCtxId scopedCtx;
                   ctxKey = if isFanOut then "${key}/{${ctxNames}}" else key;
                   scopeHandlers = constantHandler scopedCtx;
-                  updateCtx = fx.effects.state.modify (st: st // { currentCtx = _: scopedCtx; });
+                  updateCtx = fx.effects.state.modify (
+                    st:
+                    st
+                    // {
+                      scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = scopedCtx; };
+                    }
+                  );
                   baseComputation =
                     if isFanOut && ((transition.routing or { }).isolateFanOut or false) then
                       resolveFanOut {
@@ -458,7 +464,8 @@ let
       { param, state }:
       let
         sourceAspect = param.self;
-        rootCtx = (state.currentCtx or (_: { })) null;
+        scope = state.currentScope;
+        rootCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         # Merge the source aspect's context so that stages resolved with
         # explicit context have their context available for the into function.
         aspectCtx = den.lib.aspects.fx.aspect.ctxFromHandlers (sourceAspect.__scopeHandlers or { });
@@ -687,40 +694,48 @@ let
               enrichedCtx = currentCtx // combinedEnrichment;
               enrichHandlers = constantHandler combinedEnrichment;
             in
-            fx.bind (fx.effects.state.modify (st: st // { currentCtx = _: enrichedCtx; })) (
-              _:
-              fx.bind
-                (fx.effects.scope.provide enrichHandlers (
-                  fx.bind (fx.send "drain-deferred" enrichedCtx) (
-                    satisfiable:
-                    fx.bind (fx.send "drain-dead-letters" null) (
-                      _:
-                      builtins.foldl' (
-                        acc: deferred:
-                        fx.bind acc (
-                          _:
-                          let
-                            scopeHandlers = constantHandler enrichedCtx;
-                            ctxId = mkCtxId enrichedCtx;
-                            deferredTagged = deferred.child // {
-                              __scopeHandlers = scopeHandlers;
-                              __ctxId = ctxId;
-                            };
-                          in
-                          fx.bind (aspectToEffect deferredTagged) (_: fx.pure null)
-                        )
-                      ) (fx.pure null) satisfiable
+            fx.bind
+              (fx.effects.state.modify (
+                st:
+                st
+                // {
+                  scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; };
+                }
+              ))
+              (
+                _:
+                fx.bind
+                  (fx.effects.scope.provide enrichHandlers (
+                    fx.bind (fx.send "drain-deferred" enrichedCtx) (
+                      satisfiable:
+                      fx.bind (fx.send "drain-dead-letters" null) (
+                        _:
+                        builtins.foldl' (
+                          acc: deferred:
+                          fx.bind acc (
+                            _:
+                            let
+                              scopeHandlers = constantHandler enrichedCtx;
+                              ctxId = mkCtxId enrichedCtx;
+                              deferredTagged = deferred.child // {
+                                __scopeHandlers = scopeHandlers;
+                                __ctxId = ctxId;
+                              };
+                            in
+                            fx.bind (aspectToEffect deferredTagged) (_: fx.pure null)
+                          )
+                        ) (fx.pure null) satisfiable
+                      )
                     )
+                  ))
+                  (
+                    _:
+                    let
+                      nextResolveCtx = traits // enrichedCtx // { __entityKind = sourceEntityKind; };
+                    in
+                    iterateEnrichment (iteration + 1) combinedTransitions combinedEnrichment newFired nextResolveCtx
                   )
-                ))
-                (
-                  _:
-                  let
-                    nextResolveCtx = traits // enrichedCtx // { __entityKind = sourceEntityKind; };
-                  in
-                  iterateEnrichment (iteration + 1) combinedTransitions combinedEnrichment newFired nextResolveCtx
-                )
-            );
+              );
       in
       if depth >= maxTransitionDepth then
         throw "den: transition depth exceeded ${toString maxTransitionDepth} — likely a cycle in den.policies (${sourceAspect.name or "?"})"

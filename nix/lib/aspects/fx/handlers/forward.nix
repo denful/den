@@ -208,7 +208,8 @@ let
         # Capture parent entity context at handler time for post-processing.
         # Sources with explicit context (__scopeHandlers) keep theirs;
         # sources without context inherit parent entities.
-        parentCtx = (state.currentCtx or (_: { })) null;
+        scope = state.currentScope;
+        parentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         entityCtx = lib.filterAttrs (_: builtins.isAttrs) parentCtx;
         sourceScopeHandlers = spec.sourceAspect.__scopeHandlers or { };
         sourceCtx = den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers;

@@ -105,7 +105,8 @@ let
       { param, state }:
       let
         kind = param.kind;
-        currentCtx = (state.currentCtx or (_: { })) null;
+        scope = state.currentScope;
+        currentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         entity = den.lib.resolveEntity kind currentCtx;
         strippedIncludes =
           if denDefault != null then
@@ -285,12 +286,10 @@ let
     in
     fx.handle {
       handlers = composeHandlers rootHandlers extraHandlers;
-      # Wrap currentCtx in a thunk so deepSeq doesn't force NixOS config objects.
       state =
         defaultState
         // extraState
         // {
-          currentCtx = _: ctx;
           inherit class;
           currentScope = rootScopeId;
           scopeContexts = _: { ${rootScopeId} = ctx; };
@@ -405,7 +404,8 @@ let
     let
       rawClassImports = result.state.classImports null;
       forwardSpecs = result.state.forwardSpecs null;
-      finalCtx = (result.state.currentCtx or (_: { })) null;
+      subRootScope = mkScopeId ctx;
+      finalCtx = (result.state.scopeContexts null).${subRootScope} or ctx;
       wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
       forwarded = applyForwardSpecs {
         inherit forwardSpecs;
@@ -612,7 +612,8 @@ let
         # Extract enriched context from pipeline state for post-pipeline wrapping.
         # Enrichment policies inject non-schema bindings (isNixos, isDarwin, etc.)
         # that may not have been available at class module emit time.
-        finalCtx = (result.state.currentCtx or (_: { })) null;
+        rootScopeId' = mkScopeId ctx;
+        finalCtx = (result.state.scopeContexts null).${rootScopeId'} or ctx;
         # Wrap BEFORE forwards — forward source modules need wrapped class data + traitModule.
         wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
         # Apply forwards AFTER wrapping + traitModule synthesis.
