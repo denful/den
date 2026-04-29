@@ -154,6 +154,70 @@ let
       )
     );
 
+  # Walk scope tree for trait inheritance.
+  # "list": parent data ++ own data (accumulate up tree)
+  # "map": parent data // own data (child overrides parent keys)
+  # "single": own data only (no inheritance)
+  inheritTraits =
+    { scopedTraits, scopeParent }:
+    scopeId: traitName: strategy:
+    let
+      emptyDefault = if strategy == "map" then { } else [ ];
+      own = (scopedTraits.${scopeId} or { }).${traitName} or emptyDefault;
+      parentId = scopeParent.${scopeId} or null;
+      parentData =
+        if parentId == null then
+          emptyDefault
+        else
+          inheritTraits { inherit scopedTraits scopeParent; } parentId traitName strategy;
+    in
+    if strategy == "single" then
+      own
+    else if strategy == "map" then
+      parentData // own
+    else
+      parentData ++ own;
+
+  # Synthesize a traitModule for a specific scope with inheritance.
+  traitModuleForScope =
+    {
+      scopedTraits,
+      scopedDeferredTraits,
+      scopeParent,
+      traitSchemas,
+    }:
+    scopeId:
+    {
+      config,
+      lib,
+      pkgs,
+      options,
+      modulesPath,
+      ...
+    }@moduleArgs:
+    {
+      options._den.traits = lib.mkOption {
+        type = lib.types.attrsOf lib.types.anything;
+        default = { };
+        internal = true;
+      };
+      config._den.traits = lib.mapAttrs (
+        traitName: schema:
+        let
+          strategy = schema.collection or "list";
+          inherited = inheritTraits { inherit scopedTraits scopeParent; } scopeId traitName strategy;
+          deferred = (scopedDeferredTraits.${scopeId} or { }).${traitName} or [ ];
+          deferredData = map (e: e.value moduleArgs) deferred;
+        in
+        if strategy == "single" then
+          if deferredData != [ ] then builtins.head deferredData else inherited
+        else if strategy == "map" then
+          builtins.foldl' (acc: d: acc // d) inherited deferredData
+        else
+          inherited ++ deferredData
+      ) traitSchemas;
+    };
+
   defaultState = {
     # --- Existing flat state (handlers still write here until Task 1+) ---
     seen = _: { };
@@ -599,6 +663,8 @@ in
     composeHandlers
     defaultHandlers
     defaultState
+    inheritTraits
+    traitModuleForScope
     mkPipeline
     mkScopeId
     fxFullResolve

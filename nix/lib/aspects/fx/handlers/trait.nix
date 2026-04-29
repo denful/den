@@ -205,10 +205,51 @@ let
       traitName: schema:
       { param, state }:
       let
-        traits = (state.traits or (_: { })) null;
         strategy = if builtins.isAttrs schema then schema.collection or "list" else "list";
         emptyDefault = if strategy == "map" then { } else [ ];
-        traitData = traits.${traitName} or emptyDefault;
+        # Try scoped read with inheritance first, fall back to flat
+        scope = state.currentScope or null;
+        scopedTraits = (state.scopedTraits or (_: { })) null;
+        scopeParent = (state.scopeParent or (_: { })) null;
+        hasScoped = scope != null && scopedTraits != { };
+        traitData =
+          if hasScoped then
+            if strategy == "single" then
+              (scopedTraits.${scope} or { }).${traitName} or null
+            else if strategy == "map" then
+              let
+                own = (scopedTraits.${scope} or { }).${traitName} or { };
+                walkParent =
+                  pid:
+                  if pid == null then
+                    { }
+                  else
+                    let
+                      pData = (scopedTraits.${pid} or { }).${traitName} or { };
+                    in
+                    (walkParent (scopeParent.${pid} or null)) // pData;
+              in
+              (walkParent (scopeParent.${scope} or null)) // own
+            else
+              let
+                own = (scopedTraits.${scope} or { }).${traitName} or [ ];
+                walkParent =
+                  pid:
+                  if pid == null then
+                    [ ]
+                  else
+                    let
+                      pData = (scopedTraits.${pid} or { }).${traitName} or [ ];
+                    in
+                    (walkParent (scopeParent.${pid} or null)) ++ pData;
+              in
+              (walkParent (scopeParent.${scope} or null)) ++ own
+          else
+            # Fallback: flat read (tests without full pipeline)
+            let
+              traits = (state.traits or (_: { })) null;
+            in
+            traits.${traitName} or emptyDefault;
         consumed = (state.consumedTraits or (_: { })) null;
       in
       {
@@ -223,15 +264,18 @@ let
           scopedConsumedTraits =
             _:
             let
-              all = state.scopedConsumedTraits null;
-              scope = state.currentScope;
+              all = (state.scopedConsumedTraits or (_: { })) null;
+              sc = state.currentScope or null;
             in
-            all
-            // {
-              ${scope} = (all.${scope} or { }) // {
-                ${traitName} = true;
+            if sc == null then
+              all
+            else
+              all
+              // {
+                ${sc} = (all.${sc} or { }) // {
+                  ${traitName} = true;
+                };
               };
-            };
         };
       }
     ) traitSchemas;
