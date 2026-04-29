@@ -200,6 +200,19 @@ let
             // {
               ${param.class} = (current.${param.class} or [ ]) ++ [ mod ];
             };
+          scopedClassImports =
+            x:
+            let
+              all = state.scopedClassImports x;
+              scope = state.currentScope;
+              scopeData = all.${scope} or { };
+            in
+            all
+            // {
+              ${scope} = scopeData // {
+                ${param.class} = (scopeData.${param.class} or [ ]) ++ [ mod ];
+              };
+            };
         };
       };
   };

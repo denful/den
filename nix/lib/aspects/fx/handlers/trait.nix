@@ -132,6 +132,25 @@ let
                     }
                   ];
                 };
+              scopedDeferredTraits =
+                _:
+                let
+                  all = state.scopedDeferredTraits null;
+                  scope = state.currentScope;
+                  scopeData = all.${scope} or { };
+                  existingScoped = scopeData.${traitName} or [ ];
+                in
+                all
+                // {
+                  ${scope} = scopeData // {
+                    ${traitName} = existingScoped ++ [
+                      {
+                        value = rawValue;
+                        chain = param.chain or "<unknown>";
+                      }
+                    ];
+                  };
+                };
             };
           }
         else
@@ -152,6 +171,25 @@ let
                 traits
                 // {
                   ${traitName} = collected;
+                };
+              scopedTraits =
+                _:
+                let
+                  all = state.scopedTraits null;
+                  scope = state.currentScope;
+                  scopeData = all.${scope} or { };
+                  existingScoped = scopeData.${traitName} or (if strategy == "map" then { } else [ ]);
+                  collectedScoped = collectTrait {
+                    inherit strategy traitName;
+                    existing = existingScoped;
+                    newValue = tierInfo.value;
+                  };
+                in
+                all
+                // {
+                  ${scope} = scopeData // {
+                    ${traitName} = collectedScoped;
+                  };
                 };
             };
           };
@@ -181,6 +219,18 @@ let
             consumed
             // {
               ${traitName} = true;
+            };
+          scopedConsumedTraits =
+            _:
+            let
+              all = state.scopedConsumedTraits null;
+              scope = state.currentScope;
+            in
+            all
+            // {
+              ${scope} = (all.${scope} or { }) // {
+                ${traitName} = true;
+              };
             };
         };
       }

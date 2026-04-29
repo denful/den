@@ -224,6 +224,16 @@ let
         resume = null;
         state = state // {
           forwardSpecs = x: (state.forwardSpecs x) ++ [ enrichedSpec ];
+          scopedForwardSpecs =
+            x:
+            let
+              all = state.scopedForwardSpecs x;
+              scope = state.currentScope;
+            in
+            all
+            // {
+              ${scope} = (all.${scope} or [ ]) ++ [ enrichedSpec ];
+            };
         };
       };
   };
