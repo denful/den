@@ -18,5 +18,5 @@ in
     if __entityKind != "flake-parts" then
       [ ]
     else
-      [ (resolve.to "flake-parts-system" { fromClass = _: "packages"; }) ];
+      [ (resolve.to "flake-parts-system" { fromClass = "packages"; }) ];
 }

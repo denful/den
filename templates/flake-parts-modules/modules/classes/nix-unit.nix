@@ -27,19 +27,11 @@ in
     else
       [
         (resolve.to "flake-parts-system" {
-          fromClass = _: "tests";
-          intoPath = _: [
+          fromClass = "tests";
+          intoPath = [
             "nix-unit"
             "tests"
           ];
-          # test helpers
-          adaptArgs =
-            args:
-            let
-              igloo = config.flake.nixosConfigurations.igloo.config;
-              tux = igloo.users.users.tux;
-            in
-            args.config.allModuleArgs // { inherit igloo tux; };
         })
       ];
 }

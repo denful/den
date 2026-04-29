@@ -15,8 +15,8 @@ in
     else
       [
         (resolve.to "flake-parts-system" {
-          fromClass = _: "devshell";
-          intoPath = _: [
+          fromClass = "devshell";
+          intoPath = [
             "devshells"
             "default"
           ];

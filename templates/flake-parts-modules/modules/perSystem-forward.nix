@@ -1,23 +1,22 @@
 { den, lib, ... }:
 let
+  flakePartsEntity = den.lib.resolveEntity "flake-parts" { };
 
   perSystemFwd =
-    forwardArgs:
-    { class, aspect-chain }:
-    den.provides.forward (
-      {
-        each = lib.optional (class == "flake-parts") forwardArgs;
-        intoClass = _: "flake-parts";
-        fromAspect = _: lib.head aspect-chain;
-        adaptArgs = { config, ... }: config.allModuleArgs;
-      }
-      // forwardArgs
-      // lib.optionalAttrs (!forwardArgs ? intoPath) {
-        intoPath = x: [ (forwardArgs.fromClass x) ];
-      }
-    );
+    {
+      fromClass,
+      intoPath ? [ fromClass ],
+      ...
+    }:
+    den.provides.forward {
+      each = [ true ];
+      fromClass = _: fromClass;
+      intoClass = _: "flake-parts";
+      intoPath = _: intoPath;
+      fromAspect = _: flakePartsEntity;
+      adaptArgs = { config, ... }: config.allModuleArgs;
+    };
 
-  ctx.flake-parts = { };
   perSystemModule = den.lib.aspects.resolve "flake-parts" (den.lib.resolveEntity "flake-parts" { });
 in
 {
