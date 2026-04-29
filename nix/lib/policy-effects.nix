@@ -44,4 +44,18 @@
     __policyEffect = "exclude";
     value = aspect;
   };
+
+  # Tag a value with collisionPolicy = "class-wins".
+  # When the value reaches a class module that also receives the same arg
+  # from the module system (e.g., NixOS provides `lib`), the class value
+  # wins silently — no collision error.
+  pipelineOnly =
+    value:
+    if builtins.isAttrs value then
+      value // { collisionPolicy = "class-wins"; }
+    else
+      {
+        __functor = _: value;
+        collisionPolicy = "class-wins";
+      };
 }
