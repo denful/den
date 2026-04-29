@@ -297,42 +297,6 @@ let
     in
     fx.bind pushScope (_: fx.bind mergeImports (_: fx.bind popScope (_: fx.pure innerResults)));
 
-  # Routing decision: sibling targets (routing.from == routing.to) route
-  # through provide-to for cross-entity distribution. Child targets
-  # resolve locally. Manual into transitions always resolve locally.
-  isSiblingRoute =
-    transition: transition ? routing && transition.routing.from == transition.routing.to;
-
-  resolveSiblingTransition =
-    targetClass: sourceAspect: currentCtx: results: transition:
-    builtins.foldl' (
-      acc: indexed:
-      fx.bind acc (
-        innerResults:
-        let
-          newCtx = indexed.ctx;
-          scopedCtx = currentCtx // newCtx;
-          rawTarget = newCtx.${transition.routing.targetKey} or newCtx;
-          targetEntity =
-            if builtins.isAttrs rawTarget && !(rawTarget ? name) then
-              builtins.trace "den: sibling route target has no name — groupByTarget will use label as key" rawTarget
-            else
-              rawTarget;
-          # Run sub-pipeline per peer to collect traits from source entity.
-          stageAspect = den.lib.resolveEntity transition.routing.from scopedCtx;
-          sub = den.lib.aspects.fx.pipeline.runSubPipeline {
-            class = targetClass;
-            self = stageAspect;
-            ctx = scopedCtx;
-          };
-          traits = sub.traits;
-        in
-        fx.send "provide-to" {
-          inherit targetEntity traits;
-        }
-      )
-    ) (fx.pure results) (lib.imap0 (i: ctx: { inherit i ctx; }) transition.contexts);
-
   # Register exclude constraints from policy routing before resolution.
   registerExcludes =
     policyName: excludes:
@@ -384,8 +348,10 @@ let
     if transition.contexts == [ ] then
       # Include/exclude-only transition — no resolve targets.
       processIncludeOnly currentCtx results transition
-    else if isSiblingRoute transition then
-      resolveSiblingTransition targetClass sourceAspect currentCtx results transition
+    else if transition ? routing && transition.routing.from == transition.routing.to then
+      # Sibling route (from == to): skip. Previously routed through provide-to
+      # for cross-entity trait distribution; scope inheritance replaces this.
+      fx.pure results
     else
       let
         key = "${targetClass}/${lib.concatStringsSep "/" transition.path}";

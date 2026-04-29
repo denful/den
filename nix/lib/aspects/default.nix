@@ -62,7 +62,7 @@ let
       self = wrapped;
     };
 
-  # Like resolve but returns full pipeline result including state.provideTo.
+  # Like resolve but returns full pipeline result including state.
   fxResolveTreeFull =
     class: resolved:
     let

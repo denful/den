@@ -88,7 +88,6 @@ let
     // drainDeadLettersHandler
     // resolveEntityHandler
     // handlers.forwardHandler
-    // handlers.provideToHandler
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.
@@ -227,7 +226,6 @@ let
     pathSet = _: { };
     includesChain = _: [ ];
     deferredIncludes = _: [ ];
-    provideTo = _: [ ];
     traits = _: { };
     deferredTraits = _: { };
     consumedTraits = _: { };
@@ -327,7 +325,7 @@ let
     in
     own ++ nested;
 
-  # Returns { classImports, provideTo } with forwarded content merged.
+  # Returns { classImports } with forwarded content merged.
   applyForwardSpecs =
     {
       forwardSpecs,
@@ -335,62 +333,55 @@ let
       traitModule,
       hasTraitSchemas,
     }:
-    builtins.foldl'
-      (
-        acc: spec:
-        let
-          normalizedSource = normalizeRoot spec.sourceAspect;
-          sub = runSubPipeline {
-            class = spec.fromClass;
-            self = normalizedSource;
-            ctx = spec.__resolveCtx;
-            extraState = {
-              aspectPolicies = spec.__aspectPolicies;
+    builtins.foldl' (
+      acc: spec:
+      let
+        normalizedSource = normalizeRoot spec.sourceAspect;
+        sub = runSubPipeline {
+          class = spec.fromClass;
+          self = normalizedSource;
+          ctx = spec.__resolveCtx;
+          extraState = {
+            aspectPolicies = spec.__aspectPolicies;
+          };
+        };
+        # Sub-pipeline has its own trait state — synthesize a traitModule for it
+        # so evalConfig forwards can access config._den.traits.
+        subTraitSchemas = den.traits or { };
+        subHasTraitSchemas = subTraitSchemas != { };
+        subTraits = sub.traits;
+        subTraitModule =
+          { ... }:
+          {
+            options._den.traits = lib.mkOption {
+              type = lib.types.attrsOf lib.types.anything;
+              default = { };
+              internal = true;
             };
+            # Tier 1/2 only — no deferred data in sub-pipeline scope.
+            config._den.traits = lib.mapAttrs (
+              traitName: schema:
+              let
+                strategy = schema.collection or "list";
+                raw = subTraits.${traitName} or (if strategy == "map" then { } else [ ]);
+              in
+              raw
+            ) subTraitSchemas;
           };
-          # Sub-pipeline has its own trait state — synthesize a traitModule for it
-          # so evalConfig forwards can access config._den.traits.
-          subTraitSchemas = den.traits or { };
-          subHasTraitSchemas = subTraitSchemas != { };
-          subTraits = sub.traits;
-          subTraitModule =
-            { ... }:
-            {
-              options._den.traits = lib.mkOption {
-                type = lib.types.attrsOf lib.types.anything;
-                default = { };
-                internal = true;
-              };
-              # Tier 1/2 only — no deferred or cross-entity data in sub-pipeline scope.
-              config._den.traits = lib.mapAttrs (
-                traitName: schema:
-                let
-                  strategy = schema.collection or "list";
-                  raw = subTraits.${traitName} or (if strategy == "map" then { } else [ ]);
-                in
-                raw
-              ) subTraitSchemas;
-            };
-          rawSourceModule = {
-            imports =
-              (sub.classImports.${spec.fromClass} or [ ]) ++ lib.optional subHasTraitSchemas subTraitModule;
-          };
-          sourceModule = spec.mapModule rawSourceModule;
-          forwardAspect = handlers.buildForwardAspect spec sourceModule;
-          newMods = collectClassMods spec.intoClass forwardAspect;
-        in
-        {
-          classImports = acc.classImports // {
-            ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
-          };
-          provideTo = acc.provideTo ++ sub.provideTo;
-        }
-      )
+        rawSourceModule = {
+          imports =
+            (sub.classImports.${spec.fromClass} or [ ]) ++ lib.optional subHasTraitSchemas subTraitModule;
+        };
+        sourceModule = spec.mapModule rawSourceModule;
+        forwardAspect = handlers.buildForwardAspect spec sourceModule;
+        newMods = collectClassMods spec.intoClass forwardAspect;
+      in
       {
-        inherit classImports;
-        provideTo = [ ];
+        classImports = acc.classImports // {
+          ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
+        };
       }
-      forwardSpecs;
+    ) { inherit classImports; } forwardSpecs;
 
   # Thin wrapper: runs sub-pipeline, materializes state thunks.
   # Each call site does its own post-processing.
@@ -422,12 +413,10 @@ let
         traitModule = null;
         hasTraitSchemas = false;
       };
-      pipelineProvideTo = (result.state.provideTo or (_: [ ])) null;
     in
     {
       classImports = forwarded.classImports;
       traits = result.state.traits null;
-      provideTo = pipelineProvideTo ++ forwarded.provideTo;
     };
 
   # Post-pipeline wrapping pass: wrap raw class entries (__rawEntry = true)
@@ -554,7 +543,6 @@ let
       class,
       self,
       ctx,
-      crossEntityTraits ? { },
     }:
     let
       result = mkPipeline { inherit class; } { inherit self ctx; };
@@ -596,7 +584,6 @@ let
               raw = traits.${traitName} or (if strategy == "map" then { } else [ ]);
               deferred = deferredTraits.${traitName} or [ ];
               deferredData = map (e: e.value moduleArgs) deferred;
-              crossEntity = crossEntityTraits.${traitName} or (if strategy == "map" then { } else [ ]);
               mergeMaps =
                 base: extras:
                 builtins.foldl' (
@@ -610,13 +597,7 @@ let
                     acc // d
                 ) base extras;
             in
-            if strategy == "map" then
-              # "map": merge pipeline data, deferred emissions, and cross-entity data
-              # (duplicates error across all three)
-              mergeMaps raw (deferredData ++ [ crossEntity ])
-            else
-              # "list": pipeline data, deferred emissions, then cross-entity data
-              raw ++ deferredData ++ crossEntity
+            if strategy == "map" then mergeMaps raw deferredData else raw ++ deferredData
           ) traitSchemas;
         };
 
@@ -636,9 +617,6 @@ let
         wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
         # Apply forwards AFTER wrapping + traitModule synthesis.
         # Forward source modules now include traitModule, fixing Tier 3 trait delivery.
-        # forwarded.provideTo intentionally ignored — fxResolve never
-        # exposed provideTo (only returns { imports }). provideTo from
-        # forward sub-pipelines is handled by runSubPipeline callers.
         forwarded = applyForwardSpecs {
           inherit forwardSpecs traitModule hasTraitSchemas;
           classImports = wrappedClassImports;
