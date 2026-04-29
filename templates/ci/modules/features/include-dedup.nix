@@ -382,16 +382,15 @@
             };
           includes = [ ];
         };
-        result = den.lib.aspects.fx.pipeline.fxFullResolve {
+        result = den.lib.aspects.fx.pipeline.fxResolve {
           class = "nixos";
           self = aspect;
           ctx = { };
         };
       in
       {
-        # Before fix: 1 (module passes through unwrapped).
-        # After fix: 0 (unsatisfied guard skips emission).
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        # Without user context: unsatisfied module skipped → 0 imports.
+        expr = builtins.length result.imports;
         expected = 0;
       }
     );
@@ -417,7 +416,7 @@
           includes = [ ];
           __scopeHandlers = handlers.constantHandler { user = "tux"; };
         };
-        result = den.lib.aspects.fx.pipeline.fxFullResolve {
+        result = den.lib.aspects.fx.pipeline.fxResolve {
           class = "nixos";
           self = aspect;
           ctx = {
@@ -427,7 +426,7 @@
       in
       {
         # With user context: module wraps (main + validator) → 2 imports.
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length result.imports;
         expected = 2;
       }
     );

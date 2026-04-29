@@ -422,7 +422,6 @@ let
       { idx, module }:
       let
         elemIdentity = if isMulti then "${entry.aspectIdentity}[${toString idx}]" else entry.aspectIdentity;
-        isFunc = builtins.isFunction module;
       in
       [
         (fx.send "emit-class" {
@@ -434,7 +433,7 @@ let
           globalPolicy = entry.globalPolicy;
           traitNames = traitRegistry;
           __rawEntry = true;
-          isContextDependent = isFunc || entry.parametricResolved || entry.contextDependent;
+          isContextDependent = entry.parametricResolved || entry.contextDependent;
         })
       ]
     ) indexed;
@@ -533,7 +532,6 @@ let
           { idx, module }:
           let
             elemIdentity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
-            isFunc = builtins.isFunction module;
           in
           [
             (fx.send "emit-class" {
@@ -548,7 +546,7 @@ let
               traitNames = traitRegistry;
               __rawEntry = true;
               isContextDependent =
-                isFunc || (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
+                (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
             })
           ]
         ) indexed

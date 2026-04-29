@@ -263,13 +263,96 @@ let
       rawClassImports = result.state.classImports null;
       forwardSpecs = result.state.forwardSpecs null;
       forwarded = applyForwardSpecs forwardSpecs rawClassImports;
+      finalCtx = (result.state.currentCtx or (_: { })) null;
+      wrappedClassImports = wrapCollectedClasses finalCtx forwarded.classImports;
       pipelineProvideTo = (result.state.provideTo or (_: [ ])) null;
     in
     {
-      inherit (forwarded) classImports;
+      classImports = wrappedClassImports;
       traits = result.state.traits null;
       provideTo = pipelineProvideTo ++ forwarded.provideTo;
     };
+
+  # Post-pipeline wrapping pass: wrap raw class entries (__rawEntry = true)
+  # using wrapClassModule with the full enriched context they carry.
+  # Non-raw entries pass through unchanged.
+  wrapCollectedClasses =
+    enrichedCtx: classImports:
+    lib.mapAttrs (
+      class: entries:
+      lib.concatMap (
+        entry:
+        if !(entry.__rawEntry or false) then
+          # Legacy or already-wrapped entry — pass through
+          [ entry ]
+        else
+          let
+            # Merge enrichment-only keys into the entry's emit-time ctx.
+            # Only keys NOT already in entry.ctx are added — this avoids
+            # overwriting entity bindings (host, user) from a different
+            # scope while providing enrichment args (isNixos, isDarwin).
+            enrichmentKeys = lib.filterAttrs (k: _: !(entry.ctx ? ${k})) enrichedCtx;
+            ctx = entry.ctx // enrichmentKeys;
+            result = den.lib.aspects.fx.aspect.wrapClassModule {
+              inherit ctx;
+              inherit (entry)
+                module
+                aspectPolicy
+                globalPolicy
+                traitNames
+                ;
+            };
+            # Enrichment-only args must NOT be advertised to NixOS — they
+            # don't exist in _module.args and would trigger infinite recursion
+            # when NixOS tries to look them up. Standard den args (host, user)
+            # DO exist in _module.args and are safe to advertise.
+            enrichmentOnlyKeys = builtins.attrNames enrichmentKeys;
+            # Strip enrichment-only keys from the wrapped module's advertised
+            # args so NixOS won't try to resolve them from _module.args.
+            # For wrapped function modules, strip enrichment-only keys from
+            # the advertised args. setFunctionArgs returns an attrset with
+            # __functor + __functionArgs, so check __functionArgs presence.
+            hasAdvertisedArgs = builtins.isAttrs result.module && result.module ? __functionArgs;
+            finalModule =
+              if result.wrapped && enrichmentOnlyKeys != [ ] && hasAdvertisedArgs then
+                result.module // { __functionArgs = removeAttrs result.module.__functionArgs enrichmentOnlyKeys; }
+              else
+                result.module;
+            nodeIdentity = entry.identity or "<anon>";
+            isAnon =
+              !(den.lib.aspects.isMeaningfulName nodeIdentity)
+              || lib.hasPrefix "<root>/" nodeIdentity
+              || lib.hasInfix "/<anon>:" nodeIdentity;
+            isContextDependent = result.wrapped || (entry.isContextDependent or false);
+            finalIdentity =
+              if isContextDependent then nodeIdentity else lib.head (lib.splitString "/{" nodeIdentity);
+            finalLoc = "${class}@${finalIdentity}";
+            wrappedMod =
+              if isAnon then
+                lib.setDefaultModuleLocation finalLoc finalModule
+              else
+                {
+                  key = finalLoc;
+                  _file = finalLoc;
+                  imports = [ finalModule ];
+                };
+            validatorMod =
+              let
+                validatorLoc = "${class}@${nodeIdentity}/<collision-validator>";
+                validatorModule = lib.setFunctionArgs result.validator (
+                  result.validatorAdvertisedArgs or result.advertisedArgs or { }
+                );
+              in
+              lib.setDefaultModuleLocation validatorLoc validatorModule;
+          in
+          if result.unsatisfied or false then
+            builtins.trace
+              "den: class module ${class}@${nodeIdentity} skipped — context never provided: ${toString result.missingArgs}"
+              [ ]
+          else
+            [ wrappedMod ] ++ lib.optional (result ? validator) validatorMod
+      ) entries
+    ) classImports;
 
   # Drop-in resolve shape: returns { imports = [...] }.
   fxResolve =
@@ -355,6 +438,11 @@ let
         # exposed provideTo (only returns { imports }). provideTo from
         # forward sub-pipelines is handled by runSubPipeline callers.
         forwarded = applyForwardSpecs forwardSpecs rawClassImports;
+        # Extract enriched context from pipeline state for post-pipeline wrapping.
+        # Enrichment policies inject non-schema bindings (isNixos, isDarwin, etc.)
+        # that may not have been available at class module emit time.
+        finalCtx = (result.state.currentCtx or (_: { })) null;
+        wrappedClassImports = wrapCollectedClasses finalCtx forwarded.classImports;
         # Dead letter queue diagnostics — warn about keys never claimed by any registry.
         finalDLQ = (result.state.deadLetterQueue or (_: [ ])) null;
         _dlqWarn = builtins.seq (map (
@@ -367,7 +455,7 @@ let
         # fxFullResolve (state.classImports null). Not exposed here because
         # fxResolve's return is used as a NixOS deferredModule by entity
         # types — extra attrs would error.
-        imports = (forwarded.classImports.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
+        imports = (wrappedClassImports.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in
 {
