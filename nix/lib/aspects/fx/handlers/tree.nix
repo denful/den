@@ -37,6 +37,23 @@ let
                   inherit scope ownerChain;
                 }
               ];
+            scopedConstraintFilters =
+              _:
+              let
+                all = (state.scopedConstraintFilters or (_: { })) null;
+                currentScope = state.currentScope;
+                existing = all.${currentScope} or [ ];
+              in
+              all
+              // {
+                ${currentScope} = existing ++ [
+                  {
+                    predicate = param.predicate;
+                    owner = param.owner or "<anon>";
+                    inherit scope ownerChain;
+                  }
+                ];
+              };
           };
         }
       else
@@ -58,6 +75,20 @@ let
               registry
               // {
                 ${param.identity} = existing ++ [ entry ];
+              };
+            scopedConstraintRegistry =
+              _:
+              let
+                all = (state.scopedConstraintRegistry or (_: { })) null;
+                currentScope = state.currentScope;
+                scopeData = all.${currentScope} or { };
+                existingScoped = scopeData.${param.identity} or [ ];
+              in
+              all
+              // {
+                ${currentScope} = scopeData // {
+                  ${param.identity} = existingScoped ++ [ entry ];
+                };
               };
           };
         };
@@ -128,6 +159,17 @@ let
         resume = null;
         state = state // {
           includesChain = _: chain ++ [ param.identity ];
+          scopedIncludesChain =
+            _:
+            let
+              all = (state.scopedIncludesChain or (_: { })) null;
+              currentScope = state.currentScope;
+              scopeChain = all.${currentScope} or [ ];
+            in
+            all
+            // {
+              ${currentScope} = scopeChain ++ [ param.identity ];
+            };
         };
       };
     "chain-pop" =
@@ -144,6 +186,21 @@ let
               throw "fx: chain-pop on empty includesChain — push/pop mismatch in aspect compiler"
             else
               lib.init chain;
+          scopedIncludesChain =
+            _:
+            let
+              all = (state.scopedIncludesChain or (_: { })) null;
+              currentScope = state.currentScope;
+              scopeChain = all.${currentScope} or [ ];
+            in
+            all
+            // {
+              ${currentScope} =
+                if scopeChain == [ ] then
+                  throw "fx: chain-pop on empty scopedIncludesChain"
+                else
+                  lib.init scopeChain;
+            };
         };
       };
   };
@@ -224,6 +281,16 @@ let
         resume = [ ];
         state = state // {
           deferredIncludes = x: ((state.deferredIncludes or (_: [ ])) x) ++ [ param ];
+          scopedDeferredIncludes =
+            x:
+            let
+              all = (state.scopedDeferredIncludes or (_: { })) x;
+              currentScope = state.currentScope;
+            in
+            all
+            // {
+              ${currentScope} = (all.${currentScope} or [ ]) ++ [ param ];
+            };
         };
       };
   };
@@ -245,6 +312,19 @@ let
             registry
             // {
               ${param.name} = entry;
+            };
+          scopedAspectPolicies =
+            _:
+            let
+              all = (state.scopedAspectPolicies or (_: { })) null;
+              currentScope = state.currentScope;
+              scopeData = all.${currentScope} or { };
+            in
+            all
+            // {
+              ${currentScope} = scopeData // {
+                ${param.name} = entry;
+              };
             };
         };
       };
@@ -360,6 +440,16 @@ let
         resume = null;
         state = state // {
           deadLetterQueue = x: (state.deadLetterQueue x) ++ [ param ];
+          scopedDeadLetterQueue =
+            _:
+            let
+              all = (state.scopedDeadLetterQueue or (_: { })) null;
+              currentScope = state.currentScope;
+            in
+            all
+            // {
+              ${currentScope} = (all.${currentScope} or [ ]) ++ [ param ];
+            };
         };
       };
   };
