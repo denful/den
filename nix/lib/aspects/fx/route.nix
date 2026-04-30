@@ -46,6 +46,9 @@ let
     map (mod: guardModule (nestModule (adaptModule mod))) modules;
 
   # Synthesize a NixOS module from trait data at a target path.
+  # Unlike class routes, trait routes handle their own path nesting because
+  # trait data is a plain value (list, map, scalar), not a NixOS module —
+  # wrapRouteModules' submodule-based nesting doesn't apply.
   traitRouteModule =
     route: traitData:
     { ... }:
@@ -92,9 +95,28 @@ let
             if traitData == emptyDefault then [ ] else [ (traitRouteModule route traitData) ]
           else
             wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
+        # Trait route modules handle their own path nesting (via setAttrByPath)
+        # because trait data is a plain value, not a NixOS submodule.
+        # Class route modules go through wrapRouteModules for submodule nesting.
+        # Both still apply guard wrapping if specified.
+        guard = route.guard or null;
+        guardWrap =
+          mod:
+          if guard == null then
+            mod
+          else
+            args:
+            let
+              inner = if builtins.isFunction mod then mod args else mod;
+            in
+            {
+              config = lib.mkIf (guard args) (inner.config or inner);
+            };
         wrappedModules =
           if sourceModules == [ ] then
             [ ]
+          else if isTraitRoute then
+            map guardWrap sourceModules
           else
             wrapRouteModules {
               modules = sourceModules;

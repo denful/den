@@ -346,21 +346,42 @@ let
       subRootScope = mkScopeId spec.__resolveCtx;
       finalCtx = (subResult.state.scopeContexts null).${subRootScope} or spec.__resolveCtx;
       wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
+
+      # Apply Tier 1 routes within the sub-pipeline.
+      subScopedRoutes = subResult.state.scopedRoutes null;
+      subScopedClassImportsRaw = subResult.state.scopedClassImports null;
+      subWrappedPerScope = lib.mapAttrs (
+        scopeId: scopeClasses:
+        let
+          scopeCtx = (subResult.state.scopeContexts null).${scopeId} or spec.__resolveCtx;
+        in
+        wrapCollectedClasses scopeCtx scopeClasses
+      ) subScopedClassImportsRaw;
+      subScopeParent = subResult.state.scopeParent null;
+      subTraitSchemas = den.traits or { };
+      withSubRoutes = route.applyRoutes {
+        scopedRoutes = subScopedRoutes;
+        wrappedPerScope = subWrappedPerScope;
+        scopedTraits = subResult.state.scopedTraits null;
+        scopeParent = subScopeParent;
+        traitSchemas = subTraitSchemas;
+        classImports = wrappedClassImports;
+      };
+
       # Recursively apply any forwards within the sub-pipeline.
       forwarded =
         if forwardSpecs == [ ] then
-          wrappedClassImports
+          withSubRoutes.classImports
         else
           let
             fwd = applyForwardSpecs {
               inherit forwardSpecs;
-              classImports = wrappedClassImports;
+              classImports = withSubRoutes.classImports;
               traitModule = null;
               hasTraitSchemas = false;
             };
           in
           fwd.classImports;
-      subTraitSchemas = den.traits or { };
       subHasTraitSchemas = subTraitSchemas != { };
       subTraits = subResult.state.traits null;
       subTraitModule =
