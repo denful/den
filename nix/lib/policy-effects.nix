@@ -52,6 +52,13 @@
     value = spec;
   };
 
+  # Request post-pipeline instantiation of a class for a given entity.
+  # Consumed after the tree-walk completes — dormant until Task 2 wires it.
+  instantiate = spec: {
+    __policyEffect = "instantiate";
+    value = spec;
+  };
+
   # Tag a value with collisionPolicy = "class-wins".
   # When the value reaches a class module that also receives the same arg
   # from the module system (e.g., NixOS provides `lib`), the class value

@@ -293,6 +293,7 @@ let
       subScopedDT = subResult.state.scopedDeferredTraits null;
       subScopedFS = subResult.state.scopedForwardSpecs null;
       subScopedDLQ = subResult.state.scopedDeadLetterQueue null;
+      subScopedInstantiates = subResult.state.scopedInstantiates null;
       subScopeContexts = subResult.state.scopeContexts null;
       subScopeParent = subResult.state.scopeParent null;
       subScopeChildren = subResult.state.scopeChildren null;
@@ -333,6 +334,7 @@ let
           scopedDeferredTraits = _: (st.scopedDeferredTraits null) // subScopedDT;
           scopedForwardSpecs = _: (st.scopedForwardSpecs null) // subScopedFS;
           scopedDeadLetterQueue = _: (st.scopedDeadLetterQueue null) // subScopedDLQ;
+          scopedInstantiates = _: (st.scopedInstantiates null) // subScopedInstantiates;
           scopeContexts = _: (st.scopeContexts null) // subScopeContexts;
           scopeParent = _: (st.scopeParent null) // subScopeParent;
           scopeChildren = _: (st.scopeChildren null) // subScopeChildren;
@@ -575,6 +577,9 @@ let
                     routeEffects = builtins.filter (
                       e: builtins.isAttrs e && (e.__policyEffect or "") == "route"
                     ) rawEffects;
+                    instantiateEffects = builtins.filter (
+                      e: builtins.isAttrs e && (e.__policyEffect or "") == "instantiate"
+                    ) rawEffects;
                     includeAspects = map (e: e.value) includeEffects;
                     excludeAspects = map (e: e.value) excludeEffects;
                     isolateFanOut =
@@ -627,7 +632,12 @@ let
                   else
                     [
                       {
-                        inherit transition mergedEnrichment routeEffects;
+                        inherit
+                          transition
+                          mergedEnrichment
+                          routeEffects
+                          instantiateEffects
+                          ;
                         policyName = name;
                       }
                     ]
@@ -665,6 +675,9 @@ let
                 ) rawEffects;
                 routeEffects = builtins.filter (
                   e: builtins.isAttrs e && (e.__policyEffect or "") == "route"
+                ) rawEffects;
+                instantiateEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "instantiate"
                 ) rawEffects;
                 includeAspects = map (e: e.value) includeEffects;
                 excludeAspects = map (e: e.value) excludeEffects;
@@ -705,12 +718,17 @@ let
               if resolveEffects == [ ] then
                 {
                   transition = [ ];
-                  inherit mergedEnrichment routeEffects;
+                  inherit mergedEnrichment routeEffects instantiateEffects;
                   policyName = entry.name;
                 }
               else
                 {
-                  inherit transition mergedEnrichment routeEffects;
+                  inherit
+                    transition
+                    mergedEnrichment
+                    routeEffects
+                    instantiateEffects
+                    ;
                   policyName = entry.name;
                 }
             ) matchingAspect;
@@ -722,17 +740,21 @@ let
             allRouteEffects = builtins.concatMap (
               r: map (re: re // { __routePolicyName = r.policyName; }) (r.routeEffects or [ ])
             ) allResults;
+            allInstantiateEffects = builtins.concatMap (
+              r: map (ie: ie // { __instantiatePolicyName = r.policyName; }) (r.instantiateEffects or [ ])
+            ) allResults;
           in
           {
             transitions = allTransitions;
             enrichment = allEnrichment;
             routeEffects = allRouteEffects;
+            instantiateEffects = allInstantiateEffects;
           };
 
         # Fixed-point enrichment loop: dispatch policies, collect enrichment,
         # install enrichment into context, re-dispatch until stable.
         iterateEnrichment =
-          iteration: accTransitions: accEnrichment: accRouteEffects: firedPolicies: currentResolveCtx:
+          iteration: accTransitions: accEnrichment: accRouteEffects: accInstantiateEffects: firedPolicies: currentResolveCtx:
           let
             dispatched = mkDispatch currentResolveCtx;
             # Filter out transitions from already-fired policies.
@@ -745,6 +767,10 @@ let
               re: !(builtins.elem (re.__routePolicyName or "") firedPolicies)
             ) dispatched.routeEffects;
             combinedRouteEffects = accRouteEffects ++ newRouteEffects;
+            newInstantiateEffects = builtins.filter (
+              ie: !(builtins.elem (ie.__instantiatePolicyName or "") firedPolicies)
+            ) dispatched.instantiateEffects;
+            combinedInstantiateEffects = accInstantiateEffects ++ newInstantiateEffects;
             # Only enrichment keys not already accumulated count as new.
             newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
               builtins.attrNames dispatched.enrichment
@@ -757,6 +783,7 @@ let
               transitions = combinedTransitions;
               enrichment = combinedEnrichment;
               routeEffects = combinedRouteEffects;
+              instantiateEffects = combinedInstantiateEffects;
             }
           else if iteration >= maxEnrichmentIterations then
             throw "den: enrichment iteration exceeded ${toString maxEnrichmentIterations} — likely a cycle in enrichment policies (${sourceAspect.name or "?"})"
@@ -805,9 +832,10 @@ let
                     let
                       nextResolveCtx = traits // enrichedCtx // { __entityKind = sourceEntityKind; };
                     in
-                    iterateEnrichment (
-                      iteration + 1
-                    ) combinedTransitions combinedEnrichment combinedRouteEffects newFired nextResolveCtx
+                    iterateEnrichment (iteration + 1) combinedTransitions combinedEnrichment combinedRouteEffects
+                      combinedInstantiateEffects
+                      newFired
+                      nextResolveCtx
                   )
               );
       in
@@ -815,7 +843,7 @@ let
         throw "den: transition depth exceeded ${toString maxTransitionDepth} — likely a cycle in den.policies (${sourceAspect.name or "?"})"
       else
         {
-          resume = fx.bind (iterateEnrichment 0 manualTransitions { } [ ] [ ] resolveCtx) (
+          resume = fx.bind (iterateEnrichment 0 manualTransitions { } [ ] [ ] [ ] resolveCtx) (
             result:
             let
               rawTransitions = result.transitions;
@@ -856,8 +884,13 @@ let
               emitRoutes = builtins.foldl' (
                 acc: re: fx.bind acc (_: fx.send "register-route" re.value)
               ) (fx.pure null) result.routeEffects;
+              emitInstantiates = builtins.foldl' (
+                acc: ie: fx.bind acc (_: fx.send "register-instantiate" ie.value)
+              ) (fx.pure null) result.instantiateEffects;
             in
-            fx.bind resolveAllTransitions (transitionResults: fx.bind emitRoutes (_: fx.pure transitionResults))
+            fx.bind resolveAllTransitions (
+              transitionResults: fx.bind emitRoutes (_: fx.bind emitInstantiates (_: fx.pure transitionResults))
+            )
           );
           state = state // {
             transitionDepth = depth + 1;

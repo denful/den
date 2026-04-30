@@ -502,6 +502,31 @@ let
       };
   };
 
+  registerInstantiateHandler = {
+    "register-instantiate" =
+      { param, state }:
+      let
+        scope = state.currentScope;
+        spec = param // {
+          sourceScopeId = scope;
+        };
+      in
+      {
+        resume = null;
+        state = state // {
+          scopedInstantiates =
+            _:
+            let
+              all = state.scopedInstantiates null;
+            in
+            all
+            // {
+              ${scope} = (all.${scope} or [ ]) ++ [ spec ];
+            };
+        };
+      };
+  };
+
 in
 {
   inherit
@@ -516,5 +541,6 @@ in
     registerTraitSchemaHandler
     getTraitSchemasHandler
     registerRouteHandler
+    registerInstantiateHandler
     ;
 }

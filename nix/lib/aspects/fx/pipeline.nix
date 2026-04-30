@@ -87,6 +87,7 @@ let
     // handlers.drainDeferredHandler
     // handlers.deadLetterHandler
     // handlers.registerRouteHandler
+    // handlers.registerInstantiateHandler
     // drainDeadLettersHandler
     // resolveEntityHandler
     // handlers.forwardHandler
@@ -249,6 +250,7 @@ let
     scopedConstraintRegistry = _: { };
     scopedConstraintFilters = _: { };
     scopedRoutes = _: { };
+    scopedInstantiates = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
     includeSeen = _: { };
