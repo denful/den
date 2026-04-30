@@ -283,6 +283,38 @@ let
             all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
         }
       );
+      # Merge sub-pipeline results into parent state: flat classImports
+      # plus all scoped state fields. Scope IDs are globally unique
+      # (mkScopeId on entity context), so simple // merge is safe for
+      # most fields. scopedClassImports uses mergeScoped to handle the
+      # unlikely case of overlapping scope+class entries.
+      subScopedCI = subResult.state.scopedClassImports null;
+      subScopedTraits = subResult.state.scopedTraits null;
+      subScopedDT = subResult.state.scopedDeferredTraits null;
+      subScopedFS = subResult.state.scopedForwardSpecs null;
+      subScopedDLQ = subResult.state.scopedDeadLetterQueue null;
+      subScopeContexts = subResult.state.scopeContexts null;
+      subScopeParent = subResult.state.scopeParent null;
+      subScopeChildren = subResult.state.scopeChildren null;
+      # Merge helper: combine two attrsets where values are lists or attrsets-of-lists.
+      mergeScoped =
+        parent: sub:
+        parent
+        // lib.mapAttrs (
+          k: v:
+          if parent ? ${k} then
+            if builtins.isList v then
+              parent.${k} ++ v
+            else if builtins.isAttrs v then
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                parent.${k}
+                v
+              ]
+            else
+              v
+          else
+            v
+        ) sub;
       mergeImports = fx.effects.state.modify (
         st:
         st
@@ -296,6 +328,14 @@ let
               current
               subClassImports
             ];
+          scopedClassImports = _: mergeScoped (st.scopedClassImports null) subScopedCI;
+          scopedTraits = _: (st.scopedTraits null) // subScopedTraits;
+          scopedDeferredTraits = _: (st.scopedDeferredTraits null) // subScopedDT;
+          scopedForwardSpecs = _: (st.scopedForwardSpecs null) // subScopedFS;
+          scopedDeadLetterQueue = _: (st.scopedDeadLetterQueue null) // subScopedDLQ;
+          scopeContexts = _: (st.scopeContexts null) // subScopeContexts;
+          scopeParent = _: (st.scopeParent null) // subScopeParent;
+          scopeChildren = _: (st.scopeChildren null) // subScopeChildren;
         }
       );
       popScope = fx.effects.state.modify (
