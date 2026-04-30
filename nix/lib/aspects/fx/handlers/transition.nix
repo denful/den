@@ -536,7 +536,9 @@ let
         # Direct policy dispatch: iterate den.policies, check scope + args, call directly.
         traits = (state.traits or (_: { })) null;
         resolveCtx = traits // currentCtx // { __entityKind = sourceEntityKind; };
-        allPolicies = den.policies or { };
+        # Schema-scoped policies: only fire for matching entity kind.
+        schemaPolicies = (den.schema.${sourceEntityKind} or { }).policies or { };
+        allPolicies = (den.policies or { }) // schemaPolicies;
 
         # Dispatch all policies (global + aspect) against a given context,
         # classifying resolve effects into schema transitions vs enrichment.
