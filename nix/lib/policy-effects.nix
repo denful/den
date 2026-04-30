@@ -45,6 +45,13 @@
     value = aspect;
   };
 
+  # Route class or trait content from one scope partition into a target class.
+  # Tier 1 delivery — replaces den.provides.forward for the common case.
+  route = spec: {
+    __policyEffect = "route";
+    value = spec;
+  };
+
   # Tag a value with collisionPolicy = "class-wins".
   # When the value reaches a class module that also receives the same arg
   # from the module system (e.g., NixOS provides `lib`), the class value

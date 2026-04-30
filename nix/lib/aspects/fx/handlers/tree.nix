@@ -477,6 +477,31 @@ let
       };
   };
 
+  registerRouteHandler = {
+    "register-route" =
+      { param, state }:
+      let
+        scope = state.currentScope;
+        route = param // {
+          sourceScopeId = scope;
+        };
+      in
+      {
+        resume = null;
+        state = state // {
+          scopedRoutes =
+            _:
+            let
+              all = (state.scopedRoutes or (_: { })) null;
+            in
+            all
+            // {
+              ${scope} = (all.${scope} or [ ]) ++ [ route ];
+            };
+        };
+      };
+  };
+
 in
 {
   inherit
@@ -490,5 +515,6 @@ in
     deadLetterHandler
     registerTraitSchemaHandler
     getTraitSchemasHandler
+    registerRouteHandler
     ;
 }

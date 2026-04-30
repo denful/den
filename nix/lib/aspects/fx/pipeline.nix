@@ -85,6 +85,7 @@ let
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
     // handlers.deadLetterHandler
+    // handlers.registerRouteHandler
     // drainDeadLettersHandler
     // resolveEntityHandler
     // handlers.forwardHandler
@@ -246,6 +247,7 @@ let
     scopedIncludesChain = _: { };
     scopedConstraintRegistry = _: { };
     scopedConstraintFilters = _: { };
+    scopedRoutes = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
     includeSeen = _: { };

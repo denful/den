@@ -530,6 +530,9 @@ let
                     excludeEffects = builtins.filter (
                       e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
                     ) rawEffects;
+                    routeEffects = builtins.filter (
+                      e: builtins.isAttrs e && (e.__policyEffect or "") == "route"
+                    ) rawEffects;
                     includeAspects = map (e: e.value) includeEffects;
                     excludeAspects = map (e: e.value) excludeEffects;
                     isolateFanOut =
@@ -582,7 +585,7 @@ let
                   else
                     [
                       {
-                        inherit transition mergedEnrichment;
+                        inherit transition mergedEnrichment routeEffects;
                         policyName = name;
                       }
                     ]
@@ -617,6 +620,9 @@ let
                 ) rawEffects;
                 excludeEffects = builtins.filter (
                   e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
+                ) rawEffects;
+                routeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "route"
                 ) rawEffects;
                 includeAspects = map (e: e.value) includeEffects;
                 excludeAspects = map (e: e.value) excludeEffects;
@@ -657,12 +663,12 @@ let
               if resolveEffects == [ ] then
                 {
                   transition = [ ];
-                  inherit mergedEnrichment;
+                  inherit mergedEnrichment routeEffects;
                   policyName = entry.name;
                 }
               else
                 {
-                  inherit transition mergedEnrichment;
+                  inherit transition mergedEnrichment routeEffects;
                   policyName = entry.name;
                 }
             ) matchingAspect;
@@ -671,16 +677,18 @@ let
             allResults = globalResults ++ aspectResults;
             allTransitions = builtins.concatLists (map (r: r.transition) allResults);
             allEnrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } allResults;
+            allRouteEffects = builtins.concatMap (r: r.routeEffects or [ ]) allResults;
           in
           {
             transitions = allTransitions;
             enrichment = allEnrichment;
+            routeEffects = allRouteEffects;
           };
 
         # Fixed-point enrichment loop: dispatch policies, collect enrichment,
         # install enrichment into context, re-dispatch until stable.
         iterateEnrichment =
-          iteration: accTransitions: accEnrichment: firedPolicies: currentResolveCtx:
+          iteration: accTransitions: accEnrichment: accRouteEffects: firedPolicies: currentResolveCtx:
           let
             dispatched = mkDispatch currentResolveCtx;
             # Filter out transitions from already-fired policies.
@@ -689,6 +697,7 @@ let
             ) dispatched.transitions;
             newFired = firedPolicies ++ map (t: (t.routing or { }).policyName or "") newTransitions;
             combinedTransitions = accTransitions ++ newTransitions;
+            combinedRouteEffects = accRouteEffects ++ dispatched.routeEffects;
             # Only enrichment keys not already accumulated count as new.
             newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
               builtins.attrNames dispatched.enrichment
@@ -700,6 +709,7 @@ let
             fx.pure {
               transitions = combinedTransitions;
               enrichment = combinedEnrichment;
+              routeEffects = combinedRouteEffects;
             }
           else if iteration >= maxEnrichmentIterations then
             throw "den: enrichment iteration exceeded ${toString maxEnrichmentIterations} — likely a cycle in enrichment policies (${sourceAspect.name or "?"})"
@@ -748,7 +758,9 @@ let
                     let
                       nextResolveCtx = traits // enrichedCtx // { __entityKind = sourceEntityKind; };
                     in
-                    iterateEnrichment (iteration + 1) combinedTransitions combinedEnrichment newFired nextResolveCtx
+                    iterateEnrichment (
+                      iteration + 1
+                    ) combinedTransitions combinedEnrichment combinedRouteEffects newFired nextResolveCtx
                   )
               );
       in
@@ -756,7 +768,7 @@ let
         throw "den: transition depth exceeded ${toString maxTransitionDepth} — likely a cycle in den.policies (${sourceAspect.name or "?"})"
       else
         {
-          resume = fx.bind (iterateEnrichment 0 manualTransitions { } [ ] resolveCtx) (
+          resume = fx.bind (iterateEnrichment 0 manualTransitions { } [ ] [ ] resolveCtx) (
             result:
             let
               rawTransitions = result.transitions;
@@ -786,15 +798,19 @@ let
                 }
               ) { } rawTransitions;
               allTransitions = builtins.attrValues mergeByPath;
+              resolveAllTransitions = builtins.foldl' (
+                acc: transition:
+                fx.bind acc (
+                  results:
+                  resolveTransition targetClass sourceAspect effectiveCtx (state.aspectPolicies or (_: { })
+                  ) results transition
+                )
+              ) (fx.pure [ ]) allTransitions;
+              emitRoutes = builtins.foldl' (
+                acc: re: fx.bind acc (_: fx.send "register-route" re.value)
+              ) (fx.pure null) result.routeEffects;
             in
-            builtins.foldl' (
-              acc: transition:
-              fx.bind acc (
-                results:
-                resolveTransition targetClass sourceAspect effectiveCtx (state.aspectPolicies or (_: { })
-                ) results transition
-              )
-            ) (fx.pure [ ]) allTransitions
+            fx.bind resolveAllTransitions (transitionResults: fx.bind emitRoutes (_: fx.pure transitionResults))
           );
           state = state // {
             transitionDepth = depth + 1;
