@@ -37,11 +37,7 @@ let
         else
           [ ];
       # Host-level framework aspects have no inbound policy — deliver directly.
-      hostFramework =
-        if name == "host" then
-          builtins.filter (x: x != null) [ (den.aspects.os-host-fwd or null) ]
-        else
-          [ ];
+      hostFramework = [ ];
       schemaIncludes = ((den.schema or { }).${name} or { }).includes or [ ];
     in
     {

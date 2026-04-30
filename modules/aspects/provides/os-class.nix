@@ -13,31 +13,26 @@ let
       };
 
   '';
-
-  mkOsFwd =
-    ctx: aspect:
-    den.provides.forward {
-      each = [
-        "nixos"
-        "darwin"
-      ];
-      fromClass = _: "os";
-      intoClass = lib.id;
-      intoPath = _: [ ];
-      fromAspect = _: aspect;
-      fromCtx = _: ctx;
-    };
-
-  # Host-level os-class: forwards os content from the host's aspect.
-  host-os-fwd = { host, ... }: mkOsFwd { inherit host; } host.aspect;
-
-  # User-level os-class: forwards os content from each user's aspect.
-  user-os-fwd = { user, host, ... }: mkOsFwd { inherit host user; } user.aspect;
-
 in
 {
-  den.aspects.os-host-fwd = host-os-fwd;
-  den.aspects.os-user-fwd = user-os-fwd;
-
   den.classes.os.description = "Convenience class forwarding to both nixos and darwin";
+
+  # Built-in policy: route os class content to the host's class.
+  # Replaces os-host-fwd and os-user-fwd forward aspects.
+  # Fires in every scope where host is bound (including user scopes),
+  # routing per-scope os content to the host's target class.
+  den.policies.os-to-host =
+    { host, ... }:
+    lib.optional
+      (builtins.elem host.class [
+        "nixos"
+        "darwin"
+      ])
+      (
+        den.lib.policy.route {
+          fromClass = "os";
+          intoClass = host.class;
+          path = [ ];
+        }
+      );
 }

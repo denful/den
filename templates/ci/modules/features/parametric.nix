@@ -42,9 +42,9 @@
             funny.names = [ "p${toString i}" ];
             includes = [
               (
-                { host, ... }:
+                { tag, ... }:
                 {
-                  funny.names = [ "i${toString i}-${host}" ];
+                  funny.names = [ "i${toString i}-${tag}" ];
                 }
               )
             ];
@@ -54,15 +54,15 @@
       {
         den.schema.start.includes = [
           (
-            { host }:
+            { tag }:
             {
-              funny.names = [ host ];
+              funny.names = [ tag ];
             }
           )
         ]
         ++ aspects;
 
-        expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { host = "h"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { tag = "h"; }));
         expected = 61;
       }
     );
@@ -71,9 +71,9 @@
       { den, funnyNames, ... }:
       let
         inner =
-          { host, planet, ... }:
+          { tag, planet, ... }:
           {
-            funny.names = [ "${host}-${planet}" ];
+            funny.names = [ "${tag}-${planet}" ];
           };
         expanded = den.lib.parametric.expands { planet = "mars"; } {
           funny.names = [ "exp" ];
@@ -83,15 +83,15 @@
       {
         den.schema.start.includes = [
           (
-            { host }:
+            { tag }:
             {
-              funny.names = [ host ];
+              funny.names = [ tag ];
             }
           )
           expanded
         ];
 
-        expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { host = "h"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "start" { tag = "h"; }));
         expected = 17;
       }
     );
@@ -103,9 +103,9 @@
           funny.names = [ "shared" ];
           includes = [
             (
-              { host, ... }:
+              { tag, ... }:
               {
-                funny.names = [ "inner-${host}" ];
+                funny.names = [ "inner-${tag}" ];
               }
             )
           ];
@@ -114,9 +114,9 @@
       {
         den.schema.a.includes = [
           (
-            { host }:
+            { tag }:
             {
-              funny.names = [ "a-${host}" ];
+              funny.names = [ "a-${tag}" ];
             }
           )
           shared
@@ -130,20 +130,20 @@
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "a" || !(ctx ? host) then
+          if __entityKind != "a" || !(ctx ? tag) then
             [ ]
           else
             [
-              (resolve.to "b" { host = "${ctx.host}!"; })
+              (resolve.to "b" { tag = "${ctx.tag}!"; })
               (include (
-                { host }:
+                { tag }:
                 {
-                  funny.names = [ "b-${host}" ];
+                  funny.names = [ "b-${tag}" ];
                 }
               ))
               (include shared)
             ];
-        expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { host = "v"; }));
+        expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { tag = "v"; }));
         expected = 6;
       }
     );

@@ -28,7 +28,13 @@ let
           mod;
 
       nestModule =
-        mod: if path == [ ] then mod else { config = lib.setAttrByPath path { imports = [ mod ]; }; };
+        mod:
+        if path == [ ] then
+          mod
+        else
+          # Place source module as a submodule definition at the target path.
+          # Requires the option at `path` in the target class to be a submodule type.
+          { config = lib.setAttrByPath path { imports = [ mod ]; }; };
 
       guardModule =
         mod:

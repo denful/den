@@ -103,7 +103,6 @@ let
               (den.lib.policy.include hostModule)
               (den.lib.policy.include userForward)
             ]
-            ++ lib.optional (den.aspects ? os-user-fwd) (den.lib.policy.include den.aspects.os-user-fwd)
             ++ lib.optional (den.aspects ? os-user-class-fwd) (
               den.lib.policy.include den.aspects.os-user-class-fwd
             );
