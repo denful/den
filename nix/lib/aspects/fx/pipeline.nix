@@ -595,22 +595,37 @@ let
       throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
     else
       let
-        rawClassImports = result.state.classImports null;
         forwardSpecs = result.state.forwardSpecs null;
-        # Extract enriched context from pipeline state for post-pipeline wrapping.
-        finalCtx = (result.state.scopeContexts null).${rootScopeId} or ctx;
-        # Wrap BEFORE forwards — forward source modules need wrapped class data + traitModule.
-        wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
 
-        # Build per-scope wrapped map for route source reads.
+        # Build per-scope wrapped class imports from scoped partitions.
+        # With Part 1 (scoped state merge in resolveFanOut), this includes
+        # ALL scopes — parent pipeline and fan-out sub-pipelines.
+        scopeContexts = result.state.scopeContexts null;
         scopedClassImportsRaw = result.state.scopedClassImports null;
         wrappedPerScope = lib.mapAttrs (
           scopeId: scopeClasses:
           let
-            scopeCtx = (result.state.scopeContexts null).${scopeId} or ctx;
+            scopeCtx = scopeContexts.${scopeId} or ctx;
           in
           wrapCollectedClasses scopeCtx scopeClasses
         ) scopedClassImportsRaw;
+
+        # Flatten per-scope wrapped imports into a single classImports map.
+        # Scoped partitions are the primary source of truth. Fall back to
+        # flat classImports for classes that only exist in flat state (e.g.,
+        # flake class from flake-level resolution paths that bypass scope tracking).
+        flatClassImports = result.state.classImports null;
+        flatWrapped = wrapCollectedClasses ((result.state.scopeContexts null).${rootScopeId} or ctx
+        ) flatClassImports;
+        scopedFlattened = builtins.foldl' (
+          acc: scopeData:
+          lib.zipAttrsWith (_: builtins.concatLists) [
+            acc
+            scopeData
+          ]
+        ) { } (builtins.attrValues wrappedPerScope);
+        # Merge: scoped wins where present, flat fills gaps.
+        wrappedClassImports = flatWrapped // scopedFlattened;
 
         # Apply Tier 1 routes (reads wrappedPerScope, produces new entries).
         scopedRoutes = result.state.scopedRoutes null;
