@@ -8,6 +8,7 @@ let
   handlers = den.lib.aspects.fx.handlers;
   identity = den.lib.aspects.fx.identity;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect drainDeadLettersHandler;
+  route = import ./route.nix { inherit lib den; };
 
   # Compose two handler sets, chaining handlers for shared effect names.
   # For overlapping keys: b's resume wins, a's state wins (a runs on b's output state).
@@ -579,10 +580,30 @@ let
         finalCtx = (result.state.scopeContexts null).${rootScopeId} or ctx;
         # Wrap BEFORE forwards — forward source modules need wrapped class data + traitModule.
         wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
-        # Apply forwards AFTER wrapping + traitModule synthesis.
+
+        # Build per-scope wrapped map for route source reads.
+        scopedClassImportsRaw = result.state.scopedClassImports null;
+        wrappedPerScope = lib.mapAttrs (
+          scopeId: scopeClasses:
+          let
+            scopeCtx = (result.state.scopeContexts null).${scopeId} or ctx;
+          in
+          wrapCollectedClasses scopeCtx scopeClasses
+        ) scopedClassImportsRaw;
+
+        # Apply Tier 1 routes (reads wrappedPerScope, produces new entries).
+        scopedRoutes = result.state.scopedRoutes null;
+        withRoutes = route.applyRoutes {
+          inherit scopedRoutes wrappedPerScope;
+          scopedTraits = result.state.scopedTraits null;
+          inherit scopeParent traitSchemas;
+          classImports = wrappedClassImports;
+        };
+
+        # Apply forwards AFTER wrapping + route application + traitModule synthesis.
         forwarded = applyForwardSpecs {
           inherit forwardSpecs traitModule hasTraitSchemas;
-          classImports = wrappedClassImports;
+          classImports = withRoutes.classImports;
         };
         # Dead letter queue diagnostics.
         finalDLQ = (result.state.deadLetterQueue or (_: [ ])) null;
