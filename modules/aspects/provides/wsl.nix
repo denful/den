@@ -24,17 +24,6 @@ let
        den.schema.host.wsl.enable = true;
   '';
 
-  fwd =
-    { host, aspect-chain, ... }:
-    den.provides.forward {
-      each = lib.singleton true;
-      fromClass = _: "wsl";
-      intoClass = _: host.class;
-      intoPath = _: [ "wsl" ];
-      fromAspect = _: lib.head aspect-chain;
-      guard = { options, ... }: options ? wsl;
-    };
-
   hostConf.options.wsl = {
     enable = lib.mkEnableOption "Enable WSL on this host";
     module = lib.mkOption {
@@ -53,7 +42,6 @@ let
         imports = [ host.wsl.module ];
         wsl.enable = true;
       };
-      includes = [ fwd ];
     };
 
 in
@@ -79,4 +67,18 @@ in
       ]
     else
       [ ];
+
+  # Route wsl class content to host class at ["wsl"]. Fires in ALL scopes
+  # (host + user) so user-scope wsl content (e.g., from primary-user) is
+  # captured. Guard ensures injection only when wsl module is loaded.
+  den.policies.wsl-to-host =
+    { host, ... }:
+    lib.optional ((host.wsl or { }).enable or false) (
+      den.lib.policy.route {
+        fromClass = "wsl";
+        intoClass = host.class;
+        path = [ "wsl" ];
+        guard = { options, ... }: options ? wsl;
+      }
+    );
 }

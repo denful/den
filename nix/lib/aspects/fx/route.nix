@@ -57,12 +57,21 @@ let
             config = lib.setAttrByPath path (_: cfg);
           }
         else
-          # Plain submodule nesting: _: wrapper marks as module definition.
-          # Requires the option at `path` to be a submodule type.
+          # Plain nesting: evaluate source module via freeform evalModules,
+          # then place the config at the target path. Works for both submodule
+          # targets (users.users.<name>) and plain option namespaces (wsl).
+          let
+            freeformMod.config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+            evaluated = lib.evalModules {
+              modules = [
+                freeformMod
+                mod
+              ];
+            };
+            cfg = builtins.removeAttrs evaluated.config [ "_module" ];
+          in
           {
-            config = lib.setAttrByPath path (_: {
-              imports = [ mod ];
-            });
+            config = lib.setAttrByPath path cfg;
           };
 
       guardModule =
