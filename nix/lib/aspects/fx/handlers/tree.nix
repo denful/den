@@ -492,7 +492,7 @@ let
           scopedRoutes =
             _:
             let
-              all = (state.scopedRoutes or (_: { })) null;
+              all = state.scopedRoutes null;
             in
             all
             // {

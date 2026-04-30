@@ -677,7 +677,9 @@ let
             allResults = globalResults ++ aspectResults;
             allTransitions = builtins.concatLists (map (r: r.transition) allResults);
             allEnrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } allResults;
-            allRouteEffects = builtins.concatMap (r: r.routeEffects or [ ]) allResults;
+            allRouteEffects = builtins.concatMap (
+              r: map (re: re // { __routePolicyName = r.policyName; }) (r.routeEffects or [ ])
+            ) allResults;
           in
           {
             transitions = allTransitions;
@@ -697,7 +699,10 @@ let
             ) dispatched.transitions;
             newFired = firedPolicies ++ map (t: (t.routing or { }).policyName or "") newTransitions;
             combinedTransitions = accTransitions ++ newTransitions;
-            combinedRouteEffects = accRouteEffects ++ dispatched.routeEffects;
+            newRouteEffects = builtins.filter (
+              re: !(builtins.elem (re.__routePolicyName or "") firedPolicies)
+            ) dispatched.routeEffects;
+            combinedRouteEffects = accRouteEffects ++ newRouteEffects;
             # Only enrichment keys not already accumulated count as new.
             newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
               builtins.attrNames dispatched.enrichment
