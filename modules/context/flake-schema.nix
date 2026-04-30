@@ -8,13 +8,6 @@ let
   flakeKinds = [
     "flake"
     "flake-system"
-    "flake-os"
-    "flake-hm"
-    "flake-packages"
-    "flake-apps"
-    "flake-checks"
-    "flake-devShells"
-    "flake-legacyPackages"
     "default"
   ];
 in

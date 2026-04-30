@@ -52,7 +52,7 @@
       }
     );
 
-    test-forward-flake-packages-from-aspect = denTest (
+    test-route-flake-packages-from-aspect = denTest (
       {
         den,
         lib,
@@ -64,7 +64,7 @@
         imports = [ inputs.den.flakeOutputs.packages ];
         den.hosts.x86_64-linux.igloo = { };
 
-        den.schema.flake-packages.includes = [ den.aspects.igloo ];
+        den.schema.flake-system.includes = [ den.aspects.igloo ];
 
         den.aspects.igloo = {
           packages =
@@ -79,7 +79,7 @@
       }
     );
 
-    test-forward-flake-apps-from-aspect = denTest (
+    test-route-flake-apps-from-aspect = denTest (
       {
         den,
         lib,
@@ -91,6 +91,8 @@
         imports = [ inputs.den.flakeOutputs.apps ];
         den.hosts.x86_64-linux.igloo = { };
 
+        den.schema.flake-system.includes = [ den.aspects.foo ];
+
         den.aspects.foo = {
           apps =
             { pkgs, ... }:
@@ -99,14 +101,12 @@
             };
         };
 
-        den.schema.flake-apps.includes = [ den.aspects.foo ];
-
         expr = lib.getName config.flake.apps.x86_64-linux.hello;
         expected = "hello";
       }
     );
 
-    test-forward-flake-checks-from-aspect = denTest (
+    test-route-flake-checks-from-aspect = denTest (
       {
         den,
         lib,
@@ -117,6 +117,8 @@
         imports = [ inputs.den.flakeOutputs.checks ];
         den.hosts.x86_64-linux.igloo = { };
 
+        den.schema.flake-system.includes = [ den.aspects.foo ];
+
         den.aspects.foo = {
           checks =
             { pkgs, ... }:
@@ -125,14 +127,12 @@
             };
         };
 
-        den.schema.flake-checks.includes = [ den.aspects.foo ];
-
         expr = lib.getName config.flake.checks.x86_64-linux.hello;
         expected = "hello";
       }
     );
 
-    test-forward-flake-devShells-from-aspect = denTest (
+    test-route-flake-devShells-from-aspect = denTest (
       {
         den,
         lib,
@@ -142,6 +142,8 @@
       {
         imports = [ inputs.den.flakeOutputs.devShells ];
         den.hosts.x86_64-linux.igloo = { };
+
+        den.schema.flake-system.includes = [ den.aspects.foo ];
 
         den.aspects.foo = {
           devShells =
@@ -153,14 +155,12 @@
             };
         };
 
-        den.schema.flake-devShells.includes = [ den.aspects.foo ];
-
         expr = config.flake.devShells.x86_64-linux ? default;
         expected = true;
       }
     );
 
-    test-forward-flake-outputs-from-hosts = denTest (
+    test-route-flake-outputs-from-hosts = denTest (
       {
         den,
         lib,
@@ -174,6 +174,8 @@
         ];
         den.hosts.x86_64-linux.igloo = { };
 
+        den.schema.flake-system.includes = [ den.aspects.igloo ];
+
         den.aspects.igloo = {
           packages =
             { pkgs, ... }:
@@ -186,19 +188,6 @@
               inherit (pkgs) hello;
             };
         };
-
-        den.policies.flake-system-to-host =
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
-          let
-            inherit (den.lib.policy) resolve;
-          in
-          if __entityKind != "flake-system" || !(ctx ? system) then
-            [ ]
-          else
-            map (host: resolve { inherit host; }) (lib.attrValues den.hosts.${ctx.system});
 
         expr = {
           package = lib.getName config.flake.packages.x86_64-linux.hello;

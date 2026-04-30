@@ -1,15 +1,13 @@
-# Flake output policies — traversal from flake-level entity kinds.
-#
-# Policies use __entityKind body guards for scoping and resolve.to
-# for targetKey derivation (resolve binding keys don't match schema
-# kind names — e.g. `host` resolves to `flake-os`).
+# Flake output policies — schema-scoped, no __entityKind guards.
 {
   den,
   lib,
+  inputs,
+  options,
   ...
 }:
 let
-  inherit (den.lib.policy) resolve include;
+  inherit (den.lib.policy) resolve;
 
   systemOutputs = [
     "packages"
@@ -19,73 +17,59 @@ let
     "legacyPackages"
   ];
 
-  systemOutputPolicies = map (output: {
-    name = "flake-system-to-flake-${output}";
-    value =
-      {
-        __entityKind ? null,
-        system,
-        ...
-      }:
-      if __entityKind != "flake-system" then
-        [ ]
-      else
-        [
-          (resolve.to "flake-${output}" { inherit system output; })
-          (include den.aspects."flake-${output}")
-        ];
-  }) systemOutputs;
+  has-flake-output =
+    output: ((options.flake.type.getSubOptions or (_: options.flake)) { }) ? ${output};
 in
 {
-  den.policies = lib.listToAttrs systemOutputPolicies // {
-    flake-to-flake-system =
-      {
-        __entityKind ? null,
-        ...
-      }:
-      if __entityKind != "flake" then
-        [ ]
-      else
-        map (system: resolve.to "flake-system" { inherit system; }) den.systems;
+  # Register system output names as classes so aspect keys dispatch correctly.
+  den.classes = lib.listToAttrs (
+    map (output: {
+      name = output;
+      value.description = "Flake ${output} output class";
+    }) systemOutputs
+  );
 
-    flake-system-to-flake-os =
-      {
-        __entityKind ? null,
-        system,
-        ...
-      }:
-      if __entityKind != "flake-system" then
-        [ ]
-      else
-        let
-          hosts = den.hosts.${system} or { };
-        in
-        lib.concatMap (host: [
-          (resolve.to "flake-os" { inherit host; })
-          (include den.aspects."flake-os")
-        ]) (builtins.attrValues hosts);
+  # flake -> flake-system: fan out per system
+  den.schema.flake.policies.to-systems =
+    _: map (system: resolve.to "flake-system" { inherit system; }) den.systems;
 
-    flake-system-to-flake-hm =
-      {
-        __entityKind ? null,
-        system,
-        ...
-      }:
-      if __entityKind != "flake-system" then
-        [ ]
-      else
-        let
-          homes = den.homes.${system} or { };
-        in
-        lib.concatMap (home: [
-          (resolve.to "flake-hm" (
-            {
-              inherit home;
-            }
-            // lib.optionalAttrs (home.host != null) { inherit (home) host; }
-            // lib.optionalAttrs (home.user != null) { inherit (home) user; }
-          ))
-          (include den.aspects."flake-hm")
-        ]) (builtins.attrValues homes);
-  };
+  # flake-system -> OS/HM outputs + per-output routes
+  den.schema.flake-system.policies = {
+    to-os-outputs =
+      { system, ... }:
+      let
+        hosts = den.hosts.${system} or { };
+      in
+      lib.concatMap (host: lib.optional (host.intoAttr != [ ]) (den.lib.policy.instantiate host)) (
+        builtins.attrValues hosts
+      );
+
+    to-hm-outputs =
+      { system, ... }:
+      let
+        homes = den.homes.${system} or { };
+      in
+      lib.concatMap (home: lib.optional (home.intoAttr != [ ]) (den.lib.policy.instantiate home)) (
+        builtins.attrValues homes
+      );
+  }
+  // lib.listToAttrs (
+    map (output: {
+      name = "to-${output}";
+      value =
+        { system, ... }:
+        lib.optional (has-flake-output output) (
+          den.lib.policy.route {
+            fromClass = output;
+            intoClass = "flake";
+            path = [
+              "flake"
+              output
+              system
+            ];
+            adaptArgs = _: { pkgs = inputs.nixpkgs.legacyPackages.${system}; };
+          }
+        );
+    }) systemOutputs
+  );
 }

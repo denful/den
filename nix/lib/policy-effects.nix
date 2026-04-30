@@ -52,8 +52,8 @@
     value = spec;
   };
 
-  # Request post-pipeline instantiation of a class for a given entity.
-  # Consumed after the tree-walk completes — dormant until Task 2 wires it.
+  # Request post-pipeline instantiation of an entity's class content.
+  # The entity carries instantiate, intoAttr, mainModule metadata.
   instantiate = spec: {
     __policyEffect = "instantiate";
     value = spec;

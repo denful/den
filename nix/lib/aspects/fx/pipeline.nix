@@ -638,10 +638,49 @@ let
           classImports = wrappedClassImports;
         };
 
-        # Apply forwards AFTER wrapping + route application + traitModule synthesis.
+        # Apply entity instantiation — evaluate entities and place in flake output.
+        scopedInstantiates = result.state.scopedInstantiates null;
+        allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
+        instantiateModules = lib.concatMap (
+          spec:
+          let
+            # spec IS the entity — value unwrapping happens at emission
+            # (transition.nix sends ie.value, not ie).
+            entity = spec;
+            hasOutput = (entity.intoAttr or [ ]) != [ ];
+          in
+          if !hasOutput then
+            [ ]
+          else
+            let
+              # Home entities provide pkgs; OS entities provide system for hostPlatform.
+              instantiateArgs =
+                if entity ? pkgs then
+                  {
+                    inherit (entity) pkgs;
+                    modules = [ entity.mainModule ];
+                  }
+                else
+                  {
+                    modules = [
+                      entity.mainModule
+                    ]
+                    ++ lib.optional (entity ? system) {
+                      nixpkgs.hostPlatform = lib.mkDefault entity.system;
+                    };
+                  };
+              evaluated = entity.instantiate instantiateArgs;
+            in
+            [ { config = lib.setAttrByPath ([ "flake" ] ++ entity.intoAttr) evaluated; } ]
+        ) allInstantiates;
+        withInstantiates = withRoutes.classImports // {
+          flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
+        };
+
+        # Apply forwards AFTER wrapping + route application + instantiation + traitModule synthesis.
         forwarded = applyForwardSpecs {
           inherit forwardSpecs traitModule hasTraitSchemas;
-          classImports = withRoutes.classImports;
+          classImports = withInstantiates;
         };
         # Dead letter queue diagnostics.
         finalDLQ = (result.state.deadLetterQueue or (_: [ ])) null;

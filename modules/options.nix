@@ -181,7 +181,7 @@ let
           {
             __functor = _: { ... }: merged;
             includes = [ ];
-            policies = { };
+            policies = allPolicies;
             isEntity = false;
           };
     };
