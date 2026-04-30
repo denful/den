@@ -18,9 +18,12 @@ let
       adaptArgs ? null,
     }:
     let
+      # For path = [], adaptArgs wraps function modules directly.
+      # For path != [], adaptArgs is injected via _module.args in the submodule
+      # definition (see nestModule), so adaptModule is only used for top-level routes.
       adaptModule =
         mod:
-        if adaptArgs == null then
+        if adaptArgs == null || path != [ ] then
           mod
         else if builtins.isFunction mod then
           args: mod (adaptArgs args)
@@ -31,10 +34,36 @@ let
         mod:
         if path == [ ] then
           mod
+        else if adaptArgs != null then
+          # Submodule nesting with adapted args: evaluate source module with
+          # adaptArgs-provided specialArgs (pkgs, osConfig, etc.) via a freeform
+          # evalModules, then inject the result as a submodule definition function
+          # at the target path. The _: wrapper ensures NixOS treats it as a
+          # submodule definition, creating the entry (e.g., users.users.tux).
+          args:
+          let
+            adapted = adaptArgs args;
+            freeformMod.config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+            evaluated = lib.evalModules {
+              specialArgs = adapted;
+              modules = [
+                freeformMod
+                mod
+              ];
+            };
+            cfg = builtins.removeAttrs evaluated.config [ "_module" ];
+          in
+          {
+            config = lib.setAttrByPath path (_: cfg);
+          }
         else
-          # Place source module as a submodule definition at the target path.
-          # Requires the option at `path` in the target class to be a submodule type.
-          { config = lib.setAttrByPath path { imports = [ mod ]; }; };
+          # Plain submodule nesting: _: wrapper marks as module definition.
+          # Requires the option at `path` to be a submodule type.
+          {
+            config = lib.setAttrByPath path (_: {
+              imports = [ mod ];
+            });
+          };
 
       guardModule =
         mod:
@@ -118,9 +147,21 @@ let
             {
               config = lib.mkIf (guard args) (inner.config or inner);
             };
+        # When adaptArgs is set with path nesting, always produce at least an
+        # empty submodule definition so the target entry exists (e.g.,
+        # users.users.tux). Other modules (home-manager) reference the entry.
+        ensureEntry =
+          if route.adaptArgs or null != null && route.path or [ ] != [ ] && sourceModules == [ ] then
+            [
+              (_: {
+                config = lib.setAttrByPath route.path (_: { });
+              })
+            ]
+          else
+            [ ];
         wrappedModules =
           if sourceModules == [ ] then
-            [ ]
+            ensureEntry
           else if isTraitRoute then
             map guardWrap sourceModules
           else
