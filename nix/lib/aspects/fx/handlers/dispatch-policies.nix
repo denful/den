@@ -81,11 +81,6 @@ let
         entityKind = param.entityKind;
         scope = state.currentScope;
         currentCtx = if scope == null then ctx else (state.scopeContexts null).${scope} or ctx;
-        # Policies that already produced resolve effects at a parent scope.
-        # At descendant levels, their resolve effects are skipped (ctx-seen
-        # handles this), but include/exclude effects still fire normally.
-        # Currently unused — dedup handled by ctx-seen instead.
-        # parentFiredResolves = (state.firedResolvePolicies or (_: [ ])) null;
 
         # Merge traits into resolve context.
         traits = builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (state.scopedTraits null));
@@ -308,7 +303,8 @@ let
                 newScopeId = mkScopeId scopedCtx;
                 scopeHandlers = constantHandler scopedCtx;
 
-                pushScope = fx.effects.state.modify (
+                # Set scope — save parentScope, set currentScope to child.
+                setScope = fx.effects.state.modify (
                   st:
                   let
                     parentScope = st.currentScope;
@@ -316,15 +312,8 @@ let
                   st
                   // {
                     currentScope = newScopeId;
-                    scopeStack = _: (st.scopeStack null) ++ [ parentScope ];
                     scopeContexts = _: (st.scopeContexts null) // { ${newScopeId} = scopedCtx; };
                     scopeParent = _: (st.scopeParent null) // { ${newScopeId} = parentScope; };
-                    scopeChildren =
-                      _:
-                      let
-                        all = st.scopeChildren null;
-                      in
-                      all // { ${parentScope} = (all.${parentScope} or [ ]) ++ [ newScopeId ]; };
                     scopedAspectPolicies =
                       _:
                       let
@@ -335,20 +324,17 @@ let
                   }
                 );
 
-                popScope = fx.effects.state.modify (
+                # Restore scope — set currentScope back to parent.
+                restoreScope = fx.effects.state.modify (
                   st:
-                  let
-                    stack = st.scopeStack null;
-                  in
                   st
                   // {
-                    currentScope = lib.last stack;
-                    scopeStack = _: lib.init stack;
+                    currentScope = scope;
                   }
                 );
 
                 # Full entity resolution: push scope, resolve entity, walk tree, drain deferred, pop.
-                fullResolution = fx.bind pushScope (
+                fullResolution = fx.bind setScope (
                   _:
                   fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
                     rawEntity:
@@ -377,7 +363,7 @@ let
                                 fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
                               )
                             ) (fx.pure (prevResults ++ [ childResult ])) satisfiable)
-                            (allResults: fx.bind popScope (_: fx.pure allResults))
+                            (allResults: fx.bind restoreScope (_: fx.pure allResults))
                         )
                       )
                     )

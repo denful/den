@@ -75,14 +75,12 @@ let
     // handlers.constraintRegistryHandler
     // handlers.chainHandler
     // handlers.includeHandler
-    // handlers.transitionHandler
     // handlers.ctxSeenHandler
     // identity.pathSetHandler
     // identity.collectPathsHandler
     // handlers.registerAspectPolicyHandler
     // handlers.registerTraitSchemaHandler
     // handlers.getTraitSchemasHandler
-    // handlers.dispatchPolicyIncludesHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
     // handlers.deadLetterHandler
@@ -132,7 +130,7 @@ let
   # prevents re-materializing large attrsets (pathSet, seen, etc.) at
   # every trampoline step. Unwrap with `state.field null`.
   #
-  # Plain fields (class, transitionDepth, etc.) are small and safe to
+  # Plain fields (class, currentScope, etc.) are small and safe to
   # deepSeq directly.
 
   # mkScopeId: injective scope identity from a context attrset.
@@ -249,15 +247,11 @@ let
     # Sentinel scope for bare handler use (tests that bypass mkPipeline).
     # mkPipeline overrides this with the real rootScopeId.
     currentScope = "__unscoped";
-    scopeStack = _: [ ];
     scopeContexts = _: { };
     scopeParent = _: { };
-    scopeChildren = _: { };
-    scopeProvenance = _: { };
 
     # --- Global state ---
     traitSchemas = _: den.traits or { };
-    firedResolvePolicies = _: [ ];
   };
 
   mkPipeline =

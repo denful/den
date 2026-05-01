@@ -6,7 +6,6 @@
 (import ./ctx.nix args)
 // (import ./tree.nix args)
 // (import ./include.nix args)
-// (import ./transition.nix args)
 // (import ./forward.nix args)
 // (import ./provides-compat.nix args)
 // (import ./trait.nix args)

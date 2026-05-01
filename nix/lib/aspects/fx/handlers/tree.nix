@@ -292,87 +292,6 @@ let
       };
   };
 
-  # Dispatch include-only aspect-included policies during tree-walk.
-  # Called by emitTransitions BEFORE into-transition so injected aspects
-  # participate in entity resolution (visible to class forwarding sub-pipelines).
-  #
-  # Only processes policies that return NO resolve effects (include/exclude only).
-  # PolicyFns with resolve effects are handled by dispatchAspectPolicies in
-  # transition.nix — their includes travel with the transition's routing.aspects
-  # so they're injected into the child entity's resolution scope.
-  # Dispatch include-only aspect-included policies during tree-walk.
-  # Called by emitTransitions BEFORE into-transition so injected aspects
-  # participate in entity resolution (visible to class forwarding sub-pipelines).
-  #
-  # Only processes policies that return NO resolve effects (include/exclude only).
-  # PolicyFns with resolve effects are handled by dispatchAspectPolicies in
-  # transition.nix — their includes travel with the transition's routing.aspects.
-  #
-  # No dedup tracking: include-only policies must fire for every entity context
-  # (e.g., per-user). Cross-level double-firing is prevented by arg matching —
-  # a { host, user } policyFn won't match at host level where user is absent.
-  dispatchPolicyIncludesHandler = {
-    "dispatch-policy-includes" =
-      { param, state }:
-      let
-        # Read aspect policies from ALL scopes — policies registered during
-        # one sibling's resolution must be visible during other siblings.
-        aspectPolicies = builtins.foldl' (acc: v: acc // v) { } (
-          builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
-        );
-        traits = builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (state.scopedTraits null));
-        currentCtx = param.ctx;
-        resolveCtx = traits // currentCtx;
-        traitNames = state.traitSchemas null;
-
-        entries = lib.attrsToList aspectPolicies;
-        matching = builtins.filter (
-          e:
-          let
-            fargs = den.lib.policyTypes.policyFnArgs e.value.fn;
-            requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
-          in
-          builtins.all (k: resolveCtx ? ${k} || traitNames ? ${k}) requiredArgs
-        ) entries;
-
-        # Call matching policies, keep only include-only results.
-        perPolicy = map (
-          entry:
-          let
-            rawEffects = entry.value.fn resolveCtx;
-            effects = if builtins.isList rawEffects then rawEffects else [ rawEffects ];
-            hasResolve = builtins.any (
-              e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
-            ) effects;
-          in
-          {
-            inherit effects hasResolve;
-          }
-        ) matching;
-
-        includeOnly = builtins.filter (p: !p.hasResolve) perPolicy;
-
-        allEffects = lib.concatMap (
-          p:
-          builtins.filter (
-            e:
-            builtins.isAttrs e
-            && builtins.elem (e.__policyEffect or "") [
-              "include"
-              "exclude"
-            ]
-          ) p.effects
-        ) includeOnly;
-
-        includes = map (e: e.value) (builtins.filter (e: e.__policyEffect == "include") allEffects);
-        excludes = map (e: e.value) (builtins.filter (e: e.__policyEffect == "exclude") allEffects);
-      in
-      {
-        resume = { inherit includes excludes; };
-        inherit state;
-      };
-  };
-
   drainDeferredHandler = {
     "drain-deferred" =
       { param, state }:
@@ -506,7 +425,6 @@ in
     chainHandler
     classCollectorHandler
     registerAspectPolicyHandler
-    dispatchPolicyIncludesHandler
     deferredIncludeHandler
     drainDeferredHandler
     deadLetterHandler
