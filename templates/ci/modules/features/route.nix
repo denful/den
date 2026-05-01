@@ -94,22 +94,18 @@ in
           collection = "list";
         };
 
-        den.policies.route-trait-items =
+        den.schema.host.policies.route-trait-items =
           {
             host,
-            __entityKind ? null,
             ...
           }:
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (den.lib.policy.route {
-                fromTrait = "route-items";
-                intoClass = host.class;
-                path = [ "route-collected" ];
-              })
-            ];
+          [
+            (den.lib.policy.route {
+              fromTrait = "route-items";
+              intoClass = host.class;
+              path = [ "route-collected" ];
+            })
+          ];
 
         den.aspects.igloo = {
           route-items = [

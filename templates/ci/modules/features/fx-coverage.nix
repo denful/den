@@ -509,21 +509,15 @@
         den.schema.test-filter.includes = [ ];
 
         # New-style policy with include effect resolves normally.
-        den.policies.host-to-test-filter =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-filter =
+          _:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (resolve.to "test-filter" { })
-              (include { nixos.users.users.tux.description = "from-stage"; })
-            ];
+          [
+            (resolve.to "test-filter" { })
+            (include { nixos.users.users.tux.description = "from-stage"; })
+          ];
 
         # The stage resolves normally via new-style dispatch.
         expr = igloo.users.users.tux.description;

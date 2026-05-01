@@ -101,28 +101,24 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.policies.mixed =
+        den.schema.host.policies.mixed =
           {
             host,
-            __entityKind ? null,
             ...
           }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            map (
-              user:
-              resolve {
-                inherit user;
-                isNixos = host.class == "nixos";
-              }
-            ) (builtins.attrValues host.users)
-            ++ [
-              (include den.aspects.user-check)
-            ];
+          map (
+            user:
+            resolve {
+              inherit user;
+              isNixos = host.class == "nixos";
+            }
+          ) (builtins.attrValues host.users)
+          ++ [
+            (include den.aspects.user-check)
+          ];
 
         den.aspects.user-check = {
           nixos =
@@ -199,22 +195,18 @@
             })
           ];
 
-        den.policies.user-routing =
+        den.schema.host.policies.user-routing =
           {
             host,
-            __entityKind ? null,
             ...
           }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            map (user: resolve { inherit user; }) (builtins.attrValues host.users)
-            ++ [
-              (include den.aspects.user-config)
-            ];
+          map (user: resolve { inherit user; }) (builtins.attrValues host.users)
+          ++ [
+            (include den.aspects.user-config)
+          ];
 
         den.aspects.user-config = {
           nixos =

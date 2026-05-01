@@ -17,21 +17,13 @@ in
     inputs = inputs;
   };
 
-  den.policies.flake-parts-to-flake-parts-system-tests =
-    {
-      __entityKind ? null,
-      ...
-    }:
-    if __entityKind != "flake-parts" then
-      [ ]
-    else
-      [
-        (resolve.to "flake-parts-system" {
-          fromClass = "tests";
-          intoPath = [
-            "nix-unit"
-            "tests"
-          ];
-        })
+  den.schema.flake-parts.policies.to-flake-parts-system-tests = _: [
+    (resolve.to "flake-parts-system" {
+      fromClass = "tests";
+      intoPath = [
+        "nix-unit"
+        "tests"
       ];
+    })
+  ];
 }

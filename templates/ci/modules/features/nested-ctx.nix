@@ -9,26 +9,20 @@
       {
         den.schema.flat.includes = [ ];
 
-        den.policies.test-root-to-flat =
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
+        den.schema.root.policies.test-root-to-flat =
+          { ... }@ctx:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "root" then
-            [ ]
-          else
-            [
-              (resolve.to "flat" ctx)
-              (include (
-                { x }:
-                {
-                  funny.names = [ x ];
-                }
-              ))
-            ];
+          [
+            (resolve.to "flat" ctx)
+            (include (
+              { x }:
+              {
+                funny.names = [ x ];
+              }
+            ))
+          ];
         expr = funnyNames (den.lib.resolveEntity "root" { x = "hi"; });
         expected = [ "hi" ];
       }
@@ -50,60 +44,48 @@
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-a =
-                {
-                  __entityKind ? null,
-                  ...
-                }:
+              den.schema.root.policies.test-root-to-leaf-a =
+                _:
                 let
                   inherit (den.lib.policy) resolve;
                 in
-                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "a"; }) ];
+                [ (resolve.to "leaf" { v = "a"; }) ];
             }
           )
 
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-b =
-                {
-                  __entityKind ? null,
-                  ...
-                }:
+              den.schema.root.policies.test-root-to-leaf-b =
+                _:
                 let
                   inherit (den.lib.policy) resolve;
                 in
-                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "b"; }) ];
+                [ (resolve.to "leaf" { v = "b"; }) ];
             }
           )
 
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-c =
-                {
-                  __entityKind ? null,
-                  ...
-                }:
+              den.schema.root.policies.test-root-to-leaf-c =
+                _:
                 let
                   inherit (den.lib.policy) resolve;
                 in
-                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "c"; }) ];
+                [ (resolve.to "leaf" { v = "c"; }) ];
             }
           )
 
           (
             { den, ... }:
             {
-              den.policies.test-root-to-leaf-d =
-                {
-                  __entityKind ? null,
-                  ...
-                }:
+              den.schema.root.policies.test-root-to-leaf-d =
+                _:
                 let
                   inherit (den.lib.policy) resolve;
                 in
-                if __entityKind != "root" then [ ] else [ (resolve.to "leaf" { v = "d"; }) ];
+                [ (resolve.to "leaf" { v = "d"; }) ];
             }
           )
         ];

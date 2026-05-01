@@ -99,18 +99,14 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
 
-        den.policies.host-to-peers =
+        den.schema.host.policies.host-to-peers =
           {
-            __entityKind ? null,
             host,
             ...
           }:
-          if __entityKind != "host" then
-            [ ]
-          else
-            map (h: den.lib.policy.resolve { host = h; }) (
-              lib.filter (h: h.hostName != host.hostName) (lib.attrValues den.hosts.x86_64-linux)
-            );
+          map (h: den.lib.policy.resolve { host = h; }) (
+            lib.filter (h: h.hostName != host.hostName) (lib.attrValues den.hosts.x86_64-linux)
+          );
 
         expr =
           let

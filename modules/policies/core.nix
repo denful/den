@@ -8,16 +8,10 @@ let
   inherit (den.lib.policy) resolve;
 in
 {
-  den.policies = {
-    host-to-users =
-      {
-        __entityKind ? null,
-        host,
-        ...
-      }:
-      if __entityKind != "host" then
-        [ ]
-      else
-        map (user: resolve.shared { inherit user; }) (lib.attrValues host.users);
-  };
+  den.schema.host.policies.host-to-users =
+    {
+      host,
+      ...
+    }:
+    map (user: resolve.shared { inherit user; }) (lib.attrValues host.users);
 }

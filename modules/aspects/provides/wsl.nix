@@ -52,15 +52,12 @@ in
 
   den.schema.host.imports = [ hostConf ];
 
-  den.policies.host-to-wsl-host =
+  den.schema.host.policies.host-to-wsl-host =
     {
-      __entityKind ? null,
       host,
       ...
     }:
-    if __entityKind != "host" then
-      [ ]
-    else if host.class == "nixos" && (host.wsl or { }).enable or false then
+    if host.class == "nixos" && (host.wsl or { }).enable or false then
       [
         (den.lib.policy.resolve.to "wsl-host" { inherit host; })
         (den.lib.policy.include wsl-host-aspect)

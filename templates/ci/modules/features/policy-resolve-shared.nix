@@ -64,16 +64,12 @@
             }
           )
         ];
-        den.policies.src-to-tgt =
+        den.schema.src.policies.src-to-tgt =
           {
-            __entityKind ? null,
             v,
             ...
           }:
-          if __entityKind != "src" then
-            [ ]
-          else
-            [ (den.lib.policy.resolve.shared.to "tgt" { v = "${v}!"; }) ];
+          [ (den.lib.policy.resolve.shared.to "tgt" { v = "${v}!"; }) ];
         expr = funnyNames (den.lib.resolveEntity "src" { v = "x"; });
         expected = [
           "src-x"
@@ -103,13 +99,12 @@
             }
           )
         ];
-        den.policies.src2-to-tgt2 =
+        den.schema.src2.policies.src2-to-tgt2 =
           {
-            __entityKind ? null,
             v,
             ...
           }:
-          if __entityKind != "src2" then [ ] else [ (den.lib.policy.resolve.to "tgt2" { v = "${v}!"; }) ];
+          [ (den.lib.policy.resolve.to "tgt2" { v = "${v}!"; }) ];
         expr = funnyNames (den.lib.resolveEntity "src2" { v = "x"; });
         expected = [
           "src2-x"

@@ -12,26 +12,20 @@
 
         den.schema.test-flat.includes = [ ];
 
-        den.policies.host-to-test-flat =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-flat =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include {
-                nixos =
-                  { host, config, ... }:
-                  {
-                    networking.hostName = host.name;
-                  };
-              })
-            ];
+          [
+            (include {
+              nixos =
+                { host, config, ... }:
+                {
+                  networking.hostName = host.name;
+                };
+            })
+          ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -48,29 +42,23 @@
 
         den.schema.test-twolayer.includes = [ ];
 
-        den.policies.host-to-test-twolayer =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-twolayer =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include (
-                { host, ... }:
-                {
-                  nixos =
-                    { config, ... }:
-                    {
-                      networking.hostName = host.name;
-                    };
-                }
-              ))
-            ];
+          [
+            (include (
+              { host, ... }:
+              {
+                nixos =
+                  { config, ... }:
+                  {
+                    networking.hostName = host.name;
+                  };
+              }
+            ))
+          ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -87,33 +75,29 @@
 
         den.schema.test-multi-args.includes = [ ];
 
-        den.policies.host-to-test-multi-args =
+        den.schema.host.policies.host-to-test-multi-args =
           {
-            __entityKind ? null,
             host,
             ...
           }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            map (user: resolve.to "test-multi-args" { inherit user; }) (builtins.attrValues host.users)
-            ++ [
-              (include {
-                nixos =
-                  {
-                    host,
-                    user,
-                    config,
-                    ...
-                  }:
-                  {
-                    users.users.tux.description = "${host.name}/${user.name}";
-                  };
-              })
-            ];
+          map (user: resolve.to "test-multi-args" { inherit user; }) (builtins.attrValues host.users)
+          ++ [
+            (include {
+              nixos =
+                {
+                  host,
+                  user,
+                  config,
+                  ...
+                }:
+                {
+                  users.users.tux.description = "${host.name}/${user.name}";
+                };
+            })
+          ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";
@@ -155,30 +139,24 @@
 
         den.schema.test-functor.includes = [ ];
 
-        den.policies.host-to-test-functor =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-functor =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include {
-                nixos = {
-                  __functor =
-                    self:
-                    { config, ... }:
-                    {
-                      networking.hostName = self.myName;
-                    };
-                  myName = "from-functor";
-                };
-              })
-            ];
+          [
+            (include {
+              nixos = {
+                __functor =
+                  self:
+                  { config, ... }:
+                  {
+                    networking.hostName = self.myName;
+                  };
+                myName = "from-functor";
+              };
+            })
+          ];
 
         expr = igloo.networking.hostName;
         expected = "from-functor";
@@ -196,32 +174,26 @@
 
         den.schema.test-funcargs.includes = [ ];
 
-        den.policies.host-to-test-funcargs =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-funcargs =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include {
-                nixos =
-                  {
-                    host,
-                    config,
-                    lib,
-                    pkgs,
-                    ...
-                  }:
-                  {
-                    users.users.tux.description = host.name;
-                  };
-              })
-            ];
+          [
+            (include {
+              nixos =
+                {
+                  host,
+                  config,
+                  lib,
+                  pkgs,
+                  ...
+                }:
+                {
+                  users.users.tux.description = host.name;
+                };
+            })
+          ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo";
@@ -286,20 +258,14 @@
 
         den.schema.test-static-flat.includes = [ ];
 
-        den.policies.host-to-test-static-flat =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-static-flat =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include den.aspects.static-flat)
-            ];
+          [
+            (include den.aspects.static-flat)
+          ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -316,31 +282,27 @@
 
         den.schema.test-cross-param.includes = [ ];
 
-        den.policies.host-to-test-cross-param =
+        den.schema.host.policies.host-to-test-cross-param =
           {
-            __entityKind ? null,
             host,
             ...
           }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            map (user: resolve.to "test-cross-param" { inherit user; }) (builtins.attrValues host.users)
-            ++ [
-              (include (
-                { host, ... }:
-                {
-                  nixos =
-                    { user, config, ... }:
-                    {
-                      users.users.tux.description = "${host.name}/${user.name}";
-                    };
-                }
-              ))
-            ];
+          map (user: resolve.to "test-cross-param" { inherit user; }) (builtins.attrValues host.users)
+          ++ [
+            (include (
+              { host, ... }:
+              {
+                nixos =
+                  { user, config, ... }:
+                  {
+                    users.users.tux.description = "${host.name}/${user.name}";
+                  };
+              }
+            ))
+          ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";
@@ -357,30 +319,24 @@
 
         den.schema.test-paren.includes = [ ];
 
-        den.policies.host-to-test-paren =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-paren =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include (
-                { host, ... }:
-                {
-                  nixos = (
-                    { config, ... }:
-                    {
-                      networking.hostName = host.name;
-                    }
-                  );
-                }
-              ))
-            ];
+          [
+            (include (
+              { host, ... }:
+              {
+                nixos = (
+                  { config, ... }:
+                  {
+                    networking.hostName = host.name;
+                  }
+                );
+              }
+            ))
+          ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -397,29 +353,23 @@
 
         den.schema.test-full-apply.includes = [ ];
 
-        den.policies.host-to-test-full-apply =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-test-full-apply =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include {
-                nixos =
-                  { host }:
-                  (
-                    { config, ... }:
-                    {
-                      networking.hostName = host.name;
-                    }
-                  );
-              })
-            ];
+          [
+            (include {
+              nixos =
+                { host }:
+                (
+                  { config, ... }:
+                  {
+                    networking.hostName = host.name;
+                  }
+                );
+            })
+          ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -473,27 +423,21 @@
 
         den.schema.test-collision-err-int.includes = [ ];
 
-        den.policies.host-to-collision-err-int =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-collision-err-int =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include { nixos._module.args.host = "from-module-system"; })
-              (include {
-                nixos =
-                  { host, config, ... }:
-                  {
-                    networking.hostName = if builtins.isString host then host else host.name;
-                  };
-              })
-            ];
+          [
+            (include { nixos._module.args.host = "from-module-system"; })
+            (include {
+              nixos =
+                { host, config, ... }:
+                {
+                  networking.hostName = if builtins.isString host then host else host.name;
+                };
+            })
+          ];
 
         # The throw from the validator propagates when any part of igloo
         # config that depends on warnings is accessed. tryEval catches it.
@@ -511,27 +455,21 @@
 
         den.schema.test-collision-dw.includes = [ ];
 
-        den.policies.host-to-collision-dw =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-collision-dw =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include { nixos._module.args.host = "from-module-system"; })
-              (include {
-                nixos =
-                  { host, config, ... }:
-                  {
-                    networking.hostName = if builtins.isString host then host else host.name;
-                  };
-              })
-            ];
+          [
+            (include { nixos._module.args.host = "from-module-system"; })
+            (include {
+              nixos =
+                { host, config, ... }:
+                {
+                  networking.hostName = if builtins.isString host then host else host.name;
+                };
+            })
+          ];
 
         # Den value wins — host is the den entity, not the string.
         expr = igloo.networking.hostName;
@@ -548,27 +486,21 @@
 
         den.schema.test-collision-global.includes = [ ];
 
-        den.policies.host-to-collision-global =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-collision-global =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include { nixos._module.args.host = "from-module-system"; })
-              (include {
-                nixos =
-                  { host, config, ... }:
-                  {
-                    networking.hostName = if builtins.isString host then host else host.name;
-                  };
-              })
-            ];
+          [
+            (include { nixos._module.args.host = "from-module-system"; })
+            (include {
+              nixos =
+                { host, config, ... }:
+                {
+                  networking.hostName = if builtins.isString host then host else host.name;
+                };
+            })
+          ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -584,27 +516,21 @@
 
         den.schema.test-collision-cw.includes = [ ];
 
-        den.policies.host-to-collision-cw =
-          {
-            __entityKind ? null,
-            ...
-          }:
+        den.schema.host.policies.host-to-collision-cw =
+          _:
           let
             inherit (den.lib.policy) include;
           in
-          if __entityKind != "host" then
-            [ ]
-          else
-            [
-              (include { nixos._module.args.host = "from-module-system"; })
-              (include {
-                nixos =
-                  { host, config, ... }:
-                  {
-                    networking.hostName = if builtins.isString host then host else host.name;
-                  };
-              })
-            ];
+          [
+            (include { nixos._module.args.host = "from-module-system"; })
+            (include {
+              nixos =
+                { host, config, ... }:
+                {
+                  networking.hostName = if builtins.isString host then host else host.name;
+                };
+            })
+          ];
 
         expr = igloo.networking.hostName;
         expected = "from-module-system";

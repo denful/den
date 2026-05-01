@@ -19,26 +19,20 @@
           )
         ];
         den.schema.shout.includes = [ ];
-        den.policies.test-greeting-to-shout =
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
+        den.schema.greeting.policies.test-greeting-to-shout =
+          { hello, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "greeting" then
-            [ ]
-          else
-            [
-              (resolve.to "shout" { shout = lib.toUpper ctx.hello; })
-              (include (
-                { shout }:
-                {
-                  funny.names = [ shout ];
-                }
-              ))
-            ];
+          [
+            (resolve.to "shout" { shout = lib.toUpper hello; })
+            (include (
+              { shout }:
+              {
+                funny.names = [ shout ];
+              }
+            ))
+          ];
         expr = funnyNames (den.lib.resolveEntity "greeting" { hello = "world"; });
         expected = [
           "WORLD"

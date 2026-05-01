@@ -5,21 +5,13 @@ in
 {
   imports = [ inputs.devshell.flakeModule ];
   den.classes.devshell = { };
-  den.policies.flake-parts-to-flake-parts-system-devshell =
-    {
-      __entityKind ? null,
-      ...
-    }:
-    if __entityKind != "flake-parts" then
-      [ ]
-    else
-      [
-        (resolve.to "flake-parts-system" {
-          fromClass = "devshell";
-          intoPath = [
-            "devshells"
-            "default"
-          ];
-        })
+  den.schema.flake-parts.policies.to-flake-parts-system-devshell = _: [
+    (resolve.to "flake-parts-system" {
+      fromClass = "devshell";
+      intoPath = [
+        "devshells"
+        "default"
       ];
+    })
+  ];
 }

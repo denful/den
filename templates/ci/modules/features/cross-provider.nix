@@ -19,32 +19,26 @@
           )
         ];
         den.schema.child.includes = [ ];
-        den.policies.test-parent-to-child =
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
+        den.schema.parent.policies.test-parent-to-child =
+          { x, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "parent" || !(ctx ? x) then
-            [ ]
-          else
-            [
-              (resolve.to "child" { y = "derived"; })
-              (include (
-                { x, y }:
-                {
-                  funny.names = [ "child-${y}" ];
-                }
-              ))
-              (include (
-                { x, y }:
-                {
-                  funny.names = [ "parent-for-child-${x}-${y}" ];
-                }
-              ))
-            ];
+          [
+            (resolve.to "child" { y = "derived"; })
+            (include (
+              { x, y }:
+              {
+                funny.names = [ "child-${y}" ];
+              }
+            ))
+            (include (
+              { x, y }:
+              {
+                funny.names = [ "parent-for-child-${x}-${y}" ];
+              }
+            ))
+          ];
         expr = funnyNames (den.lib.resolveEntity "parent" { x = "hello"; });
         expected = [
           "child-derived"
@@ -71,33 +65,27 @@
           )
         ];
         den.schema.dst.includes = [ ];
-        den.policies.test-src-to-dst =
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
+        den.schema.src.policies.test-src-to-dst =
+          { x, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "src" || !(ctx ? x) then
-            [ ]
-          else
-            [
-              (resolve.to "dst" { i = 1; })
-              (resolve.to "dst" { i = 2; })
-              (include (
-                { x, i }:
-                {
-                  funny.names = [ "dst-${toString i}" ];
-                }
-              ))
-              (include (
-                { x, i }:
-                {
-                  funny.names = [ "src-for-${x}-${toString i}" ];
-                }
-              ))
-            ];
+          [
+            (resolve.to "dst" { i = 1; })
+            (resolve.to "dst" { i = 2; })
+            (include (
+              { x, i }:
+              {
+                funny.names = [ "dst-${toString i}" ];
+              }
+            ))
+            (include (
+              { x, i }:
+              {
+                funny.names = [ "src-for-${x}-${toString i}" ];
+              }
+            ))
+          ];
         expr = funnyNames (den.lib.resolveEntity "src" { x = "a"; });
         expected = [
           "a"
@@ -126,26 +114,20 @@
           )
         ];
         den.schema.dst.includes = [ ];
-        den.policies.test-src-to-dst-no-cross =
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
+        den.schema.src.policies.test-src-to-dst-no-cross =
+          { x, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "src" || !(ctx ? x) then
-            [ ]
-          else
-            [
-              (resolve.to "dst" { y = ctx.x; })
-              (include (
-                { y }:
-                {
-                  funny.names = [ "dst-${y}" ];
-                }
-              ))
-            ];
+          [
+            (resolve.to "dst" { y = x; })
+            (include (
+              { y }:
+              {
+                funny.names = [ "dst-${y}" ];
+              }
+            ))
+          ];
         expr = funnyNames (den.lib.resolveEntity "src" { x = "val"; });
         expected = [
           "dst-val"

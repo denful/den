@@ -5,13 +5,7 @@ in
 {
   imports = [ inputs.files.flakeModules.default ];
   den.classes.files = { };
-  den.policies.flake-parts-to-flake-parts-system-files =
-    {
-      __entityKind ? null,
-      ...
-    }:
-    if __entityKind != "flake-parts" then
-      [ ]
-    else
-      [ (resolve.to "flake-parts-system" { fromClass = "files"; }) ];
+  den.schema.flake-parts.policies.to-flake-parts-system-files = _: [
+    (resolve.to "flake-parts-system" { fromClass = "files"; })
+  ];
 }

@@ -122,27 +122,21 @@
           shared
         ];
         den.schema.b.includes = [ ];
-        den.policies.a-to-b =
-          {
-            __entityKind ? null,
-            ...
-          }@ctx:
+        den.schema.a.policies.a-to-b =
+          { tag, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          if __entityKind != "a" || !(ctx ? tag) then
-            [ ]
-          else
-            [
-              (resolve.to "b" { tag = "${ctx.tag}!"; })
-              (include (
-                { tag }:
-                {
-                  funny.names = [ "b-${tag}" ];
-                }
-              ))
-              (include shared)
-            ];
+          [
+            (resolve.to "b" { tag = "${tag}!"; })
+            (include (
+              { tag }:
+              {
+                funny.names = [ "b-${tag}" ];
+              }
+            ))
+            (include shared)
+          ];
         expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { tag = "v"; }));
         expected = 6;
       }
