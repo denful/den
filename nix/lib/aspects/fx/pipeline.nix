@@ -561,36 +561,19 @@ let
           in
           own ++ nested;
 
-        # Collect source modules from the scope chain (parent scopes have
-        # den.default and other shared aspects) for a given class.
-        collectFromScopeChain =
-          fromClass: depth: scopeId:
-          let
-            own = wrappedPerScope.${scopeId}.${fromClass} or [ ];
-            parent = scopeParent.${scopeId} or null;
-            parentMods =
-              if parent != null && parent != scopeId && depth < 10 then
-                collectFromScopeChain fromClass (depth + 1) parent
-              else
-                [ ];
-          in
-          own ++ parentMods;
-
         applyForwardSpecs =
           specs: classImports:
           builtins.foldl' (
             acc: spec:
             let
               sid = spec.sourceScopeId;
-              # Source modules come from two places:
-              # 1. wrappedPerScope (directly emitted class modules, scope-inherited)
-              # 2. acc.classImports (modules produced by earlier forwards in this pass)
-              # This enables chained forwards: home → homeManager → nixos works
-              # because home → homeManager adds to acc.classImports.homeManager,
-              # which homeManager → nixos then reads.
-              scopeModules = collectFromScopeChain spec.fromClass 0 sid;
-              chainedModules = acc.classImports.${spec.fromClass} or [ ];
-              sourceModules = scopeModules ++ chainedModules;
+              # Source modules from acc.classImports — this includes:
+              # 1. wrappedClassImports (all scopes flattened — has parent scope modules)
+              # 2. Route-produced modules
+              # 3. Modules from earlier forwards in this pass (chained forward support)
+              # No separate scope chain walk needed — wrappedClassImports already merges
+              # all scopes, and acc accumulates forward outputs.
+              sourceModules = acc.classImports.${spec.fromClass} or [ ];
               rawSourceModule = {
                 imports = sourceModules;
               };
