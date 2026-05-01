@@ -118,7 +118,16 @@
         } comp;
       in
       {
-        expr = builtins.length ((result.state.classImports null).user or [ ]) > 0;
+        expr =
+          builtins.length (
+            (builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).user or [ ]
+          ) > 0;
         expected = true;
       }
     );

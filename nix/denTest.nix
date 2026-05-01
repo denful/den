@@ -174,7 +174,18 @@ let
               [ root.name ] ++ buildTree rootName entries;
         in
         {
-          imports = (result.state.classImports null).${class} or [ ];
+          imports =
+            let
+              scoped = result.state.scopedClassImports null;
+              flat = builtins.foldl' (
+                acc: sd:
+                lib.zipAttrsWith (_: builtins.concatLists) [
+                  acc
+                  sd
+                ]
+              ) { } (builtins.attrValues scoped);
+            in
+            flat.${class} or [ ];
           trace = traceTree;
         };
 

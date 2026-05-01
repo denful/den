@@ -192,7 +192,15 @@
         } comp;
       in
       {
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 1;
       }
     );
@@ -595,7 +603,15 @@
         } comp;
       in
       {
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 1;
       }
     );

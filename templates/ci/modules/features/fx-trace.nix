@@ -205,7 +205,15 @@
         expr = {
           hasHostEntry = builtins.any (e: e.name == "host") result.state.entries;
           allEntriesHaveClass = builtins.all (e: e.class == "nixos") result.state.entries;
-          hasImports = ((result.state.classImports null).nixos or [ ]) != [ ];
+          hasImports =
+            ((builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+            ) != [ ];
         };
         expected = {
           hasHostEntry = true;
@@ -267,7 +275,15 @@
         expr = {
           hasProvider = builtins.elem "host-provider" entryNames;
           hasHost = builtins.elem "host" entryNames;
-          importCount = builtins.length ((result.state.classImports null).nixos or [ ]);
+          importCount = builtins.length (
+            (builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+          );
         };
         expected = {
           hasProvider = true;
@@ -336,7 +352,15 @@
         expr = {
           hasEntries = result.state.entries != [ ];
           hasPaths = (result.state.pathSet) null != { };
-          hasImports = ((result.state.classImports null).nixos or [ ]) != [ ];
+          hasImports =
+            ((builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+            ) != [ ];
         };
         expected = {
           hasEntries = true;

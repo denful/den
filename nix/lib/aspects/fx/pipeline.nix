@@ -224,7 +224,6 @@ let
   defaultState = {
     # --- Flat state (global or with remaining flat readers) ---
     seen = _: { };
-    classImports = _: { }; # dual-write kept — many tests read flat classImports
     aspectPolicies = _: { }; # dual-write kept — resolveFanOut extraState seeding
     pathSet = _: { };
     traits = _: { };

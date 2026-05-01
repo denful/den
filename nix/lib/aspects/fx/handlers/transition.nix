@@ -279,7 +279,6 @@ let
         traitModule = null;
         hasTraitSchemas = false;
       };
-      subClassImports = subForwarded.classImports;
       # Push scope, merge sub-pipeline results, pop scope.
       pushScope = fx.effects.state.modify (
         st:
@@ -307,8 +306,8 @@ let
             all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
         }
       );
-      # Merge sub-pipeline results into parent state: flat classImports
-      # plus all scoped state fields. Scope IDs are globally unique
+      # Merge sub-pipeline results into parent state: all scoped state
+      # fields. Scope IDs are globally unique
       # (mkScopeId on entity context), so simple // merge is safe for
       # most fields. scopedClassImports uses mergeScoped to handle the
       # unlikely case of overlapping scope+class entries.
@@ -344,15 +343,6 @@ let
         st:
         st
         // {
-          classImports =
-            x:
-            let
-              current = st.classImports x;
-            in
-            lib.zipAttrsWith (_: builtins.concatLists) [
-              current
-              subClassImports
-            ];
           scopedClassImports = _: mergeScoped (st.scopedClassImports null) subScopedCI;
           scopedTraits = _: (st.scopedTraits null) // subScopedTraits;
           scopedDeferredTraits = _: (st.scopedDeferredTraits null) // subScopedDT;

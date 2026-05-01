@@ -180,7 +180,15 @@
       in
       {
         # Without dedup: 2 imports. With dedup: 1 import.
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 1;
       }
     );
@@ -224,7 +232,15 @@
         };
       in
       {
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 1;
       }
     );
@@ -257,7 +273,15 @@
       in
       {
         # Different contexts → different dedup keys → both resolve.
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 2;
       }
     );
@@ -357,7 +381,15 @@
       {
         # shared excluded in treeA, included in treeB → 1 import.
         # If exclude pollutes includeSeen (bug): 0 imports.
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 1;
       }
     );

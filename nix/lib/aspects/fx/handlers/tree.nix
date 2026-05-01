@@ -227,15 +227,6 @@ let
       {
         resume = null;
         state = state // {
-          classImports =
-            x:
-            let
-              current = state.classImports x;
-            in
-            current
-            // {
-              ${param.class} = (current.${param.class} or [ ]) ++ [ mod ];
-            };
           scopedClassImports =
             x:
             let

@@ -32,7 +32,15 @@
       {
         expr = {
           hasNixos = result.value ? nixos;
-          importsLength = builtins.length ((result.state.classImports null).nixos or [ ]);
+          importsLength = builtins.length (
+            (builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+          );
         };
         expected = {
           hasNixos = true;
@@ -66,7 +74,16 @@
       {
         den.classes.nixos.description = "NixOS system configuration";
 
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]) > 0;
+        expr =
+          builtins.length (
+            (builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+          ) > 0;
         expected = true;
       }
     );
@@ -150,7 +167,15 @@
         };
 
         # Only nixos should produce an import, not firewall
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 1;
       }
     );
@@ -190,7 +215,15 @@
           in
           {
             # Only nixos (class) produces imports; firewall (trait) is no-op
-            importsCount = builtins.length ((result.state.classImports null).nixos or [ ]);
+            importsCount = builtins.length (
+              (builtins.foldl' (
+                acc: sd:
+                lib.zipAttrsWith (_: builtins.concatLists) [
+                  acc
+                  sd
+                ]
+              ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+            );
             resolvedOk = result.value.name == "mixed";
           };
         expected = {
@@ -229,7 +262,16 @@
         den.classes.nixos.description = "NixOS";
 
         # The nested "servers" aspect should recurse and emit its "nixos" sub-key as a class
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]) > 0;
+        expr =
+          builtins.length (
+            (builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+          ) > 0;
         expected = true;
       }
     );
@@ -262,7 +304,15 @@
 
         # Only the class "nixos" produces an import; randomThing is freeform → ignored
         expr = {
-          importsCount = builtins.length ((result.state.classImports null).nixos or [ ]);
+          importsCount = builtins.length (
+            (builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+          );
           name = result.value.name;
         };
         expected = {
@@ -311,7 +361,16 @@
       in
       {
         # Batteries auto-register nixos as a class; aspect should still produce imports.
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]) > 0;
+        expr =
+          builtins.length (
+            (builtins.foldl' (
+              acc: sd:
+              lib.zipAttrsWith (_: builtins.concatLists) [
+                acc
+                sd
+              ]
+            ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+          ) > 0;
         expected = true;
       }
     );
@@ -343,7 +402,15 @@
         den.classes.nixos.description = "NixOS";
 
         # myclass matches targetClass → emitted as class → produces import
-        expr = builtins.length ((result.state.classImports null).myclass or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).myclass or [ ]
+        );
         expected = 1;
       }
     );
@@ -378,7 +445,15 @@
         den.classes.nixos.description = "NixOS";
 
         # Only nixos produces an import; bogus is ignored
-        expr = builtins.length ((result.state.classImports null).nixos or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+        );
         expected = 1;
       }
     );

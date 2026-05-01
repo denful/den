@@ -102,7 +102,16 @@
         };
 
         expr = {
-          hasImports = builtins.length ((result.state.classImports null).nixos or [ ]) > 0;
+          hasImports =
+            builtins.length (
+              (builtins.foldl' (
+                acc: sd:
+                lib.zipAttrsWith (_: builtins.concatLists) [
+                  acc
+                  sd
+                ]
+              ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
+            ) > 0;
           hasTraitData = (result.state.traits null) ? firewall;
           traitValue = (result.state.traits null).firewall;
         };
