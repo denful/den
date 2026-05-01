@@ -203,13 +203,14 @@
             traitSchemas = { };
           };
           state = {
-            traits = _: { };
-            deferredTraits = _: { };
+            currentScope = "__test";
+            scopedTraits = _: { };
+            scopedDeferredTraits = _: { };
           };
         } comp;
       in
       {
-        expr = (result.state.traits null).firewall;
+        expr = (result.state.scopedTraits null).__test.firewall;
         expected = [
           { enable = true; }
         ];
@@ -247,13 +248,14 @@
             traitSchemas = { };
           };
           state = {
-            traits = _: { };
-            deferredTraits = _: { };
+            currentScope = "__test";
+            scopedTraits = _: { };
+            scopedDeferredTraits = _: { };
           };
         } comp;
       in
       {
-        expr = (result.state.traits null).firewall;
+        expr = (result.state.scopedTraits null).__test.firewall;
         expected = [
           { port = 80; }
           { port = 443; }
@@ -296,13 +298,14 @@
             };
           };
           state = {
-            traits = _: { };
-            deferredTraits = _: { };
+            currentScope = "__test";
+            scopedTraits = _: { };
+            scopedDeferredTraits = _: { };
           };
         } comp;
       in
       {
-        expr = (result.state.traits null).ports;
+        expr = (result.state.scopedTraits null).__test.ports;
         expected = {
           http = 80;
           https = 443;
@@ -333,15 +336,16 @@
             traitSchemas = { };
           };
           state = {
-            traits = _: { };
-            deferredTraits = _: { };
+            currentScope = "__test";
+            scopedTraits = _: { };
+            scopedDeferredTraits = _: { };
           };
         } comp;
       in
       {
         expr = {
-          traitsEmpty = (result.state.traits null) == { };
-          deferredCount = builtins.length ((result.state.deferredTraits null).firewall or [ ]);
+          traitsEmpty = (result.state.scopedTraits null).__test or { } == { };
+          deferredCount = builtins.length ((result.state.scopedDeferredTraits null).__test.firewall or [ ]);
         };
         expected = {
           traitsEmpty = true;
@@ -375,13 +379,14 @@
             traitSchemas = { };
           };
           state = {
-            traits = _: { };
-            deferredTraits = _: { };
+            currentScope = "__test";
+            scopedTraits = _: { };
+            scopedDeferredTraits = _: { };
           };
         } comp;
       in
       {
-        expr = (result.state.traits null).firewall;
+        expr = (result.state.scopedTraits null).__test.firewall;
         expected = [
           { hostFirewall = "igloo"; }
         ];
@@ -399,19 +404,23 @@
         result = fx.handle {
           handlers = handlers.traitArgHandler { firewall = true; };
           state = {
-            traits = _: {
-              firewall = [
-                { enable = true; }
-              ];
+            currentScope = "__test";
+            scopedTraits = _: {
+              __test = {
+                firewall = [
+                  { enable = true; }
+                ];
+              };
             };
-            consumedTraits = _: { };
+            scopeParent = _: { };
+            scopedConsumedTraits = _: { };
           };
         } comp;
       in
       {
         expr = {
           value = result.value;
-          consumed = (result.state.consumedTraits null) ? firewall;
+          consumed = (result.state.scopedConsumedTraits null).__test ? firewall;
         };
         expected = {
           value = [
@@ -432,8 +441,10 @@
         result = fx.handle {
           handlers = handlers.traitArgHandler { firewall = true; };
           state = {
-            traits = _: { };
-            consumedTraits = _: { };
+            currentScope = "__test";
+            scopedTraits = _: { };
+            scopeParent = _: { };
+            scopedConsumedTraits = _: { };
           };
         } comp;
       in
@@ -444,12 +455,12 @@
       }
     );
 
-    # --- defaultState has consumedTraits ---
+    # --- defaultState has scopedConsumedTraits ---
 
     test-default-state-has-consumed-traits = denTest (
       { den, ... }:
       {
-        expr = den.lib.aspects.fx.pipeline.defaultState ? consumedTraits;
+        expr = den.lib.aspects.fx.pipeline.defaultState ? scopedConsumedTraits;
         expected = true;
       }
     );
@@ -484,7 +495,9 @@
           collection = "list";
         };
 
-        expr = (result.state.traits null).firewall;
+        expr =
+          (builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (result.state.scopedTraits null)))
+          .firewall;
         expected = [
           { port = 80; }
         ];
@@ -562,7 +575,9 @@
             ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
           );
           name = result.value.name;
-          hasTraitData = (result.state.traits null) ? firewall;
+          hasTraitData =
+            (builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (result.state.scopedTraits null)))
+            ? firewall;
         };
         expected = {
           importsCount = 1;
@@ -757,7 +772,9 @@
 
         # Manually check: if consumedTraits has firewall AND deferredTraits has firewall
         # without partialOk, it should error.
-        deferredTraits = rawResult.state.deferredTraits null;
+        deferredTraits = builtins.foldl' (acc: v: acc // v) { } (
+          builtins.attrValues (rawResult.state.scopedDeferredTraits null)
+        );
         hasDeferredFirewall = (deferredTraits.firewall or [ ]) != [ ];
       in
       {
@@ -797,21 +814,25 @@
         rawResult = fx.handle {
           handlers = baseHandlers;
           state = pipeline.defaultState // {
-            # Pre-seed consumed + deferred to trigger validation
-            consumedTraits = _: {
-              firewall = true;
+            # Pre-seed consumed + deferred to trigger validation (scoped versions)
+            scopedConsumedTraits = _: {
+              "__unscoped" = {
+                firewall = true;
+              };
             };
-            deferredTraits = _: {
-              firewall = [
-                {
-                  value =
-                    { config, ... }:
-                    {
-                      enable = true;
-                    };
-                  chain = "test";
-                }
-              ];
+            scopedDeferredTraits = _: {
+              "__unscoped" = {
+                firewall = [
+                  {
+                    value =
+                      { config, ... }:
+                      {
+                        enable = true;
+                      };
+                    chain = "test";
+                  }
+                ];
+              };
             };
           };
         } comp;
@@ -827,7 +848,10 @@
         # With partialOk = true, fxResolve should NOT throw even with
         # consumed + deferred. We can't easily test fxResolve with pre-seeded
         # state, so verify the raw pipeline collected the deferred data.
-        expr = (rawResult.state.deferredTraits null) ? firewall;
+        expr =
+          (builtins.foldl' (acc: v: acc // v) { } (
+            builtins.attrValues (rawResult.state.scopedDeferredTraits null)
+          )) ? firewall;
         expected = true;
       }
     );

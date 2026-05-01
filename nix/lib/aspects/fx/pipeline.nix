@@ -222,14 +222,11 @@ let
     };
 
   defaultState = {
-    # --- Flat state (global or with remaining flat readers) ---
+    # --- Flat state (global by design, not scoped) ---
     seen = _: { };
     pathSet = _: { };
-    traits = _: { };
-    deferredTraits = _: { };
-    consumedTraits = _: { };
 
-    # --- Scope-partitioned output state (future: handlers write here) ---
+    # --- Scope-partitioned output state (handlers write here) ---
     scopedClassImports = _: { };
     scopedTraits = _: { };
     scopedDeferredTraits = _: { };
@@ -388,7 +385,9 @@ let
           in
           fwd.classImports;
       subHasTraitSchemas = subTraitSchemas != { };
-      subTraits = subResult.state.traits null;
+      subAllTraits = builtins.foldl' (acc: v: acc // v) { } (
+        builtins.attrValues (subResult.state.scopedTraits null)
+      );
       subTraitModule =
         { ... }:
         {
@@ -401,7 +400,7 @@ let
             traitName: schema:
             let
               strategy = schema.collection or "list";
-              raw = subTraits.${traitName} or (if strategy == "map" then { } else [ ]);
+              raw = subAllTraits.${traitName} or (if strategy == "map" then { } else [ ]);
             in
             raw
           ) subTraitSchemas;
@@ -409,7 +408,7 @@ let
     in
     {
       classImports = forwarded;
-      traits = subResult.state.traits null;
+      traits = subAllTraits;
       traitModule = if subHasTraitSchemas then subTraitModule else null;
       inherit subHasTraitSchemas;
     };
@@ -574,8 +573,12 @@ let
       hasTraitSchemas = traitSchemas != { };
 
       # partialOk validation
-      consumedTraits = (result.state.consumedTraits or (_: { })) null;
-      deferredTraits = result.state.deferredTraits null;
+      consumedTraits = builtins.foldl' (acc: v: acc // v) { } (
+        builtins.attrValues ((result.state.scopedConsumedTraits or (_: { })) null)
+      );
+      deferredTraits = builtins.foldl' (acc: v: acc // v) { } (
+        builtins.attrValues (result.state.scopedDeferredTraits null)
+      );
       partialOkViolations = builtins.filter (
         traitName:
         consumedTraits ? ${traitName}

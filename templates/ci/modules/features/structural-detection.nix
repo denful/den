@@ -327,8 +327,8 @@
       { den, ... }:
       {
         expr = {
-          hasTraits = den.lib.aspects.fx.pipeline.defaultState ? traits;
-          hasDeferredTraits = den.lib.aspects.fx.pipeline.defaultState ? deferredTraits;
+          hasTraits = den.lib.aspects.fx.pipeline.defaultState ? scopedTraits;
+          hasDeferredTraits = den.lib.aspects.fx.pipeline.defaultState ? scopedDeferredTraits;
         };
         expected = {
           hasTraits = true;

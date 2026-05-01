@@ -1,10 +1,10 @@
-# traitCollectorHandler: Handles emit-trait — collects trait data into state.traits/deferredTraits.
+# traitCollectorHandler: Handles emit-trait — collects trait data into scopedTraits/scopedDeferredTraits.
 #   Tier 1: plain value → collect immediately
 #   Tier 2: function with only den context args → resolve with ctx, collect
 #   Tier 3: function with module-system args → defer
 # traitArgHandler: Handles <trait-name> effects — resumes with collected trait data for parametric consumers.
-#   State reads: traits, consumedTraits
-#   State writes: consumedTraits
+#   State reads: scopedTraits, scopedConsumedTraits
+#   State writes: scopedConsumedTraits
 {
   lib,
   den,
@@ -114,24 +114,9 @@ let
         in
         if tierInfo.tier == 3 then
           # Defer — store raw function for module-system resolution
-          let
-            deferred = (state.deferredTraits or (_: { })) null;
-            existing = deferred.${traitName} or [ ];
-          in
           {
             resume = null;
             state = state // {
-              deferredTraits =
-                _:
-                deferred
-                // {
-                  ${traitName} = existing ++ [
-                    {
-                      value = rawValue;
-                      chain = param.chain or "<unknown>";
-                    }
-                  ];
-                };
               scopedDeferredTraits =
                 _:
                 let
@@ -155,23 +140,9 @@ let
           }
         else
           # Tier 1 or 2 — collect immediately
-          let
-            traits = (state.traits or (_: { })) null;
-            existing = traits.${traitName} or (if strategy == "map" then { } else [ ]);
-            collected = collectTrait {
-              inherit strategy traitName existing;
-              newValue = tierInfo.value;
-            };
-          in
           {
             resume = null;
             state = state // {
-              traits =
-                _:
-                traits
-                // {
-                  ${traitName} = collected;
-                };
               scopedTraits =
                 _:
                 let
@@ -245,22 +216,15 @@ let
               in
               (walkParent (scopeParent.${scope} or null)) ++ own
           else
-            # Fallback: flat read (tests without full pipeline)
-            let
-              traits = (state.traits or (_: { })) null;
-            in
-            traits.${traitName} or emptyDefault;
-        consumed = (state.consumedTraits or (_: { })) null;
+          # Fallback: read from current scope (tests without full pipeline)
+          if scope != null then
+            (scopedTraits.${scope} or { }).${traitName} or emptyDefault
+          else
+            emptyDefault;
       in
       {
         resume = traitData;
         state = state // {
-          consumedTraits =
-            _:
-            consumed
-            // {
-              ${traitName} = true;
-            };
           scopedConsumedTraits =
             _:
             let

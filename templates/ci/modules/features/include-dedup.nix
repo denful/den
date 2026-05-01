@@ -329,7 +329,10 @@
         };
 
         # Without dedup: [{port=80;} {port=80;}]. With dedup: [{port=80;}].
-        expr = builtins.length ((result.state.traits null).firewall or [ ]);
+        expr = builtins.length (
+          (builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (result.state.scopedTraits null)))
+          .firewall or [ ]
+        );
         expected = 1;
       }
     );

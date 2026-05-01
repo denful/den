@@ -550,7 +550,7 @@ let
         manualTransitions = if manualIntoFn != null then flattenInto (manualIntoFn currentCtx) [ ] else [ ];
 
         # Direct policy dispatch: iterate den.policies, check scope + args, call directly.
-        traits = (state.traits or (_: { })) null;
+        traits = builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (state.scopedTraits null));
         resolveCtx = traits // currentCtx // { __entityKind = sourceEntityKind; };
         # Schema-scoped policies: only fire for matching entity kind.
         schemaPolicies = (den.schema.${sourceEntityKind} or { }).policies or { };

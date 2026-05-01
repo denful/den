@@ -93,6 +93,9 @@
           };
           state = den.lib.aspects.fx.pipeline.defaultState;
         } comp;
+        allTraits = builtins.foldl' (acc: v: acc // v) { } (
+          builtins.attrValues (result.state.scopedTraits null)
+        );
       in
       {
         den.classes.nixos.description = "NixOS";
@@ -112,8 +115,8 @@
                 ]
               ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
             ) > 0;
-          hasTraitData = (result.state.traits null) ? firewall;
-          traitValue = (result.state.traits null).firewall;
+          hasTraitData = allTraits ? firewall;
+          traitValue = allTraits.firewall;
         };
         expected = {
           hasImports = true;

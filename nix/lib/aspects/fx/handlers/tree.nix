@@ -320,7 +320,7 @@ let
         aspectPolicies = builtins.foldl' (acc: v: acc // v) { } (
           builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
         );
-        traits = (state.traits or (_: { })) null;
+        traits = builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (state.scopedTraits null));
         currentCtx = param.ctx;
         resolveCtx = traits // currentCtx;
         traitNames = state.traitSchemas null;

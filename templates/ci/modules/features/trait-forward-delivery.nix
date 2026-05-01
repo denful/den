@@ -23,7 +23,9 @@
           };
           ctx = { };
         };
-        traits = result.state.traits null;
+        traits = builtins.foldl' (acc: v: acc // v) { } (
+          builtins.attrValues (result.state.scopedTraits null)
+        );
       in
       {
         den.classes.nixos.description = "NixOS";
