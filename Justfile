@@ -27,6 +27,9 @@ ci test="" *args:
 ci-deep test="" *args:
   just nix-unit ci "{{test}}" {{args}}
 
+test test_name *args:
+  nix-unit --override-input den . --flake ./templates/ci#.tests.{{test_name}} {{args}}
+
 bogus *args:
   just nix-unit bogus "bogus" {{args}}
 
