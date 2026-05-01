@@ -533,7 +533,27 @@ let
 
         # Apply Tier 2 forwards — read source modules from wrappedPerScope
         # instead of running sub-pipelines.
-        forwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
+        rawForwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
+        # Dedup by adapterKey — same forward can fire from multiple scopes
+        # when dispatch-policies walks the same entity multiple times.
+        forwardSpecs =
+          let
+            go =
+              seen: specs:
+              if specs == [ ] then
+                [ ]
+              else
+                let
+                  s = builtins.head specs;
+                  rest = builtins.tail specs;
+                  key = s.adapterKey or null;
+                in
+                if key != null && seen ? ${key} then
+                  go seen rest
+                else
+                  [ s ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
+          in
+          go { } rawForwardSpecs;
 
         # Collect class modules from a forward aspect (recursing into includes).
         collectClassMods =
@@ -550,7 +570,22 @@ let
             acc: spec:
             let
               sid = spec.sourceScopeId;
-              sourceModules = wrappedPerScope.${sid}.${spec.fromClass} or [ ];
+              # Source modules may be at the forward's source scope or a child scope
+              # (DLQ drain re-emits at the scope it runs in, which may be a child).
+              sourceModules =
+                let
+                  direct = wrappedPerScope.${sid}.${spec.fromClass} or [ ];
+                in
+                if direct != [ ] then
+                  direct
+                else
+                  # Fallback: search all scopes that descend from sourceScopeId.
+                  lib.concatLists (
+                    lib.mapAttrsToList (
+                      scopeId: scopeClasses:
+                      if lib.hasPrefix sid scopeId then scopeClasses.${spec.fromClass} or [ ] else [ ]
+                    ) wrappedPerScope
+                  );
               rawSourceModule = {
                 imports = sourceModules;
               };

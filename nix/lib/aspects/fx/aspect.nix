@@ -469,6 +469,16 @@ let
         allScoped = (state.scopedDeadLetterQueue or (_: { })) null;
         queue = lib.concatLists (lib.attrValues allScoped);
         dynamicTraitSchemas = state.traitSchemas null;
+        # Forward source classes: freeform keys used as fromClass in forwards
+        # need to be recognized as class keys so their data enters scopedClassImports.
+        forwardSourceClasses = builtins.listToAttrs (
+          map (spec: {
+            name = spec.fromClass;
+            value = true;
+          }) (lib.concatLists (lib.attrValues ((state.scopedForwardSpecs or (_: { })) null)))
+        );
+        isKnownClass =
+          key: classRegistry ? ${key} || dynamicTraitSchemas ? ${key} || forwardSourceClasses ? ${key};
       in
       if queue == [ ] then
         {
@@ -477,14 +487,12 @@ let
         }
       else
         let
-          classified = builtins.partition (
-            entry: classRegistry ? ${entry.key} || dynamicTraitSchemas ? ${entry.key}
-          ) queue;
+          classified = builtins.partition (entry: isKnownClass entry.key) queue;
           matched = classified.right;
           remaining = classified.wrong;
           reEmits = lib.concatMap (
             entry:
-            if classRegistry ? ${entry.key} then
+            if classRegistry ? ${entry.key} || forwardSourceClasses ? ${entry.key} then
               emitClassFromDLQ dynamicTraitSchemas entry
             else
               emitTraitFromDLQ entry
