@@ -13,17 +13,39 @@ if test -n "${1:-}"; then
 fi
 
 suite=""
+testFilter=""
 preSuite=""
 postSuite=""
 
 if test -n "${1:-}"; then
-  suite="$1"
+  input="$1"
+  # Split suite.test-name into suite + test filter
+  suite="${input%%.*}"
+  if [[ "$input" == *.* ]]; then
+    testFilter="${input#*.}"
+  fi
   preSuite=".${suite}"
   postSuite="${suite}."
   shift
 fi
 
 args=($@)
+
+# When a specific test is requested, delegate to nix-unit for traces
+if test -n "$testFilter"; then
+  nix_unit_output=$(nix-unit --override-input den . --flake "./templates/ci#.tests.${suite}" "${args[@]}" 2>&1) || true
+  # Show only the matching test's output (with surrounding trace context)
+  echo "$nix_unit_output" | grep -v '^[✅❌🎉😢]' | grep -v 'successful$' >&2 || true
+  if echo "$nix_unit_output" | grep -q "^✅ ${testFilter}$"; then
+    echo "✅ ${postSuite}${testFilter}"
+    echo "🎉 1/1 successful" >&2
+  else
+    echo "❌ ${postSuite}${testFilter}"
+    echo "😢 0/1 successful" >&2
+    exit 1
+  fi
+  exit 0
+fi
 
 results=$(mktemp -t den-test-XXXXX.json)
 
@@ -54,24 +76,24 @@ nix-eval-jobs \
   in builtins.mapAttrs (k: go k) tests' \
   "${args[@]}" 2>/dev/null \
   | tee "$results" \
-  | jq -r 'if (.name != null and (.name | startswith("PASS-"))) then "✅ '"${postSuite}"'" + .attr else "❌ '"${postSuite}"'" + .attr end'
+  | jq -r 'if (.name != null and (.name | startswith("PASS-"))) then "✅ '"${postSuite}"'" + .attr else empty end'
 
-total=$(cat "$results" | wc -l)
 pass=$(jq -r 'select(.name != null and (.name | startswith("PASS-"))) | "."' "$results" | wc -l)
+fail=$(jq -r 'select(.error != null or (.name != null and (.name | startswith("FAIL-")))) | "."' "$results" | wc -l)
+total=$(expr "$pass" + "$fail")
 
-
-if [ "$(expr "$total" - "$pass")" -eq "0" ]; then
+if [ "$fail" -eq "0" ]; then
   echo "🎉 ${pass}/${total} successful" >&2
   rm "$results" || true
 else
-  echo "😢 ${pass}/${total} successful" >&2
   echo >&2
-  echo "💥 FAILURES ($(expr "$total" - "$pass")):" >&2
+  echo "💥 FAILURES (${fail}):" >&2
   echo "For details run with \`just ci-deep <suite>\`" >&2
   echo "where <suite> does not include \`.test-xyz\`" >&2
   echo >&2
-  jq -r 'select(.error != null) | "❌ '"${postSuite}"'" + .attr' "$results" >&2
+  jq -r 'select(.error != null or (.name != null and (.name | startswith("FAIL-")))) | "❌ '"${postSuite}"'" + .attr' "$results" >&2
+  echo >&2
+  echo "😢 ${pass}/${total} successful" >&2
   rm "$results" || true
   exit 1
 fi
-
