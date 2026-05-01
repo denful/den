@@ -9,7 +9,7 @@ let
   inherit (den.lib.aspects.fx.pipeline) inheritTraits;
 
   # Wrap modules with path nesting, optional guard, optional adaptArgs.
-  # For path != [], target option must be a submodule type.
+  # For path != [], works with both submodule targets and plain option namespaces.
   wrapRouteModules =
     {
       modules,
@@ -19,8 +19,8 @@ let
     }:
     let
       # For path = [], adaptArgs wraps function modules directly.
-      # For path != [], adaptArgs is injected via _module.args in the submodule
-      # definition (see nestModule), so adaptModule is only used for top-level routes.
+      # For path != [], adaptArgs is resolved at the outer scope in nestModule,
+      # so adaptModule is only used for top-level routes.
       adaptModule =
         mod:
         if adaptArgs == null || path != [ ] then
@@ -35,43 +35,47 @@ let
         if path == [ ] then
           mod
         else if adaptArgs != null then
-          # Submodule nesting with adapted args: evaluate source module with
-          # adaptArgs-provided specialArgs (pkgs, osConfig, etc.) via a freeform
-          # evalModules, then inject the result as a submodule definition function
-          # at the target path. The _: wrapper ensures NixOS treats it as a
-          # submodule definition, creating the entry (e.g., users.users.tux).
+          # Submodule nesting with adapted args: evaluate the source module
+          # with adapted args at the outer scope, then place the result as a
+          # submodule definition. The outer function uses a plain `args:` pattern,
+          # so _module.args (pkgs etc.) aren't in scope — we merge them from
+          # config._module.args to make them available to the source module.
           args:
           let
-            adapted = adaptArgs args;
-            freeformMod.config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
-            evaluated = lib.evalModules {
-              specialArgs = adapted;
-              modules = [
-                freeformMod
-                mod
-              ];
-            };
-            cfg = builtins.removeAttrs evaluated.config [ "_module" ];
+            fullArgs = args // (args.config._module.args or { });
+            adapted = adaptArgs fullArgs;
+            # Resolve function imports with the full adapted args.
+            resolveImport = imp: if builtins.isFunction imp then imp adapted else imp;
+            resolvedMod =
+              if builtins.isAttrs mod && mod ? imports then
+                lib.foldl' lib.recursiveUpdate { } (map resolveImport mod.imports)
+              else if builtins.isFunction mod then
+                mod adapted
+              else
+                mod;
           in
           {
-            config = lib.setAttrByPath path (_: cfg);
+            config = lib.setAttrByPath path (_: resolvedMod);
           }
         else
-          # Plain nesting: evaluate source module via freeform evalModules,
-          # then place the config at the target path. Works for both submodule
+          # Plain nesting: resolve the source module's function imports with
+          # full outer module args (including _module.args like pkgs), then
+          # place the result at the target path. Works for both submodule
           # targets (users.users.<name>) and plain option namespaces (wsl).
+          args:
           let
-            freeformMod.config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
-            evaluated = lib.evalModules {
-              modules = [
-                freeformMod
-                mod
-              ];
-            };
-            cfg = builtins.removeAttrs evaluated.config [ "_module" ];
+            fullArgs = args // (args.config._module.args or { });
+            resolveImport = imp: if builtins.isFunction imp then imp fullArgs else imp;
+            resolvedMod =
+              if builtins.isAttrs mod && mod ? imports then
+                lib.foldl' lib.recursiveUpdate { } (map resolveImport mod.imports)
+              else if builtins.isFunction mod then
+                mod fullArgs
+              else
+                mod;
           in
           {
-            config = lib.setAttrByPath path cfg;
+            config = lib.setAttrByPath path resolvedMod;
           };
 
       guardModule =
