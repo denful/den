@@ -8,6 +8,36 @@ let
   identity = den.lib.aspects.fx.identity;
   inherit (den.lib.aspects.fx.handlers) constantHandler emitCrossProvideShims;
   inherit (den.lib.aspects) isParametricWrapper isMeaningfulName;
+  inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
+  inherit (den.lib.policyTypes) policyFnArgs;
+  inherit (den.lib.aspects.fx.pipeline) mkScopeId;
+
+  # Context identity string — used for ctx-seen dedup keys.
+  mkCtxId =
+    ctx:
+    lib.concatStringsSep "," (
+      lib.sort (a: b: a < b) (
+        map (
+          attrName:
+          let
+            attrVal = ctx.${attrName};
+          in
+          if builtins.isAttrs attrVal && attrVal ? name then
+            attrVal.name
+          else if builtins.isString attrVal then
+            attrVal
+          else if builtins.isInt attrVal || builtins.isFloat attrVal then
+            toString attrVal
+          else
+            attrName
+        ) (builtins.attrNames ctx)
+      )
+    );
+
+  # Schema entity kinds — used to classify resolve effects.
+  policySchemaKinds = builtins.filter (
+    n: n != "conf" && !(lib.hasPrefix "_" n) && (den.schema.${n}.isEntity or false)
+  ) (builtins.attrNames (den.schema or { }));
 
   structuralKeysSet = lib.genAttrs [
     "name"
@@ -466,22 +496,468 @@ let
     in
     go 0 (fx.pure [ ]);
 
-  # Dispatch policies for entity roots during tree-walk.  Replaces the old
-  # dispatchPolicyIncludes + emitTransitions two-step with a single handler
-  # call that performs fixed-point enrichment, include/exclude/route emission
-  # and schema resolution internally.
-  dispatchPoliciesCall =
+  # Classify a resolve effect into schema vs enrichment.
+  classifyResolve =
+    e:
+    let
+      keys = builtins.attrNames e.value;
+      schemaKeys = builtins.filter (k: builtins.elem k policySchemaKinds) keys;
+      enrichKeys = builtins.filter (k: !builtins.elem k policySchemaKinds) keys;
+      hasTarget = e.__targetKind or null != null;
+    in
+    if hasTarget then
+      {
+        schema = e;
+        enrichment = null;
+      }
+    else if schemaKeys == [ ] then
+      {
+        schema = null;
+        enrichment = e.value;
+      }
+    else if enrichKeys == [ ] then
+      {
+        schema = e;
+        enrichment = null;
+      }
+    else
+      {
+        schema = e // {
+          value = lib.filterAttrs (k: _: builtins.elem k policySchemaKinds) e.value;
+        };
+        enrichment = lib.filterAttrs (k: _: !builtins.elem k policySchemaKinds) e.value;
+      };
+
+  maxPolicyIterations = 10;
+
+  # Inline policy dispatch for entity roots.  Replaces the old
+  # dispatch-policies.nix handler — reads state via fx.effects.state.get
+  # and uses scope.provide for context expansion during schema resolves.
+  installPolicies =
     aspect:
     let
-      isEntityRoot = aspect ? __entityKind;
+      entityKind = aspect.__entityKind;
+      ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
     in
-    if !isEntityRoot then
-      fx.pure [ ]
-    else
-      fx.send "dispatch-policies" {
-        ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
-        entityKind = aspect.__entityKind;
-      };
+    fx.bind fx.effects.state.get (
+      state:
+      let
+        scope = state.currentScope;
+        currentCtx = if scope == null then ctx else (state.scopeContexts null).${scope} or ctx;
+
+        # Three policy sources.
+        globalPolicies = den.policies or { };
+        schemaPolicies = (den.schema.${entityKind} or { }).policies or { };
+        allDirectPolicies = globalPolicies // schemaPolicies;
+
+        # Flatten aspect policies from all scopes.
+        aspectPolicies = builtins.foldl' (acc: v: acc // v) { } (
+          builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
+        );
+
+        # Dispatch all direct (global + schema) policies against a context.
+        dispatchDirect =
+          firedPolicies: resolveCtx:
+          lib.concatLists (
+            lib.mapAttrsToList (
+              name: policy:
+              let
+                argsOk = resolveArgsSatisfied policy resolveCtx;
+              in
+              if !argsOk || builtins.elem name firedPolicies then
+                [ ]
+              else
+                let
+                  rawEffects =
+                    let
+                      result = policy resolveCtx;
+                    in
+                    if builtins.isList result then result else [ result ];
+                in
+                if rawEffects == [ ] then
+                  [ ]
+                else
+                  [
+                    {
+                      policyName = name;
+                      effects = rawEffects;
+                    }
+                  ]
+            ) allDirectPolicies
+          );
+
+        # Dispatch aspect policies against a context.
+        dispatchAspect =
+          firedPolicies: resolveCtx:
+          let
+            entries = lib.attrsToList aspectPolicies;
+            matching = builtins.filter (
+              e:
+              let
+                fargs = policyFnArgs e.value.fn;
+                requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
+              in
+              builtins.all (k: resolveCtx ? ${k}) requiredArgs && !builtins.elem e.name firedPolicies
+            ) entries;
+          in
+          map (
+            entry:
+            let
+              rawEffects =
+                let
+                  result = entry.value.fn resolveCtx;
+                in
+                if builtins.isList result then result else [ result ];
+            in
+            {
+              policyName = entry.name;
+              effects = rawEffects;
+            }
+          ) matching;
+
+        # Combined dispatch returning classified results.
+        mkDispatch =
+          firedPolicies: resolveCtx:
+          let
+            allResults = dispatchDirect firedPolicies resolveCtx ++ dispatchAspect firedPolicies resolveCtx;
+
+            # Classify effects per policy result.
+            classified = map (
+              r:
+              let
+                resolveEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }
+                ) r.effects;
+                includeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "include"
+                ) r.effects;
+                excludeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude"
+                ) r.effects;
+                routeEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "route"
+                ) r.effects;
+                instantiateEffects = builtins.filter (
+                  e: builtins.isAttrs e && (e.__policyEffect or "") == "instantiate"
+                ) r.effects;
+
+                resolveClassified = map classifyResolve resolveEffects;
+                schemaEffects = builtins.filter (c: c.schema != null) resolveClassified;
+                enrichEffects = builtins.filter (c: c.enrichment != null) resolveClassified;
+                mergedEnrichment = builtins.foldl' (acc: c: acc // c.enrichment) { } enrichEffects;
+              in
+              {
+                inherit (r) policyName;
+                inherit
+                  schemaEffects
+                  mergedEnrichment
+                  includeEffects
+                  excludeEffects
+                  routeEffects
+                  instantiateEffects
+                  ;
+              }
+            ) allResults;
+
+            allEnrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } classified;
+            allSchemaEffects = builtins.concatMap (r: r.schemaEffects) classified;
+            allIncludeEffects = builtins.concatMap (r: r.includeEffects) classified;
+            allExcludeEffects = builtins.concatMap (r: r.excludeEffects) classified;
+            allRouteEffects = builtins.concatMap (
+              r: map (re: re // { __routePolicyName = r.policyName; }) r.routeEffects
+            ) classified;
+            allInstantiateEffects = builtins.concatMap (
+              r: map (ie: ie // { __instantiatePolicyName = r.policyName; }) r.instantiateEffects
+            ) classified;
+            # Track which policies fired (had any effects).
+            firedNames = map (r: r.policyName) (
+              builtins.filter (
+                r:
+                r.schemaEffects != [ ]
+                || r.mergedEnrichment != { }
+                || r.includeEffects != [ ]
+                || r.excludeEffects != [ ]
+                || r.routeEffects != [ ]
+                || r.instantiateEffects != [ ]
+              ) classified
+            );
+          in
+          {
+            enrichment = allEnrichment;
+            schemaEffects = allSchemaEffects;
+            includeEffects = allIncludeEffects;
+            excludeEffects = allExcludeEffects;
+            routeEffects = allRouteEffects;
+            instantiateEffects = allInstantiateEffects;
+            inherit firedNames;
+          };
+
+        # Process include/exclude effects via existing handlers, collecting results.
+        policyEmitIncludes =
+          effects:
+          builtins.foldl' (
+            acc: e:
+            fx.bind acc (
+              prev:
+              fx.bind (fx.send "emit-include" {
+                child = e.value;
+                idx = null;
+              }) (r: fx.pure (prev ++ r))
+            )
+          ) (fx.pure [ ]) effects;
+
+        policyEmitExcludes =
+          effects:
+          builtins.foldl' (
+            acc: e:
+            fx.bind acc (
+              _:
+              fx.send "register-constraint" {
+                type = "exclude";
+                scope = "subtree";
+                identity = identity.pathKey (identity.aspectPath e.value);
+                owner = "policy";
+              }
+            )
+          ) (fx.pure null) effects;
+
+        policyEmitRoutes =
+          effects:
+          builtins.foldl' (acc: e: fx.bind acc (_: fx.send "register-route" e.value)) (fx.pure null) effects;
+
+        policyEmitInstantiates =
+          effects:
+          builtins.foldl' (
+            acc: e: fx.bind acc (_: fx.send "register-instantiate" e.value)
+          ) (fx.pure null) effects;
+
+        # Process schema resolve effects: ctx-seen dedup, push scope, walk entity, pop scope.
+        processSchemaResolves =
+          includeAspects: schemaEffects: enrichedCtx:
+          let
+            isFanOut = builtins.length schemaEffects > 1;
+          in
+          builtins.foldl' (
+            acc: schemaEffect:
+            fx.bind acc (
+              prevResults:
+              let
+                # Determine target entity kind from the schema effect.
+                keys = builtins.attrNames schemaEffect.schema.value;
+                targetKind =
+                  if schemaEffect.schema.__targetKind or null != null then
+                    schemaEffect.schema.__targetKind
+                  else
+                    lib.findFirst (k: builtins.elem k policySchemaKinds) (
+                      if keys != [ ] then builtins.head keys else entityKind
+                    ) keys;
+                # Build context for this schema resolve.
+                resolveBindings = schemaEffect.schema.value;
+                scopedCtx = enrichedCtx // resolveBindings;
+                ctxNames = mkCtxId scopedCtx;
+                ctxKey = if isFanOut then "${targetKind}/{${ctxNames}}" else targetKind;
+                newScopeId = mkScopeId scopedCtx;
+                scopeHandlersForCtx = constantHandler scopedCtx;
+
+                # Set scope — save parentScope, set currentScope to child.
+                setScope = fx.effects.state.modify (
+                  st:
+                  let
+                    parentScope = st.currentScope;
+                    isSameScope = newScopeId == parentScope;
+                  in
+                  st
+                  // {
+                    currentScope = newScopeId;
+                    scopeContexts = _: (st.scopeContexts null) // { ${newScopeId} = scopedCtx; };
+                    scopeParent =
+                      _: (st.scopeParent null) // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
+                    scopedAspectPolicies =
+                      _:
+                      let
+                        all = st.scopedAspectPolicies null;
+                        parentPolicies = all.${parentScope} or { };
+                      in
+                      all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
+                  }
+                );
+
+                # Restore scope — set currentScope back to parent.
+                restoreScope = fx.effects.state.modify (
+                  st:
+                  st
+                  // {
+                    currentScope = scope;
+                  }
+                );
+
+                # Full entity resolution: push scope, resolve entity, walk tree,
+                # drain deferred, pop scope.  Wrapped in scope.provide so context
+                # handlers are visible to the tree walk.
+                fullResolution = fx.bind setScope (
+                  _:
+                  fx.effects.scope.provide scopeHandlersForCtx (
+                    fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
+                      rawEntity:
+                      let
+                        entity = rawEntity // {
+                          includes = (rawEntity.includes or [ ]) ++ includeAspects;
+                        };
+                      in
+                      fx.bind (aspectToEffect entity) (
+                        childResult:
+                        fx.bind (fx.send "drain-deferred" scopedCtx) (
+                          satisfiable:
+                          fx.bind
+                            (builtins.foldl' (
+                              acc': deferred:
+                              fx.bind acc' (
+                                prev:
+                                let
+                                  deferredTagged = deferred.child // {
+                                    __scopeHandlers = scopeHandlersForCtx;
+                                    __ctxId = ctxNames;
+                                  };
+                                in
+                                fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
+                              )
+                            ) (fx.pure (prevResults ++ [ childResult ])) satisfiable)
+                            (allResults: fx.bind restoreScope (_: fx.pure allResults))
+                        )
+                      )
+                    )
+                  )
+                );
+
+                # Supplemental: emit only new aspects as includes (entity already resolved).
+                supplementalResolution =
+                  newAspectValues:
+                  builtins.foldl' (
+                    sAcc: supAspect:
+                    fx.bind sAcc (
+                      sPrev:
+                      fx.bind (fx.send "emit-include" {
+                        child = supAspect;
+                        idx = null;
+                        __parentScopeHandlers = scopeHandlersForCtx;
+                        __parentCtxId = ctxNames;
+                      }) (_: fx.pure sPrev)
+                    )
+                  ) (fx.pure prevResults) newAspectValues;
+
+                policyAspectPaths = map (a: identity.pathKey (identity.aspectPath a)) includeAspects;
+              in
+              # ctx-seen dedup: skip re-resolution of same entity context.
+              fx.bind
+                (fx.send "ctx-seen" {
+                  key = ctxKey;
+                  aspects = policyAspectPaths;
+                  aspectValues = includeAspects;
+                })
+                (
+                  { isFirst, newAspectValues }:
+                  if isFirst then
+                    fullResolution
+                  else if newAspectValues != [ ] then
+                    supplementalResolution newAspectValues
+                  else
+                    fx.pure prevResults
+                )
+            )
+          ) (fx.pure [ ]) schemaEffects;
+
+        # Fixed-point iteration: dispatch, collect enrichment, re-dispatch on widen.
+        emptyAcc = {
+          schemaEffects = [ ];
+          includeEffects = [ ];
+          excludeEffects = [ ];
+          routeEffects = [ ];
+          instantiateEffects = [ ];
+        };
+
+        iterate =
+          iteration: accEnrichment: accEffects: firedPolicies: currentResolveCtx:
+          let
+            dispatched = mkDispatch firedPolicies currentResolveCtx;
+            newFiredNames = builtins.filter (n: !builtins.elem n firedPolicies) dispatched.firedNames;
+            updatedFired = firedPolicies ++ newFiredNames;
+            newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
+              builtins.attrNames dispatched.enrichment
+            );
+            combinedEffects = {
+              schemaEffects = accEffects.schemaEffects ++ dispatched.schemaEffects;
+              includeEffects = accEffects.includeEffects ++ dispatched.includeEffects;
+              excludeEffects = accEffects.excludeEffects ++ dispatched.excludeEffects;
+              routeEffects = accEffects.routeEffects ++ dispatched.routeEffects;
+              instantiateEffects = accEffects.instantiateEffects ++ dispatched.instantiateEffects;
+            };
+          in
+          if newEnrichKeys == [ ] then
+            let
+              enrichedCtx = currentCtx // accEnrichment // dispatched.enrichment;
+              includeAspects = map (e: e.value) combinedEffects.includeEffects;
+              hasSchemaResolves = combinedEffects.schemaEffects != [ ];
+            in
+            fx.bind (policyEmitExcludes combinedEffects.excludeEffects) (
+              _:
+              fx.bind (policyEmitRoutes combinedEffects.routeEffects) (
+                _:
+                fx.bind (policyEmitInstantiates combinedEffects.instantiateEffects) (
+                  _:
+                  if hasSchemaResolves then
+                    processSchemaResolves includeAspects combinedEffects.schemaEffects enrichedCtx
+                  else
+                    policyEmitIncludes combinedEffects.includeEffects
+                )
+              )
+            )
+          else if iteration >= maxPolicyIterations then
+            throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
+          else
+            let
+              combinedEnrichment = accEnrichment // dispatched.enrichment;
+              enrichedCtx = currentCtx // combinedEnrichment;
+              enrichHandlers = constantHandler combinedEnrichment;
+              nextResolveCtx = enrichedCtx // {
+                __entityKind = entityKind;
+              };
+            in
+            fx.bind
+              (fx.effects.state.modify (
+                st:
+                st
+                // {
+                  scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; };
+                }
+              ))
+              (
+                _:
+                fx.bind (fx.effects.scope.provide enrichHandlers (
+                  fx.bind (fx.send "drain-deferred" enrichedCtx) (
+                    satisfiable:
+                    builtins.foldl' (
+                      acc: deferred:
+                      fx.bind acc (
+                        _:
+                        let
+                          deferScopeHandlers = constantHandler enrichedCtx;
+                          deferredTagged = deferred.child // {
+                            __scopeHandlers = deferScopeHandlers;
+                          };
+                        in
+                        fx.bind (aspectToEffect deferredTagged) (_: fx.pure null)
+                      )
+                    ) (fx.pure null) satisfiable
+                  )
+                )) (_: iterate (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx)
+              );
+
+        resolveCtx = currentCtx // {
+          __entityKind = entityKind;
+        };
+      in
+      iterate 0 { } emptyAcc [ ] resolveCtx
+    );
 
   mkPositionalInclude =
     {
@@ -648,9 +1124,12 @@ let
             _:
             fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
               includeResults:
-              fx.bind (dispatchPoliciesCall aspect) (
-                policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
-              )
+              if !(aspect ? __entityKind) then
+                fx.pure (selfProvResults ++ includeResults)
+              else
+                fx.bind (installPolicies aspect) (
+                  policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
+                )
             )
           )
         )
