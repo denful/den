@@ -115,7 +115,7 @@ in
           handlers = collectHandlers;
           state = { };
         } comp;
-        # myTrait is unregistered — ignored by freeform-ignore
+        # myTrait is unregistered — emitted as class (no DLQ deferral).
         emitted = builtins.filter (c: c.class == "myTrait") (result.state.classes or [ ]);
       in
       {
@@ -124,7 +124,7 @@ in
           resolvedOk = result.value.name == "dataTest";
         };
         expected = {
-          emitCount = 0;
+          emitCount = 1;
           resolvedOk = true;
         };
       }
@@ -148,11 +148,13 @@ in
           handlers = collectHandlers;
           state = { };
         } comp;
+        # myPackages is unregistered — emitted as class (no DLQ deferral).
+        # List values produce one class entry per element.
         emitted = builtins.filter (c: c.class == "myPackages") (result.state.classes or [ ]);
       in
       {
         expr = builtins.length emitted;
-        expected = 0;
+        expected = 2;
       }
     );
 

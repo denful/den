@@ -2,9 +2,9 @@
 {
   flake.tests.scope-inheritance = {
 
-    # Single entity, no child scopes — scopeChildren empty.
+    # Single entity, no child scopes — scopeParent has only the root scope.
     test-no-child-scopes = denTest (
-      { den, ... }:
+      { den, lib, ... }:
       let
         result = den.lib.aspects.fx.pipeline.fxFullResolve {
           class = "nixos";
@@ -18,11 +18,12 @@
           };
           ctx = { };
         };
-        scopeChildren = result.state.scopeChildren null;
+        scopeParent = result.state.scopeParent null;
       in
       {
         den.classes.nixos.description = "NixOS";
-        expr = scopeChildren == { };
+        # No child scopes means no child→parent entries beyond the root.
+        expr = builtins.length (builtins.attrNames scopeParent) <= 1;
         expected = true;
       }
     );
@@ -70,7 +71,7 @@
       }
     );
 
-    # Scope tree populates scopeParent and scopeChildren during transitions.
+    # Scope tree populates scopeParent during entity resolution.
     test-scope-tree-structure = denTest (
       { den, lib, ... }:
       let
@@ -86,7 +87,6 @@
           };
         };
         scopeParent = result.state.scopeParent null;
-        scopeChildren = result.state.scopeChildren null;
       in
       {
         den.hosts.x86_64-linux.igloo.users = {
@@ -96,16 +96,17 @@
         den.classes.nixos.description = "NixOS";
         den.classes.homeManager.description = "Home Manager";
 
-        # Transitions create child scopes: parent and children both populated.
+        # Entity resolution creates child scopes with parent references.
         expr = {
           hasParentEntries = scopeParent != { };
-          hasChildEntries = builtins.any (k: (scopeChildren.${k} or [ ]) != [ ]) (
-            builtins.attrNames scopeChildren
+          # Child scopes exist if any scope has a parent (i.e., the tree has depth > 1).
+          hasChildScopes = builtins.any (scopeId: scopeParent.${scopeId} != null) (
+            builtins.attrNames scopeParent
           );
         };
         expected = {
           hasParentEntries = true;
-          hasChildEntries = true;
+          hasChildScopes = true;
         };
       }
     );
