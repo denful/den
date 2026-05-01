@@ -91,6 +91,7 @@ let
     // drainDeadLettersHandler
     // resolveEntityHandler
     // handlers.forwardHandler
+    // handlers.dispatchPoliciesHandler
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.
