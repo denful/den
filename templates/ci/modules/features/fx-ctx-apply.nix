@@ -1,4 +1,4 @@
-# Tests for context traversal helpers: emitTransitions, emitSelfProvide, dedup.
+# Tests for context traversal helpers: emitSelfProvide, dedup.
 {
   denTest,
   inputs,
@@ -100,44 +100,6 @@ in
       }
     );
 
-    # emitTransitions: emits into-transition effect.
-    test-into-transition-emits = denTest (
-      { den, ... }:
-      let
-        fx = den.lib.fx;
-        aspect = {
-          name = "host";
-          meta = { };
-          into = ctx: {
-            user = [
-              {
-                user = "tux";
-              }
-            ];
-          };
-          provides = { };
-          includes = [ ];
-        };
-        comp = den.lib.aspects.fx.aspect.emitTransitions aspect;
-        result = fx.handle {
-          handlers = collectHandlers;
-          state = { };
-        } comp;
-      in
-      {
-        expr = {
-          transitionCount = builtins.length (result.state.transitions or [ ]);
-          selfName = (builtins.head result.state.transitions).selfName;
-          hasIntoFn = (builtins.head result.state.transitions).hasIntoFn;
-        };
-        expected = {
-          transitionCount = 1;
-          selfName = "host";
-          hasIntoFn = true;
-        };
-      }
-    );
-
     # Into keys excluded from class emission by structuralKeys.
     test-into-not-class = denTest (
       { den, ... }:
@@ -186,28 +148,6 @@ in
           includes = [ ];
         };
         comp = den.lib.aspects.fx.aspect.emitSelfProvide aspect;
-        result = fx.handle {
-          handlers = collectHandlers;
-          state = { };
-        } comp;
-      in
-      {
-        expr = result.value;
-        expected = [ ];
-      }
-    );
-
-    # emitTransitions returns empty when no into.
-    test-no-transitions = denTest (
-      { den, ... }:
-      let
-        fx = den.lib.fx;
-        aspect = {
-          name = "host";
-          meta = { };
-          includes = [ ];
-        };
-        comp = den.lib.aspects.fx.aspect.emitTransitions aspect;
         result = fx.handle {
           handlers = collectHandlers;
           state = { };

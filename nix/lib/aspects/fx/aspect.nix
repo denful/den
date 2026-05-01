@@ -616,10 +616,11 @@ let
     in
     go 0 (fx.pure [ ]);
 
-  # Dispatch policy include/exclude effects during tree-walk, BEFORE
-  # transitions. This ensures injected aspects participate in entity
-  # resolution and are visible to class forwarding sub-pipelines (HM forward).
-  dispatchPolicyIncludes =
+  # Dispatch policies for entity roots during tree-walk.  Replaces the old
+  # dispatchPolicyIncludes + emitTransitions two-step with a single handler
+  # call that performs fixed-point enrichment, include/exclude/route emission
+  # and schema resolution internally.
+  dispatchPoliciesCall =
     aspect:
     let
       isEntityRoot = aspect ? __entityKind;
@@ -627,82 +628,10 @@ let
     if !isEntityRoot then
       fx.pure [ ]
     else
-      let
+      fx.send "dispatch-policies" {
         ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
-      in
-      fx.bind (fx.send "dispatch-policy-includes" { inherit ctx; }) (
-        result:
-        let
-          incs = result.includes or [ ];
-          excs = result.excludes or [ ];
-          scopeHandlers = aspect.__scopeHandlers or null;
-          ctxId = aspect.__ctxId or null;
-          emitIncs =
-            if incs == [ ] then
-              fx.pure [ ]
-            else
-              builtins.foldl' (
-                acc: child:
-                fx.bind acc (
-                  prev:
-                  fx.bind (fx.send "emit-include" (
-                    {
-                      inherit child;
-                      idx = null;
-                    }
-                    // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
-                    // lib.optionalAttrs (ctxId != null) { __parentCtxId = ctxId; }
-                  )) (r: fx.pure (prev ++ r))
-                )
-              ) (fx.pure [ ]) incs;
-          regExcludes =
-            if excs == [ ] then
-              fx.pure null
-            else
-              builtins.foldl' (
-                acc: aspectRef:
-                fx.bind acc (
-                  _:
-                  fx.send "register-constraint" {
-                    type = "exclude";
-                    scope = "subtree";
-                    identity = identity.pathKey (identity.aspectPath aspectRef);
-                    owner = "policy";
-                  }
-                )
-              ) (fx.pure null) excs;
-        in
-        fx.bind emitIncs (incResults: fx.bind regExcludes (_: fx.pure incResults))
-      );
-
-  emitTransitions =
-    aspect:
-    let
-      # meta.into survives freeform deferredModule; aspect.into is the fallback.
-      intoFn = aspect.meta.into or aspect.into or null;
-      hasManualInto = intoFn != null && lib.isFunction intoFn;
-      # Only fire per-policy dispatch for entity roots (aspects with __entityKind).
-      # Inner provides/includes share the entity kind but are not transition points.
-      isEntityRoot = aspect ? __entityKind;
-      # Fire transition dispatch for any entity root when policies exist.
-      # Body guards inside each policy determine applicability per entity kind.
-      hasPolicies = isEntityRoot && (den.policies or { }) != { };
-    in
-    # Dispatch policy include/exclude effects during tree-walk first.
-    fx.bind (dispatchPolicyIncludes aspect) (
-      policyIncResults:
-      let
-        doTransition =
-          if hasManualInto || hasPolicies then
-            fx.send "into-transition" {
-              intoFn = if hasManualInto then intoFn else null;
-              self = aspect;
-            }
-          else
-            fx.pure [ ];
-      in
-      fx.bind doTransition (transResults: fx.pure (policyIncResults ++ transResults))
-    );
+        entityKind = aspect.__entityKind;
+      };
 
   mkPositionalInclude =
     {
@@ -895,8 +824,8 @@ let
               _:
               fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
                 includeResults:
-                fx.bind (emitTransitions aspect) (
-                  transitionResults: fx.pure (selfProvResults ++ includeResults ++ transitionResults)
+                fx.bind (dispatchPoliciesCall aspect) (
+                  policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
                 )
               )
             )
@@ -1112,7 +1041,6 @@ in
     aspectToEffect
     drainDeadLettersHandler
     emitIncludes
-    emitTransitions
     emitSelfProvide
     structuralKeysSet
     wrapClassModule

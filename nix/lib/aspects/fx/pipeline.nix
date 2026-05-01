@@ -257,6 +257,7 @@ let
 
     # --- Global state ---
     traitSchemas = _: den.traits or { };
+    firedResolvePolicies = _: [ ];
   };
 
   mkPipeline =

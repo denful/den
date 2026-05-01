@@ -10,6 +10,29 @@ let
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   inherit (den.lib.policyTypes) policyFnArgs;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
+  identity = den.lib.aspects.fx.identity;
+
+  # Context identity string — used for ctx-seen dedup keys.
+  mkCtxId =
+    ctx:
+    lib.concatStringsSep "," (
+      lib.sort (a: b: a < b) (
+        map (
+          attrName:
+          let
+            attrVal = ctx.${attrName};
+          in
+          if builtins.isAttrs attrVal && attrVal ? name then
+            attrVal.name
+          else if builtins.isString attrVal then
+            attrVal
+          else if builtins.isInt attrVal || builtins.isFloat attrVal then
+            toString attrVal
+          else
+            attrName
+        ) (builtins.attrNames ctx)
+      )
+    );
 
   # Schema entity kinds — used to classify resolve effects.
   schemaKinds = builtins.filter (
@@ -58,6 +81,11 @@ let
         entityKind = param.entityKind;
         scope = state.currentScope;
         currentCtx = if scope == null then ctx else (state.scopeContexts null).${scope} or ctx;
+        # Policies that already produced resolve effects at a parent scope.
+        # At descendant levels, their resolve effects are skipped (ctx-seen
+        # handles this), but include/exclude effects still fire normally.
+        # Currently unused — dedup handled by ctx-seen instead.
+        # parentFiredResolves = (state.firedResolvePolicies or (_: [ ])) null;
 
         # Merge traits into resolve context.
         traits = builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (state.scopedTraits null));
@@ -211,14 +239,34 @@ let
             inherit firedNames;
           };
 
-        # Process include/exclude effects via existing handlers.
+        # Process include/exclude effects via existing handlers, collecting results.
         emitIncludes =
           effects:
-          builtins.foldl' (acc: e: fx.bind acc (_: fx.send "include" e.value)) (fx.pure null) effects;
+          builtins.foldl' (
+            acc: e:
+            fx.bind acc (
+              prev:
+              fx.bind (fx.send "emit-include" {
+                child = e.value;
+                idx = null;
+              }) (r: fx.pure (prev ++ r))
+            )
+          ) (fx.pure [ ]) effects;
 
         emitExcludes =
           effects:
-          builtins.foldl' (acc: e: fx.bind acc (_: fx.send "exclude" e.value)) (fx.pure null) effects;
+          builtins.foldl' (
+            acc: e:
+            fx.bind acc (
+              _:
+              fx.send "register-constraint" {
+                type = "exclude";
+                scope = "subtree";
+                identity = identity.pathKey (identity.aspectPath e.value);
+                owner = "policy";
+              }
+            )
+          ) (fx.pure null) effects;
 
         emitRoutes =
           effects:
@@ -230,9 +278,14 @@ let
             acc: e: fx.bind acc (_: fx.send "register-instantiate" e.value)
           ) (fx.pure null) effects;
 
-        # Process schema resolve effects: push scope, walk entity, pop scope.
+        # Process schema resolve effects: ctx-seen dedup, push scope, walk entity, pop scope.
+        # includeAspects: list of aspects from policy include effects, injected into
+        # each resolved entity's includes so they resolve in the scoped context.
         processSchemaResolves =
-          schemaEffects: enrichedCtx:
+          includeAspects: schemaEffects: enrichedCtx:
+          let
+            isFanOut = builtins.length schemaEffects > 1;
+          in
           builtins.foldl' (
             acc: schemaEffect:
             fx.bind acc (
@@ -250,6 +303,8 @@ let
                 # Build context for this schema resolve.
                 resolveBindings = schemaEffect.schema.value;
                 scopedCtx = enrichedCtx // resolveBindings;
+                ctxNames = mkCtxId scopedCtx;
+                ctxKey = if isFanOut then "${targetKind}/{${ctxNames}}" else targetKind;
                 newScopeId = mkScopeId scopedCtx;
                 scopeHandlers = constantHandler scopedCtx;
 
@@ -291,60 +346,93 @@ let
                     scopeStack = _: lib.init stack;
                   }
                 );
-              in
-              fx.bind pushScope (
-                _:
-                fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
-                  entity:
-                  fx.bind (aspectToEffect entity) (
-                    childResult:
-                    fx.bind (fx.send "drain-deferred" scopedCtx) (
-                      satisfiable:
-                      fx.bind (fx.send "drain-dead-letters" null) (
-                        _:
-                        fx.bind
-                          (builtins.foldl' (
-                            acc': deferred:
-                            fx.bind acc' (
-                              prev:
-                              let
-                                deferredTagged = deferred.child // {
-                                  __scopeHandlers = scopeHandlers;
-                                  __ctxId = lib.concatStringsSep "," (
-                                    lib.sort (a: b: a < b) (
-                                      map (
-                                        attrName:
-                                        let
-                                          attrVal = scopedCtx.${attrName};
-                                        in
-                                        if builtins.isAttrs attrVal && attrVal ? name then
-                                          attrVal.name
-                                        else if builtins.isString attrVal then
-                                          attrVal
-                                        else if builtins.isInt attrVal || builtins.isFloat attrVal then
-                                          toString attrVal
-                                        else
-                                          attrName
-                                      ) (builtins.attrNames scopedCtx)
-                                    )
-                                  );
-                                };
-                              in
-                              fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
-                            )
-                          ) (fx.pure (prevResults ++ [ childResult ])) satisfiable)
-                          (allResults: fx.bind popScope (_: fx.pure allResults))
+
+                # Full entity resolution: push scope, resolve entity, walk tree, drain deferred, pop.
+                fullResolution = fx.bind pushScope (
+                  _:
+                  fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
+                    rawEntity:
+                    let
+                      entity = rawEntity // {
+                        includes = (rawEntity.includes or [ ]) ++ includeAspects;
+                      };
+                    in
+                    fx.bind (aspectToEffect entity) (
+                      childResult:
+                      fx.bind (fx.send "drain-deferred" scopedCtx) (
+                        satisfiable:
+                        fx.bind (fx.send "drain-dead-letters" null) (
+                          _:
+                          fx.bind
+                            (builtins.foldl' (
+                              acc': deferred:
+                              fx.bind acc' (
+                                prev:
+                                let
+                                  deferredTagged = deferred.child // {
+                                    __scopeHandlers = scopeHandlers;
+                                    __ctxId = ctxNames;
+                                  };
+                                in
+                                fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
+                              )
+                            ) (fx.pure (prevResults ++ [ childResult ])) satisfiable)
+                            (allResults: fx.bind popScope (_: fx.pure allResults))
+                        )
                       )
                     )
                   )
+                );
+
+                # Supplemental: emit only new aspects as includes (entity already resolved).
+                supplementalResolution =
+                  newAspectValues:
+                  builtins.foldl' (
+                    sAcc: aspect:
+                    fx.bind sAcc (
+                      sPrev:
+                      fx.bind (fx.send "emit-include" {
+                        child = aspect;
+                        idx = null;
+                        __parentScopeHandlers = scopeHandlers;
+                        __parentCtxId = ctxNames;
+                      }) (_: fx.pure sPrev)
+                    )
+                  ) (fx.pure prevResults) newAspectValues;
+
+                policyAspectPaths = map (a: identity.pathKey (identity.aspectPath a)) includeAspects;
+              in
+              # ctx-seen dedup: skip re-resolution of same entity context.
+              fx.bind
+                (fx.send "ctx-seen" {
+                  key = ctxKey;
+                  aspects = policyAspectPaths;
+                  aspectValues = includeAspects;
+                })
+                (
+                  { isFirst, newAspectValues }:
+                  if isFirst then
+                    fullResolution
+                  else if newAspectValues != [ ] then
+                    supplementalResolution newAspectValues
+                  else
+                    fx.pure prevResults
                 )
-              )
             )
           ) (fx.pure [ ]) schemaEffects;
 
         # Fixed-point iteration: dispatch, collect enrichment, re-dispatch on widen.
+        # Accumulator record for non-enrichment effects across iterations.
+        emptyAcc = {
+          schemaEffects = [ ];
+          includeEffects = [ ];
+          excludeEffects = [ ];
+          routeEffects = [ ];
+          instantiateEffects = [ ];
+        };
+
         iterate =
-          iteration: accEnrichment: firedPolicies: currentResolveCtx:
+          iteration: accEnrichment: accEffects: firedPolicies: currentResolveCtx:
           let
             dispatched = mkDispatch firedPolicies currentResolveCtx;
             # Filter out already-fired policies.
@@ -354,21 +442,32 @@ let
             newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
               builtins.attrNames dispatched.enrichment
             );
+            # Accumulate non-enrichment effects from this iteration.
+            combinedEffects = {
+              schemaEffects = accEffects.schemaEffects ++ dispatched.schemaEffects;
+              includeEffects = accEffects.includeEffects ++ dispatched.includeEffects;
+              excludeEffects = accEffects.excludeEffects ++ dispatched.excludeEffects;
+              routeEffects = accEffects.routeEffects ++ dispatched.routeEffects;
+              instantiateEffects = accEffects.instantiateEffects ++ dispatched.instantiateEffects;
+            };
           in
           if newEnrichKeys == [ ] then
-            # Stable — process all non-enrichment effects.
+            # Stable — process all accumulated non-enrichment effects.
             let
-              enrichedCtx = currentCtx // dispatched.enrichment;
+              enrichedCtx = currentCtx // accEnrichment // dispatched.enrichment;
+              includeAspects = map (e: e.value) combinedEffects.includeEffects;
+              hasSchemaResolves = combinedEffects.schemaEffects != [ ];
             in
-            fx.bind (emitIncludes dispatched.includeEffects) (
+            fx.bind (emitExcludes combinedEffects.excludeEffects) (
               _:
-              fx.bind (emitExcludes dispatched.excludeEffects) (
+              fx.bind (emitRoutes combinedEffects.routeEffects) (
                 _:
-                fx.bind (emitRoutes dispatched.routeEffects) (
+                fx.bind (emitInstantiates combinedEffects.instantiateEffects) (
                   _:
-                  fx.bind (emitInstantiates dispatched.instantiateEffects) (
-                    _: processSchemaResolves dispatched.schemaEffects enrichedCtx
-                  )
+                  if hasSchemaResolves then
+                    processSchemaResolves includeAspects combinedEffects.schemaEffects enrichedCtx
+                  else
+                    emitIncludes combinedEffects.includeEffects
                 )
               )
             )
@@ -377,7 +476,7 @@ let
           else
             # Widen context and re-dispatch.
             let
-              combinedEnrichment = dispatched.enrichment;
+              combinedEnrichment = accEnrichment // dispatched.enrichment;
               enrichedCtx = currentCtx // combinedEnrichment;
               enrichHandlers = constantHandler combinedEnrichment;
               nextResolveCtx = traits // enrichedCtx // { __entityKind = entityKind; };
@@ -412,13 +511,26 @@ let
                       ) (fx.pure null) satisfiable
                     )
                   )
-                )) (_: iterate (iteration + 1) (accEnrichment // dispatched.enrichment) updatedFired nextResolveCtx)
+                )) (_: iterate (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx)
               );
 
         resolveCtx = traits // currentCtx // { __entityKind = entityKind; };
+        # Dedup: if this entity+scope was already dispatched, skip.
+        dispatchKey = "${entityKind}@${scope}";
+        alreadyDispatched = builtins.elem dispatchKey ((state.dispatchedPolicies or (_: [ ])) null);
       in
       {
-        resume = iterate 0 { } [ ] resolveCtx;
+        resume =
+          if alreadyDispatched then
+            fx.pure [ ]
+          else
+            fx.bind (fx.effects.state.modify (
+              st:
+              st
+              // {
+                dispatchedPolicies = _: ((st.dispatchedPolicies or (_: [ ])) null) ++ [ dispatchKey ];
+              }
+            )) (_: iterate 0 { } emptyAcc [ ] resolveCtx);
         inherit state;
       };
   };
