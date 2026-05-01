@@ -401,112 +401,6 @@ let
       ) traitKeys
     );
 
-  emitClassFromDLQ =
-    dynamicTraitSchemas: entry:
-    let
-      rawValue = entry.rawValue;
-      modules =
-        if builtins.isList rawValue then
-          rawValue
-        else if builtins.isAttrs rawValue && rawValue ? __contentValues then
-          let
-            vals = map (d: d.value) rawValue.__contentValues;
-          in
-          if builtins.length vals == 1 then [ (builtins.head vals) ] else [ { imports = vals; } ]
-        else
-          [ rawValue ];
-      indexed = lib.imap0 (idx: module: { inherit idx module; }) modules;
-      isMulti = builtins.length modules > 1;
-    in
-    lib.concatMap (
-      { idx, module }:
-      let
-        elemIdentity = if isMulti then "${entry.aspectIdentity}[${toString idx}]" else entry.aspectIdentity;
-      in
-      [
-        (fx.send "emit-class" {
-          class = entry.key;
-          identity = elemIdentity;
-          inherit module;
-          ctx = entry.ctx;
-          aspectPolicy = entry.aspectPolicy;
-          globalPolicy = entry.globalPolicy;
-          traitNames = dynamicTraitSchemas;
-          __rawEntry = true;
-          isContextDependent = entry.parametricResolved || entry.contextDependent;
-        })
-      ]
-    ) indexed;
-
-  emitTraitFromDLQ =
-    entry:
-    let
-      rawValue = entry.rawValue;
-      contentValues =
-        if builtins.isAttrs rawValue && rawValue ? __contentValues then
-          rawValue.__contentValues
-        else
-          [
-            {
-              value = rawValue;
-              file = "<unknown>";
-            }
-          ];
-    in
-    map (
-      cv:
-      fx.send "emit-trait" {
-        trait = entry.key;
-        inherit (cv) value;
-        chain = entry.aspectIdentity;
-      }
-    ) contentValues;
-
-  drainDeadLettersHandler = {
-    "drain-dead-letters" =
-      { param, state }:
-      let
-        allScoped = (state.scopedDeadLetterQueue or (_: { })) null;
-        queue = lib.concatLists (lib.attrValues allScoped);
-        dynamicTraitSchemas = state.traitSchemas null;
-        # Forward source classes: freeform keys used as fromClass in forwards
-        # need to be recognized as class keys so their data enters scopedClassImports.
-        forwardSourceClasses = builtins.listToAttrs (
-          map (spec: {
-            name = spec.fromClass;
-            value = true;
-          }) (lib.concatLists (lib.attrValues ((state.scopedForwardSpecs or (_: { })) null)))
-        );
-        isKnownClass =
-          key: classRegistry ? ${key} || dynamicTraitSchemas ? ${key} || forwardSourceClasses ? ${key};
-      in
-      if queue == [ ] then
-        {
-          resume = null;
-          inherit state;
-        }
-      else
-        let
-          classified = builtins.partition (entry: isKnownClass entry.key) queue;
-          matched = classified.right;
-          remaining = classified.wrong;
-          reEmits = lib.concatMap (
-            entry:
-            if classRegistry ? ${entry.key} || forwardSourceClasses ? ${entry.key} then
-              emitClassFromDLQ dynamicTraitSchemas entry
-            else
-              emitTraitFromDLQ entry
-          ) matched;
-          currentScope = state.currentScope;
-        in
-        {
-          resume = fx.seq reEmits;
-          state = state // {
-            scopedDeadLetterQueue = _: { ${currentScope} = remaining; };
-          };
-        };
-  };
-
   emitClasses =
     dynamicTraitSchemas: aspect: classKeys: nodeIdentity:
     let
@@ -704,8 +598,6 @@ let
 
   # Emit register-trait-schema for each entry in aspect.traits.
   # Registered schemas become visible to classifyKeys via get-trait-schemas.
-  # Fires a drain-dead-letters after registration so queued keys that
-  # now match a trait schema get reclassified immediately.
   emitTraitSchemas =
     aspect:
     let
@@ -715,7 +607,7 @@ let
     if schemas == { } then
       fx.pure null
     else
-      fx.bind (fx.seq (
+      fx.seq (
         lib.mapAttrsToList (
           traitName: schema:
           fx.send "register-trait-schema" {
@@ -724,7 +616,7 @@ let
             ownerIdentity = nodeIdentity;
           }
         ) schemas
-      )) (_: fx.send "drain-dead-letters" null);
+      );
 
   # Emit register-aspect-policy for each entry in aspect.policies.
   # Each policy is stored with ownerIdentity for exclusion rollback.
@@ -1032,7 +924,6 @@ in
 {
   inherit
     aspectToEffect
-    drainDeadLettersHandler
     emitIncludes
     emitSelfProvide
     structuralKeysSet

@@ -7,7 +7,7 @@ let
   fx = den.lib.fx;
   handlers = den.lib.aspects.fx.handlers;
   identity = den.lib.aspects.fx.identity;
-  inherit (den.lib.aspects.fx.aspect) aspectToEffect drainDeadLettersHandler;
+  inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   route = import ./route.nix { inherit lib den; };
 
   # Compose two handler sets, chaining handlers for shared effect names.
@@ -83,10 +83,8 @@ let
     // handlers.getTraitSchemasHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
-    // handlers.deadLetterHandler
     // handlers.registerRouteHandler
     // handlers.registerInstantiateHandler
-    // drainDeadLettersHandler
     // resolveEntityHandler
     // handlers.forwardHandler
     // handlers.dispatchPoliciesHandler
@@ -232,7 +230,6 @@ let
     scopedConsumedTraits = _: { };
     scopedAspectPolicies = _: { };
     scopedDeferredIncludes = _: { };
-    scopedDeadLetterQueue = _: { };
     scopedIncludesChain = _: { };
     scopedConstraintRegistry = _: { };
     scopedConstraintFilters = _: { };
@@ -573,7 +570,7 @@ let
               # Collect source modules from the forward's scope AND ancestor scopes.
               # den.default and other shared aspects emit at parent scopes; the forward
               # needs those modules merged with the child scope's own emissions.
-              # Also searches child scopes (DLQ drain may re-emit at children).
+              # Also searches ancestor scopes (den.default emits at parent).
               collectFromScopeChain =
                 depth: scopeId:
                 let
@@ -607,14 +604,8 @@ let
           else
             (applyForwardSpecs forwardSpecs withInstantiates).classImports;
 
-        # Dead letter queue diagnostics.
-        finalDLQ = lib.concatLists (lib.attrValues ((result.state.scopedDeadLetterQueue or (_: { })) null));
-        _dlqWarn = builtins.seq (map (
-          entry:
-          builtins.trace "den: dead letter — key '${entry.key}' from aspect '${entry.aspectName}' never matched a registered class or trait" null
-        ) finalDLQ) null;
       in
-      builtins.seq _dlqWarn {
+      {
         imports = (forwarded.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in

@@ -350,24 +350,21 @@ let
                       childResult:
                       fx.bind (fx.send "drain-deferred" scopedCtx) (
                         satisfiable:
-                        fx.bind (fx.send "drain-dead-letters" null) (
-                          _:
-                          fx.bind
-                            (builtins.foldl' (
-                              acc': deferred:
-                              fx.bind acc' (
-                                prev:
-                                let
-                                  deferredTagged = deferred.child // {
-                                    __scopeHandlers = scopeHandlers;
-                                    __ctxId = ctxNames;
-                                  };
-                                in
-                                fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
-                              )
-                            ) (fx.pure (prevResults ++ [ childResult ])) satisfiable)
-                            (allResults: fx.bind restoreScope (_: fx.pure allResults))
-                        )
+                        fx.bind
+                          (builtins.foldl' (
+                            acc': deferred:
+                            fx.bind acc' (
+                              prev:
+                              let
+                                deferredTagged = deferred.child // {
+                                  __scopeHandlers = scopeHandlers;
+                                  __ctxId = ctxNames;
+                                };
+                              in
+                              fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
+                            )
+                          ) (fx.pure (prevResults ++ [ childResult ])) satisfiable)
+                          (allResults: fx.bind restoreScope (_: fx.pure allResults))
                       )
                     )
                   )
@@ -483,22 +480,19 @@ let
                 fx.bind (fx.effects.scope.provide enrichHandlers (
                   fx.bind (fx.send "drain-deferred" enrichedCtx) (
                     satisfiable:
-                    fx.bind (fx.send "drain-dead-letters" null) (
-                      _:
-                      builtins.foldl' (
-                        acc: deferred:
-                        fx.bind acc (
-                          _:
-                          let
-                            scopeHandlers = constantHandler enrichedCtx;
-                            deferredTagged = deferred.child // {
-                              __scopeHandlers = scopeHandlers;
-                            };
-                          in
-                          fx.bind (aspectToEffect deferredTagged) (_: fx.pure null)
-                        )
-                      ) (fx.pure null) satisfiable
-                    )
+                    builtins.foldl' (
+                      acc: deferred:
+                      fx.bind acc (
+                        _:
+                        let
+                          scopeHandlers = constantHandler enrichedCtx;
+                          deferredTagged = deferred.child // {
+                            __scopeHandlers = scopeHandlers;
+                          };
+                        in
+                        fx.bind (aspectToEffect deferredTagged) (_: fx.pure null)
+                      )
+                    ) (fx.pure null) satisfiable
                   )
                 )) (_: iterate (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx)
               );

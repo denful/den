@@ -344,26 +344,6 @@ let
         };
   };
 
-  deadLetterHandler = {
-    "dead-letter" =
-      { param, state }:
-      {
-        resume = null;
-        state = state // {
-          scopedDeadLetterQueue =
-            _:
-            let
-              all = (state.scopedDeadLetterQueue or (_: { })) null;
-              currentScope = state.currentScope;
-            in
-            all
-            // {
-              ${currentScope} = (all.${currentScope} or [ ]) ++ [ param ];
-            };
-        };
-      };
-  };
-
   registerTraitSchemaHandler = {
     "register-trait-schema" =
       { param, state }:
@@ -458,7 +438,6 @@ in
     registerAspectPolicyHandler
     deferredIncludeHandler
     drainDeferredHandler
-    deadLetterHandler
     registerTraitSchemaHandler
     getTraitSchemasHandler
     registerRouteHandler
