@@ -561,29 +561,36 @@ let
           in
           own ++ nested;
 
+        # Collect source modules from the scope chain (parent scopes have
+        # den.default and other shared aspects) for a given class.
+        collectFromScopeChain =
+          fromClass: depth: scopeId:
+          let
+            own = wrappedPerScope.${scopeId}.${fromClass} or [ ];
+            parent = scopeParent.${scopeId} or null;
+            parentMods =
+              if parent != null && parent != scopeId && depth < 10 then
+                collectFromScopeChain fromClass (depth + 1) parent
+              else
+                [ ];
+          in
+          own ++ parentMods;
+
         applyForwardSpecs =
           specs: classImports:
           builtins.foldl' (
             acc: spec:
             let
               sid = spec.sourceScopeId;
-              # Collect source modules from the forward's scope AND ancestor scopes.
-              # den.default and other shared aspects emit at parent scopes; the forward
-              # needs those modules merged with the child scope's own emissions.
-              # Also searches ancestor scopes (den.default emits at parent).
-              collectFromScopeChain =
-                depth: scopeId:
-                let
-                  own = wrappedPerScope.${scopeId}.${spec.fromClass} or [ ];
-                  parent = scopeParent.${scopeId} or null;
-                  parentMods =
-                    if parent != null && parent != scopeId && depth < 10 then
-                      collectFromScopeChain (depth + 1) parent
-                    else
-                      [ ];
-                in
-                own ++ parentMods;
-              sourceModules = collectFromScopeChain 0 sid;
+              # Source modules come from two places:
+              # 1. wrappedPerScope (directly emitted class modules, scope-inherited)
+              # 2. acc.classImports (modules produced by earlier forwards in this pass)
+              # This enables chained forwards: home → homeManager → nixos works
+              # because home → homeManager adds to acc.classImports.homeManager,
+              # which homeManager → nixos then reads.
+              scopeModules = collectFromScopeChain spec.fromClass 0 sid;
+              chainedModules = acc.classImports.${spec.fromClass} or [ ];
+              sourceModules = scopeModules ++ chainedModules;
               rawSourceModule = {
                 imports = sourceModules;
               };
