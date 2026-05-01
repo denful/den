@@ -51,26 +51,18 @@ let
   # with the named handlers below.
   #
   # Priority (low→high, last wins via //):
-  # 1. traitArgHandler — trait names as effects for parametric consumers
-  # 2. constantHandler — den context args; overwrites trait names on collision
-  # 3. Named handlers — emit-trait, emit-class, chain-*, etc. (no collision)
-  # 4. state.handler — always last
+  # 1. constantHandler — den context args
+  # 2. Named handlers — emit-class, chain-*, etc. (no collision)
+  # 3. state.handler — always last
   defaultHandlers =
     { class, ctx }:
-    let
-      # Top-level den.traits lives outside den.schema, breaking
-      # the evaluation cycle that existed with den.schema.traits.
-      traitSchemas = den.traits or { };
-    in
-    handlers.traitArgHandler traitSchemas
-    // handlers.constantHandler (
+    handlers.constantHandler (
       {
         inherit class;
         "aspect-chain" = [ ];
       }
       // ctx
     )
-    // handlers.traitCollectorHandler { inherit ctx traitSchemas; }
     // handlers.classCollectorHandler
     // handlers.constraintRegistryHandler
     // handlers.chainHandler
@@ -79,8 +71,6 @@ let
     // identity.pathSetHandler
     // identity.collectPathsHandler
     // handlers.registerAspectPolicyHandler
-    // handlers.registerTraitSchemaHandler
-    // handlers.getTraitSchemasHandler
     // handlers.deferredIncludeHandler
     // handlers.drainDeferredHandler
     // handlers.registerRouteHandler
@@ -154,70 +144,6 @@ let
       )
     );
 
-  # Walk scope tree for trait inheritance.
-  # "list": parent data ++ own data (accumulate up tree)
-  # "map": parent data // own data (child overrides parent keys)
-  # "single": own data only (no inheritance)
-  inheritTraits =
-    { scopedTraits, scopeParent }:
-    scopeId: traitName: strategy:
-    let
-      emptyDefault = if strategy == "map" then { } else [ ];
-      own = (scopedTraits.${scopeId} or { }).${traitName} or emptyDefault;
-      parentId = scopeParent.${scopeId} or null;
-      parentData =
-        if parentId == null then
-          emptyDefault
-        else
-          inheritTraits { inherit scopedTraits scopeParent; } parentId traitName strategy;
-    in
-    if strategy == "single" then
-      own
-    else if strategy == "map" then
-      parentData // own
-    else
-      parentData ++ own;
-
-  # Synthesize a traitModule for a specific scope with inheritance.
-  traitModuleForScope =
-    {
-      scopedTraits,
-      scopedDeferredTraits,
-      scopeParent,
-      traitSchemas,
-    }:
-    scopeId:
-    {
-      config,
-      lib,
-      pkgs,
-      options,
-      modulesPath,
-      ...
-    }@moduleArgs:
-    {
-      options._den.traits = lib.mkOption {
-        type = lib.types.attrsOf lib.types.anything;
-        default = { };
-        internal = true;
-      };
-      config._den.traits = lib.mapAttrs (
-        traitName: schema:
-        let
-          strategy = schema.collection or "list";
-          inherited = inheritTraits { inherit scopedTraits scopeParent; } scopeId traitName strategy;
-          deferred = (scopedDeferredTraits.${scopeId} or { }).${traitName} or [ ];
-          deferredData = map (e: e.value moduleArgs) deferred;
-        in
-        if strategy == "single" then
-          if deferredData != [ ] then builtins.head deferredData else inherited
-        else if strategy == "map" then
-          builtins.foldl' (acc: d: acc // d) inherited deferredData
-        else
-          inherited ++ deferredData
-      ) traitSchemas;
-    };
-
   defaultState = {
     # --- Flat state (global by design, not scoped) ---
     seen = _: { };
@@ -225,9 +151,6 @@ let
 
     # --- Scope-partitioned output state (handlers write here) ---
     scopedClassImports = _: { };
-    scopedTraits = _: { };
-    scopedDeferredTraits = _: { };
-    scopedConsumedTraits = _: { };
     scopedAspectPolicies = _: { };
     scopedDeferredIncludes = _: { };
     scopedIncludesChain = _: { };
@@ -247,9 +170,6 @@ let
     currentScope = "__unscoped";
     scopeContexts = _: { };
     scopeParent = _: { };
-
-    # --- Global state ---
-    traitSchemas = _: den.traits or { };
   };
 
   mkPipeline =
@@ -272,7 +192,6 @@ let
         };
       };
       rootScopeId = mkScopeId ctx;
-      traitSchemasVal = den.traits or { };
     in
     fx.handle {
       handlers = composeHandlers rootHandlers extraHandlers;
@@ -283,7 +202,6 @@ let
           inherit class;
           currentScope = rootScopeId;
           scopeContexts = _: { ${rootScopeId} = ctx; };
-          traitSchemas = _: traitSchemasVal;
         };
     } bootstrapAndResolve;
 
@@ -323,7 +241,6 @@ let
                 module
                 aspectPolicy
                 globalPolicy
-                traitNames
                 ;
             };
             # Enrichment-only args must NOT be advertised to NixOS — they
@@ -424,188 +341,152 @@ let
     }:
     let
       result = mkPipeline { inherit class; } { inherit self ctx; };
-      traitSchemas = result.state.traitSchemas null;
-      hasTraitSchemas = traitSchemas != { };
-
-      # partialOk validation
-      consumedTraits = builtins.foldl' (acc: v: acc // v) { } (
-        builtins.attrValues ((result.state.scopedConsumedTraits or (_: { })) null)
-      );
-      deferredTraits = builtins.foldl' (acc: v: acc // v) { } (
-        builtins.attrValues (result.state.scopedDeferredTraits null)
-      );
-      partialOkViolations = builtins.filter (
-        traitName:
-        consumedTraits ? ${traitName}
-        && (deferredTraits.${traitName} or [ ]) != [ ]
-        && !(traitSchemas.${traitName}.partialOk or false)
-      ) (builtins.attrNames consumedTraits);
-
-      # Trait module via scoped reads with inheritance.
-      rootScopeId = mkScopeId ctx;
-      scopeParent = result.state.scopeParent null;
-      traitModule =
-        if hasTraitSchemas then
-          traitModuleForScope {
-            scopedTraits = result.state.scopedTraits null;
-            scopedDeferredTraits = result.state.scopedDeferredTraits null;
-            inherit scopeParent traitSchemas;
-          } rootScopeId
-        else
-          null;
     in
-    if partialOkViolations != [ ] then
-      throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
-    else
-      let
-        # Build per-scope wrapped class imports from scoped partitions.
-        scopeContexts = result.state.scopeContexts null;
-        scopedClassImportsRaw = result.state.scopedClassImports null;
-        wrappedPerScope = lib.mapAttrs (
-          scopeId: scopeClasses:
-          let
-            scopeCtx = scopeContexts.${scopeId} or ctx;
-          in
-          wrapCollectedClasses scopeCtx scopeClasses
-        ) scopedClassImportsRaw;
+    let
+      # Build per-scope wrapped class imports from scoped partitions.
+      scopeContexts = result.state.scopeContexts null;
+      scopedClassImportsRaw = result.state.scopedClassImports null;
+      wrappedPerScope = lib.mapAttrs (
+        scopeId: scopeClasses:
+        let
+          scopeCtx = scopeContexts.${scopeId} or ctx;
+        in
+        wrapCollectedClasses scopeCtx scopeClasses
+      ) scopedClassImportsRaw;
 
-        # Flatten per-scope wrapped imports into a single classImports map.
-        # Scoped partitions are the sole source of truth — flat classImports
-        # no longer needed (flake output forwards eliminated by policy.instantiate).
-        wrappedClassImports = builtins.foldl' (
-          acc: scopeData:
-          lib.zipAttrsWith (_: builtins.concatLists) [
-            acc
-            scopeData
-          ]
-        ) { } (builtins.attrValues wrappedPerScope);
+      # Flatten per-scope wrapped imports into a single classImports map.
+      # Scoped partitions are the sole source of truth — flat classImports
+      # no longer needed (flake output forwards eliminated by policy.instantiate).
+      wrappedClassImports = builtins.foldl' (
+        acc: scopeData:
+        lib.zipAttrsWith (_: builtins.concatLists) [
+          acc
+          scopeData
+        ]
+      ) { } (builtins.attrValues wrappedPerScope);
 
-        # Apply Tier 1 routes (reads wrappedPerScope, produces new entries).
-        scopedRoutes = result.state.scopedRoutes null;
-        withRoutes = route.applyRoutes {
-          inherit scopedRoutes wrappedPerScope;
-          scopedTraits = result.state.scopedTraits null;
-          inherit scopeParent traitSchemas;
-          classImports = wrappedClassImports;
-        };
-
-        # Apply entity instantiation — evaluate entities and place in flake output.
-        scopedInstantiates = result.state.scopedInstantiates null;
-        allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
-        instantiateModules = lib.concatMap (
-          spec:
-          let
-            # spec IS the entity — value unwrapping happens at emission
-            # (transition.nix sends ie.value, not ie).
-            entity = spec;
-            hasOutput = (entity.intoAttr or [ ]) != [ ];
-          in
-          if !hasOutput then
-            [ ]
-          else
-            let
-              # Home entities provide pkgs; OS entities provide system for hostPlatform.
-              instantiateArgs =
-                if entity ? pkgs then
-                  {
-                    inherit (entity) pkgs;
-                    modules = [ entity.mainModule ];
-                  }
-                else
-                  {
-                    modules = [
-                      entity.mainModule
-                    ]
-                    ++ lib.optional (entity ? system) {
-                      nixpkgs.hostPlatform = lib.mkDefault entity.system;
-                    };
-                  };
-              evaluated = entity.instantiate instantiateArgs;
-            in
-            [ { config = lib.setAttrByPath ([ "flake" ] ++ entity.intoAttr) evaluated; } ]
-        ) allInstantiates;
-        withInstantiates = withRoutes.classImports // {
-          flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
-        };
-
-        # Apply Tier 2 forwards — read source modules from wrappedPerScope
-        # instead of running sub-pipelines.
-        rawForwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
-        # Dedup by adapterKey — same forward can fire from multiple scopes
-        # when dispatch-policies walks the same entity multiple times.
-        forwardSpecs =
-          let
-            go =
-              seen: specs:
-              if specs == [ ] then
-                [ ]
-              else
-                let
-                  s = builtins.head specs;
-                  rest = builtins.tail specs;
-                  key = s.adapterKey or null;
-                in
-                if key != null && seen ? ${key} then
-                  go seen rest
-                else
-                  [ s ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
-          in
-          go { } rawForwardSpecs;
-
-        # Collect class modules from a forward aspect (recursing into includes).
-        collectClassMods =
-          cls: aspect:
-          let
-            own = if aspect ? ${cls} then [ aspect.${cls} ] else [ ];
-            nested = builtins.concatMap (collectClassMods cls) (aspect.includes or [ ]);
-          in
-          own ++ nested;
-
-        applyForwardSpecs =
-          specs: classImports:
-          builtins.foldl' (
-            acc: spec:
-            let
-              sid = spec.sourceScopeId;
-              # Source modules from acc.classImports — this includes:
-              # 1. wrappedClassImports (all scopes flattened — has parent scope modules)
-              # 2. Route-produced modules
-              # 3. Modules from earlier forwards in this pass (chained forward support)
-              # No separate scope chain walk needed — wrappedClassImports already merges
-              # all scopes, and acc accumulates forward outputs.
-              sourceModules = acc.classImports.${spec.fromClass} or [ ];
-              rawSourceModule = {
-                imports = sourceModules;
-              };
-              sourceModule = spec.mapModule rawSourceModule;
-              forwardAspect = handlers.buildForwardAspect spec sourceModule;
-              newMods = collectClassMods spec.intoClass forwardAspect;
-            in
-            {
-              classImports = acc.classImports // {
-                ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
-              };
-            }
-          ) { inherit classImports; } specs;
-
-        forwarded =
-          if forwardSpecs == [ ] then
-            withInstantiates
-          else
-            (applyForwardSpecs forwardSpecs withInstantiates).classImports;
-
-      in
-      {
-        imports = (forwarded.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
+      # Apply Tier 1 routes (reads wrappedPerScope, produces new entries).
+      scopedRoutes = result.state.scopedRoutes null;
+      withRoutes = route.applyRoutes {
+        inherit scopedRoutes wrappedPerScope;
+        classImports = wrappedClassImports;
       };
+
+      # Apply entity instantiation — evaluate entities and place in flake output.
+      scopedInstantiates = result.state.scopedInstantiates null;
+      allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
+      instantiateModules = lib.concatMap (
+        spec:
+        let
+          # spec IS the entity — value unwrapping happens at emission
+          # (transition.nix sends ie.value, not ie).
+          entity = spec;
+          hasOutput = (entity.intoAttr or [ ]) != [ ];
+        in
+        if !hasOutput then
+          [ ]
+        else
+          let
+            # Home entities provide pkgs; OS entities provide system for hostPlatform.
+            instantiateArgs =
+              if entity ? pkgs then
+                {
+                  inherit (entity) pkgs;
+                  modules = [ entity.mainModule ];
+                }
+              else
+                {
+                  modules = [
+                    entity.mainModule
+                  ]
+                  ++ lib.optional (entity ? system) {
+                    nixpkgs.hostPlatform = lib.mkDefault entity.system;
+                  };
+                };
+            evaluated = entity.instantiate instantiateArgs;
+          in
+          [ { config = lib.setAttrByPath ([ "flake" ] ++ entity.intoAttr) evaluated; } ]
+      ) allInstantiates;
+      withInstantiates = withRoutes.classImports // {
+        flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
+      };
+
+      # Apply Tier 2 forwards — read source modules from wrappedPerScope
+      # instead of running sub-pipelines.
+      rawForwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
+      # Dedup by adapterKey — same forward can fire from multiple scopes
+      # when dispatch-policies walks the same entity multiple times.
+      forwardSpecs =
+        let
+          go =
+            seen: specs:
+            if specs == [ ] then
+              [ ]
+            else
+              let
+                s = builtins.head specs;
+                rest = builtins.tail specs;
+                key = s.adapterKey or null;
+              in
+              if key != null && seen ? ${key} then
+                go seen rest
+              else
+                [ s ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
+        in
+        go { } rawForwardSpecs;
+
+      # Collect class modules from a forward aspect (recursing into includes).
+      collectClassMods =
+        cls: aspect:
+        let
+          own = if aspect ? ${cls} then [ aspect.${cls} ] else [ ];
+          nested = builtins.concatMap (collectClassMods cls) (aspect.includes or [ ]);
+        in
+        own ++ nested;
+
+      applyForwardSpecs =
+        specs: classImports:
+        builtins.foldl' (
+          acc: spec:
+          let
+            sid = spec.sourceScopeId;
+            # Source modules from acc.classImports — this includes:
+            # 1. wrappedClassImports (all scopes flattened — has parent scope modules)
+            # 2. Route-produced modules
+            # 3. Modules from earlier forwards in this pass (chained forward support)
+            # No separate scope chain walk needed — wrappedClassImports already merges
+            # all scopes, and acc accumulates forward outputs.
+            sourceModules = acc.classImports.${spec.fromClass} or [ ];
+            rawSourceModule = {
+              imports = sourceModules;
+            };
+            sourceModule = spec.mapModule rawSourceModule;
+            forwardAspect = handlers.buildForwardAspect spec sourceModule;
+            newMods = collectClassMods spec.intoClass forwardAspect;
+          in
+          {
+            classImports = acc.classImports // {
+              ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
+            };
+          }
+        ) { inherit classImports; } specs;
+
+      forwarded =
+        if forwardSpecs == [ ] then
+          withInstantiates
+        else
+          (applyForwardSpecs forwardSpecs withInstantiates).classImports;
+
+    in
+    {
+      imports = forwarded.${class} or [ ];
+    };
 in
 {
   inherit
     composeHandlers
     defaultHandlers
     defaultState
-    inheritTraits
-    traitModuleForScope
     mkPipeline
     mkScopeId
     fxFullResolve

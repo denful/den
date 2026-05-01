@@ -344,29 +344,6 @@ let
         };
   };
 
-  registerTraitSchemaHandler = {
-    "register-trait-schema" =
-      { param, state }:
-      let
-        current = state.traitSchemas null;
-      in
-      {
-        resume = null;
-        state = state // {
-          traitSchemas = _: current // { ${param.name} = param.schema; };
-        };
-      };
-  };
-
-  getTraitSchemasHandler = {
-    "get-trait-schemas" =
-      { param, state }:
-      {
-        resume = state.traitSchemas null;
-        inherit state;
-      };
-  };
-
   registerRouteHandler = {
     "register-route" =
       { param, state }:
@@ -438,8 +415,6 @@ in
     registerAspectPolicyHandler
     deferredIncludeHandler
     drainDeferredHandler
-    registerTraitSchemaHandler
-    getTraitSchemasHandler
     registerRouteHandler
     registerInstantiateHandler
     ;

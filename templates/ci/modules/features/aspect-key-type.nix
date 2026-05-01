@@ -1,5 +1,5 @@
 # Tests for aspectKeyType — the unified freeform key type that dispatches on
-# key name via class/trait registries. Currently all branches produce
+# key name via the class registry. Currently all branches produce
 # __contentValues (aspectContentType); after provides removal, the else
 # branch switches to providerType for proper aspect shapes.
 {
@@ -16,14 +16,6 @@ let
         resume = null;
         state = state // {
           classes = (state.classes or [ ]) ++ [ param ];
-        };
-      };
-    "emit-trait" =
-      { param, state }:
-      {
-        resume = null;
-        state = state // {
-          traits = (state.traits or [ ]) ++ [ param ];
         };
       };
     "emit-include" =
@@ -93,42 +85,6 @@ in
           valueCount = 1;
           value = {
             services.nginx.enable = true;
-          };
-        };
-      }
-    );
-
-    # Trait key (firewall registered via den.traits) → provenance-wrapped __contentValues.
-    test-trait-key-shape = denTest (
-      { den, ... }:
-      let
-        types = den.lib.aspects.mkAspectsType { providerPrefix = [ ]; };
-        evaluated = lib.evalModules {
-          modules = [
-            { freeformType = lib.types.lazyAttrsOf types.aspectKeyType; }
-            {
-              firewall = {
-                port = 80;
-              };
-            }
-          ];
-        };
-        val = evaluated.config.firewall;
-      in
-      {
-        den.traits.firewall.description = "Firewall ports";
-        expr = {
-          hasContentValues = val ? __contentValues;
-          hasProvider = val ? __provider;
-          valueCount = builtins.length val.__contentValues;
-          value = (builtins.head val.__contentValues).value;
-        };
-        expected = {
-          hasContentValues = true;
-          hasProvider = true;
-          valueCount = 1;
-          value = {
-            port = 80;
           };
         };
       }
@@ -229,38 +185,6 @@ in
           valueCount = 2;
           valuesHaveNginx = true;
           valuesHaveFirewall = true;
-        };
-      }
-    );
-
-    # E2E: aspect defined through den.aspects module config exercises the
-    # pipeline with mixed keys — class emitted, trait emitted, all via
-    # aspectKeyType dispatch.
-    test-mixed-key-pipeline = denTest (
-      { den, ... }:
-      let
-        aspect = den.aspects.mixed;
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
-        result = den.lib.fx.handle {
-          handlers = collectHandlers;
-          state = { };
-        } comp;
-      in
-      {
-        den.traits.firewall.description = "Firewall ports";
-        den.aspects.mixed = {
-          nixos.services.nginx.enable = true;
-          firewall = {
-            port = 80;
-          };
-        };
-        expr = {
-          nixosEmitted = builtins.any (c: c.class == "nixos") (result.state.classes or [ ]);
-          firewallEmitted = builtins.any (t: t.trait == "firewall") (result.state.traits or [ ]);
-        };
-        expected = {
-          nixosEmitted = true;
-          firewallEmitted = true;
         };
       }
     );

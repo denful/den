@@ -283,35 +283,29 @@ let
     };
 
   # Unified freeform type for aspect submodules.
-  # Dispatches per-key: registered class/trait keys get aspectContentType
+  # Dispatches per-key: registered class keys get aspectContentType
   # (provenance wrapper), everything else also gets aspectContentType for now.
   # After provides removal, the else branch switches to providerType so that
   # nested aspects at the freeform level get proper aspect shapes.
-  # Registry lookup uses `den.classes or {}` / `den.traits or {}` which are
-  # populated by battery modules and aspect-schema.nix — no circular dependency
-  # because declared option access doesn't trigger freeform merge.
+  # Registry lookup uses `den.classes or {}` which is populated by battery
+  # modules and aspect-schema.nix — no circular dependency because declared
+  # option access doesn't trigger freeform merge.
   aspectKeyType =
     typeCfg:
     let
       classReg = den.classes or { };
-      traitReg = den.traits or { };
       contentType = aspectContentType typeCfg;
     in
     lib.types.mkOptionType {
       name = "aspectKey";
-      description = "class module, trait data, or nested aspect (dispatch by registry)";
+      description = "class module or nested aspect (dispatch by registry)";
       check = _: true;
       merge =
         loc: defs:
         let
           key = lib.last loc;
         in
-        if classReg ? ${key} then
-          contentType.merge loc defs
-        else if traitReg ? ${key} then
-          contentType.merge loc defs
-        else
-          contentType.merge loc defs;
+        if classReg ? ${key} then contentType.merge loc defs else contentType.merge loc defs;
     };
 
   aspectSubmodule =
@@ -412,12 +406,6 @@ let
                 )
               );
             };
-          };
-
-          traits = lib.mkOption {
-            description = "Trait schemas declared by this aspect, merged into den.traits.";
-            type = lib.types.lazyAttrsOf lib.types.raw;
-            default = { };
           };
 
           classes = lib.mkOption {

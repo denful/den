@@ -286,57 +286,6 @@
       }
     );
 
-    # Trait emission from shared aspect — collected once, not doubled.
-    test-dedup-trait-two-parents = denTest (
-      { den, ... }:
-      let
-        shared = {
-          name = "shared";
-          meta = { };
-          firewall = {
-            port = 80;
-          };
-          includes = [ ];
-        };
-        parentA = {
-          name = "parentA";
-          meta = { };
-          includes = [ shared ];
-        };
-        parentB = {
-          name = "parentB";
-          meta = { };
-          includes = [ shared ];
-        };
-        root = {
-          name = "root";
-          meta = { };
-          includes = [
-            parentA
-            parentB
-          ];
-        };
-        result = den.lib.aspects.fx.pipeline.fxFullResolve {
-          class = "nixos";
-          self = root;
-          ctx = { };
-        };
-      in
-      {
-        den.traits.firewall = {
-          description = "Firewall rules";
-          collection = "list";
-        };
-
-        # Without dedup: [{port=80;} {port=80;}]. With dedup: [{port=80;}].
-        expr = builtins.length (
-          (builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (result.state.scopedTraits null)))
-          .firewall or [ ]
-        );
-        expected = 1;
-      }
-    );
-
     # Aspect excluded by first parent, included by second — resolves on second visit.
     # Exclusion must not pollute includeSeen.
     test-excluded-then-included = denTest (

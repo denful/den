@@ -18,7 +18,6 @@ let
     "policies"
     "policies"
     "into"
-    "traits"
     "classes"
     "__fn"
     "__args"
@@ -100,7 +99,6 @@ let
       ctx,
       aspectPolicy,
       globalPolicy,
-      traitNames ? { },
     }:
     if builtins.isAttrs module && module ? imports then
       let
@@ -109,7 +107,6 @@ let
             ctx
             aspectPolicy
             globalPolicy
-            traitNames
             ;
         } module.imports;
         policy = resolveCollisionPolicy { inherit ctx aspectPolicy globalPolicy; };
@@ -166,8 +163,6 @@ let
         allArgs = builtins.functionArgs module;
         argNames = builtins.attrNames allArgs;
         denArgNames = builtins.filter (k: ctx ? ${k}) argNames;
-        # Trait args: registered trait names not shadowed by ctx.
-        traitArgNames = builtins.filter (k: traitNames ? ${k} && !(ctx ? ${k})) argNames;
         # Only warn for args matching known schema kinds that have no default.
         # Avoids false warnings on module-system args (config, pkgs, etc.).
         schemaKinds = builtins.filter (n: n != "conf" && n != "aspect" && !(lib.hasPrefix "_" n)) (
@@ -190,7 +185,7 @@ let
           unsatisfied = true;
           missingArgs = missingDenArgNames;
         }
-      else if denArgNames == [ ] && traitArgNames == [ ] then
+      else if denArgNames == [ ] then
         {
           module = warnedModule;
           wrapped = false;
@@ -198,11 +193,9 @@ let
       else
         let
           denArgs = lib.genAttrs denArgNames (k: ctx.${k});
-          remainingArgs = removeAttrs allArgs (denArgNames ++ traitArgNames);
+          remainingArgs = removeAttrs allArgs denArgNames;
         in
-        # Full application: all functionArgs are den args + trait args (no module-system args).
-        # Trait args need eval-time resolution, so only fully apply when there are no trait args.
-        if remainingArgs == { } && traitArgNames == [ ] then
+        if remainingArgs == { } then
           {
             module = warnedModule denArgs;
             wrapped = true;
@@ -217,18 +210,11 @@ let
             classWinsNames = builtins.filter (name: policy name == "class-wins") denArgNames;
             classWinsDen = lib.genAttrs classWinsNames (k: denArgs.${k});
             denWinsDen = removeAttrs denArgs classWinsNames;
-            # Trait args are resolved lazily from config._den.traits at eval time.
-            traitThunks = lib.genAttrs traitArgNames (
-              name: moduleArgs: moduleArgs.config._den.traits.${name} or [ ]
-            );
             wrapper =
               moduleArgs:
               # class-wins args: den first, then moduleArgs shadows
               # den-wins/error args: moduleArgs first, then denArgs shadows
-              # trait args: lazy thunks from config._den.traits
-              warnedModule (
-                classWinsDen // moduleArgs // denWinsDen // lib.mapAttrs (_: thunk: thunk moduleArgs) traitThunks
-              );
+              warnedModule (classWinsDen // moduleArgs // denWinsDen);
             # Validate(X): collision detector. Only advertises module-system
             # args + config. Checks den arg collisions by probing
             # config._module.args rather than advertising den args (which
@@ -266,9 +252,9 @@ let
               {
                 warnings = collisionChecks;
               };
-            # Wrapper advertises den args + trait args so NixOS passes thunks
+            # Wrapper advertises den args so NixOS passes thunks
             # (shadowed lazily by den values without evaluation).
-            advertisedArgs = remainingArgs // lib.genAttrs (denArgNames ++ traitArgNames) (_: true);
+            advertisedArgs = remainingArgs // lib.genAttrs denArgNames (_: true);
           in
           {
             module = lib.setFunctionArgs wrapper advertisedArgs;
@@ -292,26 +278,24 @@ let
       }).resume
     ) handlers;
 
-  # Schema registries for 4-step key classification.
-  # Top-level den.classes/den.traits live outside den.schema, breaking
-  # the evaluation cycle that existed when they lived inside den.schema.
+  # Schema registry for key classification.
+  # Top-level den.classes lives outside den.schema, breaking
+  # the evaluation cycle that existed when it lived inside den.schema.
   classRegistry = den.classes or { };
-  traitRegistry = den.traits or { };
 
   # Classify non-structural keys using the schema registry.
-  # 4-step: class → trait → nested aspect → unregistered class.
-  # When both registries are empty (no batteries), fall back to treating
+  # 3-step: class → nested aspect → unregistered class.
+  # When the registry is empty (no batteries), fall back to treating
   # all non-structural keys as classes for backward compatibility.
   classifyKeys =
-    dynamicTraitRegistry: targetClass: aspect:
+    targetClass: aspect:
     let
       allKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
-      isEmpty = classRegistry == { } && dynamicTraitRegistry == { };
+      isEmpty = classRegistry == { };
     in
     if isEmpty then
       {
         classKeys = allKeys;
-        traitKeys = [ ];
         nestedKeys = [ ];
         unregisteredClassKeys = [ ];
       }
@@ -323,8 +307,6 @@ let
               acc: k:
               if classRegistry ? ${k} || (targetClass != null && k == targetClass) then
                 acc // { classKeys = acc.classKeys ++ [ k ]; }
-              else if dynamicTraitRegistry ? ${k} then
-                acc // { traitKeys = acc.traitKeys ++ [ k ]; }
               else
                 let
                   rawValue = aspect.${k};
@@ -341,17 +323,14 @@ let
                       rawValue
                     else
                       null;
-                  # Check if any sub-key is a registered class/trait, or if any
+                  # Check if any sub-key is a registered class, or if any
                   # sub-key is itself an attrset containing recognized keys
                   # (multi-level nesting detection, depth-limited to 3).
                   hasRecognizedSubKeysAt =
                     depth: val:
                     builtins.isAttrs val
                     && builtins.any (
-                      sk:
-                      classRegistry ? ${sk}
-                      || dynamicTraitRegistry ? ${sk}
-                      || (depth > 0 && hasRecognizedSubKeysAt (depth - 1) (val.${sk}))
+                      sk: classRegistry ? ${sk} || (depth > 0 && hasRecognizedSubKeysAt (depth - 1) (val.${sk}))
                     ) (builtins.attrNames val);
                   hasRecognizedSubKeys = hasRecognizedSubKeysAt 3 innerValue;
                 in
@@ -364,7 +343,6 @@ let
             )
             {
               classKeys = [ ];
-              traitKeys = [ ];
               nestedKeys = [ ];
               unregisteredClassKeys = [ ];
             }
@@ -372,37 +350,8 @@ let
       in
       partition;
 
-  emitTraits =
-    aspect: traitKeys: nodeIdentity:
-    fx.seq (
-      lib.concatMap (
-        k:
-        let
-          wrapped = aspect.${k};
-          contentValues =
-            if builtins.isAttrs wrapped && wrapped ? __contentValues then
-              wrapped.__contentValues
-            else
-              [
-                {
-                  value = wrapped;
-                  file = "<unknown>";
-                }
-              ];
-        in
-        map (
-          cv:
-          fx.send "emit-trait" {
-            trait = k;
-            inherit (cv) value;
-            chain = nodeIdentity;
-          }
-        ) contentValues
-      ) traitKeys
-    );
-
   emitClasses =
-    dynamicTraitSchemas: aspect: classKeys: nodeIdentity:
+    aspect: classKeys: nodeIdentity:
     let
       ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
       aspectPolicy = aspect.meta.collisionPolicy or null;
@@ -452,7 +401,6 @@ let
                 aspectPolicy
                 globalPolicy
                 ;
-              traitNames = dynamicTraitSchemas;
               __rawEntry = true;
               isContextDependent =
                 (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
@@ -596,28 +544,6 @@ let
     // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
     // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
 
-  # Emit register-trait-schema for each entry in aspect.traits.
-  # Registered schemas become visible to classifyKeys via get-trait-schemas.
-  emitTraitSchemas =
-    aspect:
-    let
-      schemas = aspect.traits or { };
-      nodeIdentity = identity.pathKey (identity.aspectPath aspect);
-    in
-    if schemas == { } then
-      fx.pure null
-    else
-      fx.seq (
-        lib.mapAttrsToList (
-          traitName: schema:
-          fx.send "register-trait-schema" {
-            name = traitName;
-            inherit schema;
-            ownerIdentity = nodeIdentity;
-          }
-        ) schemas
-      );
-
   # Emit register-aspect-policy for each entry in aspect.policies.
   # Each policy is stored with ownerIdentity for exclusion rollback.
   emitAspectPolicies =
@@ -718,15 +644,12 @@ let
         selfProvResults:
         fx.bind (emitCrossProvideShims aspect) (
           _:
-          fx.bind (emitTraitSchemas aspect) (
+          fx.bind (emitAspectPolicies aspect) (
             _:
-            fx.bind (emitAspectPolicies aspect) (
-              _:
-              fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
-                includeResults:
-                fx.bind (dispatchPoliciesCall aspect) (
-                  policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
-                )
+            fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
+              includeResults:
+              fx.bind (dispatchPoliciesCall aspect) (
+                policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
               )
             )
           )
@@ -788,34 +711,22 @@ let
       hasClassHandler:
       fx.bind (if hasClassHandler then fx.send "class" null else fx.pure null) (
         targetClass:
-        fx.bind (fx.effects.hasHandler "get-trait-schemas") (
-          hasTraitSchemasHandler:
-          fx.bind (if hasTraitSchemasHandler then fx.send "get-trait-schemas" null else fx.pure traitRegistry)
-            (
-              dynamicTraitSchemas:
-              let
-                classified = classifyKeys dynamicTraitSchemas targetClass aspect;
-                inherit (classified)
-                  classKeys
-                  traitKeys
-                  nestedKeys
-                  unregisteredClassKeys
-                  ;
-                # Unregistered keys are emitted as classes immediately.
-                # No DLQ deferral — trait schemas must be declared at or
-                # above the level where trait data appears.
-                allClassKeys = classKeys ++ unregisteredClassKeys;
-              in
-              fx.bind (fx.seq (
-                [
-                  (emitClasses dynamicTraitSchemas aspect allClassKeys nodeIdentity)
-                  (emitTraits aspect traitKeys nodeIdentity)
-                  (registerConstraints aspect)
-                ]
-                ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
-              )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
-            )
-        )
+        let
+          classified = classifyKeys targetClass aspect;
+          inherit (classified)
+            classKeys
+            nestedKeys
+            unregisteredClassKeys
+            ;
+          allClassKeys = classKeys ++ unregisteredClassKeys;
+        in
+        fx.bind (fx.seq (
+          [
+            (emitClasses aspect allClassKeys nodeIdentity)
+            (registerConstraints aspect)
+          ]
+          ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
+        )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
       )
     );
 

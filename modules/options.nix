@@ -192,12 +192,6 @@ let
       options.description = lib.mkOption {
         description = "Human-readable description of this class domain.";
         type = lib.types.str;
-        apply =
-          v:
-          if (den.traits or { }) ? ${name} then
-            throw "den: '${name}' cannot be both a class and a trait"
-          else
-            v;
       };
       options.forwardTo = lib.mkOption {
         description = "Optional forward target for class evaluation.";
@@ -206,45 +200,6 @@ let
       };
     }
   );
-
-  traitSchemaType = lib.types.submodule (
-    { name, ... }:
-    {
-      options.description = lib.mkOption {
-        description = "Human-readable description of this trait channel.";
-        type = lib.types.str;
-        apply =
-          v:
-          if (den.classes or { }) ? ${name} then
-            throw "den: '${name}' cannot be both a class and a trait"
-          else
-            v;
-      };
-      options.collection = lib.mkOption {
-        description = "Collection strategy for trait data.";
-        type = lib.types.enum [
-          "list"
-          "map"
-        ];
-        default = "list";
-      };
-      options.partialOk = lib.mkOption {
-        description = "Whether partial trait data is acceptable.";
-        type = lib.types.bool;
-        default = false;
-      };
-      options.type = lib.mkOption {
-        description = "Optional type constraint for trait values.";
-        type = lib.types.nullOr lib.types.raw;
-        default = null;
-      };
-    }
-  );
-
-  # Collision check lives in each schema type's description `apply`
-  # function rather than the outer type merge. This keeps the check
-  # lazy — it only fires when `.description` of a colliding key is
-  # accessed, avoiding circular evaluation between den.classes/den.traits.
 
   schemaOption = lib.mkOption {
     description = "freeform deferred modules per entity kind";
@@ -262,11 +217,6 @@ in
   options.den.classes = lib.mkOption {
     description = "Class evaluation domains";
     type = lib.types.lazyAttrsOf classSchemaType;
-    default = { };
-  };
-  options.den.traits = lib.mkOption {
-    description = "Trait semantic data channels";
-    type = lib.types.lazyAttrsOf traitSchemaType;
     default = { };
   };
   config.den.schema = {

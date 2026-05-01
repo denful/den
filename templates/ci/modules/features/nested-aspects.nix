@@ -67,67 +67,6 @@
       }
     );
 
-    # Nested aspect with trait emission
-    test-nested-with-trait = denTest (
-      { den, ... }:
-      let
-        fx = den.lib.fx;
-        aspect = {
-          name = "parent";
-          meta = { };
-          child = {
-            nixos = {
-              networking.hostName = "trait-nested";
-            };
-            firewall = {
-              port = 22;
-            };
-          };
-          includes = [ ];
-        };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
-        result = fx.handle {
-          handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
-            class = "nixos";
-            ctx = { };
-          };
-          state = den.lib.aspects.fx.pipeline.defaultState;
-        } comp;
-        allTraits = builtins.foldl' (acc: v: acc // v) { } (
-          builtins.attrValues (result.state.scopedTraits null)
-        );
-      in
-      {
-        den.classes.nixos.description = "NixOS";
-        den.traits.firewall = {
-          description = "Firewall rules";
-          collection = "list";
-        };
-
-        expr = {
-          hasImports =
-            builtins.length (
-              (builtins.foldl' (
-                acc: sd:
-                lib.zipAttrsWith (_: builtins.concatLists) [
-                  acc
-                  sd
-                ]
-              ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
-            ) > 0;
-          hasTraitData = allTraits ? firewall;
-          traitValue = allTraits.firewall;
-        };
-        expected = {
-          hasImports = true;
-          hasTraitData = true;
-          traitValue = [
-            { port = 22; }
-          ];
-        };
-      }
-    );
-
     # Nested aspect propagates scope handlers from parent
     test-nested-scope-propagation = denTest (
       {

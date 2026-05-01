@@ -316,47 +316,6 @@
       }
     );
 
-    # Trait arg and enrichment arg coexist in the same class module
-    # function signature.  Both should resolve correctly.
-    test-enrichment-with-traits = denTest (
-      { den, igloo, ... }:
-      {
-        den.hosts.x86_64-linux.igloo.users.tux = { };
-
-        den.traits.greeting = { };
-
-        den.policies.host-guards =
-          { host, ... }:
-          [
-            (den.lib.policy.resolve {
-              isNixos = host.class == "nixos";
-            })
-          ];
-
-        den.aspects.greeter = {
-          traits.greeting = "hello";
-          nixos =
-            {
-              isNixos,
-              lib,
-              ...
-            }:
-            lib.optionalAttrs isNixos {
-              environment.variables.ENRICHED = "yes";
-            };
-        };
-
-        den.aspects.igloo.includes = [ den.aspects.greeter ];
-
-        # Validate enrichment coexists with trait emission in same aspect.
-        # Trait data access via { greeting, ... }: function args is a
-        # pre-existing bug in the trait thunk mechanism (no test coverage
-        # anywhere) — tracked separately.
-        expr = igloo.environment.variables.ENRICHED;
-        expected = "yes";
-      }
-    );
-
     # Regression: fully-applied class modules (all args are den args,
     # no remaining module-system args) are plain attrsets. The post-pipeline
     # stripping must not call lib.setFunctionArgs on them — that injects

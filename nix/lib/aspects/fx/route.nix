@@ -1,4 +1,4 @@
-# Route application: reads scope-partitioned class/trait data,
+# Route application: reads scope-partitioned class data,
 # wraps at target path, injects into target class bucket.
 {
   lib,
@@ -6,8 +6,6 @@
   ...
 }:
 let
-  inherit (den.lib.aspects.fx.pipeline) inheritTraits;
-
   # Wrap modules with path nesting, optional guard, optional adaptArgs.
   # For path != [], works with both submodule targets and plain option namespaces.
   wrapRouteModules =
@@ -93,31 +91,12 @@ let
     in
     map (mod: guardModule (nestModule (adaptModule mod))) modules;
 
-  # Synthesize a NixOS module from trait data at a target path.
-  # Unlike class routes, trait routes handle their own path nesting because
-  # trait data is a plain value (list, map, scalar), not a NixOS module —
-  # wrapRouteModules' submodule-based nesting doesn't apply.
-  traitRouteModule =
-    route: traitData:
-    { ... }:
-    {
-      config = lib.setAttrByPath route.path traitData;
-    };
-
   # Apply all registered routes to produce additional class imports.
   # Returns { classImports } with route-produced modules merged in.
-  #
-  # Design notes:
-  # - Trait routes use inheritTraits (pipeline-time data only). Deferred traits
-  #   (Tier 3 / runtime-evaluated) are intentionally excluded — they depend on
-  #   moduleArgs which aren't available at route application time.
   applyRoutes =
     {
       scopedRoutes,
       wrappedPerScope,
-      scopedTraits,
-      scopeParent,
-      traitSchemas,
       classImports,
     }:
     let
@@ -147,19 +126,9 @@ let
     builtins.foldl' (
       acc: route:
       let
-        isTraitRoute = route ? fromTrait;
         scopeExists = wrappedPerScope ? ${route.sourceScopeId};
         sourceModules =
-          if isTraitRoute then
-            let
-              strategy = (traitSchemas.${route.fromTrait} or { }).collection or "list";
-              traitData = inheritTraits {
-                inherit scopedTraits scopeParent;
-              } route.sourceScopeId route.fromTrait strategy;
-              emptyDefault = if strategy == "map" then { } else [ ];
-            in
-            if traitData == emptyDefault then [ ] else [ (traitRouteModule route traitData) ]
-          else if !scopeExists then
+          if !scopeExists then
             builtins.trace
               "den: route from '${route.fromClass}' — source scope '${route.sourceScopeId}' not found in pipeline (cross-pipeline routing requires fleet scope)"
               [ ]
@@ -167,10 +136,6 @@ let
             wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
         adapterMod = route.adapterModule or null;
         modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
-        # Trait route modules handle their own path nesting (via setAttrByPath)
-        # because trait data is a plain value, not a NixOS submodule.
-        # Class route modules go through wrapRouteModules for submodule nesting.
-        # Both still apply guard wrapping if specified.
         guard = route.guard or null;
         guardWrap =
           mod:
@@ -247,8 +212,6 @@ let
         wrappedModules =
           if modulesWithAdapter == [ ] then
             ensureEntry
-          else if isTraitRoute then
-            map guardWrap modulesWithAdapter
           else if isAdapterRoute then
             adapterWrapped
           else
@@ -267,5 +230,5 @@ let
     ) { inherit classImports; } allRoutes;
 in
 {
-  inherit wrapRouteModules applyRoutes traitRouteModule;
+  inherit wrapRouteModules applyRoutes;
 }

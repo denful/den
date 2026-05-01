@@ -82,10 +82,6 @@ let
         scope = state.currentScope;
         currentCtx = if scope == null then ctx else (state.scopeContexts null).${scope} or ctx;
 
-        # Merge traits into resolve context.
-        traits = builtins.foldl' (acc: v: acc // v) { } (builtins.attrValues (state.scopedTraits null));
-        traitNames = state.traitSchemas null;
-
         # Three policy sources.
         globalPolicies = den.policies or { };
         schemaPolicies = (den.schema.${entityKind} or { }).policies or { };
@@ -138,8 +134,7 @@ let
                 fargs = policyFnArgs e.value.fn;
                 requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
               in
-              builtins.all (k: resolveCtx ? ${k} || traitNames ? ${k}) requiredArgs
-              && !builtins.elem e.name firedPolicies
+              builtins.all (k: resolveCtx ? ${k}) requiredArgs && !builtins.elem e.name firedPolicies
             ) entries;
           in
           map (
@@ -465,7 +460,9 @@ let
               combinedEnrichment = accEnrichment // dispatched.enrichment;
               enrichedCtx = currentCtx // combinedEnrichment;
               enrichHandlers = constantHandler combinedEnrichment;
-              nextResolveCtx = traits // enrichedCtx // { __entityKind = entityKind; };
+              nextResolveCtx = enrichedCtx // {
+                __entityKind = entityKind;
+              };
             in
             fx.bind
               (fx.effects.state.modify (
@@ -497,7 +494,9 @@ let
                 )) (_: iterate (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx)
               );
 
-        resolveCtx = traits // currentCtx // { __entityKind = entityKind; };
+        resolveCtx = currentCtx // {
+          __entityKind = entityKind;
+        };
         # Dedup: if this entity+scope was already dispatched, skip.
         dispatchKey = "${entityKind}@${scope}";
         alreadyDispatched = builtins.elem dispatchKey ((state.dispatchedPolicies or (_: [ ])) null);

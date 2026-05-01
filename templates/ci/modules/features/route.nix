@@ -1,4 +1,4 @@
-# Tests for policy.route — Tier 1 class and trait delivery.
+# Tests for policy.route — Tier 1 class delivery.
 { denTest, lib, ... }:
 let
   # Submodule option helper: declares an option at `name` with a listOf str type.
@@ -79,56 +79,6 @@ in
         expected = [
           "from-nixos-owned"
           "from-src-class"
-        ];
-      }
-    );
-
-    # Trait route — list collection into target class at path.
-    test-route-trait-list = denTest (
-      { den, igloo, ... }:
-      {
-        den.hosts.x86_64-linux.igloo.users.tux = { };
-
-        den.traits.route-items = {
-          description = "Items for route trait test";
-          collection = "list";
-        };
-
-        den.schema.host.policies.route-trait-items =
-          {
-            host,
-            ...
-          }:
-          [
-            (den.lib.policy.route {
-              fromTrait = "route-items";
-              intoClass = host.class;
-              path = [ "route-collected" ];
-            })
-          ];
-
-        den.aspects.igloo = {
-          route-items = [
-            "a"
-            "b"
-          ];
-          nixos.imports = [
-            (
-              { lib, ... }:
-              {
-                options.route-collected = lib.mkOption {
-                  type = lib.types.listOf lib.types.str;
-                  default = [ ];
-                };
-              }
-            )
-          ];
-        };
-
-        expr = igloo.route-collected;
-        expected = [
-          "a"
-          "b"
         ];
       }
     );

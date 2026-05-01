@@ -21,63 +21,10 @@
       }
     );
 
-    test-trait-declaration = denTest (
-      { den, ... }:
-      {
-        den.traits.firewall = {
-          description = "Firewall trait";
-          collection = "map";
-          partialOk = true;
-        };
-
-        expr = {
-          inherit (den.traits.firewall) description collection partialOk;
-        };
-        expected = {
-          description = "Firewall trait";
-          collection = "map";
-          partialOk = true;
-        };
-      }
-    );
-
-    test-trait-defaults = denTest (
-      { den, ... }:
-      {
-        den.traits.firewall.description = "Firewall trait";
-
-        expr = {
-          inherit (den.traits.firewall) collection partialOk;
-        };
-        expected = {
-          collection = "list";
-          partialOk = false;
-        };
-      }
-    );
-
-    test-trait-type-default = denTest (
-      { den, ... }:
-      {
-        den.traits.firewall.description = "Firewall trait";
-
-        expr = den.traits.firewall.type;
-        expected = null;
-      }
-    );
-
     test-has-classes = denTest (
       { den, ... }:
       {
         expr = den ? classes;
-        expected = true;
-      }
-    );
-
-    test-has-traits = denTest (
-      { den, ... }:
-      {
-        expr = den ? traits;
         expected = true;
       }
     );
@@ -146,39 +93,6 @@
       }
     );
 
-    test-collision-error = denTest (
-      { den, ... }:
-      {
-        den.classes.shared.description = "A class";
-        den.traits.shared.description = "A trait";
-
-        expr = den.classes.shared.description;
-        expectedError = {
-          type = "ThrownError";
-          msg = "cannot be both a class and a trait";
-        };
-      }
-    );
-
-    # Namespace-level trait/class declarations merge into den.traits/den.classes
-    test-namespace-trait-merges = denTest (
-      { den, ... }:
-      {
-        den.ful.test-ns.traits.monitoring = {
-          description = "Monitoring trait";
-          collection = "list";
-        };
-
-        expr = {
-          inherit (den.traits.monitoring) description collection;
-        };
-        expected = {
-          description = "Monitoring trait";
-          collection = "list";
-        };
-      }
-    );
-
     test-namespace-class-merges = denTest (
       { den, ... }:
       {
@@ -188,61 +102,6 @@
 
         expr = den.classes.container.description;
         expected = "Container class";
-      }
-    );
-
-    test-namespace-traits-preserve-existing = denTest (
-      { den, ... }:
-      {
-        den.traits.firewall.description = "Firewall trait";
-        den.ful.test-ns.traits.monitoring = {
-          description = "Monitoring trait";
-        };
-
-        expr = {
-          firewall = den.traits.firewall.description;
-          monitoring = den.traits.monitoring.description;
-        };
-        expected = {
-          firewall = "Firewall trait";
-          monitoring = "Monitoring trait";
-        };
-      }
-    );
-
-    test-cross-namespace-trait-merge = denTest (
-      { den, ... }:
-      {
-        den.ful.ns-a.traits.shared-trait = {
-          description = "Shared trait";
-          collection = "map";
-        };
-        den.ful.ns-b.traits.shared-trait = {
-          description = "Shared trait";
-          collection = "map";
-        };
-
-        expr = den.traits.shared-trait.description;
-        expected = "Shared trait";
-      }
-    );
-
-    # Aspect-level trait/class installation tests
-    test-aspect-trait-install = denTest (
-      { den, ... }:
-      {
-        den.aspects.netstack.traits.firewall = {
-          description = "Firewall rules";
-          collection = "list";
-        };
-
-        expr = {
-          inherit (den.traits.firewall) description collection;
-        };
-        expected = {
-          description = "Firewall rules";
-          collection = "list";
-        };
       }
     );
 
@@ -258,51 +117,5 @@
       }
     );
 
-    test-aspect-trait-merge-compatible = denTest (
-      { den, ... }:
-      {
-        den.aspects.netstack.traits.firewall = {
-          description = "Firewall rules";
-          collection = "list";
-        };
-        den.aspects.security.traits.firewall = {
-          description = "Firewall rules";
-          collection = "list";
-        };
-
-        expr = den.traits.firewall.description;
-        expected = "Firewall rules";
-      }
-    );
-
-    test-aspect-traits-not-freeform = denTest (
-      { den, ... }:
-      {
-        den.aspects.netstack = {
-          traits.firewall = {
-            description = "Firewall rules";
-          };
-          nixos = { };
-        };
-
-        expr = builtins.attrNames (
-          builtins.removeAttrs den.aspects.netstack [
-            "name"
-            "description"
-            "meta"
-            "includes"
-            "provides"
-            "policies"
-            "policies"
-            "traits"
-            "classes"
-            "_module"
-            "_"
-            "__functor"
-          ]
-        );
-        expected = [ "nixos" ];
-      }
-    );
   };
 }
