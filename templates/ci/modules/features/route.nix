@@ -223,5 +223,17 @@ in
       }
     );
 
+    # policy.instantiate: host entity evaluation produces flake output
+    test-instantiate-host = denTest (
+      { den, config, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo.nixos.networking.hostName = "instantiated";
+
+        expr = config.flake.nixosConfigurations ? igloo;
+        expected = true;
+      }
+    );
+
   };
 }

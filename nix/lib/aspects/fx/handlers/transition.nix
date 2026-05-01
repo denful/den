@@ -251,34 +251,8 @@ let
           scopedAspectPolicies = _: { ${newScopeId} = aspectPolicies; };
         };
       };
-      subRootScope = mkScopeId scopedCtx;
-      subFinalCtx = (subResult.state.scopeContexts null).${subRootScope} or scopedCtx;
-      subScopedClassImportsRaw = subResult.state.scopedClassImports null;
-      subRawClassImports =
-        let
-          subWrappedPerScope = lib.mapAttrs (
-            scopeId: scopeClasses:
-            let
-              scopeCtx = (subResult.state.scopeContexts null).${scopeId} or scopedCtx;
-            in
-            den.lib.aspects.fx.pipeline.wrapCollectedClasses scopeCtx scopeClasses
-          ) subScopedClassImportsRaw;
-        in
-        builtins.foldl' (
-          acc: scopeData:
-          lib.zipAttrsWith (_: builtins.concatLists) [
-            acc
-            scopeData
-          ]
-        ) { } (builtins.attrValues subWrappedPerScope);
-      subForwardSpecs = lib.concatLists (lib.attrValues (subResult.state.scopedForwardSpecs null));
-      subWrapped = subRawClassImports;
-      subForwarded = den.lib.aspects.fx.pipeline.applyForwardSpecs {
-        forwardSpecs = subForwardSpecs;
-        classImports = subWrapped;
-        traitModule = null;
-        hasTraitSchemas = false;
-      };
+      # Sub-pipeline forward specs and routes are merged into the parent
+      # via scopedForwardSpecs/scopedRoutes and applied in fxResolve.
       # Push scope, merge sub-pipeline results, pop scope.
       pushScope = fx.effects.state.modify (
         st:

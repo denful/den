@@ -385,31 +385,20 @@ let
           in
           fwd.classImports;
       subHasTraitSchemas = subTraitSchemas != { };
-      subAllTraits = builtins.foldl' (acc: v: acc // v) { } (
-        builtins.attrValues (subResult.state.scopedTraits null)
-      );
       subTraitModule =
-        { ... }:
-        {
-          options._den.traits = lib.mkOption {
-            type = lib.types.attrsOf lib.types.anything;
-            default = { };
-            internal = true;
-          };
-          config._den.traits = lib.mapAttrs (
-            traitName: schema:
-            let
-              strategy = schema.collection or "list";
-              raw = subAllTraits.${traitName} or (if strategy == "map" then { } else [ ]);
-            in
-            raw
-          ) subTraitSchemas;
-        };
+        if subHasTraitSchemas then
+          traitModuleForScope {
+            scopedTraits = subResult.state.scopedTraits null;
+            scopedDeferredTraits = subResult.state.scopedDeferredTraits null;
+            scopeParent = subScopeParent;
+            traitSchemas = subTraitSchemas;
+          } subRootScope
+        else
+          null;
     in
     {
       classImports = forwarded;
-      traits = subAllTraits;
-      traitModule = if subHasTraitSchemas then subTraitModule else null;
+      traitModule = subTraitModule;
       inherit subHasTraitSchemas;
     };
 
