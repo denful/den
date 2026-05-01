@@ -308,12 +308,15 @@ let
                   st:
                   let
                     parentScope = st.currentScope;
+                    isSameScope = newScopeId == parentScope;
                   in
                   st
                   // {
                     currentScope = newScopeId;
                     scopeContexts = _: (st.scopeContexts null) // { ${newScopeId} = scopedCtx; };
-                    scopeParent = _: (st.scopeParent null) // { ${newScopeId} = parentScope; };
+                    # Only set parent if moving to a different scope — avoid self-reference.
+                    scopeParent =
+                      _: (st.scopeParent null) // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
                     scopedAspectPolicies =
                       _:
                       let

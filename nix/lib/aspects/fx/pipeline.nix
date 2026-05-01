@@ -570,22 +570,23 @@ let
             acc: spec:
             let
               sid = spec.sourceScopeId;
-              # Source modules may be at the forward's source scope or a child scope
-              # (DLQ drain re-emits at the scope it runs in, which may be a child).
-              sourceModules =
+              # Collect source modules from the forward's scope AND ancestor scopes.
+              # den.default and other shared aspects emit at parent scopes; the forward
+              # needs those modules merged with the child scope's own emissions.
+              # Also searches child scopes (DLQ drain may re-emit at children).
+              collectFromScopeChain =
+                depth: scopeId:
                 let
-                  direct = wrappedPerScope.${sid}.${spec.fromClass} or [ ];
+                  own = wrappedPerScope.${scopeId}.${spec.fromClass} or [ ];
+                  parent = scopeParent.${scopeId} or null;
+                  parentMods =
+                    if parent != null && parent != scopeId && depth < 10 then
+                      collectFromScopeChain (depth + 1) parent
+                    else
+                      [ ];
                 in
-                if direct != [ ] then
-                  direct
-                else
-                  # Fallback: search all scopes that descend from sourceScopeId.
-                  lib.concatLists (
-                    lib.mapAttrsToList (
-                      scopeId: scopeClasses:
-                      if lib.hasPrefix sid scopeId then scopeClasses.${spec.fromClass} or [ ] else [ ]
-                    ) wrappedPerScope
-                  );
+                own ++ parentMods;
+              sourceModules = collectFromScopeChain 0 sid;
               rawSourceModule = {
                 imports = sourceModules;
               };
