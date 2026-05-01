@@ -26,7 +26,7 @@ let
   deriveEntityKind =
     state:
     let
-      chain = (state.includesChain or (_: [ ])) null;
+      chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
       entries = state.entries or [ ];
       ancestorKinds = lib.filter (s: s != null) (
         map (
@@ -92,7 +92,8 @@ let
         selfPath = pathKey (aspectPath param);
         entry = mkBaseEntry class param // {
           name = param.name or "<anon>";
-          parent = chainParent ((state.includesChain or (_: [ ])) null) selfPath;
+          parent = chainParent (((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ]
+          ) selfPath;
           entityKind = param.__entityKind or null;
         };
       in
@@ -119,7 +120,7 @@ let
         entityKind = deriveEntityKind state;
         # Derive ctxAspect from includes chain: nearest meaningful ancestor's
         # base name (strip provider path and ctxId suffix for readability).
-        chain = (state.includesChain or (_: [ ])) null;
+        chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
         chainTip = if chain != [ ] then lib.last chain else null;
         ctxAspect =
           if chainTip == null then

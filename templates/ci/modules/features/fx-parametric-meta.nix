@@ -112,7 +112,7 @@
                 "resolve-complete" =
                   { param, state }:
                   let
-                    chain = (state.includesChain or (_: [ ])) null;
+                    chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope or "__unscoped"} or [ ];
                     parentName = if chain == [ ] then "ROOT" else lib.last chain;
                   in
                   {

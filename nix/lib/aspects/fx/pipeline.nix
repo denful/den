@@ -222,20 +222,14 @@ let
     };
 
   defaultState = {
-    # --- Existing flat state (handlers still write here until Task 1+) ---
+    # --- Flat state (global or with remaining flat readers) ---
     seen = _: { };
-    classImports = _: { };
-    constraintRegistry = _: { };
-    constraintFilters = _: [ ];
+    classImports = _: { }; # dual-write kept — many tests read flat classImports
+    aspectPolicies = _: { }; # dual-write kept — resolveFanOut extraState seeding
     pathSet = _: { };
-    includesChain = _: [ ];
-    deferredIncludes = _: [ ];
     traits = _: { };
     deferredTraits = _: { };
     consumedTraits = _: { };
-    aspectPolicies = _: { };
-    forwardSpecs = _: [ ];
-    deadLetterQueue = _: [ ];
 
     # --- Scope-partitioned output state (future: handlers write here) ---
     scopedClassImports = _: { };
@@ -256,7 +250,9 @@ let
     includeSeen = _: { };
 
     # --- Scope tree tracking ---
-    currentScope = null;
+    # Sentinel scope for bare handler use (tests that bypass mkPipeline).
+    # mkPipeline overrides this with the real rootScopeId.
+    currentScope = "__unscoped";
     scopeStack = _: [ ];
     scopeContexts = _: { };
     scopeParent = _: { };
@@ -335,6 +331,7 @@ let
     spec:
     let
       normalizedSource = normalizeRoot spec.sourceAspect;
+      subRootScope = mkScopeId spec.__resolveCtx;
       subResult = fxFullResolve {
         class = spec.fromClass;
         self = normalizedSource;
@@ -343,11 +340,8 @@ let
           aspectPolicies = spec.__aspectPolicies;
         };
       };
-      rawClassImports = subResult.state.classImports null;
-      forwardSpecs = subResult.state.forwardSpecs null;
-      subRootScope = mkScopeId spec.__resolveCtx;
       finalCtx = (subResult.state.scopeContexts null).${subRootScope} or spec.__resolveCtx;
-      wrappedClassImports = wrapCollectedClasses finalCtx rawClassImports;
+      forwardSpecs = lib.concatLists (lib.attrValues (subResult.state.scopedForwardSpecs null));
 
       # Apply Tier 1 routes within the sub-pipeline.
       subScopedRoutes = subResult.state.scopedRoutes null;
@@ -361,6 +355,13 @@ let
       ) subScopedClassImportsRaw;
       subScopeParent = subResult.state.scopeParent null;
       subTraitSchemas = den.traits or { };
+      wrappedClassImports = builtins.foldl' (
+        acc: scopeData:
+        lib.zipAttrsWith (_: builtins.concatLists) [
+          acc
+          scopeData
+        ]
+      ) { } (builtins.attrValues subWrappedPerScope);
       withSubRoutes = route.applyRoutes {
         scopedRoutes = subScopedRoutes;
         wrappedPerScope = subWrappedPerScope;
@@ -597,7 +598,7 @@ let
       throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
     else
       let
-        forwardSpecs = result.state.forwardSpecs null;
+        forwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
 
         # Build per-scope wrapped class imports from scoped partitions.
         # With Part 1 (scoped state merge in resolveFanOut), this includes
@@ -677,7 +678,7 @@ let
           classImports = withInstantiates;
         };
         # Dead letter queue diagnostics.
-        finalDLQ = (result.state.deadLetterQueue or (_: [ ])) null;
+        finalDLQ = lib.concatLists (lib.attrValues ((result.state.scopedDeadLetterQueue or (_: { })) null));
         _dlqWarn = builtins.seq (map (
           entry:
           builtins.trace "den: dead letter — key '${entry.key}' from aspect '${entry.aspectName}' never matched a registered class or trait" null

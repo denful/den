@@ -192,12 +192,13 @@
         result = fx.handle {
           handlers = den.lib.aspects.fx.handlers.chainHandler;
           state = {
-            includesChain = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
           };
         } comp;
       in
       {
-        expr = (result.state.includesChain) null;
+        expr = (result.state.scopedIncludesChain null).__test or [ ];
         expected = [
           "a"
           "b"
@@ -216,12 +217,13 @@
         result = fx.handle {
           handlers = den.lib.aspects.fx.handlers.chainHandler;
           state = {
-            includesChain = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
           };
         } comp;
       in
       {
-        expr = (result.state.includesChain) null;
+        expr = (result.state.scopedIncludesChain null).__test or [ ];
         expected = [ "a" ];
       }
     );
@@ -235,12 +237,13 @@
         raw = fx.handle {
           handlers = den.lib.aspects.fx.handlers.chainHandler;
           state = {
-            includesChain = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
           };
         } comp;
-        # Force the includesChain thunk inside tryEval to catch the throw.
+        # Force the scopedIncludesChain thunk inside tryEval to catch the throw.
         result = builtins.tryEval (
-          builtins.deepSeq ((raw.state.includesChain) null) ((raw.state.includesChain) null)
+          builtins.deepSeq ((raw.state.scopedIncludesChain) null) ((raw.state.scopedIncludesChain) null)
         );
       in
       {
@@ -323,6 +326,8 @@
           handlers = handlers.classCollectorHandler;
           state = {
             classImports = _: { };
+            currentScope = "__test";
+            scopedClassImports = _: { };
           };
         } comp;
       in
@@ -370,12 +375,13 @@
         result = fx.handle {
           handlers = handlers.deferredIncludeHandler;
           state = {
-            deferredIncludes = _: [ ];
+            currentScope = "__test";
+            scopedDeferredIncludes = _: { };
           };
         } comp;
       in
       {
-        expr = builtins.length (result.state.deferredIncludes null);
+        expr = builtins.length ((result.state.scopedDeferredIncludes null).__test or [ ]);
         expected = 2;
       }
     );
@@ -402,14 +408,17 @@
         result = fx.handle {
           handlers = handlers.drainDeferredHandler;
           state = {
-            deferredIncludes = _: [
-              deferredA
-              deferredB
-            ];
+            currentScope = "__test";
+            scopedDeferredIncludes = _: {
+              __test = [
+                deferredA
+                deferredB
+              ];
+            };
           };
         } comp;
         satisfiable = result.value;
-        remaining = result.state.deferredIncludes null;
+        remaining = (result.state.scopedDeferredIncludes null).__test or [ ];
       in
       {
         expr = {
@@ -443,14 +452,17 @@
         result = fx.handle {
           handlers = handlers.drainDeferredHandler;
           state = {
-            deferredIncludes = _: [ deferred ];
+            currentScope = "__test";
+            scopedDeferredIncludes = _: {
+              __test = [ deferred ];
+            };
           };
         } comp;
       in
       {
         expr = {
           satisfiedCount = builtins.length result.value;
-          remainingCount = builtins.length (result.state.deferredIncludes null);
+          remainingCount = builtins.length ((result.state.scopedDeferredIncludes null).__test or [ ]);
         };
         expected = {
           satisfiedCount = 0;

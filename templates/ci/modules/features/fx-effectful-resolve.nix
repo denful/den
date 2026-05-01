@@ -60,9 +60,10 @@ let
     // extraHandlers;
 
   defaultState = {
-    includesChain = _: [ ];
-    constraintRegistry = _: { };
-    constraintFilters = _: [ ];
+    currentScope = "__test";
+    scopedIncludesChain = _: { };
+    scopedConstraintRegistry = _: { };
+    scopedConstraintFilters = _: { };
     paths = [ ];
   };
 in

@@ -81,7 +81,10 @@
         result = fx.handle {
           handlers = den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            constraintRegistry = _: { };
+            currentScope = "__test";
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
+            scopedIncludesChain = _: { };
           };
         } comp;
       in
@@ -99,7 +102,10 @@
         result = fx.handle {
           handlers = den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            constraintRegistry = _: { };
+            currentScope = "__test";
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
+            scopedIncludesChain = _: { };
           };
         } comp;
       in
@@ -133,7 +139,10 @@
         result = fx.handle {
           handlers = den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            constraintRegistry = _: { };
+            currentScope = "__test";
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
+            scopedIncludesChain = _: { };
           };
         } comp;
       in
@@ -362,9 +371,10 @@
           handlers =
             den.lib.aspects.fx.handlers.chainHandler // den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            includesChain = _: [ ];
-            constraintRegistry = _: { };
-            constraintFilters = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
           };
         } comp;
       in
@@ -403,9 +413,10 @@
           handlers =
             den.lib.aspects.fx.handlers.chainHandler // den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            includesChain = _: [ ];
-            constraintRegistry = _: { };
-            constraintFilters = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
           };
         } comp;
       in
@@ -444,9 +455,10 @@
           handlers =
             den.lib.aspects.fx.handlers.chainHandler // den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            includesChain = _: [ ];
-            constraintRegistry = _: { };
-            constraintFilters = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
           };
         } comp;
       in
@@ -479,9 +491,10 @@
           handlers =
             den.lib.aspects.fx.handlers.chainHandler // den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            includesChain = _: [ ];
-            constraintRegistry = _: { };
-            constraintFilters = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
           };
         } comp;
       in
@@ -520,9 +533,10 @@
           handlers =
             den.lib.aspects.fx.handlers.chainHandler // den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = {
-            includesChain = _: [ ];
-            constraintRegistry = _: { };
-            constraintFilters = _: [ ];
+            currentScope = "__test";
+            scopedIncludesChain = _: { };
+            scopedConstraintRegistry = _: { };
+            scopedConstraintFilters = _: { };
           };
         } comp;
       in

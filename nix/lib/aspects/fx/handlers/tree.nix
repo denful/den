@@ -1,11 +1,10 @@
 # constraintRegistryHandler: Handles register-constraint, check-constraint
-#   State reads: constraintRegistry, constraintFilters, includesChain
-#   State writes: constraintRegistry, constraintFilters
+#   State reads: scopedConstraintRegistry, scopedConstraintFilters, scopedIncludesChain
+#   State writes: scopedConstraintRegistry, scopedConstraintFilters
 # chainHandler: Handles chain-push, chain-pop
-#   State reads/writes: includesChain
-#   (stage tracking removed — trace derives entityKind from entries)
+#   State reads/writes: scopedIncludesChain
 # classCollectorHandler: Handles emit-class
-#   State reads/writes: classImports
+#   State reads/writes: scopedClassImports
 {
   lib,
   den,
@@ -20,23 +19,14 @@ let
     "register-constraint" =
       { param, state }:
       let
-        ownerChain = (state.includesChain or (_: [ ])) null;
+        currentScope = state.currentScope;
+        ownerChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
         scope = param.scope or "subtree";
       in
       if param.type == "filter" then
         {
           resume = null;
           state = state // {
-            constraintFilters =
-              _:
-              ((state.constraintFilters or (_: [ ])) null)
-              ++ [
-                {
-                  predicate = param.predicate;
-                  owner = param.owner or "<anon>";
-                  inherit scope ownerChain;
-                }
-              ];
             scopedConstraintFilters =
               _:
               let
@@ -58,8 +48,6 @@ let
         }
       else
         let
-          registry = (state.constraintRegistry or (_: { })) null;
-          existing = registry.${param.identity} or [ ];
           entry = {
             type = param.type;
             getReplacement = param.getReplacement or (_: null);
@@ -70,12 +58,6 @@ let
         {
           resume = null;
           state = state // {
-            constraintRegistry =
-              _:
-              registry
-              // {
-                ${param.identity} = existing ++ [ entry ];
-              };
             scopedConstraintRegistry =
               _:
               let
@@ -98,9 +80,19 @@ let
       let
         nodeIdentity = if builtins.isAttrs param then param.identity else param;
         aspect = if builtins.isAttrs param then param.aspect or null else null;
-        registry = (state.constraintRegistry or (_: { })) null;
-        filters = (state.constraintFilters or (_: [ ])) null;
-        currentChain = (state.includesChain or (_: [ ])) null;
+        currentScope = state.currentScope;
+        # Read constraints from ALL scopes — isAncestor filters by ownerChain.
+        allScopedRegistry = (state.scopedConstraintRegistry or (_: { })) null;
+        registry = builtins.foldl' (
+          acc: scopeData:
+          lib.zipAttrsWith (_: builtins.concatLists) [
+            acc
+            scopeData
+          ]
+        ) { } (builtins.attrValues allScopedRegistry);
+        allScopedFilters = (state.scopedConstraintFilters or (_: { })) null;
+        filters = lib.concatLists (lib.attrValues allScopedFilters);
+        currentChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
         isAncestor = ownerChain: lib.take (builtins.length ownerChain) currentChain == ownerChain;
         inScope = entry: (entry.scope or "global") == "global" || isAncestor (entry.ownerChain or [ ]);
         mkDecision = action: extra: {
@@ -152,13 +144,9 @@ let
   chainHandler = {
     "chain-push" =
       { param, state }:
-      let
-        chain = (state.includesChain or (_: [ ])) null;
-      in
       {
         resume = null;
         state = state // {
-          includesChain = _: chain ++ [ param.identity ];
           scopedIncludesChain =
             _:
             let
@@ -174,18 +162,9 @@ let
       };
     "chain-pop" =
       { param, state }:
-      let
-        chain = (state.includesChain or (_: [ ])) null;
-      in
       {
         resume = null;
         state = state // {
-          includesChain =
-            _:
-            if chain == [ ] then
-              throw "fx: chain-pop on empty includesChain — push/pop mismatch in aspect compiler"
-            else
-              lib.init chain;
           scopedIncludesChain =
             _:
             let
@@ -280,7 +259,6 @@ let
       {
         resume = [ ];
         state = state // {
-          deferredIncludes = x: ((state.deferredIncludes or (_: [ ])) x) ++ [ param ];
           scopedDeferredIncludes =
             x:
             let
@@ -299,7 +277,6 @@ let
     "register-aspect-policy" =
       { param, state }:
       let
-        registry = (state.aspectPolicies or (_: { })) null;
         entry = {
           inherit (param) fn ownerIdentity;
         };
@@ -309,10 +286,10 @@ let
         state = state // {
           aspectPolicies =
             _:
-            registry
-            // {
-              ${param.name} = entry;
-            };
+            let
+              registry = (state.aspectPolicies or (_: { })) null;
+            in
+            registry // { ${param.name} = entry; };
           scopedAspectPolicies =
             _:
             let
@@ -412,23 +389,30 @@ let
       { param, state }:
       let
         ctx = param;
-        deferred = (state.deferredIncludes or (_: [ ])) null;
+        # Read deferred includes from ALL scopes — drain is triggered on
+        # context widen and should satisfy deferrals from any ancestor scope.
+        allScoped = (state.scopedDeferredIncludes or (_: { })) null;
+        allDeferred = lib.concatLists (lib.attrValues allScoped);
       in
-      if deferred == [ ] then
+      if allDeferred == [ ] then
         {
           resume = [ ];
           inherit state;
         }
       else
         let
-          partitioned = lib.partition (d: builtins.all (k: builtins.hasAttr k ctx) d.requiredArgs) deferred;
+          partitioned = lib.partition (
+            d: builtins.all (k: builtins.hasAttr k ctx) d.requiredArgs
+          ) allDeferred;
           satisfiable = partitioned.right;
           remaining = partitioned.wrong;
+          # Put remaining back into current scope (all satisfied ones removed).
+          currentScope = state.currentScope;
         in
         {
           resume = satisfiable;
           state = state // {
-            deferredIncludes = _: remaining;
+            scopedDeferredIncludes = _: { ${currentScope} = remaining; };
           };
         };
   };
@@ -439,7 +423,6 @@ let
       {
         resume = null;
         state = state // {
-          deadLetterQueue = x: (state.deadLetterQueue x) ++ [ param ];
           scopedDeadLetterQueue =
             _:
             let

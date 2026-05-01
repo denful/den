@@ -466,7 +466,8 @@ let
     "drain-dead-letters" =
       { param, state }:
       let
-        queue = (state.deadLetterQueue or (_: [ ])) null;
+        allScoped = (state.scopedDeadLetterQueue or (_: { })) null;
+        queue = lib.concatLists (lib.attrValues allScoped);
         dynamicTraitSchemas = state.traitSchemas null;
       in
       if queue == [ ] then
@@ -488,11 +489,12 @@ let
             else
               emitTraitFromDLQ entry
           ) matched;
+          currentScope = state.currentScope;
         in
         {
           resume = fx.seq reEmits;
           state = state // {
-            deadLetterQueue = _: remaining;
+            scopedDeadLetterQueue = _: { ${currentScope} = remaining; };
           };
         };
   };

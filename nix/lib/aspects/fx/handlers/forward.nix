@@ -259,7 +259,6 @@ let
         tier2Result = {
           resume = null;
           state = state // {
-            forwardSpecs = x: (state.forwardSpecs x) ++ [ enrichedSpec ];
             scopedForwardSpecs =
               x:
               let

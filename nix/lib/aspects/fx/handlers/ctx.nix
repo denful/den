@@ -36,7 +36,7 @@ let
           let
             scope = state.currentScope or null;
           in
-          if scope == null then key else "${scope}/${key}";
+          if scope == null || scope == "__unscoped" then key else "${scope}/${key}";
         aspects = if builtins.isString param then [ ] else param.aspects or [ ];
         aspectValues = if builtins.isString param then [ ] else param.aspectValues or [ ];
         seenSet = (state.seen or (_: { })) null;

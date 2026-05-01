@@ -227,7 +227,7 @@ let
   nameAnon =
     state: idx: ctxId:
     let
-      chain = (state.includesChain or (_: [ ])) null;
+      chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
       parent = if chain == [ ] then "<root>" else lib.last chain;
       suffix = if ctxId != null then "/${ctxId}" else "";
     in

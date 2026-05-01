@@ -127,6 +127,13 @@ let
               all = st.scopeChildren null;
             in
             all // { ${parentScope} = (all.${parentScope} or [ ]) ++ [ newScopeId ]; };
+          scopedAspectPolicies =
+            _:
+            let
+              all = st.scopedAspectPolicies null;
+              parentPolicies = all.${parentScope} or { };
+            in
+            all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
         }
       );
       popScope = fx.effects.state.modify (
@@ -246,9 +253,26 @@ let
       };
       subRootScope = mkScopeId scopedCtx;
       subFinalCtx = (subResult.state.scopeContexts null).${subRootScope} or scopedCtx;
-      subRawClassImports = subResult.state.classImports null;
-      subForwardSpecs = subResult.state.forwardSpecs null;
-      subWrapped = den.lib.aspects.fx.pipeline.wrapCollectedClasses subFinalCtx subRawClassImports;
+      subScopedClassImportsRaw = subResult.state.scopedClassImports null;
+      subRawClassImports =
+        let
+          subWrappedPerScope = lib.mapAttrs (
+            scopeId: scopeClasses:
+            let
+              scopeCtx = (subResult.state.scopeContexts null).${scopeId} or scopedCtx;
+            in
+            den.lib.aspects.fx.pipeline.wrapCollectedClasses scopeCtx scopeClasses
+          ) subScopedClassImportsRaw;
+        in
+        builtins.foldl' (
+          acc: scopeData:
+          lib.zipAttrsWith (_: builtins.concatLists) [
+            acc
+            scopeData
+          ]
+        ) { } (builtins.attrValues subWrappedPerScope);
+      subForwardSpecs = lib.concatLists (lib.attrValues (subResult.state.scopedForwardSpecs null));
+      subWrapped = subRawClassImports;
       subForwarded = den.lib.aspects.fx.pipeline.applyForwardSpecs {
         forwardSpecs = subForwardSpecs;
         classImports = subWrapped;
