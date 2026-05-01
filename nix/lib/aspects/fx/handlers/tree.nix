@@ -224,23 +224,42 @@ let
                 imports = [ param.module ];
               };
       in
+      let
+        scope = state.currentScope;
+        # Dedup: skip if this loc was already emitted at this scope.
+        emittedLocs = (state.scopedEmittedLocs or (_: { })) null;
+        scopeLocs = emittedLocs.${scope} or { };
+        alreadyEmitted = scopeLocs ? ${loc};
+      in
       {
         resume = null;
-        state = state // {
-          scopedClassImports =
-            x:
-            let
-              all = state.scopedClassImports x;
-              scope = state.currentScope;
-              scopeData = all.${scope} or { };
-            in
-            all
+        state =
+          if alreadyEmitted then
+            state
+          else
+            state
             // {
-              ${scope} = scopeData // {
-                ${param.class} = (scopeData.${param.class} or [ ]) ++ [ mod ];
-              };
+              scopedClassImports =
+                x:
+                let
+                  all = state.scopedClassImports x;
+                  scopeData = all.${scope} or { };
+                in
+                all
+                // {
+                  ${scope} = scopeData // {
+                    ${param.class} = (scopeData.${param.class} or [ ]) ++ [ mod ];
+                  };
+                };
+              scopedEmittedLocs =
+                _:
+                emittedLocs
+                // {
+                  ${scope} = scopeLocs // {
+                    ${loc} = true;
+                  };
+                };
             };
-        };
       };
   };
 
@@ -374,22 +393,34 @@ let
       let
         scope = state.currentScope;
         route = param // {
-          sourceScopeId = scope;
+          sourceScopeId = param.sourceScopeId or scope;
         };
+        # Dedup key: same route registered from multiple dispatch-policies levels.
+        routeKey = "${route.fromClass or "?"}>${route.intoClass or "?"}@${route.sourceScopeId}/${
+          lib.concatStringsSep "/" (route.path or [ ])
+        }";
+        registeredRoutes = (state.registeredRouteKeys or (_: { })) null;
+        alreadyRegistered = registeredRoutes ? ${routeKey};
       in
       {
         resume = null;
-        state = state // {
-          scopedRoutes =
-            _:
-            let
-              all = state.scopedRoutes null;
-            in
-            all
+        state =
+          if alreadyRegistered then
+            state
+          else
+            state
             // {
-              ${scope} = (all.${scope} or [ ]) ++ [ route ];
+              scopedRoutes =
+                _:
+                let
+                  all = state.scopedRoutes null;
+                in
+                all
+                // {
+                  ${scope} = (all.${scope} or [ ]) ++ [ route ];
+                };
+              registeredRouteKeys = _: registeredRoutes // { ${routeKey} = true; };
             };
-        };
       };
   };
 

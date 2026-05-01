@@ -121,7 +121,28 @@ let
       classImports,
     }:
     let
-      allRoutes = lib.concatLists (lib.attrValues scopedRoutes);
+      rawRoutes = lib.concatLists (lib.attrValues scopedRoutes);
+      # Dedup adapter routes by adapterKey — same forward can be registered
+      # multiple times when dispatch-policies walks the same entity from
+      # different scope levels.
+      allRoutes =
+        let
+          go =
+            seen: routes:
+            if routes == [ ] then
+              [ ]
+            else
+              let
+                r = builtins.head routes;
+                rest = builtins.tail routes;
+                key = r.adapterKey or null;
+              in
+              if key != null && seen ? ${key} then
+                go seen rest
+              else
+                [ r ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
+        in
+        go { } rawRoutes;
     in
     builtins.foldl' (
       acc: route:

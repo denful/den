@@ -238,6 +238,7 @@ let
     scopedConstraintFilters = _: { };
     scopedRoutes = _: { };
     scopedInstantiates = _: { };
+    scopedEmittedLocs = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
     includeSeen = _: { };
