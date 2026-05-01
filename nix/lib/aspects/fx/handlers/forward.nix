@@ -245,32 +245,36 @@ let
           };
         };
 
-        # Tier 2: capture context for sub-pipeline post-processing.
-        parentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
-        entityCtx = lib.filterAttrs (_: builtins.isAttrs) parentCtx;
-        sourceCtx = den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers;
-        hasOwnContext = sourceScopeHandlers != { };
-        resolveCtx = if hasOwnContext then sourceCtx else entityCtx;
-        parentAspectPolicies =
-          _:
-          builtins.foldl' (acc: v: acc // v) { } (
-            builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
-          );
-        enrichedSpec = spec // {
-          __resolveCtx = resolveCtx;
-          __aspectPolicies = parentAspectPolicies;
-        };
+        # Tier 2: register as route with guard/adaptArgs.
+        # Forward sub-pipelines eliminated — source modules are resolved
+        # in-pipeline via dispatch-policies. Route application handles
+        # adapter wrapping, guard evaluation, and path nesting.
+        sourceScopeCtx =
+          if sourceScopeHandlers != { } then
+            den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers
+          else if scope == null then
+            { }
+          else
+            (state.scopeContexts null).${scope} or { };
+        sourceScopeId = den.lib.aspects.fx.pipeline.mkScopeId sourceScopeCtx;
         tier2Result = {
           resume = null;
           state = state // {
-            scopedForwardSpecs =
-              x:
+            scopedRoutes =
+              _:
               let
-                all = state.scopedForwardSpecs x;
+                all = state.scopedRoutes null;
+                route = {
+                  inherit (spec) fromClass intoClass;
+                  path = spec.staticIntoPath;
+                  guard = spec.guard or null;
+                  adaptArgs = spec.adaptArgs or null;
+                  sourceScopeId = if sourceAlreadyCollected then scope else sourceScopeId;
+                };
               in
               all
               // {
-                ${scope} = (all.${scope} or [ ]) ++ [ enrichedSpec ];
+                ${scope} = (all.${scope} or [ ]) ++ [ route ];
               };
           };
         };

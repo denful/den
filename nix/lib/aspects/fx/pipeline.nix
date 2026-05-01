@@ -230,7 +230,6 @@ let
     scopedTraits = _: { };
     scopedDeferredTraits = _: { };
     scopedConsumedTraits = _: { };
-    scopedForwardSpecs = _: { };
     scopedAspectPolicies = _: { };
     scopedDeferredIncludes = _: { };
     scopedDeadLetterQueue = _: { };
@@ -298,134 +297,6 @@ let
       extraState ? { },
     }:
     mkPipeline { inherit class extraState; } { inherit self ctx; };
-
-  # Forward post-processing: for each registered forward spec, resolve the
-  # source aspect via sub-pipeline, wrap results via buildForwardAspect, and
-  # merge into the target class bucket.
-  #
-  # collectClassMods recursively extracts all intoClass modules from a
-  # forward aspect and its includes (mkAdapterAspect nests a companion
-  # mkDirectAspect in includes).
-  collectClassMods =
-    cls: aspect:
-    let
-      own = if aspect ? ${cls} then [ aspect.${cls} ] else [ ];
-      nested = builtins.concatMap (collectClassMods cls) (aspect.includes or [ ]);
-    in
-    own ++ nested;
-
-  inherit (den.lib.aspects) normalizeRoot;
-
-  # Resolve a forward spec's source aspect via inline sub-pipeline.
-  # Returns { classImports, traits } with wrapped content.
-  resolveForwardSource =
-    spec:
-    let
-      normalizedSource = normalizeRoot spec.sourceAspect;
-      subRootScope = mkScopeId spec.__resolveCtx;
-      subResult = fxFullResolve {
-        class = spec.fromClass;
-        self = normalizedSource;
-        ctx = spec.__resolveCtx;
-        extraState =
-          let
-            policies = spec.__aspectPolicies null;
-          in
-          {
-            scopedAspectPolicies = _: { ${subRootScope} = policies; };
-          };
-      };
-      finalCtx = (subResult.state.scopeContexts null).${subRootScope} or spec.__resolveCtx;
-      forwardSpecs = lib.concatLists (lib.attrValues (subResult.state.scopedForwardSpecs null));
-
-      # Apply Tier 1 routes within the sub-pipeline.
-      subScopedRoutes = subResult.state.scopedRoutes null;
-      subScopedClassImportsRaw = subResult.state.scopedClassImports null;
-      subWrappedPerScope = lib.mapAttrs (
-        scopeId: scopeClasses:
-        let
-          scopeCtx = (subResult.state.scopeContexts null).${scopeId} or spec.__resolveCtx;
-        in
-        wrapCollectedClasses scopeCtx scopeClasses
-      ) subScopedClassImportsRaw;
-      subScopeParent = subResult.state.scopeParent null;
-      subTraitSchemas = den.traits or { };
-      wrappedClassImports = builtins.foldl' (
-        acc: scopeData:
-        lib.zipAttrsWith (_: builtins.concatLists) [
-          acc
-          scopeData
-        ]
-      ) { } (builtins.attrValues subWrappedPerScope);
-      withSubRoutes = route.applyRoutes {
-        scopedRoutes = subScopedRoutes;
-        wrappedPerScope = subWrappedPerScope;
-        scopedTraits = subResult.state.scopedTraits null;
-        scopeParent = subScopeParent;
-        traitSchemas = subTraitSchemas;
-        classImports = wrappedClassImports;
-      };
-
-      # Recursively apply any forwards within the sub-pipeline.
-      forwarded =
-        if forwardSpecs == [ ] then
-          withSubRoutes.classImports
-        else
-          let
-            fwd = applyForwardSpecs {
-              inherit forwardSpecs;
-              classImports = withSubRoutes.classImports;
-              traitModule = null;
-              hasTraitSchemas = false;
-            };
-          in
-          fwd.classImports;
-      subHasTraitSchemas = subTraitSchemas != { };
-      subTraitModule =
-        if subHasTraitSchemas then
-          traitModuleForScope {
-            scopedTraits = subResult.state.scopedTraits null;
-            scopedDeferredTraits = subResult.state.scopedDeferredTraits null;
-            scopeParent = subScopeParent;
-            traitSchemas = subTraitSchemas;
-          } subRootScope
-        else
-          null;
-    in
-    {
-      classImports = forwarded;
-      traitModule = subTraitModule;
-      inherit subHasTraitSchemas;
-    };
-
-  # Returns { classImports } with forwarded content merged.
-  # Resolves forward sources via inline sub-pipelines.
-  applyForwardSpecs =
-    {
-      forwardSpecs,
-      classImports,
-      traitModule,
-      hasTraitSchemas,
-    }:
-    builtins.foldl' (
-      acc: spec:
-      let
-        resolved = resolveForwardSource spec;
-        rawSourceModule = {
-          imports =
-            (resolved.classImports.${spec.fromClass} or [ ])
-            ++ lib.optional resolved.subHasTraitSchemas resolved.traitModule;
-        };
-        sourceModule = spec.mapModule rawSourceModule;
-        forwardAspect = handlers.buildForwardAspect spec sourceModule;
-        newMods = collectClassMods spec.intoClass forwardAspect;
-      in
-      {
-        classImports = acc.classImports // {
-          ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
-        };
-      }
-    ) { inherit classImports; } forwardSpecs;
 
   # Post-pipeline wrapping pass: wrap raw class entries (__rawEntry = true)
   # using wrapClassModule with the full enriched context they carry.
@@ -588,11 +459,7 @@ let
       throw "den: traits consumed at pipeline time have deferred (Tier 3) emissions without partialOk: ${builtins.concatStringsSep ", " partialOkViolations}. Set partialOk = true in the trait schema to allow partial pipeline-time data."
     else
       let
-        forwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
-
         # Build per-scope wrapped class imports from scoped partitions.
-        # With Part 1 (scoped state merge in resolveFanOut), this includes
-        # ALL scopes — parent pipeline and fan-out sub-pipelines.
         scopeContexts = result.state.scopeContexts null;
         scopedClassImportsRaw = result.state.scopedClassImports null;
         wrappedPerScope = lib.mapAttrs (
@@ -662,11 +529,6 @@ let
           flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
         };
 
-        # Apply forwards AFTER wrapping + route application + instantiation + traitModule synthesis.
-        forwarded = applyForwardSpecs {
-          inherit forwardSpecs traitModule hasTraitSchemas;
-          classImports = withInstantiates;
-        };
         # Dead letter queue diagnostics.
         finalDLQ = lib.concatLists (lib.attrValues ((result.state.scopedDeadLetterQueue or (_: { })) null));
         _dlqWarn = builtins.seq (map (
@@ -675,7 +537,7 @@ let
         ) finalDLQ) null;
       in
       builtins.seq _dlqWarn {
-        imports = (forwarded.classImports.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
+        imports = (withInstantiates.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in
 {
@@ -690,6 +552,5 @@ in
     fxFullResolve
     fxResolve
     wrapCollectedClasses
-    applyForwardSpecs
     ;
 }
