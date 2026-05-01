@@ -224,7 +224,6 @@ let
   defaultState = {
     # --- Flat state (global or with remaining flat readers) ---
     seen = _: { };
-    aspectPolicies = _: { }; # dual-write kept — resolveFanOut extraState seeding
     pathSet = _: { };
     traits = _: { };
     deferredTraits = _: { };
@@ -335,9 +334,13 @@ let
         class = spec.fromClass;
         self = normalizedSource;
         ctx = spec.__resolveCtx;
-        extraState = {
-          aspectPolicies = spec.__aspectPolicies;
-        };
+        extraState =
+          let
+            policies = spec.__aspectPolicies null;
+          in
+          {
+            scopedAspectPolicies = _: { ${subRootScope} = policies; };
+          };
       };
       finalCtx = (subResult.state.scopeContexts null).${subRootScope} or spec.__resolveCtx;
       forwardSpecs = lib.concatLists (lib.attrValues (subResult.state.scopedForwardSpecs null));

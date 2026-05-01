@@ -251,7 +251,11 @@ let
         sourceCtx = den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers;
         hasOwnContext = sourceScopeHandlers != { };
         resolveCtx = if hasOwnContext then sourceCtx else entityCtx;
-        parentAspectPolicies = state.aspectPolicies or (_: { });
+        parentAspectPolicies =
+          _:
+          builtins.foldl' (acc: v: acc // v) { } (
+            builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
+          );
         enrichedSpec = spec // {
           __resolveCtx = resolveCtx;
           __aspectPolicies = parentAspectPolicies;

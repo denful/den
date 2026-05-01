@@ -275,12 +275,6 @@ let
       {
         resume = null;
         state = state // {
-          aspectPolicies =
-            _:
-            let
-              registry = (state.aspectPolicies or (_: { })) null;
-            in
-            registry // { ${param.name} = entry; };
           scopedAspectPolicies =
             _:
             let
@@ -321,7 +315,11 @@ let
     "dispatch-policy-includes" =
       { param, state }:
       let
-        aspectPolicies = (state.aspectPolicies or (_: { })) null;
+        # Read aspect policies from ALL scopes — policies registered during
+        # one sibling's resolution must be visible during other siblings.
+        aspectPolicies = builtins.foldl' (acc: v: acc // v) { } (
+          builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
+        );
         traits = (state.traits or (_: { })) null;
         currentCtx = param.ctx;
         resolveCtx = traits // currentCtx;

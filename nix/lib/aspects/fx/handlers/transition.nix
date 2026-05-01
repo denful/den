@@ -231,7 +231,7 @@ let
       scopedCtx,
       scopeHandlers,
       ctxNames,
-      aspectPolicies ? (_: { }),
+      aspectPolicies ? { },
     }:
     innerResults:
     let
@@ -248,7 +248,7 @@ let
         self = tagged;
         ctx = scopedCtx;
         extraState = {
-          inherit aspectPolicies;
+          scopedAspectPolicies = _: { ${newScopeId} = aspectPolicies; };
         };
       };
       subRootScope = mkScopeId scopedCtx;
@@ -659,7 +659,12 @@ let
             );
 
             # --- Aspect policies ---
-            aspectPoliciesVal = (state.aspectPolicies or (_: { })) null;
+            # Read aspect policies from ALL scopes — policies on one user's
+            # aspect (e.g., tux/to-users) must be visible during sibling user
+            # resolution. Policy name uniqueness means // merge is safe.
+            aspectPoliciesVal = builtins.foldl' (acc: v: acc // v) { } (
+              builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
+            );
             aspectEntries = lib.attrsToList aspectPoliciesVal;
             aspectTraitNames = den.traits or { };
             matchingAspect = builtins.filter (
@@ -891,8 +896,9 @@ let
                 acc: transition:
                 fx.bind acc (
                   results:
-                  resolveTransition targetClass sourceAspect effectiveCtx (state.aspectPolicies or (_: { })
-                  ) results transition
+                  resolveTransition targetClass sourceAspect effectiveCtx (builtins.foldl' (a: v: a // v) { } (
+                    builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
+                  )) results transition
                 )
               ) (fx.pure [ ]) allTransitions;
               emitRoutes = builtins.foldl' (
