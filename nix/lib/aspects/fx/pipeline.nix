@@ -613,21 +613,15 @@ let
         ) scopedClassImportsRaw;
 
         # Flatten per-scope wrapped imports into a single classImports map.
-        # Scoped partitions are the primary source of truth. Fall back to
-        # flat classImports for classes that only exist in flat state (e.g.,
-        # flake class from flake-level resolution paths that bypass scope tracking).
-        flatClassImports = result.state.classImports null;
-        flatWrapped = wrapCollectedClasses ((result.state.scopeContexts null).${rootScopeId} or ctx
-        ) flatClassImports;
-        scopedFlattened = builtins.foldl' (
+        # Scoped partitions are the sole source of truth — flat classImports
+        # no longer needed (flake output forwards eliminated by policy.instantiate).
+        wrappedClassImports = builtins.foldl' (
           acc: scopeData:
           lib.zipAttrsWith (_: builtins.concatLists) [
             acc
             scopeData
           ]
         ) { } (builtins.attrValues wrappedPerScope);
-        # Merge: scoped wins where present, flat fills gaps.
-        wrappedClassImports = flatWrapped // scopedFlattened;
 
         # Apply Tier 1 routes (reads wrappedPerScope, produces new entries).
         scopedRoutes = result.state.scopedRoutes null;
