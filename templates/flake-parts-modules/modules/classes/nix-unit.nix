@@ -5,7 +5,7 @@
   ...
 }:
 let
-  inherit (den.lib.policy) resolve;
+  inherit (den.lib.policy) route;
 in
 {
   imports = [ inputs.nix-unit.modules.flake.default ];
@@ -18,12 +18,14 @@ in
   };
 
   den.schema.flake-parts.policies.to-flake-parts-system-tests = _: [
-    (resolve.to "flake-parts-system" {
+    (route {
       fromClass = "tests";
-      intoPath = [
+      intoClass = "flake-parts";
+      path = [
         "nix-unit"
         "tests"
       ];
+      adaptArgs = { config, ... }: config.allModuleArgs;
     })
   ];
 }

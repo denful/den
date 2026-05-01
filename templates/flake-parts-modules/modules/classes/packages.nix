@@ -3,7 +3,7 @@
   ...
 }:
 let
-  inherit (den.lib.policy) resolve;
+  inherit (den.lib.policy) route;
 in
 {
 
@@ -11,6 +11,11 @@ in
   # NOTE: this is different from Den's flake-packages class.
   den.classes.packages = { };
   den.schema.flake-parts.policies.to-flake-parts-system-packages = _: [
-    (resolve.to "flake-parts-system" { fromClass = "packages"; })
+    (route {
+      fromClass = "packages";
+      intoClass = "flake-parts";
+      path = [ "packages" ];
+      adaptArgs = { config, ... }: config.allModuleArgs;
+    })
   ];
 }

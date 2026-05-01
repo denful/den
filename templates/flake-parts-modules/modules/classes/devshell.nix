@@ -1,17 +1,19 @@
 { den, inputs, ... }:
 let
-  inherit (den.lib.policy) resolve;
+  inherit (den.lib.policy) route;
 in
 {
   imports = [ inputs.devshell.flakeModule ];
   den.classes.devshell = { };
   den.schema.flake-parts.policies.to-flake-parts-system-devshell = _: [
-    (resolve.to "flake-parts-system" {
+    (route {
       fromClass = "devshell";
-      intoPath = [
+      intoClass = "flake-parts";
+      path = [
         "devshells"
         "default"
       ];
+      adaptArgs = { config, ... }: config.allModuleArgs;
     })
   ];
 }
