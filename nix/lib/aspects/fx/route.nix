@@ -107,10 +107,6 @@ let
   # - Trait routes use inheritTraits (pipeline-time data only). Deferred traits
   #   (Tier 3 / runtime-evaluated) are intentionally excluded — they depend on
   #   moduleArgs which aren't available at route application time.
-  # - During the dual-write transition period, wrappedPerScope wrapping is
-  #   redundant with the flat wrappedClassImports. Once flat state fields are
-  #   removed (spec steps 7-8), wrappedClassImports should derive from
-  #   wrappedPerScope directly.
   applyRoutes =
     {
       scopedRoutes,

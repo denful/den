@@ -178,7 +178,7 @@ let
       let
         strategy = if builtins.isAttrs schema then schema.collection or "list" else "list";
         emptyDefault = if strategy == "map" then { } else [ ];
-        # Try scoped read with inheritance first, fall back to flat
+        # Read trait data with scope-tree inheritance
         scope = state.currentScope or null;
         scopedTraits = (state.scopedTraits or (_: { })) null;
         scopeParent = (state.scopeParent or (_: { })) null;

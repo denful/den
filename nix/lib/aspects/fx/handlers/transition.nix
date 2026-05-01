@@ -317,6 +317,7 @@ let
       subScopedFS = subResult.state.scopedForwardSpecs null;
       subScopedDLQ = subResult.state.scopedDeadLetterQueue null;
       subScopedInstantiates = subResult.state.scopedInstantiates null;
+      subScopedRoutes = subResult.state.scopedRoutes null;
       subScopeContexts = subResult.state.scopeContexts null;
       subScopeParent = subResult.state.scopeParent null;
       subScopeChildren = subResult.state.scopeChildren null;
@@ -349,6 +350,7 @@ let
           scopedForwardSpecs = _: (st.scopedForwardSpecs null) // subScopedFS;
           scopedDeadLetterQueue = _: (st.scopedDeadLetterQueue null) // subScopedDLQ;
           scopedInstantiates = _: (st.scopedInstantiates null) // subScopedInstantiates;
+          scopedRoutes = _: (st.scopedRoutes null) // subScopedRoutes;
           scopeContexts = _: (st.scopeContexts null) // subScopeContexts;
           scopeParent = _: (st.scopeParent null) // subScopeParent;
           scopeChildren = _: (st.scopeChildren null) // subScopeChildren;
