@@ -205,13 +205,49 @@ let
       { param, state }:
       let
         spec = param;
-        # Capture parent entity context at handler time for post-processing.
-        # Sources with explicit context (__scopeHandlers) keep theirs;
-        # sources without context inherit parent entities.
         scope = state.currentScope;
+
+        # Tier 1 classification: simple forwards with source modules already
+        # in the current pipeline's scopedClassImports can become routes.
+        # Requirements:
+        # - No adapter, no guard, static path, no evalConfig
+        # - Source aspect has no own context (__scopeHandlers — external
+        #   entities like resolveEntity carry these)
+        # - Source class already collected in current scope (excludes
+        #   synthetic source aspects whose modules aren't in the pipeline)
+        isSimpleSpec = spec.canDirectImport && !spec.needsAdapter && !(spec.evalConfig or false);
+        sourceScopeHandlers = spec.sourceAspect.__scopeHandlers or { };
+        sourceIsLocal = sourceScopeHandlers == { };
+        scopeClasses = (state.scopedClassImports null).${scope} or { };
+        sourceAlreadyCollected = scopeClasses ? ${spec.fromClass};
+        isTier1 = isSimpleSpec && sourceIsLocal && sourceAlreadyCollected;
+
+        # Tier 1: register as a route (source modules already in scopedClassImports).
+        tier1Result = {
+          resume = null;
+          state = state // {
+            scopedRoutes =
+              _:
+              let
+                all = state.scopedRoutes null;
+                route = {
+                  inherit (spec) fromClass intoClass;
+                  path = spec.staticIntoPath;
+                  guard = null;
+                  adaptArgs = null;
+                  sourceScopeId = scope;
+                };
+              in
+              all
+              // {
+                ${scope} = (all.${scope} or [ ]) ++ [ route ];
+              };
+          };
+        };
+
+        # Tier 2: capture context for sub-pipeline post-processing.
         parentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         entityCtx = lib.filterAttrs (_: builtins.isAttrs) parentCtx;
-        sourceScopeHandlers = spec.sourceAspect.__scopeHandlers or { };
         sourceCtx = den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers;
         hasOwnContext = sourceScopeHandlers != { };
         resolveCtx = if hasOwnContext then sourceCtx else entityCtx;
@@ -220,23 +256,23 @@ let
           __resolveCtx = resolveCtx;
           __aspectPolicies = parentAspectPolicies;
         };
-      in
-      {
-        resume = null;
-        state = state // {
-          forwardSpecs = x: (state.forwardSpecs x) ++ [ enrichedSpec ];
-          scopedForwardSpecs =
-            x:
-            let
-              all = state.scopedForwardSpecs x;
-              scope = state.currentScope;
-            in
-            all
-            // {
-              ${scope} = (all.${scope} or [ ]) ++ [ enrichedSpec ];
-            };
+        tier2Result = {
+          resume = null;
+          state = state // {
+            forwardSpecs = x: (state.forwardSpecs x) ++ [ enrichedSpec ];
+            scopedForwardSpecs =
+              x:
+              let
+                all = state.scopedForwardSpecs x;
+              in
+              all
+              // {
+                ${scope} = (all.${scope} or [ ]) ++ [ enrichedSpec ];
+              };
+          };
         };
-      };
+      in
+      if isTier1 then tier1Result else tier2Result;
   };
 
 in
