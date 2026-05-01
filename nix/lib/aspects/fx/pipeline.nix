@@ -414,7 +414,7 @@ let
       # instead of running sub-pipelines.
       rawForwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
       # Dedup by adapterKey — same forward can fire from multiple scopes
-      # when dispatch-policies walks the same entity multiple times.
+      # when policy dispatch walks the same entity multiple times.
       forwardSpecs =
         let
           go =

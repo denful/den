@@ -531,7 +531,7 @@ let
   maxPolicyIterations = 10;
 
   # Inline policy dispatch for entity roots.  Replaces the old
-  # dispatch-policies.nix handler — reads state via fx.effects.state.get
+  # handler — reads state via fx.effects.state.get
   # and uses scope.provide for context expansion during schema resolves.
   installPolicies =
     aspect:

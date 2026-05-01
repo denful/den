@@ -102,7 +102,7 @@ let
     let
       rawRoutes = lib.concatLists (lib.attrValues scopedRoutes);
       # Dedup adapter routes by adapterKey — same forward can be registered
-      # multiple times when dispatch-policies walks the same entity from
+      # multiple times when policy dispatch walks the same entity from
       # different scope levels.
       allRoutes =
         let

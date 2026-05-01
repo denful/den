@@ -352,7 +352,7 @@ let
         route = param // {
           sourceScopeId = param.sourceScopeId or scope;
         };
-        # Dedup key: same route registered from multiple dispatch-policies levels.
+        # Dedup key: same route registered from multiple policy dispatch levels.
         routeKey = "${route.fromClass or "?"}>${route.intoClass or "?"}@${route.sourceScopeId}/${
           lib.concatStringsSep "/" (route.path or [ ])
         }";
