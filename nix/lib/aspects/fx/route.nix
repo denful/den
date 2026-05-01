@@ -175,11 +175,61 @@ let
             ]
           else
             [ ];
+        # Tier 2 adapter wrapping: forward-derived routes with adapterKey
+        # use submodule evaluation (specialArgs) for the source modules.
+        isAdapterRoute = route.adapterKey or null != null;
+        adapterWrapped =
+          if !isAdapterRoute then
+            [ ]
+          else
+            let
+              sourceModule = {
+                imports = sourceModules;
+              };
+              guardFn = route.guard or (_: lib.id);
+              adaptArgsFn = route.adaptArgs or (_: { });
+              intoPathFn = route.intoPathFn or (_: route.path);
+              key = route.adapterKey;
+              guardArgs = route.guardArgs or { };
+              intoPathArgs = route.intoPathArgs or { };
+              adaptArgv = route.adaptArgv or { };
+              freeformMod =
+                route.freeformMod or {
+                  config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+                };
+              adapterMods =
+                if adapterMod != null then
+                  [
+                    freeformMod
+                    adapterMod
+                  ]
+                else
+                  [ freeformMod ];
+            in
+            [
+              {
+                __functionArgs = guardArgs // intoPathArgs // adaptArgv;
+                __functor = _: args: {
+                  options.den.fwd.${key} = lib.mkOption {
+                    defaultText = lib.literalExpression "{ }";
+                    default = { };
+                    type = lib.types.submoduleWith {
+                      specialArgs = adaptArgsFn args;
+                      modules = adapterMods ++ [ sourceModule ];
+                    };
+                  };
+                  config = guardFn args (lib.setAttrByPath (intoPathFn args) args.config.den.fwd.${key});
+                };
+              }
+            ];
+
         wrappedModules =
           if modulesWithAdapter == [ ] then
             ensureEntry
           else if isTraitRoute then
             map guardWrap modulesWithAdapter
+          else if isAdapterRoute then
+            adapterWrapped
           else
             wrapRouteModules {
               modules = modulesWithAdapter;

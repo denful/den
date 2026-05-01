@@ -245,10 +245,10 @@ let
           };
         };
 
-        # Tier 2: register as route with guard/adaptArgs.
+        # Tier 2: register as route with full adapter fields.
         # Forward sub-pipelines eliminated — source modules are resolved
-        # in-pipeline via dispatch-policies. Route application handles
-        # adapter wrapping, guard evaluation, and path nesting.
+        # in-pipeline via dispatch-policies. Route application uses the
+        # adapter fields for submodule wrapping when present.
         sourceScopeCtx =
           if sourceScopeHandlers != { } then
             den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers
@@ -267,9 +267,18 @@ let
                 route = {
                   inherit (spec) fromClass intoClass;
                   path = spec.staticIntoPath;
-                  guard = spec.guard or null;
-                  adaptArgs = spec.adaptArgs or null;
+                  guard = spec.guardFn or null;
+                  adaptArgs = spec.adaptArgsFn or null;
                   sourceScopeId = if sourceAlreadyCollected then scope else sourceScopeId;
+                  # Adapter fields for Tier 2 forwards.
+                  adapterModule = if spec.adapterMods or [ ] != [ ] then { imports = spec.adapterMods; } else null;
+                  intoPathFn = spec.intoPathFn or null;
+                  freeformMod = spec.freeformMod or null;
+                  adapterKey = spec.adapterKey or null;
+                  adaptArgv = spec.adaptArgv or { };
+                  guardArgs = spec.guardArgs or { };
+                  intoPathArgs = spec.intoPathArgs or { };
+                  extraArgsFor = spec.extraArgsFor or null;
                 };
               in
               all
