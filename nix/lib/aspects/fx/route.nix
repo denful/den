@@ -123,6 +123,12 @@ let
       acc: route:
       let
         isTraitRoute = route ? fromTrait;
+        scopeExists = wrappedPerScope ? ${route.sourceScopeId};
+        _scopeWarn =
+          if !isTraitRoute && !scopeExists then
+            builtins.trace "den: route from '${route.fromClass}' — source scope '${route.sourceScopeId}' not found in pipeline (cross-pipeline routing requires fleet scope)" null
+          else
+            null;
         sourceModules =
           if isTraitRoute then
             let
@@ -135,6 +141,8 @@ let
             if traitData == emptyDefault then [ ] else [ (traitRouteModule route traitData) ]
           else
             wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
+        adapterMod = route.adapterModule or null;
+        modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
         # Trait route modules handle their own path nesting (via setAttrByPath)
         # because trait data is a plain value, not a NixOS submodule.
         # Class route modules go through wrapRouteModules for submodule nesting.
@@ -156,7 +164,7 @@ let
         # empty submodule definition so the target entry exists (e.g.,
         # users.users.tux). Other modules (home-manager) reference the entry.
         ensureEntry =
-          if route.adaptArgs or null != null && route.path or [ ] != [ ] && sourceModules == [ ] then
+          if route.adaptArgs or null != null && route.path or [ ] != [ ] && modulesWithAdapter == [ ] then
             [
               (_: {
                 config = lib.setAttrByPath route.path (_: { });
@@ -165,13 +173,13 @@ let
           else
             [ ];
         wrappedModules =
-          if sourceModules == [ ] then
+          if modulesWithAdapter == [ ] then
             ensureEntry
           else if isTraitRoute then
-            map guardWrap sourceModules
+            map guardWrap modulesWithAdapter
           else
             wrapRouteModules {
-              modules = sourceModules;
+              modules = modulesWithAdapter;
               inherit (route) path;
               guard = route.guard or null;
               adaptArgs = route.adaptArgs or null;
