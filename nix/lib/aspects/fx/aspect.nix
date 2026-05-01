@@ -822,7 +822,41 @@ let
                                 fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
                               )
                             ) (fx.pure (prevResults ++ [ childResult ])) satisfiable)
-                            (allResults: fx.bind restoreScope (_: fx.pure allResults))
+                            (
+                              allResults:
+                              # Propagate root-scope forward specs to this child scope.
+                              # Root forwards are templates from den.default; each child
+                              # scope that has emissions for the forward's source class
+                              # gets its own copy for per-scope isolated execution.
+                              fx.bind (fx.effects.state.get) (
+                                postWalkState:
+                                let
+                                  rootSid = postWalkState.rootScopeId;
+                                  rootForwards = (postWalkState.scopedForwardSpecs null).${rootSid} or [ ];
+                                  childClasses = (postWalkState.scopedClassImports null).${newScopeId} or { };
+                                  relevantForwards = builtins.filter (fwd: childClasses ? ${fwd.fromClass}) rootForwards;
+                                  childForwards = map (fwd: fwd // { sourceScopeId = newScopeId; }) relevantForwards;
+                                in
+                                if childForwards == [ ] then
+                                  fx.bind restoreScope (_: fx.pure allResults)
+                                else
+                                  fx.bind (fx.effects.state.modify (
+                                    st:
+                                    st
+                                    // {
+                                      scopedForwardSpecs =
+                                        _:
+                                        let
+                                          all = st.scopedForwardSpecs null;
+                                        in
+                                        all
+                                        // {
+                                          ${newScopeId} = (all.${newScopeId} or [ ]) ++ childForwards;
+                                        };
+                                    }
+                                  )) (_: fx.bind restoreScope (_: fx.pure allResults))
+                              )
+                            )
                         )
                       )
                     )
