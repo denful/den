@@ -246,18 +246,13 @@ let
         };
 
         # Tier 2: register forward spec for post-pipeline scope lookup.
-        # Source modules are read from wrappedPerScope in pipeline.nix
-        # instead of running a sub-pipeline.
-        sourceScopeCtx =
-          if sourceScopeHandlers != { } then
-            den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers
-          else if scope == null then
-            { }
-          else
-            (state.scopeContexts null).${scope} or { };
-        sourceScopeId = den.lib.aspects.fx.pipeline.mkScopeId sourceScopeCtx;
+        # Source modules are read from wrappedPerScope in pipeline.nix.
+        # Use currentScope directly — that's where modules are actually
+        # emitted. The old ctxFromHandlers approach computed a scope ID
+        # from the source aspect's handlers, which didn't match the
+        # actual scope keys (missing class, aspect-chain, etc.).
         enrichedSpec = spec // {
-          inherit sourceScopeId;
+          sourceScopeId = scope;
         };
         tier2Result = {
           resume = null;
