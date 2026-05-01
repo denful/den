@@ -238,6 +238,7 @@ let
     scopedConstraintFilters = _: { };
     scopedRoutes = _: { };
     scopedInstantiates = _: { };
+    scopedForwardSpecs = _: { };
     scopedEmittedLocs = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
@@ -530,6 +531,46 @@ let
           flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
         };
 
+        # Apply Tier 2 forwards — read source modules from wrappedPerScope
+        # instead of running sub-pipelines.
+        forwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
+
+        # Collect class modules from a forward aspect (recursing into includes).
+        collectClassMods =
+          cls: aspect:
+          let
+            own = if aspect ? ${cls} then [ aspect.${cls} ] else [ ];
+            nested = builtins.concatMap (collectClassMods cls) (aspect.includes or [ ]);
+          in
+          own ++ nested;
+
+        applyForwardSpecs =
+          specs: classImports:
+          builtins.foldl' (
+            acc: spec:
+            let
+              sid = spec.sourceScopeId;
+              sourceModules = wrappedPerScope.${sid}.${spec.fromClass} or [ ];
+              rawSourceModule = {
+                imports = sourceModules;
+              };
+              sourceModule = spec.mapModule rawSourceModule;
+              forwardAspect = handlers.buildForwardAspect spec sourceModule;
+              newMods = collectClassMods spec.intoClass forwardAspect;
+            in
+            {
+              classImports = acc.classImports // {
+                ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
+              };
+            }
+          ) { inherit classImports; } specs;
+
+        forwarded =
+          if forwardSpecs == [ ] then
+            withInstantiates
+          else
+            (applyForwardSpecs forwardSpecs withInstantiates).classImports;
+
         # Dead letter queue diagnostics.
         finalDLQ = lib.concatLists (lib.attrValues ((result.state.scopedDeadLetterQueue or (_: { })) null));
         _dlqWarn = builtins.seq (map (
@@ -538,7 +579,7 @@ let
         ) finalDLQ) null;
       in
       builtins.seq _dlqWarn {
-        imports = (withInstantiates.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
+        imports = (forwarded.${class} or [ ]) ++ lib.optional hasTraitSchemas traitModule;
       };
 in
 {

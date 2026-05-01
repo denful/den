@@ -245,10 +245,9 @@ let
           };
         };
 
-        # Tier 2: register as route with full adapter fields.
-        # Forward sub-pipelines eliminated — source modules are resolved
-        # in-pipeline via dispatch-policies. Route application uses the
-        # adapter fields for submodule wrapping when present.
+        # Tier 2: register forward spec for post-pipeline scope lookup.
+        # Source modules are read from wrappedPerScope in pipeline.nix
+        # instead of running a sub-pipeline.
         sourceScopeCtx =
           if sourceScopeHandlers != { } then
             den.lib.aspects.fx.aspect.ctxFromHandlers sourceScopeHandlers
@@ -257,33 +256,20 @@ let
           else
             (state.scopeContexts null).${scope} or { };
         sourceScopeId = den.lib.aspects.fx.pipeline.mkScopeId sourceScopeCtx;
+        enrichedSpec = spec // {
+          inherit sourceScopeId;
+        };
         tier2Result = {
           resume = null;
           state = state // {
-            scopedRoutes =
+            scopedForwardSpecs =
               _:
               let
-                all = state.scopedRoutes null;
-                route = {
-                  inherit (spec) fromClass intoClass;
-                  path = spec.staticIntoPath;
-                  guard = spec.guardFn or null;
-                  adaptArgs = spec.adaptArgsFn or null;
-                  sourceScopeId = if sourceAlreadyCollected then scope else sourceScopeId;
-                  # Adapter fields for Tier 2 forwards.
-                  adapterModule = if spec.adapterMods or [ ] != [ ] then { imports = spec.adapterMods; } else null;
-                  intoPathFn = spec.intoPathFn or null;
-                  freeformMod = spec.freeformMod or null;
-                  adapterKey = spec.adapterKey or null;
-                  adaptArgv = spec.adaptArgv or { };
-                  guardArgs = spec.guardArgs or { };
-                  intoPathArgs = spec.intoPathArgs or { };
-                  extraArgsFor = spec.extraArgsFor or null;
-                };
+                all = state.scopedForwardSpecs null;
               in
               all
               // {
-                ${scope} = (all.${scope} or [ ]) ++ [ route ];
+                ${scope} = (all.${scope} or [ ]) ++ [ enrichedSpec ];
               };
           };
         };

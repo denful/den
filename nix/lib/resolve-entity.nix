@@ -46,7 +46,6 @@ let
         handleWith = null;
         excludes = [ ];
         provider = [ ];
-        into = null;
       };
       includes = selfProvide ++ hostFramework ++ schemaIncludes;
       __entityKind = name;
