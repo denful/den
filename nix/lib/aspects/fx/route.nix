@@ -124,11 +124,6 @@ let
       let
         isTraitRoute = route ? fromTrait;
         scopeExists = wrappedPerScope ? ${route.sourceScopeId};
-        _scopeWarn =
-          if !isTraitRoute && !scopeExists then
-            builtins.trace "den: route from '${route.fromClass}' — source scope '${route.sourceScopeId}' not found in pipeline (cross-pipeline routing requires fleet scope)" null
-          else
-            null;
         sourceModules =
           if isTraitRoute then
             let
@@ -139,6 +134,10 @@ let
               emptyDefault = if strategy == "map" then { } else [ ];
             in
             if traitData == emptyDefault then [ ] else [ (traitRouteModule route traitData) ]
+          else if !scopeExists then
+            builtins.trace
+              "den: route from '${route.fromClass}' — source scope '${route.sourceScopeId}' not found in pipeline (cross-pipeline routing requires fleet scope)"
+              [ ]
           else
             wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
         adapterMod = route.adapterModule or null;
