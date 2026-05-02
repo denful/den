@@ -1,7 +1,6 @@
 # Handles: resolve-conditional
 # Checks guard via get-path-set, emits children or tombstones.
 {
-  lib,
   den,
   ...
 }:

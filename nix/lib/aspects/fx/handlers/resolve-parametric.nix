@@ -1,7 +1,6 @@
 # Handles: resolve-parametric
 # Probes handlers for required args, resolves or defers.
 {
-  lib,
   den,
   ...
 }:

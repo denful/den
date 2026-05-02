@@ -1,7 +1,6 @@
 # Handles: resolve-aspect
 # Static resolution via aspectToEffect.
 {
-  lib,
   den,
   ...
 }:
