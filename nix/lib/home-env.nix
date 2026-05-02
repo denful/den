@@ -98,16 +98,21 @@ let
         else
           let
             pairs = mkIntoClassUsers className { inherit host; };
-            resolves = map (pair: den.lib.policy.resolve { user = pair.user; }) pairs;
-            includes = [
+            resolves = map (
+              pair:
+              den.lib.policy.resolve {
+                user = pair.user;
+                __includes = [ userForward ];
+              }
+            ) pairs;
+            rootIncludes = [
               (den.lib.policy.include hostModule)
-              (den.lib.policy.include userForward)
             ]
             ++ lib.optional (den.aspects ? os-user-class-fwd) (
               den.lib.policy.include den.aspects.os-user-class-fwd
             );
           in
-          resolves ++ includes;
+          resolves ++ rootIncludes;
     in
     {
       battery = {

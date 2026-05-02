@@ -666,8 +666,28 @@ let
             ) allResults;
 
             allEnrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } classified;
-            allSchemaEffects = builtins.concatMap (r: r.schemaEffects) classified;
-            allIncludeEffects = builtins.concatMap (r: r.includeEffects) classified;
+            # Per-policy include pairing for cross-provider patterns:
+            # When a policy has resolve.to (explicit __targetKind) AND includes,
+            # the includes travel with the schema effects. This prevents
+            # cross-provider includes from being broadcast to all entity walks
+            # (which causes double-fire via drain-deferred).
+            # Regular resolve (no __targetKind, e.g., home-env battery) keeps
+            # includes standalone — they emit at current scope as before.
+            hasCrossProviderResolve =
+              r:
+              r.schemaEffects != [ ]
+              && r.includeEffects != [ ]
+              && builtins.any (se: se.schema.__targetKind or null != null) r.schemaEffects;
+            allSchemaEffects = builtins.concatMap (
+              r:
+              if hasCrossProviderResolve r then
+                map (se: se // { __policyIncludes = map (e: e.value) r.includeEffects; }) r.schemaEffects
+              else
+                r.schemaEffects
+            ) classified;
+            allIncludeEffects = builtins.concatMap (
+              r: if hasCrossProviderResolve r then [ ] else r.includeEffects
+            ) classified;
             allExcludeEffects = builtins.concatMap (r: r.excludeEffects) classified;
             allRouteEffects = builtins.concatMap (
               r: map (re: re // { __routePolicyName = r.policyName; }) r.routeEffects
@@ -738,6 +758,8 @@ let
           ) (fx.pure null) effects;
 
         # Process schema resolve effects: ctx-seen dedup, push scope, walk entity, pop scope.
+        # includeAspects: standalone includes from policies (backward compat, go to all entities).
+        # Each schema effect also carries per-resolve includes via __includes.
         processSchemaResolves =
           includeAspects: schemaEffects: enrichedCtx:
           let
@@ -813,6 +835,11 @@ let
                 # Full entity resolution: push scope, resolve entity, walk tree,
                 # drain deferred, pop scope.  Wrapped in scope.provide so context
                 # handlers are visible to the tree walk.
+                # Per-policy includes: includes from the same policy as this resolve.
+                policyIncludes = schemaEffect.__policyIncludes or [ ];
+                # Per-resolve includes from policy.resolve { __includes = [...]; }
+                resolveIncludes = schemaEffect.schema.includes or [ ];
+
                 fullResolution = fx.bind setScope (
                   _:
                   fx.effects.scope.provide scopeHandlersForCtx (
@@ -820,7 +847,7 @@ let
                       rawEntity:
                       let
                         entity = rawEntity // {
-                          includes = (rawEntity.includes or [ ]) ++ includeAspects;
+                          includes = (rawEntity.includes or [ ]) ++ includeAspects ++ policyIncludes ++ resolveIncludes;
                         };
                       in
                       fx.bind (aspectToEffect entity) (
@@ -898,7 +925,9 @@ let
                     )
                   ) (fx.pure prevResults) newAspectValues;
 
-                policyAspectPaths = map (a: identity.pathKey (identity.aspectPath a)) includeAspects;
+                policyAspectPaths = map (a: identity.pathKey (identity.aspectPath a)) (
+                  includeAspects ++ policyIncludes ++ resolveIncludes
+                );
               in
               # ctx-seen dedup: skip re-resolution of same entity context.
               fx.bind
@@ -948,6 +977,9 @@ let
           if newEnrichKeys == [ ] then
             let
               enrichedCtx = currentCtx // accEnrichment // dispatched.enrichment;
+              # Standalone includes (not carried by any resolve) still go to
+              # entity walks for backward compatibility.  Per-resolve __includes
+              # are added per-entity inside processSchemaResolves.
               includeAspects = map (e: e.value) combinedEffects.includeEffects;
               hasSchemaResolves = combinedEffects.schemaEffects != [ ];
             in

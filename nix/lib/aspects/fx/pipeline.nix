@@ -136,6 +136,8 @@ let
               v.name
             else if builtins.isString v then
               v
+            else if builtins.isInt v || builtins.isFloat v then
+              toString v
             else
               "<${builtins.typeOf v}:${k}>"
           }"
@@ -477,16 +479,23 @@ let
               # merged for root-scope forwards (aggregate/alias forwards unchanged).
               sourceModules =
                 if sid != rootScopeId then
-                  # Per-scope + root fallback: scope isolation for multi-user.
-                  # Own scope has user-specific modules. Root scope fallback
-                  # provides den.default's shared modules (stripped from children).
+                  # Per-scope + filtered root fallback: only den.default's shared
+                  # modules (identity = "default") from root scope. Host-specific
+                  # aspect modules (identity = host name) are excluded to prevent
+                  # leaking into user forwards.
                   let
                     ownModules = (acc.perScope.${sid} or { }).${spec.fromClass} or [ ];
                     rootModules = (acc.perScope.${rootScopeId} or { }).${spec.fromClass} or [ ];
+                    isDenDefaultModule =
+                      mod:
+                      let
+                        k = mod.key or mod._file or "";
+                      in
+                      lib.hasSuffix "@default" k;
+                    sharedModules = builtins.filter isDenDefaultModule rootModules;
                   in
-                  rootModules ++ ownModules
+                  sharedModules ++ ownModules
                 else
-                  # Root-scope aggregate: read from merged classImports (current behavior).
                   acc.classImports.${spec.fromClass} or [ ];
               rawSourceModule = {
                 imports = sourceModules;
