@@ -99,6 +99,31 @@
       }
     );
 
+    # Regression: provides.to-users compat shim uses policy.provide (content reaches HM).
+    test-provides-to-users-via-provide = denTest (
+      {
+        den,
+        tuxHm,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.shared-user-config = {
+          provides.to-users = _: {
+            homeManager = _: {
+              programs.direnv.enable = true;
+            };
+          };
+        };
+
+        den.aspects.igloo.includes = [ den.aspects.shared-user-config ];
+
+        expr = tuxHm.programs.direnv.enable;
+        expected = true;
+      }
+    );
+
     test-static-parent-bare-fn-sub = denTest (
       {
         den,
