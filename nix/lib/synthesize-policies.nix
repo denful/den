@@ -11,8 +11,7 @@ let
   resolveArgsSatisfied =
     policy: ctx:
     let
-      inherit (den.lib.policyTypes) policyFnArgs;
-      fargs = policyFnArgs policy;
+      fargs = lib.functionArgs policy;
       requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
     in
     builtins.all (k: ctx ? ${k}) requiredArgs;

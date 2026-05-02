@@ -9,10 +9,9 @@ let
   # Entity kinds that carry .aspect on their schema entry.
   # These get a parametric self-provide wrapper so the root aspect
   # is resolved once the entity's scope handlers are established.
-  schemaKinds = builtins.attrNames (den.schema or { });
-  aspectKinds = builtins.filter (
-    k: k != "conf" && !(lib.hasPrefix "_" k) && k != "default" && (den.schema.${k}.isEntity or false)
-  ) schemaKinds;
+  inherit (den.lib.schemaUtil) schemaEntityKinds;
+  # Filter "default" — handled specially at line 23.
+  aspectKinds = builtins.filter (k: k != "default") schemaEntityKinds;
   aspectKindSet = lib.genAttrs aspectKinds (_: true);
 
   resolveEntity =
@@ -36,8 +35,6 @@ let
           ]
         else
           [ ];
-      # Host-level framework aspects have no inbound policy — deliver directly.
-      hostFramework = [ ];
       schemaIncludes = ((den.schema or { }).${name} or { }).includes or [ ];
     in
     {
@@ -47,7 +44,7 @@ let
         excludes = [ ];
         provider = [ ];
       };
-      includes = selfProvide ++ hostFramework ++ schemaIncludes;
+      includes = selfProvide ++ schemaIncludes;
       __entityKind = name;
       __scopeHandlers = scopeHandlers;
     };

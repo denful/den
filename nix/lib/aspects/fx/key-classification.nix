@@ -61,17 +61,7 @@ let
                   rawValue = aspect.${k};
                   # Unwrap aspectContentType to inspect sub-keys.
                   # Multi-site defs: merge all attrset values for detection.
-                  innerValue =
-                    if builtins.isAttrs rawValue && rawValue ? __contentValues then
-                      let
-                        vals = map (d: d.value) rawValue.__contentValues;
-                        attrVals = builtins.filter builtins.isAttrs vals;
-                      in
-                      if attrVals != [ ] then builtins.foldl' (a: b: a // b) { } attrVals else null
-                    else if builtins.isAttrs rawValue then
-                      rawValue
-                    else
-                      null;
+                  innerValue = den.lib.aspects.fx.contentUtil.unwrapContentValuesForClassification rawValue;
                   # Check if any sub-key is a registered class, or if any
                   # sub-key is itself an attrset containing recognized keys
                   # (multi-level nesting detection, depth-limited to 3).

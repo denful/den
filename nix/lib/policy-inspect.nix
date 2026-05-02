@@ -10,9 +10,7 @@ let
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
 
   # Schema entity kinds — used to derive targetKey from resolve bindings.
-  schemaKinds = builtins.filter (
-    n: n != "conf" && !(lib.hasPrefix "_" n) && (den.schema.${n}.isEntity or false)
-  ) (builtins.attrNames (den.schema or { }));
+  schemaKinds = den.lib.schemaUtil.schemaEntityKinds;
 
   # Inspect a policy: call as function, parse typed effects.
   inspectPolicy =

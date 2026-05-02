@@ -138,9 +138,7 @@ let
         denArgNames = builtins.filter (k: ctx ? ${k}) argNames;
         # Only warn for args matching known schema kinds that have no default.
         # Avoids false warnings on module-system args (config, pkgs, etc.).
-        schemaKinds = builtins.filter (n: n != "conf" && n != "aspect" && !(lib.hasPrefix "_" n)) (
-          builtins.attrNames (den.schema or { })
-        );
+        schemaKinds = den.lib.schemaUtil.schemaArgKinds;
         missingDenArgNames = builtins.filter (k: builtins.elem k schemaKinds && !(allArgs.${k} or false)) (
           builtins.filter (k: !(ctx ? ${k})) argNames
         );

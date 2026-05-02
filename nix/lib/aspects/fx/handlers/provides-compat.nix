@@ -11,11 +11,9 @@ let
   identity = den.lib.aspects.fx.identity;
   policy = den.lib.policy;
 
-  inherit (import ../key-classification.nix { inherit lib den; }) structuralKeysSet;
+  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
 
-  schemaKinds = builtins.filter (n: den.schema.${n}.isEntity or false) (
-    builtins.attrNames (den.schema or { })
-  );
+  schemaKinds = den.lib.schemaUtil.schemaEntityKinds;
 
   # Mirror shape detection from emitSelfProvide in aspect.nix.
   applyProvide =
@@ -29,23 +27,7 @@ let
     else
       value;
 
-  # Unwrap a single class module value from aspectContentType wrapping.
-  unwrapClassValue =
-    rawValue:
-    if builtins.isAttrs rawValue && rawValue ? __contentValues then
-      let
-        vals = builtins.filter (v: !(builtins.isAttrs v && v == { })) (
-          map (d: d.value) rawValue.__contentValues
-        );
-      in
-      if builtins.length vals == 0 then
-        { }
-      else if builtins.length vals == 1 then
-        builtins.head vals
-      else
-        { imports = vals; }
-    else
-      rawValue;
+  inherit (den.lib.aspects.fx.contentUtil) unwrapContentValues;
 
   # Extract non-structural keys from an aspect result as class modules.
   extractClassModules =
@@ -56,7 +38,7 @@ let
     in
     map (k: {
       class = k;
-      module = unwrapClassValue result.${k};
+      module = unwrapContentValues result.${k};
     }) classKeys;
 
   # to-hosts: fires for every host×user pair, delivers directly to host's nixos class.

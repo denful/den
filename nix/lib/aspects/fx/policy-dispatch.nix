@@ -11,36 +11,11 @@ let
   fx = den.lib.fx;
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
-  inherit (den.lib.policyTypes) policyFnArgs;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   identity = den.lib.aspects.fx.identity;
 
-  # Context identity string — used for ctx-seen dedup keys.
-  mkCtxId =
-    ctx:
-    lib.concatStringsSep "," (
-      lib.sort (a: b: a < b) (
-        map (
-          attrName:
-          let
-            attrVal = ctx.${attrName};
-          in
-          if builtins.isAttrs attrVal && attrVal ? name then
-            attrVal.name
-          else if builtins.isString attrVal then
-            attrVal
-          else if builtins.isInt attrVal || builtins.isFloat attrVal then
-            toString attrVal
-          else
-            attrName
-        ) (builtins.attrNames ctx)
-      )
-    );
-
   # Schema entity kinds — used to classify resolve effects.
-  policySchemaKinds = builtins.filter (
-    n: n != "conf" && !(lib.hasPrefix "_" n) && (den.schema.${n}.isEntity or false)
-  ) (builtins.attrNames (den.schema or { }));
+  policySchemaKinds = den.lib.schemaUtil.schemaEntityKinds;
 
   # Classify a resolve effect into schema vs enrichment.
   classifyResolve =
@@ -109,7 +84,7 @@ let
       matching = builtins.filter (
         e:
         let
-          fargs = policyFnArgs e.value.fn;
+          fargs = lib.functionArgs e.value.fn;
           requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
         in
         builtins.all (k: resolveCtx ? ${k}) requiredArgs && !builtins.elem e.name firedPolicies
@@ -333,7 +308,7 @@ let
       targetKind = resolveTargetKind entityKind schemaEffect;
       resolveBindings = schemaEffect.schema.value;
       scopedCtx = enrichedCtx // resolveBindings;
-      ctxNames = mkCtxId scopedCtx;
+      ctxNames = mkScopeId scopedCtx;
       ctxKey = if isFanOut then "${targetKind}/{${ctxNames}}" else targetKind;
       entityClass = resolveEntityClass targetKind resolveBindings;
       scopeHandlersForCtx = constantHandler (

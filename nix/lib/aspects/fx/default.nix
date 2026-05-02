@@ -10,5 +10,7 @@
   trace = import ./trace.nix { inherit lib den; };
   handlers = import ./handlers { inherit lib den; };
   aspect = import ./aspect.nix { inherit lib den; };
+  contentUtil = import ./content-util.nix { inherit lib; };
   pipeline = import ./pipeline.nix { inherit lib den; };
+  keyClassification = import ./key-classification.nix { inherit lib den; };
 }

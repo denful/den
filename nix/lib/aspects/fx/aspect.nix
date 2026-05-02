@@ -9,7 +9,7 @@ let
   inherit (den.lib.aspects.fx.handlers) emitCrossProvideShims;
   inherit (den.lib.aspects) isMeaningfulName;
 
-  inherit (import ./key-classification.nix { inherit lib den; }) structuralKeysSet classifyKeys;
+  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet classifyKeys;
 
   inherit (import ./class-module.nix { inherit lib den; }) wrapClassModule;
 
@@ -50,23 +50,7 @@ let
           # aspectContentType wraps values with __contentValues/__provider.
           # Unwrap to recover the original module value for wrapClassModule.
           # Lists are coerced to per-element processing; bare values become singletons.
-          modules =
-            if builtins.isList rawValue then
-              rawValue
-            else if builtins.isAttrs rawValue && rawValue ? __contentValues then
-              let
-                vals = builtins.filter (v: !(builtins.isAttrs v && v == { })) (
-                  map (d: d.value) rawValue.__contentValues
-                );
-              in
-              if builtins.length vals == 0 then
-                [ { } ]
-              else if builtins.length vals == 1 then
-                [ (builtins.head vals) ]
-              else
-                [ { imports = vals; } ]
-            else
-              [ rawValue ];
+          modules = den.lib.aspects.fx.contentUtil.unwrapContentValuesList rawValue;
           # Process each module element independently.
           indexed = lib.imap0 (idx: module: { inherit idx module; }) modules;
           isMulti = builtins.length modules > 1;
@@ -154,14 +138,7 @@ let
     aspect: k: nodeIdentity:
     let
       rawValue = aspect.${k};
-      innerValue =
-        if builtins.isAttrs rawValue && rawValue ? __contentValues then
-          let
-            vals = map (d: d.value) rawValue.__contentValues;
-          in
-          if builtins.length vals == 1 then builtins.head vals else { imports = vals; }
-        else
-          rawValue;
+      innerValue = den.lib.aspects.fx.contentUtil.unwrapContentValuesRaw rawValue;
       subAspect =
         (if builtins.isAttrs innerValue then innerValue else { })
         // {
