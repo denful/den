@@ -13,3 +13,4 @@
 // (import ./forward.nix args)
 // (import ./provide.nix args)
 // (import ./provides-compat.nix args)
+// (import ./resolve-schema-entity.nix args)

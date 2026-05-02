@@ -82,6 +82,7 @@ let
     // handlers.provideHandler
     // resolveEntityHandler
     // handlers.forwardHandler
+    // handlers.resolveSchemaEntityHandler
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.

@@ -12,7 +12,6 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (den.lib.policyTypes) policyFnArgs;
-  inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   identity = den.lib.aspects.fx.identity;
 
   # Context identity string — used for ctx-seen dedup keys.
@@ -271,113 +270,6 @@ let
           )
       );
 
-  # Build scope transition operations for a schema effect.
-  mkScopeTransition =
-    scope: scopedCtx: entityClass: newScopeId:
-    let
-      scopeHandlersForCtx = constantHandler (
-        scopedCtx // lib.optionalAttrs (entityClass != null) { class = entityClass; }
-      );
-      setScope = fx.effects.state.modify (
-        st:
-        let
-          parentScope = st.currentScope;
-          isSameScope = newScopeId == parentScope;
-        in
-        st
-        // {
-          currentScope = newScopeId;
-          scopeContexts = _: (st.scopeContexts null) // { ${newScopeId} = scopedCtx; };
-          scopeParent =
-            _: (st.scopeParent null) // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
-          scopedAspectPolicies =
-            _:
-            let
-              all = st.scopedAspectPolicies null;
-              parentPolicies = all.${parentScope} or { };
-            in
-            all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
-        }
-      );
-      restoreScope = fx.effects.state.modify (st: st // { currentScope = scope; });
-    in
-    {
-      inherit scopeHandlersForCtx setScope restoreScope;
-    };
-
-  # Propagate root-scope forward specs to a child scope.
-  propagateRootForwards =
-    newScopeId: restoreScope: allResults:
-    fx.bind (fx.effects.state.get) (
-      postWalkState:
-      let
-        rootSid = postWalkState.rootScopeId;
-        rootForwards = (postWalkState.scopedForwardSpecs null).${rootSid} or [ ];
-        childClasses = (postWalkState.scopedClassImports null).${newScopeId} or { };
-        relevantForwards = builtins.filter (fwd: childClasses ? ${fwd.fromClass}) rootForwards;
-        childForwards = map (fwd: fwd // { sourceScopeId = newScopeId; }) relevantForwards;
-      in
-      if childForwards == [ ] then
-        fx.bind restoreScope (_: fx.pure allResults)
-      else
-        fx.bind (fx.effects.state.modify (
-          st:
-          st
-          // {
-            scopedForwardSpecs =
-              _:
-              let
-                all = st.scopedForwardSpecs null;
-              in
-              all // { ${newScopeId} = (all.${newScopeId} or [ ]) ++ childForwards; };
-          }
-        )) (_: fx.bind restoreScope (_: fx.pure allResults))
-    );
-
-  # Walk deferred aspects after entity resolution.
-  walkDeferred =
-    scopeHandlersForCtx: ctxNames: prevResults: childResult: satisfiable:
-    builtins.foldl' (
-      acc': deferred:
-      fx.bind acc' (
-        prev:
-        let
-          deferredTagged = deferred.child // {
-            __scopeHandlers = scopeHandlersForCtx;
-            __ctxId = ctxNames;
-          };
-        in
-        fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
-      )
-    ) (fx.pure (prevResults ++ [ childResult ])) satisfiable;
-
-  # Full entity resolution: push scope, resolve entity, walk tree,
-  # drain deferred, propagate forwards, pop scope.
-  mkFullResolution =
-    scopeTransition: includeAspects: policyIncludes: resolveIncludes: targetKind: scopedCtx: ctxNames: newScopeId: prevResults:
-    fx.bind scopeTransition.setScope (
-      _:
-      fx.effects.scope.provide scopeTransition.scopeHandlersForCtx (
-        fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
-          rawEntity:
-          let
-            entity = rawEntity // {
-              includes = (rawEntity.includes or [ ]) ++ includeAspects ++ policyIncludes ++ resolveIncludes;
-            };
-          in
-          fx.bind (aspectToEffect entity) (
-            childResult:
-            fx.bind (fx.send "drain-deferred" scopedCtx) (
-              satisfiable:
-              fx.bind (walkDeferred scopeTransition.scopeHandlersForCtx ctxNames prevResults childResult
-                satisfiable
-              ) (allResults: propagateRootForwards newScopeId scopeTransition.restoreScope allResults)
-            )
-          )
-        )
-      )
-    );
-
   # Emit new aspects as includes for already-seen contexts.
   mkSupplementalResolution =
     scopeHandlersForCtx: ctxNames: prevResults: newAspectValues:
@@ -425,9 +317,10 @@ let
       scopedCtx = enrichedCtx // resolveBindings;
       ctxNames = mkCtxId scopedCtx;
       ctxKey = if isFanOut then "${targetKind}/{${ctxNames}}" else targetKind;
-      newScopeId = mkScopeId scopedCtx;
       entityClass = resolveEntityClass targetKind resolveBindings;
-      scopeTransition = mkScopeTransition scope scopedCtx entityClass newScopeId;
+      scopeHandlersForCtx = constantHandler (
+        scopedCtx // lib.optionalAttrs (entityClass != null) { class = entityClass; }
+      );
       policyIncludes = schemaEffect.__policyIncludes or [ ];
       resolveIncludes = schemaEffect.schema.includes or [ ];
       policyAspectPaths = map (a: identity.pathKey (identity.aspectPath a)) (
@@ -443,12 +336,20 @@ let
       (
         { isFirst, newAspectValues }:
         if isFirst then
-          mkFullResolution scopeTransition includeAspects policyIncludes resolveIncludes targetKind scopedCtx
-            ctxNames
-            newScopeId
-            prevResults
+          fx.send "resolve-schema-entity" {
+            inherit
+              targetKind
+              scopedCtx
+              entityClass
+              includeAspects
+              policyIncludes
+              resolveIncludes
+              ctxNames
+              prevResults
+              ;
+          }
         else if newAspectValues != [ ] then
-          mkSupplementalResolution scopeTransition.scopeHandlersForCtx ctxNames prevResults newAspectValues
+          mkSupplementalResolution scopeHandlersForCtx ctxNames prevResults newAspectValues
         else
           fx.pure prevResults
       );
