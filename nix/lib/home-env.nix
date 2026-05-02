@@ -99,11 +99,7 @@ let
           let
             pairs = mkIntoClassUsers className { inherit host; };
             resolves = map (
-              pair:
-              den.lib.policy.resolve {
-                user = pair.user;
-                __includes = [ userForward ];
-              }
+              pair: den.lib.policy.resolve.withIncludes [ userForward ] { user = pair.user; }
             ) pairs;
             rootIncludes = [
               (den.lib.policy.include hostModule)

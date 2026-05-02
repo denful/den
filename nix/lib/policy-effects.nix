@@ -8,49 +8,47 @@
   # policy.resolve.shared {} sets __shared = true for shared (non-isolated) fan-out.
   resolve =
     let
-      splitIncludes =
-        bindings:
-        if bindings ? __includes then
-          {
-            includes = bindings.__includes;
-            value = removeAttrs bindings [ "__includes" ];
-          }
-        else
-          {
-            includes = [ ];
-            value = bindings;
-          };
-      mkResolve =
-        shared: bindings:
-        let
-          s = splitIncludes bindings;
-        in
-        {
-          __policyEffect = "resolve";
-          __shared = shared;
-          inherit (s) value includes;
-        };
-      mkResolveTo =
-        shared: kind: bindings:
-        let
-          s = splitIncludes bindings;
-        in
-        {
-          __policyEffect = "resolve";
-          __shared = shared;
-          __targetKind = kind;
-          inherit (s) value includes;
-        };
+      mkResolve = shared: bindings: {
+        __policyEffect = "resolve";
+        __shared = shared;
+        value = bindings;
+        includes = [ ];
+      };
+      mkResolveWith = shared: includes: bindings: {
+        __policyEffect = "resolve";
+        __shared = shared;
+        value = bindings;
+        inherit includes;
+      };
+      mkResolveTo = shared: kind: bindings: {
+        __policyEffect = "resolve";
+        __shared = shared;
+        __targetKind = kind;
+        value = bindings;
+        includes = [ ];
+      };
+      mkResolveToWith = shared: kind: includes: bindings: {
+        __policyEffect = "resolve";
+        __shared = shared;
+        __targetKind = kind;
+        value = bindings;
+        inherit includes;
+      };
     in
     {
       __functor = _: mkResolve false;
+      withIncludes = mkResolveWith false;
       shared = {
         __functor = _: mkResolve true;
         # resolve.shared.to "kind" { bindings } — shared fan-out with explicit target.
         to = mkResolveTo true;
+        withIncludes = mkResolveWith true;
       };
       # resolve.to "kind" { bindings } — explicit target kind for routing.
-      to = mkResolveTo false;
+      to = {
+        __functor = _: mkResolveTo false;
+        withIncludes = mkResolveToWith false;
+      };
     };
 
   # Inject an aspect into the current resolution context.
