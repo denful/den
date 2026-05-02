@@ -545,6 +545,12 @@ let
         scope = state.currentScope;
         currentCtx = if scope == null then ctx else (state.scopeContexts null).${scope} or ctx;
 
+        # Dedup: skip if this entityKind@scope was already dispatched.
+        # Multiple aspects in the tree can have __entityKind, but policies
+        # should only fire once per entity kind per scope.
+        dispatchKey = "${entityKind}@${scope}";
+        alreadyDispatched = builtins.elem dispatchKey ((state.dispatchedPolicies or (_: [ ])) null);
+
         # Three policy sources.
         globalPolicies = den.policies or { };
         schemaPolicies = (den.schema.${entityKind} or { }).policies or { };
@@ -990,7 +996,16 @@ let
           __entityKind = entityKind;
         };
       in
-      iterate 0 { } emptyAcc [ ] resolveCtx
+      if alreadyDispatched then
+        fx.pure [ ]
+      else
+        fx.bind (fx.effects.state.modify (
+          st:
+          st
+          // {
+            dispatchedPolicies = _: ((st.dispatchedPolicies or (_: [ ])) null) ++ [ dispatchKey ];
+          }
+        )) (_: iterate 0 { } emptyAcc [ ] resolveCtx)
     );
 
   mkPositionalInclude =
