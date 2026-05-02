@@ -387,7 +387,22 @@ let
               paired = map tagCrossProvider classified;
               lateIncludes = collectIncludeEffects paired;
               lateSchemas = collectSchemaEffects paired;
-              hasLateEffects = lateIncludes != [ ] || lateSchemas != [ ];
+              lateRoutes = builtins.concatMap (
+                r: map (re: re // { __routePolicyName = r.policyName; }) r.routeEffects
+              ) classified;
+              lateInstantiates = builtins.concatMap (
+                r: map (ie: ie // { __instantiatePolicyName = r.policyName; }) r.instantiateEffects
+              ) classified;
+              lateProvides = builtins.concatMap (
+                r: map (pe: pe // { __providePolicyName = r.policyName; }) r.provideEffects
+              ) classified;
+              lateExcludes = builtins.concatMap (r: r.excludeEffects) classified;
+              hasLateEffects =
+                lateIncludes != [ ]
+                || lateRoutes != [ ]
+                || lateInstantiates != [ ]
+                || lateProvides != [ ]
+                || lateExcludes != [ ];
               scopeHandlersForCtx = constantHandler (
                 sib.scopedCtx // lib.optionalAttrs (sib.entityClass != null) { class = sib.entityClass; }
               );
@@ -395,20 +410,20 @@ let
             if latePolicies == { } || !hasLateEffects then
               fx.pure null
             else
-              # Push sibling scope, provide its context, emit late includes.
+              # Push sibling scope, provide its context, emit late effects.
+              # Schema effects are intentionally NOT processed here — entity
+              # re-resolution from late dispatch causes duplicate module
+              # emissions with different identities (context-dependent vs base).
+              # Route/provide/instantiate effects are emitted directly instead.
               fx.bind (fx.effects.state.modify (st: st // { currentScope = sib.scopeId; })) (
                 _:
                 fx.bind
                   (fx.effects.scope.provide scopeHandlersForCtx (
-                    fx.bind (policyEmitIncludes lateIncludes) (
+                    fx.bind (policyEmitExcludes lateExcludes) (
                       _:
-                      if lateSchemas != [ ] then
-                        let
-                          lateIncludeAspects = map (e: e.value) lateIncludes;
-                        in
-                        processSchemaResolvesInner true sib.targetKind lateIncludeAspects lateSchemas sib.scopedCtx
-                      else
-                        fx.pure null
+                      fx.bind (policyEmitEffects lateRoutes lateInstantiates lateProvides) (
+                        _: policyEmitIncludes lateIncludes
+                      )
                     )
                   ))
                   (
@@ -597,7 +612,8 @@ let
   installPolicies =
     aspect:
     let
-      entityKind = aspect.__entityKind;
+      inherit (den.lib.aspects.fx.traceUtil) traceDetail;
+      entityKind = traceDetail "installPolicies entityKind=${aspect.__entityKind or "?"}" aspect.__entityKind;
       ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
     in
     fx.bind fx.effects.state.get (

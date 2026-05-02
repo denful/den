@@ -11,6 +11,7 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
+  inherit (den.lib.aspects.fx.traceUtil) traceDetail;
 
   # Build scope transition operations for a schema effect.
   mkScopeTransition =
@@ -111,7 +112,9 @@ let
           prevResults
           ;
         scope = state.currentScope;
-        newScopeId = mkScopeId scopedCtx;
+        newScopeId = traceDetail "resolve-schema-entity kind=${param.targetKind} scope=${scope}→${mkScopeId scopedCtx} includeAspects=${toString (builtins.length includeAspects)} policyIncludes=${toString (builtins.length policyIncludes)}" (
+          mkScopeId scopedCtx
+        );
         scopeTransition = mkScopeTransition scope scopedCtx entityClass newScopeId;
       in
       {
