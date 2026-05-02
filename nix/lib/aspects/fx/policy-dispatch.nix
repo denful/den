@@ -310,7 +310,7 @@ let
 
   # Process a single schema resolve effect within the fold.
   processSingleResolve =
-    entityKind: scope: enrichedCtx: includeAspects: isFanOut: prevResults: schemaEffect:
+    entityKind: enrichedCtx: includeAspects: isFanOut: prevResults: schemaEffect:
     let
       targetKind = resolveTargetKind entityKind schemaEffect;
       resolveBindings = schemaEffect.schema.value;
@@ -356,7 +356,7 @@ let
 
   # Process schema resolve effects: ctx-seen dedup, push scope, walk entity, pop scope.
   processSchemaResolves =
-    entityKind: scope: includeAspects: schemaEffects: enrichedCtx:
+    entityKind: includeAspects: schemaEffects: enrichedCtx:
     let
       isFanOut = builtins.length schemaEffects > 1;
     in
@@ -364,7 +364,7 @@ let
       acc: schemaEffect:
       fx.bind acc (
         prevResults:
-        processSingleResolve entityKind scope enrichedCtx includeAspects isFanOut prevResults schemaEffect
+        processSingleResolve entityKind enrichedCtx includeAspects isFanOut prevResults schemaEffect
       )
     ) (fx.pure [ ]) schemaEffects;
 
@@ -390,7 +390,7 @@ let
 
   # Emit final effects when enrichment has stabilized.
   emitFinalEffects =
-    entityKind: scope: currentCtx: accEnrichment: dispatched: combinedEffects:
+    entityKind: currentCtx: accEnrichment: dispatched: combinedEffects:
     let
       enrichedCtx = currentCtx // accEnrichment // dispatched.enrichment;
       includeAspects = map (e: e.value) combinedEffects.includeEffects;
@@ -405,7 +405,7 @@ let
         (
           _:
           if hasSchemaResolves then
-            processSchemaResolves entityKind scope includeAspects combinedEffects.schemaEffects enrichedCtx
+            processSchemaResolves entityKind includeAspects combinedEffects.schemaEffects enrichedCtx
           else
             policyEmitIncludes combinedEffects.includeEffects
         )
@@ -433,7 +433,7 @@ let
 
   # Fixed-point iteration: dispatch, collect enrichment, re-dispatch on widen.
   iterate =
-    allDirectPolicies: aspectPolicies: entityKind: scope: currentCtx: iteration: accEnrichment: accEffects: firedPolicies: currentResolveCtx:
+    allDirectPolicies: aspectPolicies: entityKind: currentCtx: iteration: accEnrichment: accEffects: firedPolicies: currentResolveCtx:
     let
       dispatched = mkDispatch allDirectPolicies aspectPolicies firedPolicies currentResolveCtx;
       newFiredNames = builtins.filter (n: !builtins.elem n firedPolicies) dispatched.firedNames;
@@ -444,7 +444,7 @@ let
       combinedEffects = mergeEffects accEffects dispatched;
     in
     if newEnrichKeys == [ ] then
-      emitFinalEffects entityKind scope currentCtx accEnrichment dispatched combinedEffects
+      emitFinalEffects entityKind currentCtx accEnrichment dispatched combinedEffects
     else if iteration >= maxPolicyIterations then
       throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
     else
@@ -468,7 +468,7 @@ let
           _:
           fx.bind (fx.effects.scope.provide enrichHandlers (drainEnrichmentDeferred enrichedCtx)) (
             _:
-            iterate allDirectPolicies aspectPolicies entityKind scope currentCtx (
+            iterate allDirectPolicies aspectPolicies entityKind currentCtx (
               iteration + 1
             ) combinedEnrichment combinedEffects updatedFired nextResolveCtx
           )
@@ -501,18 +501,13 @@ let
       if alreadyDispatched then
         fx.pure [ ]
       else
-        fx.bind
-          (fx.effects.state.modify (
-            st:
-            st
-            // {
-              dispatchedPolicies = _: ((st.dispatchedPolicies or (_: [ ])) null) ++ [ dispatchKey ];
-            }
-          ))
-          (
-            _:
-            iterate allDirectPolicies aspectPolicies entityKind scope currentCtx 0 { } emptyAcc [ ] resolveCtx
-          )
+        fx.bind (fx.effects.state.modify (
+          st:
+          st
+          // {
+            dispatchedPolicies = _: ((st.dispatchedPolicies or (_: [ ])) null) ++ [ dispatchKey ];
+          }
+        )) (_: iterate allDirectPolicies aspectPolicies entityKind currentCtx 0 { } emptyAcc [ ] resolveCtx)
     );
 
 in
