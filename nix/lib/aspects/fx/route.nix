@@ -247,16 +247,26 @@ let
             adapterMod = route.adapterModule or null;
             modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
             guard = route.guard or null;
-            # When adaptArgs is set with path nesting, produce an empty
-            # submodule definition so the target entry exists (e.g.,
-            # users.users.tux needs to exist for home-manager).
-            # Use a plain attrset (not _: {}) to avoid breaking flake
-            # output types that reject function values.
+            # Create an empty submodule definition so the target entry exists
+            # (e.g., users.users.tux for home-manager).
+            # Use _: { imports = []; } which is a valid module that doesn't
+            # set any config (avoids _: {} which is a bare function value
+            # rejected by non-submodule option types like lazyAttrsOf package).
+            # Only emit for routes targeting non-flake classes (flake output
+            # routes with no source modules should produce nothing).
+            isFlakeRoute = route.intoClass == "flake";
             ensureEntry =
-              if route.adaptArgs or null != null && route.path or [ ] != [ ] && modulesWithAdapter == [ ] then
+              if
+                !isFlakeRoute
+                && route.adaptArgs or null != null
+                && route.path or [ ] != [ ]
+                && modulesWithAdapter == [ ]
+              then
                 [
                   (_: {
-                    config = lib.setAttrByPath route.path { };
+                    config = lib.setAttrByPath route.path (_: {
+                      imports = [ ];
+                    });
                   })
                 ]
               else
