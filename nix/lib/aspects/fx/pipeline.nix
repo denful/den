@@ -175,6 +175,11 @@ let
     currentScope = "__unscoped";
     scopeContexts = _: { };
     scopeParent = _: { };
+
+    # --- Policy dispatch tracking ---
+    # Maps "entityKind@scopeId" → list of policy names fired in that scope.
+    # Used by lateDispatchPass to identify policies registered after a scope resolved.
+    firedPolicyNames = _: { };
   };
 
   mkPipeline =

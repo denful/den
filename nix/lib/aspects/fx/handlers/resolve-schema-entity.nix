@@ -117,25 +117,51 @@ let
       {
         resume = fx.bind scopeTransition.setScope (
           _:
-          fx.effects.scope.provide scopeTransition.scopeHandlersForCtx (
-            fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
-              rawEntity:
+          # Copy parent-scope deferred items into the new child scope.
+          # This enables fan-out: { host, user } deferred at host scope
+          # gets a fresh copy in each user scope, drained independently.
+          fx.bind
+            (fx.effects.state.modify (
+              st:
               let
-                entity = rawEntity // {
-                  includes = (rawEntity.includes or [ ]) ++ includeAspects ++ policyIncludes ++ resolveIncludes;
-                };
+                allScoped = (st.scopedDeferredIncludes or (_: { })) null;
+                parentItems = allScoped.${scope} or [ ];
               in
-              fx.bind (aspectToEffect entity) (
-                childResult:
-                fx.bind (fx.send "drain-deferred" scopedCtx) (
-                  satisfiable:
-                  fx.bind (walkDeferred scopeTransition.scopeHandlersForCtx ctxNames prevResults childResult
-                    satisfiable
-                  ) (allResults: propagateRootRoutes newScopeId scopeTransition.restoreScope allResults)
+              if parentItems == [ ] then
+                st
+              else
+                st
+                // {
+                  scopedDeferredIncludes =
+                    _:
+                    allScoped
+                    // {
+                      ${newScopeId} = (allScoped.${newScopeId} or [ ]) ++ parentItems;
+                    };
+                }
+            ))
+            (
+              _:
+              fx.effects.scope.provide scopeTransition.scopeHandlersForCtx (
+                fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
+                  rawEntity:
+                  let
+                    entity = rawEntity // {
+                      includes = (rawEntity.includes or [ ]) ++ includeAspects ++ policyIncludes ++ resolveIncludes;
+                    };
+                  in
+                  fx.bind (aspectToEffect entity) (
+                    childResult:
+                    fx.bind (fx.send "drain-deferred" scopedCtx) (
+                      satisfiable:
+                      fx.bind (walkDeferred scopeTransition.scopeHandlersForCtx ctxNames prevResults childResult
+                        satisfiable
+                      ) (allResults: propagateRootRoutes newScopeId scopeTransition.restoreScope allResults)
+                    )
+                  )
                 )
               )
             )
-          )
         );
         inherit state;
       };

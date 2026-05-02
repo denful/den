@@ -12,6 +12,7 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (den.lib.policyTypes) policyFnArgs;
+  inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   identity = den.lib.aspects.fx.identity;
 
   # Context identity string — used for ctx-seen dedup keys.
@@ -185,9 +186,16 @@ let
         r.schemaEffects
     ) paired;
 
-  # Collect non-cross-provider include effects.
+  # Collect non-cross-provider include effects, tagged with source policy name.
   collectIncludeEffects =
-    paired: builtins.concatMap (r: if r.isCrossProvider then [ ] else r.includeEffects) paired;
+    paired:
+    builtins.concatMap (
+      r:
+      if r.isCrossProvider then
+        [ ]
+      else
+        map (e: e // { __sourcePolicyName = r.policyName; }) r.includeEffects
+    ) paired;
 
   # Combined dispatch returning classified results.
   mkDispatch =
@@ -217,14 +225,24 @@ let
     };
 
   # Emit policy include effects via existing handlers.
+  # Tags each include with its source policy name for unique identity
+  # (prevents emit-class LOC dedup from collapsing distinct policy outputs).
   policyEmitIncludes =
     effects:
     builtins.foldl' (
       acc: e:
       fx.bind acc (
         prev:
+        let
+          policyName = e.__sourcePolicyName or null;
+          child =
+            if policyName != null && builtins.isAttrs e.value && !(e.value ? name) then
+              e.value // { name = "<policy:${policyName}>"; }
+            else
+              e.value;
+        in
         fx.bind (fx.send "emit-include" {
-          child = e.value;
+          inherit child;
           idx = null;
         }) (r: fx.pure (prev ++ r))
       )
@@ -354,19 +372,130 @@ let
           fx.pure prevResults
       );
 
+  # Post-resolve pass: re-dispatch aspect policies registered by later siblings
+  # into earlier sibling scopes. Fixes ordering-dependent policy visibility.
+  #
+  # Key insight: firedPolicyNames is keyed by "${targetKind}@${scopeId}" where
+  # targetKind is the CHILD entity kind (e.g., "user"), not the parent entity kind
+  # (e.g., "host") that processSchemaResolves receives. Each sibling's targetKind
+  # from siblingMetas must be used for correct dispatchKey lookup.
+  lateDispatchPass =
+    _entityKind: siblingMetas:
+    fx.bind (fx.effects.state.modify (st: st // { inLateDispatch = true; })) (
+      _:
+      fx.bind fx.effects.state.get (
+        state:
+        let
+          allAspectPolicies = builtins.foldl' (acc: v: acc // v) { } (
+            builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
+          );
+          firedPerScope = (state.firedPolicyNames or (_: { })) null;
+          parentScope = state.currentScope;
+        in
+        builtins.foldl' (
+          acc: sib:
+          fx.bind acc (
+            _:
+            let
+              # Use the sibling's own target entity kind for dispatchKey — this matches
+              # what iterate records when installPolicies fires at the child scope.
+              dispatchKey = "${sib.targetKind}@${sib.scopeId}";
+              alreadyFired = firedPerScope.${dispatchKey} or [ ];
+              # Only dispatch policies NOT already fired at this scope.
+              latePolicies = lib.filterAttrs (name: _: !builtins.elem name alreadyFired) allAspectPolicies;
+              resolveCtx = sib.scopedCtx // {
+                __entityKind = sib.targetKind;
+              };
+              # Dispatch late aspect policies against this scope's context.
+              lateResults = dispatchAspect latePolicies alreadyFired resolveCtx;
+              classified = map classifyPolicyResult lateResults;
+              paired = map tagCrossProvider classified;
+              lateIncludes = collectIncludeEffects paired;
+              lateSchemas = collectSchemaEffects paired;
+              hasLateEffects = lateIncludes != [ ] || lateSchemas != [ ];
+              scopeHandlersForCtx = constantHandler (
+                sib.scopedCtx // lib.optionalAttrs (sib.entityClass != null) { class = sib.entityClass; }
+              );
+            in
+            if latePolicies == { } || !hasLateEffects then
+              fx.pure null
+            else
+              # Push sibling scope, provide its context, emit late includes.
+              fx.bind (fx.effects.state.modify (st: st // { currentScope = sib.scopeId; })) (
+                _:
+                fx.bind
+                  (fx.effects.scope.provide scopeHandlersForCtx (
+                    fx.bind (policyEmitIncludes lateIncludes) (
+                      _:
+                      if lateSchemas != [ ] then
+                        let
+                          lateIncludeAspects = map (e: e.value) lateIncludes;
+                        in
+                        processSchemaResolvesInner true sib.targetKind lateIncludeAspects lateSchemas sib.scopedCtx
+                      else
+                        fx.pure null
+                    )
+                  ))
+                  (
+                    _:
+                    # Restore parent scope.
+                    fx.effects.state.modify (st: st // { currentScope = parentScope; })
+                  )
+              )
+          )
+        ) (fx.pure null) siblingMetas
+      )
+    );
+
   # Process schema resolve effects: ctx-seen dedup, push scope, walk entity, pop scope.
+  # When processing fan-out (multiple siblings), runs a late-dispatch pass after
+  # all resolves to fix cross-sibling aspect policy visibility.
   processSchemaResolves =
     entityKind: includeAspects: schemaEffects: enrichedCtx:
+    processSchemaResolvesInner false entityKind includeAspects schemaEffects enrichedCtx;
+
+  processSchemaResolvesInner =
+    isLatePass: entityKind: includeAspects: schemaEffects: enrichedCtx:
     let
       isFanOut = builtins.length schemaEffects > 1;
+      mainFold = builtins.foldl' (
+        acc: schemaEffect:
+        fx.bind acc (
+          prevResults:
+          processSingleResolve entityKind enrichedCtx includeAspects isFanOut prevResults schemaEffect
+        )
+      ) (fx.pure [ ]) schemaEffects;
     in
-    builtins.foldl' (
-      acc: schemaEffect:
-      fx.bind acc (
-        prevResults:
-        processSingleResolve entityKind enrichedCtx includeAspects isFanOut prevResults schemaEffect
-      )
-    ) (fx.pure [ ]) schemaEffects;
+    if !isFanOut || isLatePass then
+      mainFold
+    else
+      fx.bind fx.effects.state.get (
+        preState:
+        # Skip late dispatch if already inside a late-dispatch pass (state flag).
+        if (preState.inLateDispatch or false) then
+          mainFold
+        else
+          fx.bind mainFold (
+            allResults:
+            let
+              # Compute sibling metadata purely from schema effects.
+              siblingMetas = map (
+                schemaEffect:
+                let
+                  targetKind = resolveTargetKind entityKind schemaEffect;
+                  resolveBindings = schemaEffect.schema.value;
+                  scopedCtx = enrichedCtx // resolveBindings;
+                  entityClass = resolveEntityClass targetKind resolveBindings;
+                in
+                {
+                  inherit targetKind scopedCtx entityClass;
+                  scopeId = mkScopeId scopedCtx;
+                }
+              ) schemaEffects;
+            in
+            fx.bind (lateDispatchPass entityKind siblingMetas) (_: fx.pure allResults)
+          )
+      );
 
   # Empty accumulator for iteration.
   emptyAcc = {
@@ -444,7 +573,22 @@ let
       combinedEffects = mergeEffects accEffects dispatched;
     in
     if newEnrichKeys == [ ] then
-      emitFinalEffects entityKind currentCtx accEnrichment dispatched combinedEffects
+      # Record fired policy names for late-dispatch pass (cross-sibling visibility).
+      fx.bind (fx.effects.state.modify (
+        st:
+        let
+          dispatchKey = "${entityKind}@${st.currentScope}";
+        in
+        st
+        // {
+          firedPolicyNames =
+            _:
+            let
+              all = (st.firedPolicyNames or (_: { })) null;
+            in
+            all // { ${dispatchKey} = updatedFired; };
+        }
+      )) (_: emitFinalEffects entityKind currentCtx accEnrichment dispatched combinedEffects)
     else if iteration >= maxPolicyIterations then
       throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
     else
@@ -485,7 +629,12 @@ let
       state:
       let
         scope = state.currentScope;
-        currentCtx = if scope == null then ctx else (state.scopeContexts null).${scope} or ctx;
+        # Merge handler-derived ctx (from aspect's __scopeHandlers) with
+        # scopeContexts. Handler ctx takes precedence — it reflects the
+        # actual scope.provide context for entities resolved inline
+        # (without their own setScope).
+        scopeCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
+        currentCtx = scopeCtx // ctx;
         dispatchKey = "${entityKind}@${scope}";
         alreadyDispatched = builtins.elem dispatchKey ((state.dispatchedPolicies or (_: [ ])) null);
         globalPolicies = den.policies or { };

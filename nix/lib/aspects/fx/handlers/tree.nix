@@ -333,13 +333,18 @@ let
           ) allDeferred;
           satisfiable = partitioned.right;
           remaining = partitioned.wrong;
-          # Put remaining back into current scope (all satisfied ones removed).
+          # Remove satisfied items from current scope only, preserve other scopes.
           currentScope = state.currentScope;
         in
         {
           resume = satisfiable;
           state = state // {
-            scopedDeferredIncludes = _: { ${currentScope} = remaining; };
+            scopedDeferredIncludes =
+              _:
+              allScoped
+              // {
+                ${currentScope} = remaining;
+              };
           };
         };
   };

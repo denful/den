@@ -60,15 +60,17 @@
         ];
 
         expr = lib.sort lib.lessThan igloo.funny;
-        # Post-ctx: perUser on host aspect fires when drained with user
-        # context. perHost on user aspect also fires (host is available,
-        # no extras). Both guards are deprecated — context guards are
-        # unnecessary with handler-based resolution.
+        # Fan-out: perUser includes on host aspect drain once per user
+        # scope. Static variants produce identical output at each scope
+        # (appearing twice in the merged list). Fun variants produce
+        # per-user distinct output.
         expected = [
           "atHost perHost igloo fun"
           "atHost perHost static"
           "atHost perUser pingu@igloo fun"
           "atHost perUser static"
+          "atHost perUser static"
+          "atHost perUser tux@igloo fun"
           "atUser perUser static"
           "atUser perUser tux@igloo fun"
         ];

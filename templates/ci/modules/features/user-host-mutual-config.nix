@@ -132,9 +132,11 @@
           tuxHm.programs.direnv.enable
           pinguHm.programs.direnv.enable
         ];
+        # { host, user } parametric includes resolve once per user
+        # when both args are available (fan-out via deferred drain).
         expected = [
-          false
-          false
+          true
+          true
         ];
       }
     );
