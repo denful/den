@@ -11,6 +11,8 @@ let
   identity = den.lib.aspects.fx.identity;
   policy = den.lib.policy;
 
+  inherit (import ../key-classification.nix { inherit lib den; }) structuralKeysSet;
+
   schemaKinds = builtins.filter (n: den.schema.${n}.isEntity or false) (
     builtins.attrNames (den.schema or { })
   );
@@ -27,8 +29,57 @@ let
     else
       value;
 
-  # to-users / to-hosts: fires for every host×user pair.
-  mkWildcardPolicy =
+  # Unwrap a single class module value from aspectContentType wrapping.
+  unwrapClassValue =
+    rawValue:
+    if builtins.isAttrs rawValue && rawValue ? __contentValues then
+      let
+        vals = builtins.filter (v: !(builtins.isAttrs v && v == { })) (
+          map (d: d.value) rawValue.__contentValues
+        );
+      in
+      if builtins.length vals == 0 then
+        { }
+      else if builtins.length vals == 1 then
+        builtins.head vals
+      else
+        { imports = vals; }
+    else
+      rawValue;
+
+  # Extract non-structural keys from an aspect result as class modules.
+  extractClassModules =
+    result:
+    let
+      allKeys = builtins.attrNames result;
+      classKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) allKeys;
+    in
+    map (k: {
+      class = k;
+      module = unwrapClassValue result.${k};
+    }) classKeys;
+
+  # to-hosts: fires for every host×user pair, delivers directly to host's nixos class.
+  # Uses policy.provide for direct delivery — no tree walk, no duplicate emissions.
+  mkToHostsPolicy =
+    aspectName: key: value:
+    {
+      host,
+      user,
+      ...
+    }:
+    let
+      result = applyProvide value { inherit host user; };
+      classModules = extractClassModules result;
+    in
+    lib.warn
+      "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.provide { class = \"<class>\"; module = { <config> }; }) ];"
+      (map (cm: policy.provide cm) classModules);
+
+  # to-users: fires for every host×user pair, delivers to user's homeManager class.
+  # Uses policy.include because homeManager is a different pipeline class — policy.provide
+  # cannot deliver cross-class content (it only reaches the current pipeline's class).
+  mkToUsersPolicy =
     aspectName: key: value:
     {
       host,
@@ -40,11 +91,13 @@ let
     in
     [
       (policy.include (
-        lib.warn "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.include { <config> }) ];" result
+        lib.warn "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.include { <homeManager config> }) ];" result
       ))
     ];
 
   # Named target: fires only when entity name matches key.
+  # Uses policy.include because named targets may match either hosts or users,
+  # and user-targeted content requires cross-class delivery through the forward path.
   mkNamedTargetPolicy =
     aspectName: key: value:
     {
@@ -57,7 +110,7 @@ let
     in
     lib.optional (host.name == key || user.name == key) (
       policy.include (
-        lib.warn "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    lib.optional (host.name == \"${key}\" || user.name == \"${key}\")\n      (policy.include { <config> });" result
+        lib.warn "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    lib.optional (host.name == \"${key}\" || user.name == \"${key}\")\n      (policy.provide { class = \"<class>\"; module = { <config> }; });" result
       )
     );
 in
@@ -79,10 +132,11 @@ in
           key:
           let
             value = provides.${key};
-            isWildcard = key == "to-users" || key == "to-hosts";
             policyFn =
-              if isWildcard then
-                mkWildcardPolicy aspectName key value
+              if key == "to-hosts" then
+                mkToHostsPolicy aspectName key value
+              else if key == "to-users" then
+                mkToUsersPolicy aspectName key value
               else
                 mkNamedTargetPolicy aspectName key value;
           in

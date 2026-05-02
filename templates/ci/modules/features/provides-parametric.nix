@@ -78,6 +78,27 @@
       }
     );
 
+    # Regression: provides.to-hosts compat shim uses policy.provide (no duplicate emissions).
+    test-provides-to-hosts-compat-no-dupes = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.shared-host-config = {
+          provides.to-hosts.nixos.networking.hostName = "via-compat";
+        };
+
+        den.aspects.igloo.includes = [ den.aspects.shared-host-config ];
+
+        expr = igloo.networking.hostName;
+        expected = "via-compat";
+      }
+    );
+
     test-static-parent-bare-fn-sub = denTest (
       {
         den,
