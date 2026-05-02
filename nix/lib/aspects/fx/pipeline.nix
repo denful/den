@@ -80,14 +80,11 @@ let
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.
-  # Always returns a valid entity — existence gating removed.
   # Strips den.default from child entity includes to prevent
   # cross-context duplicate resolution: den.default is resolved once
-  # at the root entity level; child entities resolved during transitions
-  # must not re-resolve it in a different context (which would produce
-  # duplicate NixOS module definitions).
-  # Note: filter uses pointer identity — den.default in schemaIncludes
-  # is the same fixpoint value as denDefault here (no normalization).
+  # at the root entity level; child entities must not re-resolve it
+  # in a different context (which would produce duplicate NixOS
+  # module definitions). Filter uses pointer identity.
   denDefault = den.default or null;
   resolveEntityHandler = {
     "resolve-entity" =
@@ -201,7 +198,7 @@ let
         defaultState
         // extraState
         // {
-          inherit class rootScopeId;
+          inherit rootScopeId;
           currentScope = rootScopeId;
           scopeContexts = _: { ${rootScopeId} = ctx; };
         };
@@ -250,31 +247,11 @@ let
             # when NixOS tries to look them up. Standard den args (host, user)
             # DO exist in _module.args and are safe to advertise.
             enrichmentOnlyKeys = builtins.attrNames enrichmentKeys;
-            # Strip enrichment-only keys from the wrapped module's advertised
-            # args so NixOS won't try to resolve them from _module.args.
-            # For wrapped function modules, strip enrichment-only keys from
-            # the advertised args. setFunctionArgs returns an attrset with
-            # __functor + __functionArgs, so check __functionArgs presence.
             # Strip args that NixOS can't resolve from the module's advertised
-            # functionArgs.  Without this, NixOS tries _module.args.${name} for
-            # every advertised arg and crashes when the key doesn't exist —
-            # even when the arg has a default in the Nix function.
-            #
-            # For wrapped modules: enrichment-only keys were injected by den
-            # and don't exist in _module.args.
-            # For unwrapped modules: any arg with a default that isn't in ctx
-            # and isn't a standard module-system arg should be hidden so NixOS
-            # uses the function's native default instead of probing _module.args.
-            # Strip args that NixOS can't resolve from the module's advertised
-            # functionArgs.  Without this, NixOS tries _module.args.${name} for
-            # every advertised arg and crashes when the key doesn't exist —
-            # even when the arg has a default in the Nix function.
-            #
-            # For wrapped modules (setFunctionArgs attrset): enrichment-only
-            # keys were injected by den and don't exist in _module.args.
-            # For unwrapped raw functions: any arg with a default that isn't
-            # in ctx should be hidden so NixOS uses the function's native
-            # default instead of probing _module.args.
+            # functionArgs. Without this, NixOS probes _module.args.${name}
+            # for every advertised arg and crashes when the key doesn't exist.
+            # Wrapped modules: strip enrichment-only keys (injected by den).
+            # Unwrapped modules: strip args with defaults not in ctx.
             isWrappedAttrset = builtins.isAttrs result.module && result.module ? __functionArgs;
             rawFuncArgs =
               if isWrappedAttrset then
@@ -380,8 +357,6 @@ let
       instantiateModules = lib.concatMap (
         spec:
         let
-          # spec IS the entity — value unwrapping happens at emission
-          # (transition.nix sends ie.value, not ie).
           entity = spec;
           hasOutput = (entity.intoAttr or [ ]) != [ ];
         in
@@ -419,7 +394,6 @@ let
       # for user isolation. Root-scope-only forwards (no child copies) read
       # from merged classImports (unchanged behavior).
       rootScopeId = mkScopeId ctx;
-      scopeParent = result.state.scopeParent null;
       rawForwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
 
       # Dedup by adapterKey@scope. Suppress root-scope specs when child

@@ -46,7 +46,6 @@ let
     "includes"
     "provides"
     "policies"
-    "policies"
     "into"
     "classes"
     "__fn"
@@ -666,28 +665,29 @@ let
             ) allResults;
 
             allEnrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } classified;
-            # Per-policy include pairing for cross-provider patterns:
-            # When a policy has resolve.to (explicit __targetKind) AND includes,
-            # the includes travel with the schema effects. This prevents
-            # cross-provider includes from being broadcast to all entity walks
-            # (which causes double-fire via drain-deferred).
-            # Regular resolve (no __targetKind, e.g., home-env battery) keeps
-            # includes standalone — they emit at current scope as before.
-            hasCrossProviderResolve =
+            # Per-policy include pairing for cross-provider patterns.
+            # Prevents double-fire via drain-deferred when a resolve.to policy
+            # also has includes — includes travel with their schema effects.
+            paired = map (
               r:
-              r.schemaEffects != [ ]
-              && r.includeEffects != [ ]
-              && builtins.any (se: se.schema.__targetKind or null != null) r.schemaEffects;
+              let
+                isCrossProvider =
+                  r.schemaEffects != [ ]
+                  && r.includeEffects != [ ]
+                  && builtins.any (se: se.schema.__targetKind or null != null) r.schemaEffects;
+              in
+              r // { inherit isCrossProvider; }
+            ) classified;
             allSchemaEffects = builtins.concatMap (
               r:
-              if hasCrossProviderResolve r then
+              if r.isCrossProvider then
                 map (se: se // { __policyIncludes = map (e: e.value) r.includeEffects; }) r.schemaEffects
               else
                 r.schemaEffects
-            ) classified;
+            ) paired;
             allIncludeEffects = builtins.concatMap (
-              r: if hasCrossProviderResolve r then [ ] else r.includeEffects
-            ) classified;
+              r: if r.isCrossProvider then [ ] else r.includeEffects
+            ) paired;
             allExcludeEffects = builtins.concatMap (r: r.excludeEffects) classified;
             allRouteEffects = builtins.concatMap (
               r: map (re: re // { __routePolicyName = r.policyName; }) r.routeEffects
@@ -1208,8 +1208,8 @@ let
         __parentScopeHandlers = scopeHandlers;
         __parentCtxId = ctxId;
       };
-      # Includes resolve before transitions so deferred parametric includes
-      # drain when context widens during transitions.
+      # Includes resolve before policy dispatch so deferred parametric
+      # includes drain when context widens during entity resolution.
       childResolution = fx.bind (emitSelfProvide aspect) (
         selfProvResults:
         fx.bind (emitCrossProvideShims aspect) (

@@ -8,30 +8,38 @@
   # policy.resolve.shared {} sets __shared = true for shared (non-isolated) fan-out.
   resolve =
     let
+      splitIncludes =
+        bindings:
+        if bindings ? __includes then
+          {
+            includes = bindings.__includes;
+            value = removeAttrs bindings [ "__includes" ];
+          }
+        else
+          {
+            includes = [ ];
+            value = bindings;
+          };
       mkResolve =
         shared: bindings:
         let
-          includes = bindings.__includes or [ ];
-          cleanBindings = removeAttrs bindings [ "__includes" ];
+          s = splitIncludes bindings;
         in
         {
           __policyEffect = "resolve";
           __shared = shared;
-          value = cleanBindings;
-          inherit includes;
+          inherit (s) value includes;
         };
       mkResolveTo =
         shared: kind: bindings:
         let
-          includes = bindings.__includes or [ ];
-          cleanBindings = removeAttrs bindings [ "__includes" ];
+          s = splitIncludes bindings;
         in
         {
           __policyEffect = "resolve";
           __shared = shared;
           __targetKind = kind;
-          value = cleanBindings;
-          inherit includes;
+          inherit (s) value includes;
         };
     in
     {

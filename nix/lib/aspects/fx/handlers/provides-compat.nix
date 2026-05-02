@@ -15,7 +15,7 @@ let
     builtins.attrNames (den.schema or { })
   );
 
-  # Mirror shape detection from emitSelfProvide (aspect.nix:696-704).
+  # Mirror shape detection from emitSelfProvide in aspect.nix.
   applyProvide =
     value: ctx:
     if builtins.isAttrs value && value ? __fn then
