@@ -52,11 +52,13 @@
       };
 
     # <user>.policies.<name>, aspect-included policy
+    # Delivers NixOS config to the host (cross-scope via policy.provide).
     policies.to-igloo =
       { host, user, ... }:
       lib.optional (host.name == "igloo") (
-        den.lib.policy.include {
-          nixos.programs.nh.enable = true;
+        den.lib.policy.provide {
+          class = "nixos";
+          module.programs.nh.enable = true;
         }
       );
   };
