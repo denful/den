@@ -198,8 +198,9 @@ let
     in
     base // body;
 
-  # Register forward spec in state with captured context for post-processing.
-  # Post-processing in pipeline.nix runs sub-pipelines and wraps results.
+  # Register forward spec as a route in pipeline state.
+  # All forwards — simple and complex — go into scopedRoutes.
+  # Post-processing in route.nix handles both kinds uniformly.
   forwardHandler = {
     "emit-forward" =
       { param, state }:
@@ -222,54 +223,37 @@ let
         sourceAlreadyCollected = scopeClasses ? ${spec.fromClass};
         isTier1 = isSimpleSpec && sourceIsLocal && sourceAlreadyCollected;
 
-        # Tier 1: register as a route (source modules already in scopedClassImports).
-        tier1Result = {
-          resume = null;
-          state = state // {
-            scopedRoutes =
-              _:
-              let
-                all = state.scopedRoutes null;
-                route = {
-                  inherit (spec) fromClass intoClass;
-                  path = spec.staticIntoPath;
-                  guard = null;
-                  adaptArgs = null;
-                  sourceScopeId = scope;
-                };
-              in
-              all
-              // {
-                ${scope} = (all.${scope} or [ ]) ++ [ route ];
-              };
-          };
-        };
-
-        # Tier 2: register forward spec for post-pipeline scope lookup.
-        # Source modules are read from wrappedPerScope in pipeline.nix.
-        # Use currentScope directly — that's where modules are actually
-        # emitted. The old ctxFromHandlers approach computed a scope ID
-        # from the source aspect's handlers, which didn't match the
-        # actual scope keys (missing class, aspect-chain, etc.).
-        enrichedSpec = spec // {
+        # Tier 1: simple route shape (backward compatible).
+        simpleRoute = {
+          inherit (spec) fromClass intoClass;
+          path = spec.staticIntoPath;
+          guard = null;
+          adaptArgs = null;
           sourceScopeId = scope;
         };
-        tier2Result = {
-          resume = null;
-          state = state // {
-            scopedForwardSpecs =
-              _:
-              let
-                all = state.scopedForwardSpecs null;
-              in
-              all
-              // {
-                ${scope} = (all.${scope} or [ ]) ++ [ enrichedSpec ];
-              };
-          };
+
+        # Complex: full forward spec as route with __complexForward marker.
+        complexRoute = spec // {
+          sourceScopeId = scope;
+          __complexForward = true;
         };
+
+        route = if isTier1 then simpleRoute else complexRoute;
       in
-      if isTier1 then tier1Result else tier2Result;
+      {
+        resume = null;
+        state = state // {
+          scopedRoutes =
+            _:
+            let
+              all = state.scopedRoutes null;
+            in
+            all
+            // {
+              ${scope} = (all.${scope} or [ ]) ++ [ route ];
+            };
+        };
+      };
   };
 
 in

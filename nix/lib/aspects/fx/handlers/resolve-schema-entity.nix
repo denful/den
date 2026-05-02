@@ -46,31 +46,35 @@ let
       inherit scopeHandlersForCtx setScope restoreScope;
     };
 
-  # Propagate root-scope forward specs to a child scope.
-  propagateRootForwards =
+  # Propagate root-scope complex routes to a child scope.
+  # Complex routes (those with __complexForward) registered at root scope
+  # need child-scope copies so applyRoutes can read per-scope source modules.
+  propagateRootRoutes =
     newScopeId: restoreScope: allResults:
     fx.bind (fx.effects.state.get) (
       postWalkState:
       let
         rootSid = postWalkState.rootScopeId;
-        rootForwards = (postWalkState.scopedForwardSpecs null).${rootSid} or [ ];
+        rootRoutes = (postWalkState.scopedRoutes null).${rootSid} or [ ];
         childClasses = (postWalkState.scopedClassImports null).${newScopeId} or { };
-        relevantForwards = builtins.filter (fwd: childClasses ? ${fwd.fromClass}) rootForwards;
-        childForwards = map (fwd: fwd // { sourceScopeId = newScopeId; }) relevantForwards;
+        # Only propagate complex routes — simple routes don't need per-scope source.
+        complexRootRoutes = builtins.filter (r: r.__complexForward or false) rootRoutes;
+        relevantRoutes = builtins.filter (r: childClasses ? ${r.fromClass}) complexRootRoutes;
+        childRoutes = map (r: r // { sourceScopeId = newScopeId; }) relevantRoutes;
       in
-      if childForwards == [ ] then
+      if childRoutes == [ ] then
         fx.bind restoreScope (_: fx.pure allResults)
       else
         fx.bind (fx.effects.state.modify (
           st:
           st
           // {
-            scopedForwardSpecs =
+            scopedRoutes =
               _:
               let
-                all = st.scopedForwardSpecs null;
+                all = st.scopedRoutes null;
               in
-              all // { ${newScopeId} = (all.${newScopeId} or [ ]) ++ childForwards; };
+              all // { ${newScopeId} = (all.${newScopeId} or [ ]) ++ childRoutes; };
           }
         )) (_: fx.bind restoreScope (_: fx.pure allResults))
     );
@@ -127,7 +131,7 @@ let
                   satisfiable:
                   fx.bind (walkDeferred scopeTransition.scopeHandlersForCtx ctxNames prevResults childResult
                     satisfiable
-                  ) (allResults: propagateRootForwards newScopeId scopeTransition.restoreScope allResults)
+                  ) (allResults: propagateRootRoutes newScopeId scopeTransition.restoreScope allResults)
                 )
               )
             )

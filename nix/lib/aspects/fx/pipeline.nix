@@ -163,7 +163,6 @@ let
     scopedRoutes = _: { };
     scopedInstantiates = _: { };
     scopedProvides = _: { };
-    scopedForwardSpecs = _: { };
     scopedEmittedLocs = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
@@ -351,14 +350,10 @@ let
         ]
       ) { } (builtins.attrValues wrappedPerScope);
 
-      # Apply Tier 1 routes (reads wrappedPerScope, produces new entries).
-      scopedRoutes = result.state.scopedRoutes null;
-      withRoutes = route.applyRoutes {
-        inherit scopedRoutes wrappedPerScope;
-        classImports = wrappedClassImports;
-      };
-
       # Apply policy.provide — inject new modules directly into target classes.
+      # Provides run BEFORE routes so that complex forward-derived routes
+      # (which read from classImports/perScope) can see provide-injected modules.
+      # This preserves the old ordering: provides → forwards.
       # Dedup: same policy firing at multiple scopes produces identical provides.
       # Keyed by policyName + class + path to preserve legitimate multi-policy provides.
       scopedProvides = result.state.scopedProvides null;
@@ -419,13 +414,30 @@ let
             }
           )
           {
-            classImports = withRoutes.classImports;
+            classImports = wrappedClassImports;
             perScope = wrappedPerScope;
           }
           allProvides;
 
       withProvides = providesResult.classImports;
       wrappedPerScopeWithProvides = providesResult.perScope;
+
+      # Apply all routes — both simple (path nesting) and complex (forward-derived).
+      # Runs after provides so complex routes can see provide-injected modules.
+      scopedRoutes = result.state.scopedRoutes null;
+      rootScopeId = mkScopeId ctx;
+      withRoutes = route.applyRoutes {
+        inherit
+          scopedRoutes
+          scopeContexts
+          ctx
+          rootScopeId
+          ;
+        wrappedPerScope = wrappedPerScopeWithProvides;
+        classImports = withProvides;
+        inherit fxResolve;
+        inherit (handlers) buildForwardAspect;
+      };
 
       # Apply entity instantiation — evaluate entities and place in flake output.
       scopedInstantiates = result.state.scopedInstantiates null;
@@ -460,148 +472,13 @@ let
           in
           [ { config = lib.setAttrByPath ([ "flake" ] ++ entity.intoAttr) evaluated; } ]
       ) allInstantiates;
-      withInstantiates = withProvides // {
-        flake = (withProvides.flake or [ ]) ++ instantiateModules;
+      withInstantiates = withRoutes.classImports // {
+        flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
       };
-
-      # Apply Tier 2 forwards with per-scope isolation.
-      # installPolicies propagates root-scope forward specs to child scopes
-      # during the pipeline walk. Child-scope copies read per-scope source
-      # for user isolation. Root-scope-only forwards (no child copies) read
-      # from merged classImports (unchanged behavior).
-      rootScopeId = mkScopeId ctx;
-      rawForwardSpecs = lib.concatLists (lib.attrValues (result.state.scopedForwardSpecs null));
-
-      # Dedup by adapterKey@scope. Suppress root-scope specs when child
-      # copies exist (child copies handle the forward with scope isolation).
-      forwardSpecs =
-        let
-          # Collect adapterKeys that have child-scope specs.
-          childScopeKeys = builtins.foldl' (
-            acc: s:
-            let
-              ak = s.adapterKey or null;
-            in
-            if ak != null && s.sourceScopeId != rootScopeId then acc // { ${ak} = true; } else acc
-          ) { } rawForwardSpecs;
-
-          go =
-            seen: specs:
-            if specs == [ ] then
-              [ ]
-            else
-              let
-                s = builtins.head specs;
-                rest = builtins.tail specs;
-                ak = s.adapterKey or null;
-                # Suppress root-scope spec when child copies handle the same forward.
-                isRedundantRoot = ak != null && s.sourceScopeId == rootScopeId && childScopeKeys ? ${ak};
-                # Scope-specific dedup: same forward at different scopes must NOT
-                # be deduped — each scope needs its own isolated execution.
-                key = if ak != null then "${ak}@${s.sourceScopeId}" else null;
-              in
-              if isRedundantRoot then
-                go seen rest
-              else if key != null && seen ? ${key} then
-                go seen rest
-              else
-                [ s ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
-        in
-        go { } rawForwardSpecs;
-
-      # Collect class modules from a forward aspect (recursing into includes).
-      collectClassMods =
-        cls: aspect:
-        let
-          own = if aspect ? ${cls} then [ aspect.${cls} ] else [ ];
-          nested = builtins.concatMap (collectClassMods cls) (aspect.includes or [ ]);
-        in
-        own ++ nested;
-
-      applyForwardSpecs =
-        specs: classImports:
-        builtins.foldl'
-          (
-            acc: spec:
-            let
-              sid = spec.sourceScopeId;
-              # Source modules: per-scope for child-scope forwards (scope isolation),
-              # merged for root-scope forwards (aggregate/alias forwards unchanged).
-              sourceModules =
-                if sid != rootScopeId then
-                  # Per-scope + filtered root fallback: only den.default's shared
-                  # modules (identity = "default") from root scope. Host-specific
-                  # aspect modules (identity = host name) are excluded to prevent
-                  # leaking into user forwards.
-                  let
-                    ownModules = (acc.perScope.${sid} or { }).${spec.fromClass} or [ ];
-                    rootModules = (acc.perScope.${rootScopeId} or { }).${spec.fromClass} or [ ];
-                    isDenDefaultModule =
-                      mod:
-                      let
-                        k = mod.key or mod._file or "";
-                      in
-                      lib.hasSuffix "@default" k;
-                    sharedModules = builtins.filter isDenDefaultModule rootModules;
-                  in
-                  sharedModules ++ ownModules
-                else
-                  acc.classImports.${spec.fromClass} or [ ];
-              # If no source modules in the pipeline, resolve the forward's
-              # source aspect directly. This handles forwards whose fromAspect
-              # produces a synthetic aspect not walked during the pipeline
-              # (the old sub-pipeline was removed).
-              resolvedSourceModules =
-                if sourceModules != [ ] then
-                  sourceModules
-                else if spec ? sourceAspect then
-                  let
-                    normalized = den.lib.aspects.normalizeRoot spec.sourceAspect;
-                    sourceCtx = scopeContexts.${sid} or ctx;
-                    sourceResult = fxResolve {
-                      class = spec.fromClass;
-                      self = normalized;
-                      ctx =
-                        sourceCtx // den.lib.aspects.fx.aspect.ctxFromHandlers (spec.sourceAspect.__scopeHandlers or { });
-                    };
-                  in
-                  sourceResult.imports
-                else
-                  [ ];
-              rawSourceModule = {
-                imports = resolvedSourceModules;
-              };
-              sourceModule = spec.mapModule rawSourceModule;
-              forwardAspect = handlers.buildForwardAspect spec sourceModule;
-              newMods = collectClassMods spec.intoClass forwardAspect;
-            in
-            {
-              classImports = acc.classImports // {
-                ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
-              };
-              # Track forward outputs per-scope for chained forward support.
-              perScope = acc.perScope // {
-                ${sid} = (acc.perScope.${sid} or { }) // {
-                  ${spec.intoClass} = ((acc.perScope.${sid} or { }).${spec.intoClass} or [ ]) ++ newMods;
-                };
-              };
-            }
-          )
-          {
-            inherit classImports;
-            perScope = wrappedPerScopeWithProvides;
-          }
-          specs;
-
-      forwarded =
-        if forwardSpecs == [ ] then
-          withInstantiates
-        else
-          (applyForwardSpecs forwardSpecs withInstantiates).classImports;
 
     in
     {
-      imports = forwarded.${class} or [ ];
+      imports = withInstantiates.${class} or [ ];
     };
 in
 {
