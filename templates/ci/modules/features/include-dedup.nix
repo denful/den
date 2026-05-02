@@ -486,5 +486,70 @@
       }
     );
 
+    # Provide with anonymous parametric sub-includes setting a unique-typed
+    # option. The entity resolves twice (first from host scope, second from
+    # self-referential policy dispatch). Both resolutions walk the provide's
+    # sub-includes. The second resolution must NOT produce duplicate modules
+    # with different identities — that would collide on the unique option.
+    # Reproduces: slashfiles inputs' _module.args collision.
+    test-provide-anon-sub-include-no-dup = denTest (
+      {
+        den,
+        lib,
+        igloo,
+        tuxHm,
+        ...
+      }:
+      let
+        # Mimics den.provides.inputs' pattern: a provide with anonymous
+        # parametric sub-includes that emit to homeManager class.
+        myProvide = {
+          name = "my-provide";
+          meta = { };
+          includes = [
+            # osAspect — parametric, takes { host }
+            (
+              { host }:
+              {
+                ${host.class}.environment.variables.FROM_PROVIDE = "yes";
+              }
+            )
+            # userAspect — parametric, takes { user, host }, emits to homeManager
+            (
+              { user, host }:
+              {
+                homeManager.home.sessionVariables.FROM_PROVIDE = "yes";
+              }
+            )
+          ];
+        };
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.default.homeManager.home.stateVersion = "25.11";
+        den.default.includes = [ myProvide ];
+        # Enrichment policy — mimics slashfiles host-guards which adds
+        # isDarwin/isNixos context. This triggers context widening and
+        # re-dispatch at each entity scope, causing the provide's sub-includes
+        # to be walked a second time with different __ctxId.
+        den.default.policies.enrichment =
+          { host, ... }:
+          [
+            (den.lib.policy.resolve {
+              isNixos = host.class == "nixos";
+            })
+          ];
+
+        expr = {
+          nixos = igloo.environment.variables.FROM_PROVIDE or "missing";
+          hm = tuxHm.home.sessionVariables.FROM_PROVIDE or "missing";
+        };
+        expected = {
+          nixos = "yes";
+          hm = "yes";
+        };
+      }
+    );
+
   };
 }

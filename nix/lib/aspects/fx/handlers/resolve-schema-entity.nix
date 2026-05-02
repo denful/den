@@ -90,7 +90,6 @@ let
         let
           deferredTagged = deferred.child // {
             __scopeHandlers = scopeHandlersForCtx;
-            __ctxId = ctxNames;
           };
         in
         fx.bind (aspectToEffect deferredTagged) (resolved: fx.pure (prev ++ [ resolved ]))
@@ -149,8 +148,25 @@ let
                 fx.bind (fx.send "resolve-entity" { kind = targetKind; }) (
                   rawEntity:
                   let
+                    # Strip stale __ctxId from policy-threaded includes (recursively).
+                    # These aspects carry ctxId from their original dispatch
+                    # context, which causes identity mismatches when re-resolved
+                    # in the entity's fresh scope — producing duplicate emissions.
+                    stripCtxId =
+                      a:
+                      if builtins.isAttrs a then
+                        (builtins.removeAttrs a [ "__ctxId" ])
+                        // lib.optionalAttrs (a ? includes) {
+                          includes = map stripCtxId (a.includes or [ ]);
+                        }
+                      else
+                        a;
                     entity = rawEntity // {
-                      includes = (rawEntity.includes or [ ]) ++ includeAspects ++ policyIncludes ++ resolveIncludes;
+                      includes =
+                        (rawEntity.includes or [ ])
+                        ++ map stripCtxId includeAspects
+                        ++ map stripCtxId policyIncludes
+                        ++ map stripCtxId resolveIncludes;
                     };
                   in
                   fx.bind (aspectToEffect entity) (
