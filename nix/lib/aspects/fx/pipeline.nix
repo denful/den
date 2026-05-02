@@ -75,6 +75,7 @@ let
     // handlers.drainDeferredHandler
     // handlers.registerRouteHandler
     // handlers.registerInstantiateHandler
+    // handlers.provideHandler
     // resolveEntityHandler
     // handlers.forwardHandler
     // fx.effects.state.handler;
@@ -156,6 +157,7 @@ let
     scopedConstraintFilters = _: { };
     scopedRoutes = _: { };
     scopedInstantiates = _: { };
+    scopedProvides = _: { };
     scopedForwardSpecs = _: { };
     scopedEmittedLocs = _: { };
 
@@ -351,6 +353,49 @@ let
         classImports = wrappedClassImports;
       };
 
+      # Apply policy.provide — inject new modules directly into target classes.
+      scopedProvides = result.state.scopedProvides null;
+      allProvides = lib.concatLists (lib.attrValues scopedProvides);
+      withProvides = builtins.foldl' (
+        acc: spec:
+        let
+          targetClass = spec.class;
+          path = spec.path or [ ];
+          scopeCtx = scopeContexts.${spec.sourceScopeId} or ctx;
+          wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
+            ctx = scopeCtx;
+            module = spec.module;
+            aspectPolicy = null;
+            globalPolicy = null;
+          };
+          wrappedMod =
+            if wrapped.unsatisfied or false then
+              [ ]
+            else
+              let
+                mod = wrapped.module;
+                nested =
+                  if path == [ ] then
+                    mod
+                  else
+                    args:
+                    let
+                      fullArgs = args // (args.config._module.args or { });
+                      resolved = if builtins.isFunction mod then mod fullArgs else mod;
+                    in
+                    {
+                      config = lib.setAttrByPath path resolved;
+                    };
+                loc = "${targetClass}@<provide>/${lib.concatStringsSep "/" path}";
+              in
+              [ (lib.setDefaultModuleLocation loc nested) ];
+        in
+        acc
+        // {
+          ${targetClass} = (acc.${targetClass} or [ ]) ++ wrappedMod;
+        }
+      ) withRoutes.classImports allProvides;
+
       # Apply entity instantiation — evaluate entities and place in flake output.
       scopedInstantiates = result.state.scopedInstantiates null;
       allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
@@ -384,8 +429,8 @@ let
           in
           [ { config = lib.setAttrByPath ([ "flake" ] ++ entity.intoAttr) evaluated; } ]
       ) allInstantiates;
-      withInstantiates = withRoutes.classImports // {
-        flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
+      withInstantiates = withProvides // {
+        flake = (withProvides.flake or [ ]) ++ instantiateModules;
       };
 
       # Apply Tier 2 forwards with per-scope isolation.

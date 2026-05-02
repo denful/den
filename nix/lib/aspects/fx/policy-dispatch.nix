@@ -150,6 +150,7 @@ let
       excludeEffects = filterEffect "exclude" r.effects;
       routeEffects = filterEffect "route" r.effects;
       instantiateEffects = filterEffect "instantiate" r.effects;
+      provideEffects = filterEffect "provide" r.effects;
     };
 
   # Tag cross-provider schema effects with their paired includes.
@@ -171,7 +172,8 @@ let
     || r.includeEffects != [ ]
     || r.excludeEffects != [ ]
     || r.routeEffects != [ ]
-    || r.instantiateEffects != [ ];
+    || r.instantiateEffects != [ ]
+    || r.provideEffects != [ ];
 
   # Collect all schema effects, attaching cross-provider includes.
   collectSchemaEffects =
@@ -209,6 +211,9 @@ let
       instantiateEffects = builtins.concatMap (
         r: map (ie: ie // { __instantiatePolicyName = r.policyName; }) r.instantiateEffects
       ) classified;
+      provideEffects = builtins.concatMap (
+        r: map (pe: pe // { __providePolicyName = r.policyName; }) r.provideEffects
+      ) classified;
       firedNames = map (r: r.policyName) (builtins.filter hasEffects classified);
     };
 
@@ -242,18 +247,25 @@ let
       )
     ) (fx.pure null) effects;
 
-  # Emit policy route and instantiate effects.
+  # Emit policy route, instantiate, and provide effects.
   policyEmitEffects =
-    routeEffects: instantiateEffects:
+    routeEffects: instantiateEffects: provideEffects:
     fx.bind
       (builtins.foldl' (
         acc: e: fx.bind acc (_: fx.send "register-route" e.value)
       ) (fx.pure null) routeEffects)
       (
         _:
-        builtins.foldl' (
-          acc: e: fx.bind acc (_: fx.send "register-instantiate" e.value)
-        ) (fx.pure null) instantiateEffects
+        fx.bind
+          (builtins.foldl' (
+            acc: e: fx.bind acc (_: fx.send "register-instantiate" e.value)
+          ) (fx.pure null) instantiateEffects)
+          (
+            _:
+            builtins.foldl' (
+              acc: e: fx.bind acc (_: fx.send "register-provide" e.value)
+            ) (fx.pure null) provideEffects
+          )
       );
 
   # Build scope transition operations for a schema effect.
@@ -459,6 +471,7 @@ let
     excludeEffects = [ ];
     routeEffects = [ ];
     instantiateEffects = [ ];
+    provideEffects = [ ];
   };
 
   # Merge new dispatch results into the accumulator.
@@ -468,6 +481,7 @@ let
     excludeEffects = accEffects.excludeEffects ++ dispatched.excludeEffects;
     routeEffects = accEffects.routeEffects ++ dispatched.routeEffects;
     instantiateEffects = accEffects.instantiateEffects ++ dispatched.instantiateEffects;
+    provideEffects = accEffects.provideEffects ++ dispatched.provideEffects;
   };
 
   # Emit final effects when enrichment has stabilized.
@@ -480,13 +494,17 @@ let
     in
     fx.bind (policyEmitExcludes combinedEffects.excludeEffects) (
       _:
-      fx.bind (policyEmitEffects combinedEffects.routeEffects combinedEffects.instantiateEffects) (
-        _:
-        if hasSchemaResolves then
-          processSchemaResolves entityKind scope includeAspects combinedEffects.schemaEffects enrichedCtx
-        else
-          policyEmitIncludes combinedEffects.includeEffects
-      )
+      fx.bind
+        (policyEmitEffects combinedEffects.routeEffects combinedEffects.instantiateEffects
+          combinedEffects.provideEffects
+        )
+        (
+          _:
+          if hasSchemaResolves then
+            processSchemaResolves entityKind scope includeAspects combinedEffects.schemaEffects enrichedCtx
+          else
+            policyEmitIncludes combinedEffects.includeEffects
+        )
     );
 
   # Drain deferred aspects after enrichment context widen.

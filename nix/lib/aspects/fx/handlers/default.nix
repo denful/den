@@ -7,4 +7,5 @@
 // (import ./tree.nix args)
 // (import ./include.nix args)
 // (import ./forward.nix args)
+// (import ./provide.nix args)
 // (import ./provides-compat.nix args)

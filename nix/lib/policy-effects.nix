@@ -79,6 +79,15 @@
     value = spec;
   };
 
+  # Deliver a new module directly into a target class.
+  # Unlike route (which moves existing pipeline content), provide injects
+  # new content that didn't come from the pipeline walk.
+  # spec: { class, module, path? }
+  provide = spec: {
+    __policyEffect = "provide";
+    value = spec;
+  };
+
   # Tag a value with collisionPolicy = "class-wins".
   # When the value reaches a class module that also receives the same arg
   # from the module system (e.g., NixOS provides `lib`), the class value
