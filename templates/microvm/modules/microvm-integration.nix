@@ -79,6 +79,10 @@ in
 
   # Guest VM policy: resolve VM as a host entity within the pipeline's scope
   # tree, then route its class modules into the actual host's configuration.
+  # Guest VM policy: resolve VM host externally (isolated pipeline) and
+  # deliver its modules to the server via policy.provide at the correct paths.
+  # External resolution prevents VM modules from merging into the server's
+  # top-level output — only the routed content reaches the server.
   den.schema.microvm-guest.policies.microvm-guest-resolve-vm =
     {
       host,
@@ -86,8 +90,19 @@ in
       ...
     }:
     let
-      sharedNixStoreModule = lib.optionalAttrs host.microvm.sharedNixStore {
-        ${host.class}.microvm.vms.${vm.name}.config.microvm.shares = [
+      inherit (den.lib.policy) provide;
+
+      sharedNixStore = lib.optional host.microvm.sharedNixStore (provide {
+        class = host.class;
+        path = [
+          "microvm"
+          "vms"
+          vm.name
+          "config"
+          "microvm"
+          "shares"
+        ];
+        module = [
           {
             source = "/nix/store";
             mountPoint = "/nix/.ro-store";
@@ -95,52 +110,42 @@ in
             proto = "virtiofs";
           }
         ];
+      });
+
+      # Resolve VM as an isolated host pipeline — its modules stay external.
+      vmResolved = den.lib.aspects.resolve vm.class (den.lib.resolveEntity "host" { host = vm; });
+      microvmResolved = den.lib.aspects.resolve "microvm" vm.aspect;
+
+      # Deliver VM's OS class modules to server at microvm.vms.<name>.config
+      # Use submodule definition form (_: { imports }) so the module system
+      # evaluates them within the submodule context.
+      osProvide = provide {
+        class = host.class;
+        path = [
+          "microvm"
+          "vms"
+          vm.name
+          "config"
+        ];
+        module = _: vmResolved;
+      };
+
+      # Deliver VM's microvm class modules to server at microvm.vms.<name>
+      microvmProvide = provide {
+        class = host.class;
+        path = [
+          "microvm"
+          "vms"
+          vm.name
+        ];
+        module = _: microvmResolved;
       };
     in
     [
-      # Resolve VM as a host entity — its class modules land in a child scope.
-      # Pass __microvmHost so the child host policy can route modules back.
-      (resolve.to "host" {
-        host = vm;
-        __microvmHost = host;
-      })
-      # Inject shared nix store config into actual host
-      (include sharedNixStoreModule)
-    ];
-
-  # When a host is resolved within a microvm-guest context (__microvmHost present),
-  # route the VM's class modules and microvm class modules back to the actual host.
-  den.schema.host.policies.microvm-vm-route-back =
-    {
-      host,
-      __microvmHost ? null,
-      ...
-    }:
-    lib.optionals (__microvmHost != null) [
-      # Route VM's OS class modules (e.g., nixos) into actual host at
-      # microvm.vms.<vm-name>.config
-      (route {
-        fromClass = host.class;
-        intoClass = __microvmHost.class;
-        path = [
-          "microvm"
-          "vms"
-          host.name
-          "config"
-        ];
-      })
-      # Route VM's microvm class modules into actual host at
-      # microvm.vms.<vm-name>
-      (route {
-        fromClass = "microvm";
-        intoClass = __microvmHost.class;
-        path = [
-          "microvm"
-          "vms"
-          host.name
-        ];
-      })
-    ];
+      osProvide
+      microvmProvide
+    ]
+    ++ sharedNixStore;
 
   den.schema.microvm-host.includes = [ ];
   den.schema.microvm-guest.includes = [ ];
