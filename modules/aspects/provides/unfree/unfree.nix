@@ -18,21 +18,29 @@ let
       "provides"
     ];
     __fn =
-      { class, ... }:
+      { class, ... }@args:
+      let
+        # At user scope, emit to the user's primary class (e.g. homeManager)
+        # instead of the pipeline class (nixos). The old sub-pipeline system
+        # set class per-entity; the unified pipeline uses one root class.
+        targetClass =
+          if args ? user then builtins.head ((args.user.classes or [ ]) ++ [ class ]) else class;
+      in
       if
-        (builtins.elem class [
+        (builtins.elem targetClass [
           "nixos"
           "darwin"
           "homeManager"
         ])
       then
         {
-          ${class}.unfree.packages = allowed-names;
+          ${targetClass}.unfree.packages = allowed-names;
         }
       else
         { };
     __args = {
       class = true;
+      user = true;
     };
   };
 in
