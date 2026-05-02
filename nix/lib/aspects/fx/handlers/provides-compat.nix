@@ -77,8 +77,7 @@ let
       (map (cm: policy.provide cm) classModules);
 
   # to-users: fires for every host×user pair, delivers to user's homeManager class.
-  # Uses policy.include because homeManager is a different pipeline class — policy.provide
-  # cannot deliver cross-class content (it only reaches the current pipeline's class).
+  # Uses policy.provide for direct cross-class delivery into homeManager.
   mkToUsersPolicy =
     aspectName: key: value:
     {
@@ -88,16 +87,14 @@ let
     }:
     let
       result = applyProvide value { inherit host user; };
+      classModules = extractClassModules result;
     in
-    [
-      (policy.include (
-        lib.warn "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.include { <homeManager config> }) ];" result
-      ))
-    ];
+    lib.warn
+      "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.provide { class = \"homeManager\"; module = { <config> }; }) ];"
+      (map (cm: policy.provide cm) classModules);
 
   # Named target: fires only when entity name matches key.
-  # Uses policy.include because named targets may match either hosts or users,
-  # and user-targeted content requires cross-class delivery through the forward path.
+  # Uses policy.provide for direct cross-class delivery into the target class.
   mkNamedTargetPolicy =
     aspectName: key: value:
     {
@@ -107,11 +104,12 @@ let
     }:
     let
       result = applyProvide value { inherit host user; };
+      classModules = extractClassModules result;
     in
-    lib.optional (host.name == key || user.name == key) (
-      policy.include (
-        lib.warn "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    lib.optional (host.name == \"${key}\" || user.name == \"${key}\")\n      (policy.provide { class = \"<class>\"; module = { <config> }; });" result
-      )
+    lib.optionals (host.name == key || user.name == key) (
+      lib.warn
+        "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    lib.optional (host.name == \"${key}\" || user.name == \"${key}\")\n      (policy.provide { class = \"<class>\"; module = { <config> }; });"
+        (map (cm: policy.provide cm) classModules)
     );
 in
 {

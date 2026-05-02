@@ -19,7 +19,7 @@ let
             _:
             all
             // {
-              ${scope} = (all.${scope} or [ ]) ++ [ param ];
+              ${scope} = (all.${scope} or [ ]) ++ [ (param // { sourceScopeId = scope; }) ];
             };
         };
       };

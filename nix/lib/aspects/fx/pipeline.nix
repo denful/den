@@ -377,33 +377,50 @@ let
                 [ s ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
         in
         go { } raw;
-      withProvides = builtins.foldl' (
-        acc: spec:
-        let
-          targetClass = spec.class;
-          path = spec.path or [ ];
-          scopeCtx = scopeContexts.${spec.sourceScopeId} or ctx;
-          rawModule = if path == [ ] then spec.module else lib.setAttrByPath path spec.module;
-          wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
-            ctx = scopeCtx;
-            module = rawModule;
-            aspectPolicy = null;
-            globalPolicy = null;
-          };
-          wrappedMod =
-            if wrapped.unsatisfied or false then
-              [ ]
-            else
-              let
-                loc = "${targetClass}@<provide>/${lib.concatStringsSep "/" path}";
-              in
-              [ (lib.setDefaultModuleLocation loc wrapped.module) ];
-        in
-        acc
-        // {
-          ${targetClass} = (acc.${targetClass} or [ ]) ++ wrappedMod;
-        }
-      ) withRoutes.classImports allProvides;
+      providesResult =
+        builtins.foldl'
+          (
+            acc: spec:
+            let
+              targetClass = spec.class;
+              path = spec.path or [ ];
+              sid = spec.sourceScopeId;
+              scopeCtx = scopeContexts.${sid} or ctx;
+              rawModule = if path == [ ] then spec.module else lib.setAttrByPath path spec.module;
+              wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
+                ctx = scopeCtx;
+                module = rawModule;
+                aspectPolicy = null;
+                globalPolicy = null;
+              };
+              wrappedMod =
+                if wrapped.unsatisfied or false then
+                  [ ]
+                else
+                  let
+                    loc = "${targetClass}@<provide>/${lib.concatStringsSep "/" path}";
+                  in
+                  [ (lib.setDefaultModuleLocation loc wrapped.module) ];
+            in
+            {
+              classImports = acc.classImports // {
+                ${targetClass} = (acc.classImports.${targetClass} or [ ]) ++ wrappedMod;
+              };
+              perScope = acc.perScope // {
+                ${sid} = (acc.perScope.${sid} or { }) // {
+                  ${targetClass} = ((acc.perScope.${sid} or { }).${targetClass} or [ ]) ++ wrappedMod;
+                };
+              };
+            }
+          )
+          {
+            classImports = withRoutes.classImports;
+            perScope = wrappedPerScope;
+          }
+          allProvides;
+
+      withProvides = providesResult.classImports;
+      wrappedPerScopeWithProvides = providesResult.perScope;
 
       # Apply entity instantiation — evaluate entities and place in flake output.
       scopedInstantiates = result.state.scopedInstantiates null;
@@ -567,7 +584,7 @@ let
           )
           {
             inherit classImports;
-            perScope = wrappedPerScope;
+            perScope = wrappedPerScopeWithProvides;
           }
           specs;
 

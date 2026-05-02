@@ -114,5 +114,33 @@ in
       }
     );
 
+    # Cross-class provide — inject homeManager content from a host pipeline policy.
+    test-provide-cross-class = denTest (
+      {
+        den,
+        tuxHm,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo = { };
+
+        den.policies.provide-cross-class =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "homeManager";
+              module = {
+                programs.direnv.enable = true;
+              };
+            })
+          ];
+
+        expr = tuxHm.programs.direnv.enable;
+        expected = true;
+      }
+    );
+
   };
 }
