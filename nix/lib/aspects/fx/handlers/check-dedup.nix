@@ -9,6 +9,7 @@
 let
   identity = den.lib.aspects.fx.identity;
   inherit (den.lib.aspects) isMeaningfulName;
+  inherit (den.lib.aspects.fx.traceUtil) traceDetail;
 in
 {
   checkDedupHandler = {
@@ -26,9 +27,17 @@ in
         isDuplicate = dedupKey != null && seen ? ${dedupKey};
       in
       {
-        resume = {
-          inherit isDuplicate dedupKey;
-        };
+        resume =
+          let
+            dk = if dedupKey != null then dedupKey else "null";
+            cid = child.__ctxId or "null";
+            dup = if isDuplicate then "yes" else "no";
+          in
+          traceDetail
+            "check-dedup name=${originalName} identity=${childIdentity} dedupKey=${dk} isDup=${dup} ctxId=${cid}"
+            {
+              inherit isDuplicate dedupKey;
+            };
         state =
           if isDuplicate || dedupKey == null then
             state

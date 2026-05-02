@@ -10,6 +10,7 @@ let
   inherit (den.lib.aspects) isMeaningfulName;
 
   inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet classifyKeys;
+  inherit (den.lib.aspects.fx.traceUtil) traceSummary traceDetail;
 
   inherit (import ./class-module.nix { inherit lib den; }) wrapClassModule;
 
@@ -72,7 +73,12 @@ let
                 ;
               __rawEntry = true;
               isContextDependent =
-                (aspect.__parametricResolved or false) || (aspect.meta.contextDependent or false);
+                let
+                  resolvedArgs = aspect.__parametricResolvedArgs or [ ];
+                  usesCtxArgs = resolvedArgs != [ ] && builtins.any (ak: ctx ? ${ak}) resolvedArgs;
+                  result = usesCtxArgs || (aspect.meta.contextDependent or false);
+                in
+                traceDetail "isContextDependent ${k}@${elemIdentity} resolvedArgs=[${lib.concatStringsSep "," resolvedArgs}] ctxKeys=[${lib.concatStringsSep "," (builtins.attrNames ctx)}] usesCtx=${if usesCtxArgs then "yes" else "no"} result=${if result then "yes" else "no"}" result;
             })
           ]
         ) indexed
@@ -230,7 +236,8 @@ let
     // lib.optionalAttrs (mergedScopeHandlers != { }) { __scopeHandlers = mergedScopeHandlers; }
     // lib.optionalAttrs (aspect ? __ctxId) { inherit (aspect) __ctxId; }
     // {
-      __parametricResolved = true;
+      __parametricResolvedArgs =
+        (aspect.__parametricResolvedArgs or [ ]) ++ builtins.attrNames (aspect.__args or { });
     };
 
   maxParametricDepth = 10;
@@ -247,48 +254,55 @@ let
       scopeHandlers = aspect.__scopeHandlers or null;
       scopeFn = if scopeHandlers != null then fx.effects.scope.provide scopeHandlers else null;
     in
-    if isParametric then
-      if depth >= maxParametricDepth then
-        throw "den: parametric resolution exceeded ${toString maxParametricDepth} levels for '${aspect.name or "<anon>"}' — likely a curried function that never bottoms out"
-      else
-        let
-          rawFn = aspect.__fn;
-          fn =
-            if (aspect.meta.exactMatch or false) && scopeHandlers != null then
-              args: rawFn (args // { __scopeKeys = builtins.attrNames scopeHandlers; })
-            else
-              rawFn;
-          resolveFn = if scopeFn != null then scopeFn (fx.bind.fn userArgs fn) else fx.bind.fn userArgs fn;
-        in
-        fx.bind resolveFn (
-          resolved:
-          let
-            base = {
-              inherit (aspect) name;
-              meta =
-                (aspect.meta or { })
-                // (if builtins.isAttrs resolved then resolved.meta or { } else { })
-                // {
-                  isParametric = true;
-                  fnArgNames = builtins.attrNames userArgs;
+    traceDetail
+      "aspectToEffect name=${aspect.name or "<anon>"} entity=${aspect.__entityKind or "-"} parametric=${
+        if isParametric then "yes" else "no"
+      }"
+      (
+        if isParametric then
+          if depth >= maxParametricDepth then
+            throw "den: parametric resolution exceeded ${toString maxParametricDepth} levels for '${aspect.name or "<anon>"}' — likely a curried function that never bottoms out"
+          else
+            let
+              rawFn = aspect.__fn;
+              fn =
+                if (aspect.meta.exactMatch or false) && scopeHandlers != null then
+                  args: rawFn (args // { __scopeKeys = builtins.attrNames scopeHandlers; })
+                else
+                  rawFn;
+              resolveFn = if scopeFn != null then scopeFn (fx.bind.fn userArgs fn) else fx.bind.fn userArgs fn;
+            in
+            fx.bind resolveFn (
+              resolved:
+              let
+                base = {
+                  inherit (aspect) name;
+                  meta =
+                    (aspect.meta or { })
+                    // (if builtins.isAttrs resolved then resolved.meta or { } else { })
+                    // {
+                      isParametric = true;
+                      fnArgNames = builtins.attrNames userArgs;
+                    };
+                }
+                // lib.optionalAttrs (aspect ? into) { inherit (aspect) into; }
+                // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; };
+                next = mkParametricNext aspect base resolved;
+                tagged = tagParametricResult aspect next // {
+                  __parametricDepth = depth + 1;
                 };
-            }
-            // lib.optionalAttrs (aspect ? into) { inherit (aspect) into; }
-            // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; };
-            next = mkParametricNext aspect base resolved;
-            tagged = tagParametricResult aspect next // {
-              __parametricDepth = depth + 1;
-            };
-          in
-          aspectToEffect tagged
-        )
-    else
-      compileStatic (
-        builtins.removeAttrs aspect [
-          "__fn"
-          "__args"
-          "__parametricDepth"
-        ]
+              in
+              aspectToEffect tagged
+            )
+        else
+          compileStatic (
+            builtins.removeAttrs aspect [
+              "__fn"
+              "__args"
+              "__parametricDepth"
+              "__parametricResolvedArgs"
+            ]
+          )
       );
 
 in
