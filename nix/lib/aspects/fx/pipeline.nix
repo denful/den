@@ -67,6 +67,10 @@ let
     // handlers.constraintRegistryHandler
     // handlers.chainHandler
     // handlers.includeHandler
+    // handlers.checkDedupHandler
+    // handlers.resolveConditionalHandler
+    // handlers.resolveParametricHandler
+    // handlers.resolveAspectHandler
     // handlers.ctxSeenHandler
     // identity.pathSetHandler
     // identity.collectPathsHandler

@@ -12,7 +12,14 @@ let
       den,
       extraHandlers ? { },
     }:
+    let
+      fx = den.lib.fx;
+    in
     den.lib.aspects.fx.handlers.includeHandler
+    // den.lib.aspects.fx.handlers.checkDedupHandler
+    // den.lib.aspects.fx.handlers.resolveConditionalHandler
+    // den.lib.aspects.fx.handlers.resolveParametricHandler
+    // den.lib.aspects.fx.handlers.resolveAspectHandler
     // den.lib.aspects.fx.handlers.constraintRegistryHandler
     // {
       # Fallback probe-arg for custom handler sets without constantHandler.
@@ -57,7 +64,8 @@ let
           inherit state;
         };
     }
-    // extraHandlers;
+    // extraHandlers
+    // fx.effects.state.handler;
 
   defaultState = {
     currentScope = "__test";

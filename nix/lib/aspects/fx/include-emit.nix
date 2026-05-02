@@ -7,7 +7,7 @@
 let
   fx = den.lib.fx;
   identity = den.lib.aspects.fx.identity;
-  inherit (den.lib.aspects) isParametricWrapper;
+  inherit (den.lib.aspects) isParametricWrapper isMeaningfulName isSubmoduleFn;
 
   registerConstraints =
     aspect:
@@ -33,13 +33,136 @@ let
     in
     fx.seq (map (c: fx.send "register-constraint" (c // { inherit owner; })) allConstraints);
 
-  # Fold includes through emit-include effects, tagging each with its
-  # positional index and parent __scopeHandlers so the handler
-  # can derive stable identities and propagate context to children.
+  # --- Helpers moved from include.nix ---
+
+  # Normalize a NixOS module function into an aspect attrset.
+  normalizeModuleFn =
+    child:
+    den.lib.aspects.types.aspectType.merge
+      [ (child.name or "<deferred>") ]
+      [
+        {
+          file = "<deferred>";
+          value = child;
+        }
+      ];
+
+  wrapFunctorChild =
+    child:
+    let
+      innerFn = child.__functor child;
+      innerArgs = if builtins.isFunction innerFn then builtins.functionArgs innerFn else { };
+    in
+    if builtins.isFunction innerFn && isSubmoduleFn innerFn then
+      normalizeModuleFn innerFn
+    else
+      child
+      // {
+        __fn =
+          if child ? __args then
+            child.__fn
+          else if builtins.isFunction innerFn then
+            innerFn
+          else
+            _: innerFn;
+        __args =
+          let
+            explicit = child.__args or { };
+          in
+          if explicit != { } then explicit else innerArgs;
+        includes = child.includes or [ ];
+      };
+
+  wrapBareFn =
+    child:
+    if isSubmoduleFn child then
+      normalizeModuleFn child
+    else
+      {
+        name = child.name or "<anon>";
+        meta = child.meta or { };
+        __fn = child;
+        __args = lib.functionArgs child;
+      };
+
+  wrapChild =
+    child:
+    if lib.isFunction child then
+      if builtins.isAttrs child && child ? name && child ? includes && builtins.isList child.includes then
+        child
+      else if builtins.isAttrs child then
+        wrapFunctorChild child
+      else
+        wrapBareFn child
+    else
+      child;
+
+  nameAnon =
+    state: idx: ctxId:
+    let
+      chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
+      parent = if chain == [ ] then "<root>" else lib.last chain;
+      suffix = if ctxId != null then "/${ctxId}" else "";
+    in
+    "${parent}/<anon>:${toString idx}${suffix}";
+
+  excludeChild =
+    child: owner: dedupKey:
+    let
+      tombstone = identity.tombstone child { excludedFrom = owner; };
+    in
+    fx.bind (fx.send "resolve-complete" tombstone) (
+      _:
+      if dedupKey == null then
+        fx.pure [ tombstone ]
+      else
+        fx.bind (fx.send "include-unseen" dedupKey) (_: fx.pure [ tombstone ])
+    );
+
+  substituteChild =
+    child: decision:
+    let
+      tombstone = identity.tombstone child {
+        excludedFrom = decision.owner;
+        replacedBy = decision.replacement.name or "<anon>";
+      };
+    in
+    fx.bind (fx.send "resolve-complete" tombstone) (
+      _:
+      fx.bind (den.lib.aspects.fx.aspect.aspectToEffect decision.replacement) (
+        resolved:
+        fx.pure [
+          tombstone
+          resolved
+        ]
+      )
+    );
+
+  tagConstraintOwner =
+    child: decision:
+    let
+      owner = decision.owner or null;
+    in
+    if owner != null then
+      child
+      // {
+        meta = (child.meta or { }) // {
+          constraintOwner = owner;
+        };
+      }
+    else
+      child;
+
+  # --- Classifier-based emitIncludes ---
+
+  # Fold includes, classifying each child and sending typed effects.
+  # __skipNameAnon: when true, don't rename anonymous children (used by
+  # emit-include handler for policy/self-provide callers that pass idx=null).
   emitIncludes =
     {
       __parentScopeHandlers ? null,
       __parentCtxId ? null,
+      __skipNameAnon ? false,
     }:
     incs:
     let
@@ -52,18 +175,70 @@ let
           go (idx + 1) (
             fx.bind acc (
               results:
-              fx.bind (fx.send "emit-include" (
-                {
-                  child = builtins.elemAt incs idx;
-                  inherit idx;
-                }
-                // lib.optionalAttrs (__parentScopeHandlers != null) { inherit __parentScopeHandlers; }
-                // lib.optionalAttrs (__parentCtxId != null) { inherit __parentCtxId; }
-              )) (childResults: fx.pure (results ++ childResults))
+              let
+                rawChild = builtins.elemAt incs idx;
+                wrapped = wrapChild rawChild;
+                withScope =
+                  wrapped
+                  // lib.optionalAttrs (__parentScopeHandlers != null && !(wrapped ? __scopeHandlers)) {
+                    __scopeHandlers = __parentScopeHandlers;
+                  }
+                  // lib.optionalAttrs (__parentCtxId != null && !(wrapped ? __ctxId)) {
+                    __ctxId = __parentCtxId;
+                  };
+                classifyAndSend = fx.bind fx.effects.state.get (
+                  state:
+                  let
+                    child =
+                      if !__skipNameAnon && !(isMeaningfulName (withScope.name or "<anon>")) then
+                        withScope // { name = nameAnon state idx (withScope.__ctxId or null); }
+                      else
+                        withScope;
+                    isConditional = builtins.isAttrs child && child ? meta && child.meta ? guard;
+                    isForward =
+                      builtins.isAttrs child && child ? meta && builtins.isAttrs child.meta && child.meta ? __forward;
+                    isParametric = (child.__args or { }) != { };
+                  in
+                  # 1. Dedup check
+                  fx.bind (fx.send "check-dedup" child) (
+                    { isDuplicate, dedupKey }:
+                    if isDuplicate then
+                      fx.pure [ ]
+                    # 2. Forward
+                    else if isForward then
+                      fx.bind (fx.send "emit-forward" child.meta.__forward) (_: fx.pure [ ])
+                    # 3. Conditional
+                    else if isConditional then
+                      fx.send "resolve-conditional" child
+                    # 4. Constraint check → parametric or static
+                    else
+                      fx.bind
+                        (fx.send "check-constraint" {
+                          identity = identity.pathKey (identity.aspectPath child);
+                          aspect = child;
+                        })
+                        (
+                          decision:
+                          if decision.action == "exclude" then
+                            excludeChild child decision.owner dedupKey
+                          else if decision.action == "substitute" then
+                            substituteChild child decision
+                          else
+                            let
+                              tagged = tagConstraintOwner child decision;
+                            in
+                            if isParametric then fx.send "resolve-parametric" tagged else fx.send "resolve-aspect" tagged
+                        )
+                  )
+                );
+              in
+              fx.bind classifyAndSend (childResults: fx.pure (results ++ childResults))
             )
           );
     in
     go 0 (fx.pure [ ]);
+
+  # --- Include constructors (unchanged) ---
 
   mkPositionalInclude =
     {
@@ -127,7 +302,6 @@ let
     // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
 
   # Emit register-aspect-policy for each entry in aspect.policies.
-  # Each policy is stored with ownerIdentity for exclusion rollback.
   emitAspectPolicies =
     aspect:
     let
