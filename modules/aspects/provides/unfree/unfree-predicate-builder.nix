@@ -46,6 +46,7 @@ let
     };
 
   aspect = {
+    name = "unfree-predicate";
     inherit description;
     includes = [
       osAspect

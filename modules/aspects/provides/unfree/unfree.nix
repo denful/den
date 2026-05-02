@@ -18,21 +18,32 @@ let
       "provides"
     ];
     __fn =
-      { class, ... }:
-      if
-        (builtins.elem class [
+      {
+        class,
+        host ? null,
+        ...
+      }:
+      let
+        validClasses = [
           "nixos"
           "darwin"
           "homeManager"
-        ])
-      then
-        {
-          ${class}.unfree.packages = allowed-names;
-        }
-      else
-        { };
+        ];
+        classModule =
+          if builtins.elem class validClasses then { ${class}.unfree.packages = allowed-names; } else { };
+        # When resolving for homeManager at user scope, also emit to the
+        # host's OS class. This ensures nixpkgs.config.allowUnfreePredicate
+        # covers these packages when home-manager.useGlobalPkgs = true.
+        hostModule =
+          if class == "homeManager" && host != null && builtins.elem host.class validClasses then
+            { ${host.class}.unfree.packages = allowed-names; }
+          else
+            { };
+      in
+      classModule // hostModule;
     __args = {
       class = true;
+      host = true;
     };
   };
 in
