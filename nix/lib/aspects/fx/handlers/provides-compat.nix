@@ -1,3 +1,5 @@
+# DEPRECATED: scheduled for removal after first stable release post-fx-pipeline merge.
+# Migration: remove provides from aspects; use policies for cross-entity routing.
 # Backwards-compatibility handler for main-era provides.X cross-provide patterns.
 # Synthesizes aspect policies that replicate mutual-provider routing.
 # Remove after migration period (see provides-removal spec).

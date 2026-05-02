@@ -1,3 +1,5 @@
+# DEPRECATED: scheduled for removal after first stable release post-fx-pipeline merge.
+# Migration: use cross-entity policies (policy.resolve, policy.include).
 # Compatibility shim: makes den._.mutual-provider evaluate to an inert aspect
 # instead of erroring. On main, mutual-provider was a parametric aspect that
 # handled cross-entity routing via provides.X — that routing is now built-in

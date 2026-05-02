@@ -1,3 +1,5 @@
+# DEPRECATED: scheduled for removal after first stable release post-fx-pipeline merge.
+# Migration: use den.lib.canTake instead.
 # Deprecated context-level guards.
 # Under handler-based resolution, bind.fn resolves args from handlers.
 # take.exactly uses optional-arg detection to gate on context level.

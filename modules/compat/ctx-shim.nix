@@ -1,3 +1,5 @@
+# DEPRECATED: scheduled for removal after first stable release post-fx-pipeline merge.
+# Migration: use den.aspects.{name} instead of den.ctx.{name}.
 # Compatibility shim: forwards den.ctx.* to den.aspects
 # with deprecation warnings.
 # den.ctx was always flat (host, user, hm-host — never nested namespaces).

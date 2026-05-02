@@ -1,3 +1,5 @@
+# DEPRECATED: scheduled for removal after first stable release post-fx-pipeline merge.
+# Migration: use den.schema.host / den.schema.user directly.
 # Deprecated context-level guards.
 # Under handler-based resolution, bind.fn resolves each arg independently.
 # Optional args with no handler are skipped (nix-effects c7931d7), so

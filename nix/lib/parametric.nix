@@ -1,3 +1,5 @@
+# DEPRECATED: scheduled for removal after first stable release post-fx-pipeline merge.
+# Migration: use parametric aspect includes ({ host, user }: { ... }) directly.
 { lib, den, ... }:
 let
   warn = msg: v: lib.warn "den.lib.parametric: ${msg}" v;
