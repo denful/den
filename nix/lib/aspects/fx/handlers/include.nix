@@ -283,7 +283,14 @@ let
         # across multiple structurally different nodes.
         originalName = withScope.name or "<anon>";
         isSyntheticName = lib.hasPrefix "<" originalName && lib.hasSuffix ">" originalName;
-        dedupKey = if isMeaningfulName originalName && !isSyntheticName then childIdentity else null;
+        rawDedupKey = if isMeaningfulName originalName && !isSyntheticName then childIdentity else null;
+        # Scope-aware dedup: same named aspect at different scopes resolves
+        # independently. This allows parametric aspects (set-user-desc,
+        # host-aspects) to produce different outputs per user scope.
+        # Den.default stripping prevents re-walking at child scopes, so
+        # scope-aware dedup doesn't cause duplicate den.default modules.
+        scope = state.currentScope or "__unscoped";
+        dedupKey = if rawDedupKey != null then "${scope}/${rawDedupKey}" else null;
         seen = (state.includeSeen or (_: { })) null;
         alreadyResolved = dedupKey != null && seen ? ${dedupKey};
       in
