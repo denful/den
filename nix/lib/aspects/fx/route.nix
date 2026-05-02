@@ -35,27 +35,27 @@ let
         if path == [ ] then
           mod
         else if adaptArgs != null then
-          # Submodule nesting with adapted args: evaluate the source module
-          # with adapted args at the outer scope, then place the result as a
-          # submodule definition. The outer function uses a plain `args:` pattern,
-          # so _module.args (pkgs etc.) aren't in scope — we merge them from
-          # config._module.args to make them available to the source module.
+          # Submodule nesting with adapted args: evaluate source modules
+          # in a freeform submodule with specialArgs, then place the
+          # evaluated config at the target path. This handles both raw
+          # module functions and wrapped module attrsets (from wrapCollectedClasses).
           args:
           let
             fullArgs = args // (args.config._module.args or { });
             adapted = adaptArgs fullArgs;
-            # Resolve function imports with the full adapted args.
-            resolveImport = imp: if builtins.isFunction imp then imp adapted else imp;
-            resolvedMod =
-              if builtins.isAttrs mod && mod ? imports then
-                lib.foldl' lib.recursiveUpdate { } (map resolveImport mod.imports)
-              else if builtins.isFunction mod then
-                mod adapted
-              else
-                mod;
+            sourceModules = if builtins.isAttrs mod && mod ? imports then mod.imports else [ mod ];
+            evaluated = lib.evalModules {
+              specialArgs = adapted;
+              modules = [
+                {
+                  config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+                }
+              ]
+              ++ sourceModules;
+            };
           in
           {
-            config = lib.setAttrByPath path (_: resolvedMod);
+            config = lib.setAttrByPath path (builtins.removeAttrs evaluated.config [ "_module" ]);
           }
         else
           # Plain nesting: resolve the source module's function imports with
@@ -247,13 +247,16 @@ let
             adapterMod = route.adapterModule or null;
             modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
             guard = route.guard or null;
-            # When adaptArgs is set with path nesting, always produce at least an
-            # empty submodule definition so the target entry exists.
+            # When adaptArgs is set with path nesting, produce an empty
+            # submodule definition so the target entry exists (e.g.,
+            # users.users.tux needs to exist for home-manager).
+            # Use a plain attrset (not _: {}) to avoid breaking flake
+            # output types that reject function values.
             ensureEntry =
               if route.adaptArgs or null != null && route.path or [ ] != [ ] && modulesWithAdapter == [ ] then
                 [
                   (_: {
-                    config = lib.setAttrByPath route.path (_: { });
+                    config = lib.setAttrByPath route.path { };
                   })
                 ]
               else
