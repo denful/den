@@ -497,8 +497,29 @@ let
                   sharedModules ++ ownModules
                 else
                   acc.classImports.${spec.fromClass} or [ ];
+              # If no source modules in the pipeline, resolve the forward's
+              # source aspect directly. This handles forwards whose fromAspect
+              # produces a synthetic aspect not walked during the pipeline
+              # (the old sub-pipeline was removed).
+              resolvedSourceModules =
+                if sourceModules != [ ] then
+                  sourceModules
+                else if spec ? sourceAspect then
+                  let
+                    normalized = den.lib.aspects.normalizeRoot spec.sourceAspect;
+                    sourceCtx = scopeContexts.${sid} or ctx;
+                    sourceResult = fxResolve {
+                      class = spec.fromClass;
+                      self = normalized;
+                      ctx =
+                        sourceCtx // den.lib.aspects.fx.aspect.ctxFromHandlers (spec.sourceAspect.__scopeHandlers or { });
+                    };
+                  in
+                  sourceResult.imports
+                else
+                  [ ];
               rawSourceModule = {
-                imports = sourceModules;
+                imports = resolvedSourceModules;
               };
               sourceModule = spec.mapModule rawSourceModule;
               forwardAspect = handlers.buildForwardAspect spec sourceModule;
