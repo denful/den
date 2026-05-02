@@ -12,5 +12,6 @@
   aspect = import ./aspect.nix { inherit lib den; };
   contentUtil = import ./content-util.nix { inherit lib; };
   pipeline = import ./pipeline.nix { inherit lib den; };
+  wrapClasses = import ./wrap-classes.nix { inherit lib den; };
   keyClassification = import ./key-classification.nix { inherit lib den; };
 }

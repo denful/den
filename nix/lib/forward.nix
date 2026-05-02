@@ -132,5 +132,5 @@ let
 
 in
 {
-  inherit forwardEach;
+  inherit forwardEach forwardItem;
 }
