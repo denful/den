@@ -10,33 +10,18 @@ let
       { param, state }:
       let
         scope = state.currentScope;
-        spec = param // {
-          sourceScopeId = param.sourceScopeId or scope;
-        };
-        # Dedup key: same provide registered from multiple policy dispatch levels.
-        provideKey = "${spec.class}/${lib.concatStringsSep "/" (spec.path or [ ])}";
-        registeredProvides = (state.registeredProvideKeys or (_: { })) null;
-        alreadyRegistered = registeredProvides ? ${provideKey};
+        all = state.scopedProvides null;
       in
       {
         resume = null;
-        state =
-          if alreadyRegistered then
-            state
-          else
-            state
+        state = state // {
+          scopedProvides =
+            _:
+            all
             // {
-              scopedProvides =
-                _:
-                let
-                  all = state.scopedProvides null;
-                in
-                all
-                // {
-                  ${scope} = (all.${scope} or [ ]) ++ [ spec ];
-                };
-              registeredProvideKeys = _: registeredProvides // { ${provideKey} = true; };
+              ${scope} = (all.${scope} or [ ]) ++ [ param ];
             };
+        };
       };
   };
 in

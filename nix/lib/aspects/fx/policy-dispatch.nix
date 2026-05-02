@@ -263,7 +263,10 @@ let
           (
             _:
             builtins.foldl' (
-              acc: e: fx.bind acc (_: fx.send "register-provide" e.value)
+              acc: e:
+              fx.bind acc (
+                _: fx.send "register-provide" (e.value // { __providePolicyName = e.__providePolicyName or null; })
+              )
             ) (fx.pure null) provideEffects
           )
       );
@@ -495,9 +498,9 @@ let
     fx.bind (policyEmitExcludes combinedEffects.excludeEffects) (
       _:
       fx.bind
-        (policyEmitEffects combinedEffects.routeEffects combinedEffects.instantiateEffects
+        (policyEmitEffects (combinedEffects.routeEffects) (combinedEffects.instantiateEffects) (
           combinedEffects.provideEffects
-        )
+        ))
         (
           _:
           if hasSchemaResolves then

@@ -354,17 +354,39 @@ let
       };
 
       # Apply policy.provide — inject new modules directly into target classes.
+      # Dedup: same policy firing at multiple scopes produces identical provides.
+      # Keyed by policyName + class + path to preserve legitimate multi-policy provides.
       scopedProvides = result.state.scopedProvides null;
-      allProvides = lib.concatLists (lib.attrValues scopedProvides);
+      allProvides =
+        let
+          raw = lib.concatLists (lib.attrValues scopedProvides);
+          go =
+            seen: specs:
+            if specs == [ ] then
+              [ ]
+            else
+              let
+                s = builtins.head specs;
+                rest = builtins.tail specs;
+                pn = s.__providePolicyName or null;
+                key = if pn != null then "${pn}/${s.class}/${lib.concatStringsSep "/" (s.path or [ ])}" else null;
+              in
+              if key != null && seen ? ${key} then
+                go seen rest
+              else
+                [ s ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
+        in
+        go { } raw;
       withProvides = builtins.foldl' (
         acc: spec:
         let
           targetClass = spec.class;
           path = spec.path or [ ];
           scopeCtx = scopeContexts.${spec.sourceScopeId} or ctx;
+          rawModule = if path == [ ] then spec.module else lib.setAttrByPath path spec.module;
           wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
             ctx = scopeCtx;
-            module = spec.module;
+            module = rawModule;
             aspectPolicy = null;
             globalPolicy = null;
           };
@@ -373,22 +395,9 @@ let
               [ ]
             else
               let
-                mod = wrapped.module;
-                nested =
-                  if path == [ ] then
-                    mod
-                  else
-                    args:
-                    let
-                      fullArgs = args // (args.config._module.args or { });
-                      resolved = if builtins.isFunction mod then mod fullArgs else mod;
-                    in
-                    {
-                      config = lib.setAttrByPath path resolved;
-                    };
                 loc = "${targetClass}@<provide>/${lib.concatStringsSep "/" path}";
               in
-              [ (lib.setDefaultModuleLocation loc nested) ];
+              [ (lib.setDefaultModuleLocation loc wrapped.module) ];
         in
         acc
         // {
