@@ -763,7 +763,20 @@ let
                 ctxNames = mkCtxId scopedCtx;
                 ctxKey = if isFanOut then "${targetKind}/{${ctxNames}}" else targetKind;
                 newScopeId = mkScopeId scopedCtx;
-                scopeHandlersForCtx = constantHandler scopedCtx;
+                # Override the class handler for child entities. The pipeline's
+                # root class (e.g. "nixos") is wrong for child entity scopes —
+                # class-generic aspects like unfree use { class, ... }: to emit
+                # to the current class. At user scope, class should be the
+                # user's primary class (e.g. "homeManager").
+                entityClass =
+                  let
+                    entity = resolveBindings.${targetKind} or null;
+                    classes = if entity != null then entity.classes or null else null;
+                  in
+                  if classes != null && classes != [ ] then builtins.head classes else null;
+                scopeHandlersForCtx = constantHandler (
+                  scopedCtx // lib.optionalAttrs (entityClass != null) { class = entityClass; }
+                );
 
                 # Set scope — save parentScope, set currentScope to child.
                 setScope = fx.effects.state.modify (

@@ -174,8 +174,8 @@
               "inner-parametric-exactly-host-user-igloo-tux"
               "inner-parametric-include-igloo"
               "inner-parametric-include-igloo"
-              "inner-static-nixos"
-              "inner-static-nixos"
+              "inner-static-homeManager"
+              "inner-static-homeManager"
               "outer-owned"
               "outer-owned"
               "outer-parametric-atLeast-host-igloo"
@@ -186,8 +186,8 @@
               "outer-parametric-exactly-host-user-igloo-tux"
               "outer-parametric-include-igloo"
               "outer-parametric-include-igloo"
-              "outer-static-nixos"
-              "outer-static-nixos"
+              "outer-static-homeManager"
+              "outer-static-homeManager"
             ];
           }
         );
@@ -287,8 +287,8 @@
               "inner-parametric-exactly-user-tux"
               "inner-parametric-include-igloo"
               "inner-parametric-include-igloo"
-              "inner-static-nixos"
-              "inner-static-nixos"
+              "inner-static-homeManager"
+              "inner-static-homeManager"
               "outer-nested-parametric-igloo"
               "outer-nested-parametric-igloo"
               "outer-owned"
@@ -305,8 +305,8 @@
               "outer-parametric-exactly-user-tux"
               "outer-parametric-include-igloo"
               "outer-parametric-include-igloo"
-              "outer-static-nixos"
-              "outer-static-nixos"
+              "outer-static-homeManager"
+              "outer-static-homeManager"
             ];
           }
         );
@@ -404,8 +404,8 @@
               "inner-parametric-exactly-host-user-igloo-tux"
               "inner-parametric-include-igloo"
               "inner-parametric-include-igloo"
-              "inner-static-nixos"
-              "inner-static-nixos"
+              "inner-static-homeManager"
+              "inner-static-homeManager"
               "outer-nested-parametric-igloo"
               "outer-nested-parametric-igloo"
               "outer-owned"
@@ -418,8 +418,8 @@
               "outer-parametric-exactly-host-user-igloo-tux"
               "outer-parametric-include-igloo"
               "outer-parametric-include-igloo"
-              "outer-static-nixos"
-              "outer-static-nixos"
+              "outer-static-homeManager"
+              "outer-static-homeManager"
             ];
           }
         );
@@ -519,8 +519,8 @@
               "inner-parametric-exactly-user-tux"
               "inner-parametric-include-igloo"
               "inner-parametric-include-igloo"
-              "inner-static-nixos"
-              "inner-static-nixos"
+              "inner-static-homeManager"
+              "inner-static-homeManager"
               "outer-nested-parametric-igloo"
               "outer-nested-parametric-igloo"
               "outer-owned"
@@ -537,8 +537,8 @@
               "outer-parametric-exactly-user-tux"
               "outer-parametric-include-igloo"
               "outer-parametric-include-igloo"
-              "outer-static-nixos"
-              "outer-static-nixos"
+              "outer-static-homeManager"
+              "outer-static-homeManager"
             ];
           }
         );
