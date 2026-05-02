@@ -54,7 +54,7 @@ Anything that you can describe via a data structure that can be traversed, can b
 A Dendritic aspect is an attrset that contains modules of different Nix `class`.
 
 ```nix
-gaming = { host, user }: { nixos = ...; homeManager = ...; hjem = ...; darwin = ...; }
+gaming = { host, user }: { nixos = ...; homeManager = ...; hjem = ...; darwin = ... ; }
 ```
 
 Such an attrset is said to be [**Dendritic**](https://dendrix.oeiuwq.com/Dendritic.html) because it allows configuring a single cross-cutting concern (`gaming`) over different configuration domains.
@@ -65,10 +65,11 @@ Nix classes are NOT an artificial concept created by Den. There are [many nix cl
 Most importantly, the context `{host,user}` here are **not** `_module.args` **nor** `specialArgs`, it is an actual function, not a module-looking-as-a-function. This means config can depend on context without Nix infinite loops.
 
 <Aside type="caution" title="Den context ≠ NixOS module args">
-When Den docs say "context" they mean the pipeline data shape (`{ host }`, `{ host, user }`,
-`{ home }`) — real Nix function arguments. This is distinct from NixOS module arguments
-(`{ config, pkgs, lib, ... }`) which live inside the module system. Den context is
-evaluated _before_ module evaluation, which is why it cannot cause infinite recursion.
+When Den docs say "context" they mean the pipeline parameters (`{ host }`, `{ host, user }`,
+`{ home }`, or any combination) — real Nix function arguments. Context is freeform: `{ host, user }` is equivalent to
+`{ host }: { user }:`, and you can request any subset you need (e.g., `{ user }` alone, or `{ user, class }`).
+This is distinct from NixOS module arguments (`{ config, pkgs, lib, ... }`) which live inside the module system.
+Den context is evaluated _before_ module evaluation, which is why it cannot cause infinite recursion.
 </Aside>
 
 
@@ -172,10 +173,10 @@ argument pattern.
 { nixos.networking.firewall.enable = true; }
 
 # Runs only when a {host} context exists
-({ host, ... }: { nixos.networking.hostName = host.hostName; })
+({ host }: { nixos.networking.hostName = host.hostName; })
 
 # Runs only when both {host, user} are present
-({ host, user, ... }: {
+({ host, user }: {
   nixos.users.users.${user.userName}.extraGroups = [ "wheel" ];
 })
 ```
@@ -208,7 +209,6 @@ Den separates **what exists** (schema) from **what it does** (aspects):
 |-------|---------|---------|
 | Schema | Declare entities | `den.hosts.x86_64-linux.laptop.users.alice = {}` |
 | Aspects | Configure behavior | `den.aspects.laptop.nixos.networking.hostName = "laptop"` |
-| Stages | Transform data flow | `den.stages.host` produces `{host}`, then `{host, user}` per user |
 | Policies | Entity topology | `den.policies.host-to-users` fans out from hosts to users |
 | Batteries | Reusable patterns | `den.provides.primary-user`, `den.provides.user-shell` |
 

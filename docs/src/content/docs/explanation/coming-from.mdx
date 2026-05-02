@@ -50,7 +50,7 @@ a home, it extracts the `homeManager` attrs. You write the concern once.
 | `mkFlake` | `inputs.den.flakeModule` or `inputs.den.denModule` -- Den is a flake-parts module |
 | `flakeModules` for sharing | `den.ful` namespaces -- shareable aspect libraries |
 
-Den is built on flake-parts, so the two are complementary. You can use `perSystem`
+Den integrates with flake-parts, so the two are complementary. You can use `perSystem`
 alongside Den for outputs that do not involve host or user entities (packages,
 devShells, checks).
 

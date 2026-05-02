@@ -33,9 +33,9 @@ Den provides three built-in entity types:
 
 ```nix
 {
-  den.hosts.x86_64-linux.igloo = {
-    users.alice = { };
-    users.bob = { };
+  den.hosts.x86_64-linux.igloo.users = {
+    alice = { };
+    bob = { };
   };
 
   den.homes.aarch64-darwin.alice = { };
@@ -49,11 +49,24 @@ or `"darwin"` (from `*-darwin`); for homes it is `"homeManager"`. Override with
 that points to the [aspect](/explanation/aspects/) responsible for configuring it —
 by default `den.aspects.<name>`.
 
+Users have a `classes` list declaring which home-environment classes they want to use
+(e.g., `classes = [ "homeManager" ]`).
+
 <Aside type="tip" title="Class vs Entity Kind">
 Don't confuse **class** (`nixos`, `darwin`, `homeManager` — a Nix module evaluation
 domain) with **entity kind** (`host`, `user`, `home` — a Den data type). Classes
 determine _which module system_ evaluates the config. Entity kinds determine _how
 policies dispatch_.
+</Aside>
+
+<Aside title="Entities as instances">
+An entity is like an "instance" of its kind's schema. A host can be seen as an instance
+of `den.schema.host`. Each entity's module evaluation merges attributes from:
+
+- **Itself** — options declared directly on the entity (like a meta-class in Ruby)
+- **`den.schema.<kind>`** — the kind's schema mixin (e.g., `den.schema.host`)
+- **`den.schema.conf`** — shared across all entity kinds
+- **The kind's type** — Den's built-in type definition for the entity kind
 </Aside>
 
 ## Schema: shared options across a kind
@@ -137,7 +150,7 @@ These attributes are accessible in aspects via the entity's context argument:
 
 ```nix
 den.aspects.igloo.includes = [
-  ({ host, ... }: lib.optionalAttrs (host ? gpu) {
+  ({ host }: lib.optionalAttrs (host ? gpu) {
     nixos.hardware.nvidia.enable = true;
   })
 ];
@@ -147,3 +160,22 @@ For attributes that should exist on _every_ entity of a kind with a default valu
 prefer defining them in `den.schema` instead — this gives you type checking and
 documentation. See the [Schema reference](/reference/schema/) for the full option
 list, or the [Declare Hosts & Users](/guides/declare-hosts/) guide for practical examples.
+
+## Strict mode
+
+By default, Den allows freeform attributes on entities. Enable `strict` mode to
+require that all entity attributes be declared via schema options:
+
+```nix
+{
+  # Enable strict mode for all hosts
+  den.schema.host.strict = true;
+
+  # Now this would be an error — gpu is not a declared option:
+  # den.hosts.x86_64-linux.igloo.gpu = "nvidia";
+}
+```
+
+Strict mode is useful for larger configurations where you want to catch typos and
+enforce a consistent entity interface. Undeclared attributes produce an eval error
+with a message indicating which option is missing.

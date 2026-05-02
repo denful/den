@@ -71,14 +71,14 @@ evaluated once during aspect resolution. Functions receiving context
 arguments (`{ host }`, `{ user }`, etc.) are **parametric** -- evaluated
 per context during pipeline resolution.
 
-### `meta.adapter`
+### `meta.adapter` *(deprecated — use `handleWith`)*
 
 An aspect can declare a subtree adapter via `meta.adapter`. The adapter
 is a function that receives the inherited adapter and returns a new one,
 enabling composition — a parent's filter cannot be overridden by children.
 
-Aspect-level `meta.adapter` is preserved. Stage-level adapters are now
-handled internally by the fx pipeline.
+Prefer `handleWith` for new code — it provides the same subtree transformation
+capability with clearer semantics and composability.
 
 ### `meta.provider`
 

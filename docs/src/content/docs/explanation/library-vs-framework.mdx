@@ -18,9 +18,7 @@ Den's core (`/default.nix`) is domain-agnostic. It provides:
 | `parametric.expands` | Extend context before dispatch |
 | `canTake` | Check if a function accepts given arguments |
 | `take.atLeast` / `take.exactly` | *(deprecated)* Dispatch is now handled by the pipeline |
-| `statics` | Extract only static includes from an aspect |
 | `owned` | Extract only owned configs (no includes, no functor) |
-| `isFn` | Check if value is a function or has `__functor` |
 | `__findFile` | Angle bracket resolution for deep aspect paths |
 | `aspects` | Den aspects API (resolve, types) |
 
@@ -60,7 +58,7 @@ module = den.lib.aspects.resolve "terranix" [] aspect;
 On top of the library, Den provides `modules/` which implement:
 
 - **Schema types** (`den.hosts`, `den.homes`) for declaring NixOS/Darwin/HM entities
-- **Stages & Policies** (`den.stages`, `den.policies`) for the resolution pipeline
+- **Aspects & Policies** (`den.aspects`, `den.policies`) for the resolution pipeline
 - **Batteries** (`den.provides.*`) for common OS configuration patterns
 - **Output generation** (`modules/config.nix`) instantiating configurations into flake outputs
 

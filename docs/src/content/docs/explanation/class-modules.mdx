@@ -9,27 +9,23 @@ import { Aside } from '@astrojs/starlight/components';
 [`nix/lib/aspects/fx/aspect.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/aspect.nix)
 </Aside>
 
-## The Problem
+## Context args in class modules
 
-Accessing den context (like `host` or `user`) inside a class module previously required a two-layer curried function. The outer function captured den args via parametric dispatch, and the inner function was the actual NixOS/Darwin/home-manager module:
+Den aspects can be written as functions that receive context arguments (`{ host }`, `{ host, user }`, etc.). The two-layer form works and is perfectly valid:
 
 ```nix
-# Two-layer form (still works, but verbose)
-{ host, ... }: {
+# Two-layer form
+{ host }: {
   nixos = { config, pkgs, ... }: {
     networking.hostName = host.name;
   };
 }
 ```
 
-This worked, but the extra indirection was boilerplate -- especially when you just needed one den arg alongside standard module-system args.
-
-## The Solution
-
-You can now write class modules in **flat form**, mixing den context args and module-system args in a single function:
+As a convenience, you can also write class modules in **flat form**, mixing context args and module-system args in a single function:
 
 ```nix
-# Flat form -- den args and module-system args side by side
+# Flat form -- context args and module-system args side by side
 {
   nixos = { host, config, pkgs, ... }: {
     networking.hostName = host.name;
@@ -37,14 +33,14 @@ You can now write class modules in **flat form**, mixing den context args and mo
 }
 ```
 
-The pipeline's `wrapClassModule` intercepts class modules before they reach the OS module system. It inspects `builtins.functionArgs`, identifies which args exist in the pipeline context (`ctx`), pre-applies those values, and advertises only the remaining args to the module system via `lib.setFunctionArgs`. The module never knows it was wrapped.
+The pipeline inspects `builtins.functionArgs`, identifies which args exist in the current context, pre-applies those values, and advertises only the remaining args to the module system via `lib.setFunctionArgs`. The module never knows it was wrapped.
 
 ## How It Works
 
 1. `builtins.functionArgs module` returns the full set of declared args.
-2. Each arg name is checked against the pipeline context: a key is a den arg if `ctx ? ${key}`.
-3. Den args are pre-applied. The remaining args are advertised to the module system.
-4. At call time, the wrapper merges the module-system args with the pre-applied den args and calls the original function.
+2. Each arg name is checked against the current context: a key is a context arg if it exists in the pipeline state.
+3. Context args are pre-applied. The remaining args are advertised to the module system.
+4. At call time, the wrapper merges the module-system args with the pre-applied context args and calls the original function.
 
 ## Usage Examples
 
@@ -62,7 +58,7 @@ A static aspect whose `nixos` class module requests `host` directly:
 }
 ```
 
-### Multiple den args
+### Multiple context args
 
 Request both `host` and `user` when a policy provides both in context:
 
@@ -74,9 +70,21 @@ Request both `host` and `user` when a policy provides both in context:
 }
 ```
 
+### Home-manager with context args
+
+Both `home` and `user` come from context:
+
+```nix
+{
+  homeManager = { user, config, ... }: {
+    home.username = user.name;
+  };
+}
+```
+
 ### Full application
 
-When **all** function args are den args (no module-system args at all), the function is called directly and its return value becomes the class module. This handles the pattern where a function returns another function:
+When **all** function args are context args (no module-system args at all), the function is called directly and its return value becomes the class module. This handles the pattern where a function returns another function:
 
 ```nix
 {
@@ -86,7 +94,7 @@ When **all** function args are den args (no module-system args at all), the func
 }
 ```
 
-Here `{ host }` has no `...` and no module-system args. `wrapClassModule` calls it with `{ host = ctx.host; }` and uses the returned function as the class module.
+Here `{ host }` has no `...` and no module-system args. The pipeline calls it with `{ host = ctx.host; }` and uses the returned function as the class module.
 
 ### Static aspect with flat form
 
@@ -99,12 +107,10 @@ No outer parametric wrapper needed -- context flows through the pipeline's scope
       networking.hostName = host.name;
     };
   };
-
-  den.stages.my-stage.includes = [ den.aspects.static-networking ];
 }
 ```
 
-## The Ellipsis Requirement
+## The Ellipsis Convention
 
 <Aside type="caution">
 Flat-form class modules **must** include `...` in their argument pattern.
@@ -112,29 +118,17 @@ Flat-form class modules **must** include `...` in their argument pattern.
 
 The NixOS module system passes extra args (`config`, `options`, `lib`, `pkgs`, `modulesPath`, and anything from `specialArgs` or `_module.args`) to every module function. Without `...`, the module system's extra args cause an eval error. This is already conventional for NixOS modules, but worth noting since the flat form makes it easy to forget.
 
-The exception is **full application** -- if every arg is a den arg (e.g., `{ host }:`), the function is called directly by den and never reaches the module system, so `...` is not needed.
+The exception is **full application** -- if every arg is a context arg (e.g., `{ host }:`), the function is called directly by Den and never reaches the module system, so `...` is not needed.
 
-## Deprecated Helpers
+Note that for aspect-level context functions (the outer wrapper), `...` is not needed and should be omitted -- these receive only the context args they declare.
 
-The following `den.lib` helpers are no longer needed for new code. They still work (backward compatible) but flat-form class modules replace their use cases:
-
-| Old | New |
-|---|---|
-| `den.lib.parametric ({ host }: { nixos = ...; })` | `{ nixos = { host, config, ... }: ...; }` |
-| `den.lib.perHost ({ host }: { nixos = ...; })` | Same flat form -- shape dispatch is automatic |
-| `den.lib.perUser ({ user }: { ... })` | `{ nixos = { user, config, ... }: ...; }` |
-| `den.lib.perHome ({ home }: { ... })` | `{ homeManager = { home, config, ... }: ...; }` |
-| `den.lib.take.*` | Pipeline handles matching automatically |
-
-Migration is straightforward: move the den args from the outer function into the class module's arg pattern and add `...` if not already present.
-
-## Collision Policies
+## Collision Handling
 
 A collision occurs when den wants to inject an arg (e.g., `host`) but the module system also provides a value for the same name -- via `specialArgs` or `_module.args`. By default, this throws an error to force an explicit resolution.
 
 ### Resolution levels
 
-Policy is resolved from three levels (first match wins):
+Collision strategy is resolved from three levels (first match wins):
 
 | Level | Where to set | Scope |
 |---|---|---|
@@ -142,15 +136,15 @@ Policy is resolved from three levels (first match wins):
 | Entity | `collisionPolicy` on the entity schema (`den.schema.host`) | All uses of that entity kind |
 | Global | `den.config.classModuleCollisionPolicy` | Entire flake (default: `"error"`) |
 
-### Policy values
+### Strategy values
 
-| Policy | Behavior |
+| Value | Behavior |
 |---|---|
 | `"error"` | Throw an eval error (default) |
 | `"den-wins"` | Den value takes precedence; `lib.warn` emitted |
 | `"class-wins"` | Module-system value takes precedence; `lib.warn` emitted |
 
-### Setting collision policies
+### Setting collision strategy
 
 ```nix
 # Aspect level
@@ -168,4 +162,4 @@ den.config.classModuleCollisionPolicy = "den-wins";
 - [Aspects & Functors](/explanation/aspects) -- how aspects work and the `__functor` pattern
 - [Context-Aware Aspects](/explanation/parametric) -- shape-based dispatch and the `canTake` mechanism
 - [Context Pipeline](/explanation/context-pipeline) -- how context flows through the resolution pipeline
-- [Policies](/explanation/policies) -- how policies dispatch context to stages
+- [Entity Policies](/explanation/policies) -- how policies dispatch context to entity kinds
