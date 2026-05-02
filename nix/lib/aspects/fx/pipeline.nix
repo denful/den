@@ -88,7 +88,6 @@ let
   # duplicate NixOS module definitions).
   # Note: filter uses pointer identity — den.default in schemaIncludes
   # is the same fixpoint value as denDefault here (no normalization).
-  denDefault = den.default or null;
   resolveEntityHandler = {
     "resolve-entity" =
       { param, state }:
@@ -97,16 +96,9 @@ let
         scope = state.currentScope;
         currentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         entity = den.lib.resolveEntity kind currentCtx;
-        strippedIncludes =
-          if denDefault != null then
-            builtins.filter (inc: inc != denDefault) entity.includes
-          else
-            entity.includes;
       in
       {
-        resume = entity // {
-          includes = strippedIncludes;
-        };
+        resume = entity;
         inherit state;
       };
   };
@@ -354,16 +346,12 @@ let
         wrapCollectedClasses scopeCtx scopeClasses
       ) scopedClassImportsRaw;
 
-      # Flatten per-scope wrapped imports into a single classImports map.
-      # Scoped partitions are the sole source of truth — flat classImports
-      # no longer needed (flake output forwards eliminated by policy.instantiate).
-      wrappedClassImports = builtins.foldl' (
-        acc: scopeData:
-        lib.zipAttrsWith (_: builtins.concatLists) [
-          acc
-          scopeData
-        ]
-      ) { } (builtins.attrValues wrappedPerScope);
+      # Root scope class imports are the base for the root entity's output.
+      # Child scope modules reach the output only via forwards/routes —
+      # each child scope is its own evaluation branch, not merged into root.
+      # Den.default re-walks at child scopes (stripping removed), so shared
+      # modules are available per-scope directly.
+      wrappedClassImports = wrappedPerScope.${rootScopeId} or { };
 
       # Apply Tier 1 routes (reads wrappedPerScope, produces new entries).
       scopedRoutes = result.state.scopedRoutes null;
@@ -476,18 +464,10 @@ let
               # Source modules: per-scope for child-scope forwards (scope isolation),
               # merged for root-scope forwards (aggregate/alias forwards unchanged).
               sourceModules =
-                if sid != rootScopeId then
-                  # Per-scope + root fallback: scope isolation for multi-user.
-                  # Own scope has user-specific modules. Root scope fallback
-                  # provides den.default's shared modules (stripped from children).
-                  let
-                    ownModules = (acc.perScope.${sid} or { }).${spec.fromClass} or [ ];
-                    rootModules = (acc.perScope.${rootScopeId} or { }).${spec.fromClass} or [ ];
-                  in
-                  rootModules ++ ownModules
-                else
-                  # Root-scope aggregate: read from merged classImports (current behavior).
-                  acc.classImports.${spec.fromClass} or [ ];
+                # Per-scope source: each scope's forward reads from its own
+                # scope partition only. Den.default re-walks at child scopes,
+                # so shared modules are available per-scope directly.
+                (acc.perScope.${sid} or { }).${spec.fromClass} or [ ];
               rawSourceModule = {
                 imports = sourceModules;
               };
