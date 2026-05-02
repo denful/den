@@ -70,10 +70,18 @@ let
       forwardPathFn,
     }:
     let
+      # Keyed module wrapper: the NixOS module system deduplicates imports
+      # with the same `key`, so this fires once even when included from
+      # multiple user entity resolves.
       hostModule =
         { host }:
         {
-          ${host.class}.imports = [ host.${optionPath}.module ];
+          ${host.class}.imports = [
+            {
+              key = "den:${optionPath}-host-module";
+              imports = [ host.${optionPath}.module ];
+            }
+          ];
         };
 
       userForward =
@@ -122,6 +130,7 @@ let
           getModule
           ;
       };
+
     };
 
 in
