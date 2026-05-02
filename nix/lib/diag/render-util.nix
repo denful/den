@@ -110,7 +110,7 @@ let
       isTerminal = node.style == "terminal";
       isPolicy = node.style == "policy";
       isDefault = !(isExcluded || isReplaced || isAdapter || isTerminal || isPolicy);
-      accent = nodeColorFor theme node.stage node.label;
+      accent = nodeColorFor theme (node.stage or null) node.label;
     in
     {
       inherit
