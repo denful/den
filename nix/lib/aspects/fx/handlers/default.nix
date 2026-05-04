@@ -18,4 +18,7 @@ args:
 // (import ./provide.nix args)
 // (import ./resolve-schema-entity.nix args)
 // (import ./resolve.nix args)
+// (import ./bind.nix args)
+// (import ./defer.nix args)
+// (import ./drain.nix args)
 // (import ./compile.nix args)
