@@ -92,6 +92,45 @@ let
         );
 
   # Fold includes, classifying each child and sending typed effects.
+  # Propagate parent scope/ctx to a child that doesn't define its own.
+  propagateScope =
+    parentScopeHandlers: parentCtxId: child:
+    child
+    // lib.optionalAttrs (parentScopeHandlers != null && !(child ? __scopeHandlers)) {
+      __scopeHandlers = parentScopeHandlers;
+    }
+    // lib.optionalAttrs (parentCtxId != null && !(child ? __ctxId)) {
+      __ctxId = parentCtxId;
+    };
+
+  # Dedup-check a child then dispatch to appropriate handler.
+  dedupAndDispatch =
+    child:
+    fx.bind (fx.send "check-dedup" child) (
+      { isDuplicate, dedupKey }:
+      if isDuplicate then fx.pure [ ] else dispatchChild child dedupKey
+    );
+
+  # Process a single include: wrap, name, dedup, dispatch.
+  processInclude =
+    { parentScopeHandlers, parentCtxId, skipNameAnon }:
+    idx: rawChild:
+    let
+      withScope = propagateScope parentScopeHandlers parentCtxId (wrapChild rawChild);
+    in
+    fx.bind fx.effects.state.get (
+      state:
+      let
+        child =
+          if !skipNameAnon && !(isMeaningfulName (withScope.name or "<anon>")) then
+            withScope // { name = nameAnon state idx (withScope.__ctxId or null); }
+          else
+            withScope;
+      in
+      dedupAndDispatch child
+    );
+
+  # Walk includes list, collecting results in reverse then flattening.
   emitIncludes =
     {
       __parentScopeHandlers ? null,
@@ -100,47 +139,21 @@ let
     }:
     incs:
     let
+      processOne = processInclude {
+        parentScopeHandlers = __parentScopeHandlers;
+        parentCtxId = __parentCtxId;
+        skipNameAnon = __skipNameAnon;
+      };
       len = builtins.length incs;
-      go =
-        idx: acc:
-        if idx >= len then
-          acc
-        else
-          go (idx + 1) (
-            fx.bind acc (
-              results:
-              let
-                rawChild = builtins.elemAt incs idx;
-                wrapped = wrapChild rawChild;
-                withScope =
-                  wrapped
-                  // lib.optionalAttrs (__parentScopeHandlers != null && !(wrapped ? __scopeHandlers)) {
-                    __scopeHandlers = __parentScopeHandlers;
-                  }
-                  // lib.optionalAttrs (__parentCtxId != null && !(wrapped ? __ctxId)) {
-                    __ctxId = __parentCtxId;
-                  };
-                classifyAndSend = fx.bind fx.effects.state.get (
-                  state:
-                  let
-                    namedChild =
-                      if !__skipNameAnon && !(isMeaningfulName (withScope.name or "<anon>")) then
-                        withScope // { name = nameAnon state idx (withScope.__ctxId or null); }
-                      else
-                        withScope;
-                  in
-                  fx.bind (fx.send "check-dedup" namedChild) (
-                    { isDuplicate, dedupKey }:
-                    if isDuplicate then
-                      fx.pure [ ]
-                    else
-                      dispatchChild namedChild dedupKey
-                  )
-                );
-              in
-              fx.bind classifyAndSend (childResults: fx.pure ([ childResults ] ++ results))
+      go = idx: acc:
+        if idx >= len then acc
+        else go (idx + 1) (
+          fx.bind acc (results:
+            fx.bind (processOne idx (builtins.elemAt incs idx)) (
+              childResults: fx.pure ([ childResults ] ++ results)
             )
-          );
+          )
+        );
     in
     fx.bind (go 0 (fx.pure [ ])) (revChunks: fx.pure (builtins.concatLists (lib.reverseList revChunks)));
 
