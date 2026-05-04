@@ -94,6 +94,7 @@
   # wins silently — no collision error.
   pipelineOnly =
     value:
+    assert builtins.isFunction value || builtins.isAttrs value;
     if builtins.isAttrs value then
       value // { collisionPolicy = "class-wins"; }
     else

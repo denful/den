@@ -35,7 +35,7 @@ let
           if hasMissing || hasExtras then
             { }
           else
-            fn (lib.intersectAttrs (lib.genAttrs requiredKeys (_: null)) cleanArgs);
+            fn (lib.intersectAttrs args cleanArgs);
         # All args are optional so the wrapper is never deferred.
         # Missing args are detected in __fn and produce {} (no-op).
         __args = lib.mapAttrs (_: _: true) args;
