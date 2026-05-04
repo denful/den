@@ -16,7 +16,8 @@ let
   inspectPolicy =
     policy: context: kind:
     let
-      rawEffects = policy context;
+      rawCall = builtins.tryEval (policy context);
+      rawEffects = if rawCall.success then rawCall.value else [ ];
       effects = if builtins.isList rawEffects then rawEffects else [ rawEffects ];
       resolveEffects = builtins.filter (
         e: builtins.isAttrs e && (e.__policyEffect or "") == "resolve" && e.value != { }

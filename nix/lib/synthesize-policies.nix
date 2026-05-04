@@ -6,11 +6,14 @@ let
   # Policies with _: or { ... }: fire with any ctx.
   resolveArgsSatisfied =
     policy: ctx:
-    let
-      fargs = lib.functionArgs policy;
-      requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
-    in
-    builtins.all (k: ctx ? ${k}) requiredArgs;
+    if !lib.isFunction policy then
+      false
+    else
+      let
+        fargs = lib.functionArgs policy;
+        requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
+      in
+      builtins.all (k: ctx ? ${k}) requiredArgs;
 
 in
 {
