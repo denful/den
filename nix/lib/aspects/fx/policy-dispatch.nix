@@ -17,13 +17,14 @@ let
   # Schema entity kinds — used to classify resolve effects.
   policySchemaKinds = den.lib.schemaUtil.schemaEntityKinds;
 
-  # Classify a resolve effect into schema vs enrichment.
+  # Classify a resolve effect into schema vs enrichment (single-pass partition).
   classifyResolve =
     e:
     let
       keys = builtins.attrNames e.value;
-      schemaKeys = builtins.filter (k: builtins.elem k policySchemaKinds) keys;
-      enrichKeys = builtins.filter (k: !builtins.elem k policySchemaKinds) keys;
+      partitioned = lib.partition (k: builtins.elem k policySchemaKinds) keys;
+      schemaKeys = partitioned.right;
+      enrichKeys = partitioned.wrong;
       hasTarget = e.__targetKind or null != null;
     in
     if hasTarget then
@@ -44,9 +45,9 @@ let
     else
       {
         schema = e // {
-          value = lib.filterAttrs (k: _: builtins.elem k policySchemaKinds) e.value;
+          value = lib.genAttrs schemaKeys (k: e.value.${k});
         };
-        enrichment = lib.filterAttrs (k: _: !builtins.elem k policySchemaKinds) e.value;
+        enrichment = lib.genAttrs enrichKeys (k: e.value.${k});
       };
 
   maxPolicyIterations = 10;
@@ -57,7 +58,7 @@ let
     lib.concatLists (
       lib.mapAttrsToList (
         name: policy:
-        if !resolveArgsSatisfied policy resolveCtx || builtins.elem name firedPolicies then
+        if !resolveArgsSatisfied policy resolveCtx || firedPolicies ? ${name} then
           [ ]
         else
           let
@@ -87,7 +88,7 @@ let
           fargs = lib.functionArgs e.value.fn;
           requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
         in
-        builtins.all (k: resolveCtx ? ${k}) requiredArgs && !builtins.elem e.name firedPolicies
+        builtins.all (k: resolveCtx ? ${k}) requiredArgs && !(firedPolicies ? ${e.name})
       ) entries;
     in
     map (
@@ -172,18 +173,13 @@ let
         map (e: e // { __sourcePolicyName = r.policyName; }) r.includeEffects
     ) paired;
 
-  # Combined dispatch returning classified results.
-  mkDispatch =
-    allDirectPolicies: aspectPolicies: firedPolicies: resolveCtx:
+  # Extract tagged side-effects from classified policy results.
+  extractTaggedEffects =
+    classified:
     let
-      allResults =
-        dispatchDirect allDirectPolicies firedPolicies resolveCtx
-        ++ dispatchAspect aspectPolicies firedPolicies resolveCtx;
-      classified = map classifyPolicyResult allResults;
       paired = map tagCrossProvider classified;
     in
     {
-      enrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } classified;
       schemaEffects = collectSchemaEffects paired;
       includeEffects = collectIncludeEffects paired;
       excludeEffects = builtins.concatMap (r: r.excludeEffects) classified;
@@ -196,6 +192,21 @@ let
       provideEffects = builtins.concatMap (
         r: map (pe: pe // { __providePolicyName = r.policyName; }) r.provideEffects
       ) classified;
+    };
+
+  # Combined dispatch returning classified results.
+  mkDispatch =
+    allDirectPolicies: aspectPolicies: firedPolicies: resolveCtx:
+    let
+      allResults =
+        dispatchDirect allDirectPolicies firedPolicies resolveCtx
+        ++ dispatchAspect aspectPolicies firedPolicies resolveCtx;
+      classified = map classifyPolicyResult allResults;
+      tagged = extractTaggedEffects classified;
+    in
+    tagged
+    // {
+      enrichment = builtins.foldl' (acc: r: acc // r.mergedEnrichment) { } classified;
       firedNames = map (r: r.policyName) (builtins.filter hasEffects classified);
     };
 
@@ -233,7 +244,7 @@ let
         fx.send "register-constraint" {
           type = "exclude";
           scope = "subtree";
-          identity = identity.pathKey (identity.aspectPath e.value);
+          identity = identity.key (e.value);
           owner = "policy";
         }
       )
@@ -316,9 +327,7 @@ let
       );
       policyIncludes = schemaEffect.__policyIncludes or [ ];
       resolveIncludes = schemaEffect.schema.includes or [ ];
-      policyAspectPaths = map (a: identity.pathKey (identity.aspectPath a)) (
-        includeAspects ++ policyIncludes ++ resolveIncludes
-      );
+      policyAspectPaths = map (a: identity.key (a)) (includeAspects ++ policyIncludes ++ resolveIncludes);
     in
     fx.bind
       (fx.send "ctx-seen" {
@@ -375,34 +384,21 @@ let
               # Use the sibling's own target entity kind for dispatchKey — this matches
               # what iterate records when installPolicies fires at the child scope.
               dispatchKey = "${sib.targetKind}@${sib.scopeId}";
-              alreadyFired = firedPerScope.${dispatchKey} or [ ];
-              # Only dispatch policies NOT already fired at this scope.
-              latePolicies = lib.filterAttrs (name: _: !builtins.elem name alreadyFired) allAspectPolicies;
+              alreadyFired = firedPerScope.${dispatchKey} or { };
+              latePolicies = lib.filterAttrs (name: _: !(alreadyFired ? ${name})) allAspectPolicies;
               resolveCtx = sib.scopedCtx // {
                 __entityKind = sib.targetKind;
               };
               # Dispatch late aspect policies against this scope's context.
               lateResults = dispatchAspect latePolicies alreadyFired resolveCtx;
               classified = map classifyPolicyResult lateResults;
-              paired = map tagCrossProvider classified;
-              lateIncludes = collectIncludeEffects paired;
-              lateSchemas = collectSchemaEffects paired;
-              lateRoutes = builtins.concatMap (
-                r: map (re: re // { __routePolicyName = r.policyName; }) r.routeEffects
-              ) classified;
-              lateInstantiates = builtins.concatMap (
-                r: map (ie: ie // { __instantiatePolicyName = r.policyName; }) r.instantiateEffects
-              ) classified;
-              lateProvides = builtins.concatMap (
-                r: map (pe: pe // { __providePolicyName = r.policyName; }) r.provideEffects
-              ) classified;
-              lateExcludes = builtins.concatMap (r: r.excludeEffects) classified;
+              late = extractTaggedEffects classified;
               hasLateEffects =
-                lateIncludes != [ ]
-                || lateRoutes != [ ]
-                || lateInstantiates != [ ]
-                || lateProvides != [ ]
-                || lateExcludes != [ ];
+                late.includeEffects != [ ]
+                || late.routeEffects != [ ]
+                || late.instantiateEffects != [ ]
+                || late.provideEffects != [ ]
+                || late.excludeEffects != [ ];
               scopeHandlersForCtx = constantHandler (
                 sib.scopedCtx // lib.optionalAttrs (sib.entityClass != null) { class = sib.entityClass; }
               );
@@ -419,10 +415,10 @@ let
                 _:
                 fx.bind
                   (fx.effects.scope.provide scopeHandlersForCtx (
-                    fx.bind (policyEmitExcludes lateExcludes) (
+                    fx.bind (policyEmitExcludes late.excludeEffects) (
                       _:
-                      fx.bind (policyEmitEffects lateRoutes lateInstantiates lateProvides) (
-                        _: policyEmitIncludes lateIncludes
+                      fx.bind (policyEmitEffects late.routeEffects late.instantiateEffects late.provideEffects) (
+                        _: policyEmitIncludes late.includeEffects
                       )
                     )
                   ))
@@ -551,62 +547,65 @@ let
     );
 
   # Fixed-point iteration: dispatch, collect enrichment, re-dispatch on widen.
+  # allDirectPolicies, aspectPolicies, entityKind, currentCtx are loop-invariant.
   iterate =
-    allDirectPolicies: aspectPolicies: entityKind: currentCtx: iteration: accEnrichment: accEffects: firedPolicies: currentResolveCtx:
+    allDirectPolicies: aspectPolicies: entityKind: currentCtx:
     let
-      dispatched = mkDispatch allDirectPolicies aspectPolicies firedPolicies currentResolveCtx;
-      newFiredNames = builtins.filter (n: !builtins.elem n firedPolicies) dispatched.firedNames;
-      updatedFired = firedPolicies ++ newFiredNames;
-      newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
-        builtins.attrNames dispatched.enrichment
-      );
-      combinedEffects = mergeEffects accEffects dispatched;
-    in
-    if newEnrichKeys == [ ] then
-      # Record fired policy names for late-dispatch pass (cross-sibling visibility).
-      fx.bind (fx.effects.state.modify (
-        st:
+      go =
+        iteration: accEnrichment: accEffects: firedPolicies: currentResolveCtx:
         let
-          dispatchKey = "${entityKind}@${st.currentScope}";
+          dispatched = mkDispatch allDirectPolicies aspectPolicies firedPolicies currentResolveCtx;
+          newFiredNames = builtins.filter (n: !(firedPolicies ? ${n})) dispatched.firedNames;
+          updatedFired = firedPolicies // lib.genAttrs newFiredNames (_: true);
+          newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
+            builtins.attrNames dispatched.enrichment
+          );
+          combinedEffects = mergeEffects accEffects dispatched;
         in
-        st
-        // {
-          firedPolicyNames =
-            _:
+        if newEnrichKeys == [ ] then
+          # Record fired policy names for late-dispatch pass (cross-sibling visibility).
+          fx.bind (fx.effects.state.modify (
+            st:
             let
-              all = (st.firedPolicyNames or (_: { })) null;
+              dispatchKey = "${entityKind}@${st.currentScope}";
             in
-            all // { ${dispatchKey} = updatedFired; };
-        }
-      )) (_: emitFinalEffects entityKind currentCtx accEnrichment dispatched combinedEffects)
-    else if iteration >= maxPolicyIterations then
-      throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
-    else
-      let
-        combinedEnrichment = accEnrichment // dispatched.enrichment;
-        enrichedCtx = currentCtx // combinedEnrichment;
-        enrichHandlers = constantHandler combinedEnrichment;
-        nextResolveCtx = enrichedCtx // {
-          __entityKind = entityKind;
-        };
-      in
-      fx.bind
-        (fx.effects.state.modify (
-          st:
-          st
-          // {
-            scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; };
-          }
-        ))
-        (
-          _:
-          fx.bind (fx.effects.scope.provide enrichHandlers (drainEnrichmentDeferred enrichedCtx)) (
-            _:
-            iterate allDirectPolicies aspectPolicies entityKind currentCtx (
-              iteration + 1
-            ) combinedEnrichment combinedEffects updatedFired nextResolveCtx
-          )
-        );
+            st
+            // {
+              firedPolicyNames =
+                _:
+                let
+                  all = (st.firedPolicyNames or (_: { })) null;
+                in
+                all // { ${dispatchKey} = updatedFired; };
+            }
+          )) (_: emitFinalEffects entityKind currentCtx accEnrichment dispatched combinedEffects)
+        else if iteration >= maxPolicyIterations then
+          throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
+        else
+          let
+            combinedEnrichment = accEnrichment // dispatched.enrichment;
+            enrichedCtx = currentCtx // combinedEnrichment;
+            enrichHandlers = constantHandler combinedEnrichment;
+            nextResolveCtx = enrichedCtx // {
+              __entityKind = entityKind;
+            };
+          in
+          fx.bind
+            (fx.effects.state.modify (
+              st:
+              st
+              // {
+                scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; };
+              }
+            ))
+            (
+              _:
+              fx.bind (fx.effects.scope.provide enrichHandlers (drainEnrichmentDeferred enrichedCtx)) (
+                _: go (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx
+              )
+            );
+    in
+    go;
 
   # Entry point: read state, check dedup, call iterate.
   installPolicies =
@@ -627,7 +626,7 @@ let
         scopeCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         currentCtx = scopeCtx // ctx;
         dispatchKey = "${entityKind}@${scope}";
-        alreadyDispatched = builtins.elem dispatchKey ((state.dispatchedPolicies or (_: [ ])) null);
+        alreadyDispatched = ((state.dispatchedPolicies or (_: { })) null) ? ${dispatchKey};
         globalPolicies = den.policies or { };
         schemaPolicies = (den.schema.${entityKind} or { }).policies or { };
         allDirectPolicies = globalPolicies // schemaPolicies;
@@ -645,9 +644,9 @@ let
           st:
           st
           // {
-            dispatchedPolicies = _: ((st.dispatchedPolicies or (_: [ ])) null) ++ [ dispatchKey ];
+            dispatchedPolicies = _: ((st.dispatchedPolicies or (_: { })) null) // { ${dispatchKey} = true; };
           }
-        )) (_: iterate allDirectPolicies aspectPolicies entityKind currentCtx 0 { } emptyAcc [ ] resolveCtx)
+        )) (_: iterate allDirectPolicies aspectPolicies entityKind currentCtx 0 { } emptyAcc { } resolveCtx)
     );
 
 in

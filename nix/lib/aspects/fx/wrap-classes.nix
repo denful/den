@@ -63,12 +63,12 @@ let
     }:
     let
       nodeIdentity = entry.identity or "<anon>";
-      isAnon =
-        !(den.lib.aspects.isMeaningfulName nodeIdentity)
-        || lib.hasPrefix "<root>/" nodeIdentity
-        || lib.hasInfix "/<anon>:" nodeIdentity;
+      isAnon = den.lib.aspects.fx.identity.isAnonIdentity nodeIdentity;
       finalIdentity =
-        if isContextDependent then nodeIdentity else lib.head (lib.splitString "/{" nodeIdentity);
+        if isContextDependent then
+          nodeIdentity
+        else
+          den.lib.aspects.fx.identity.stripCtxSuffix nodeIdentity;
     in
     {
       inherit nodeIdentity isAnon finalIdentity;

@@ -1,5 +1,3 @@
-# Handles: resolve-conditional
-# Checks guard via get-path-set, emits children or tombstones.
 {
   den,
   ...
@@ -34,7 +32,7 @@ in
           pathSet:
           let
             guardCtx = {
-              hasAspect = ref: pathSet ? ${identity.pathKey (identity.aspectPath ref)};
+              hasAspect = ref: pathSet ? ${identity.key ref};
             };
             pass = condNode.meta.guard guardCtx;
           in

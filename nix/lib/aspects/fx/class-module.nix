@@ -7,6 +7,38 @@ let
   # Resolve collision policy from three levels: aspect meta → entity → global.
   # Shared by wrapClassModule (specialArgs collisions) and mkCollisionDetector
   # (_module.args collisions).
+  # Build a collision-check validator module from a policy resolver and
+  # the list of den arg names to check. Returns a module function that
+  # probes config._module.args for each name and emits warnings/errors.
+  mkCollisionValidator =
+    policy: denArgNames: moduleArgs:
+    let
+      collisionChecks = lib.concatMap (
+        name:
+        let
+          mArgs = moduleArgs.config._module.args or { };
+          hasReal =
+            (builtins.tryEval (builtins.seq (mArgs.${name} or null) (mArgs ? ${name}))).value or false;
+          p = policy name;
+        in
+        if !hasReal then
+          [ ]
+        else if p == "error" then
+          throw "den: class module arg '${name}' collides with module-system arg — set collisionPolicy to resolve"
+        else if p == "class-wins" then
+          [
+            "den: class module arg '${name}' collision — class-wins, den value dropped"
+          ]
+        else
+          [
+            "den: class module arg '${name}' collision — den-wins, module-system value shadowed"
+          ]
+      ) denArgNames;
+    in
+    {
+      warnings = collisionChecks;
+    };
+
   resolveCollisionPolicy =
     {
       ctx,
@@ -88,34 +120,7 @@ let
         validatorAdvertisedArgs = {
           config = true;
         };
-        validator =
-          moduleArgs:
-          let
-            collisionChecks = lib.concatMap (
-              name:
-              let
-                mArgs = moduleArgs.config._module.args or { };
-                hasReal =
-                  (builtins.tryEval (builtins.seq (mArgs.${name} or null) (mArgs ? ${name}))).value or false;
-                p = policy name;
-              in
-              if !hasReal then
-                [ ]
-              else if p == "error" then
-                throw "den: class module arg '${name}' collides with module-system arg — set collisionPolicy to resolve"
-              else if p == "class-wins" then
-                [
-                  "den: class module arg '${name}' collision — class-wins, den value dropped"
-                ]
-              else
-                [
-                  "den: class module arg '${name}' collision — den-wins, module-system value shadowed"
-                ]
-            ) denArgNames;
-          in
-          {
-            warnings = collisionChecks;
-          };
+        validator = mkCollisionValidator policy denArgNames;
       in
       {
         module = module // {
@@ -193,36 +198,7 @@ let
             validatorAdvertisedArgs = remainingArgs // {
               config = true;
             };
-            validator =
-              moduleArgs:
-              let
-                collisionChecks = lib.concatMap (
-                  name:
-                  let
-                    # Probe _module.args for den arg names — a collision means
-                    # both den and the module system provide the same key.
-                    mArgs = moduleArgs.config._module.args or { };
-                    hasReal =
-                      (builtins.tryEval (builtins.seq (mArgs.${name} or null) (mArgs ? ${name}))).value or false;
-                    p = policy name;
-                  in
-                  if !hasReal then
-                    [ ]
-                  else if p == "error" then
-                    throw "den: class module arg '${name}' collides with module-system arg — set collisionPolicy to resolve"
-                  else if p == "class-wins" then
-                    [
-                      "den: class module arg '${name}' collision — class-wins, den value dropped"
-                    ]
-                  else
-                    [
-                      "den: class module arg '${name}' collision — den-wins, module-system value shadowed"
-                    ]
-                ) denArgNames;
-              in
-              {
-                warnings = collisionChecks;
-              };
+            validator = mkCollisionValidator policy denArgNames;
             # Wrapper advertises den args so NixOS passes thunks
             # (shadowed lazily by den values without evaluation).
             advertisedArgs = remainingArgs // lib.genAttrs denArgNames (_: true);

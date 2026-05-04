@@ -7,18 +7,6 @@ let
   inherit (den.lib.aspects.fx.identity) aspectPath pathKey;
   inherit (den.lib.aspects) isMeaningfulName;
 
-  policyEntryDefaults = {
-    provider = [ ];
-    excluded = false;
-    excludedFrom = null;
-    replacedBy = null;
-    isProvider = false;
-    handlers = [ ];
-    hasClass = false;
-    isParametric = false;
-    fnArgNames = [ ];
-  };
-
   # Derive the entity kind for the current node by walking the includes
   # chain upward through accumulated entries to find the nearest ancestor
   # with a non-null entityKind. O(chain × entries) — acceptable for

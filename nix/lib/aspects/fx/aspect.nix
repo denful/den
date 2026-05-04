@@ -157,7 +157,7 @@ let
   compileStatic =
     aspect:
     let
-      nodeIdentity = identity.pathKey (identity.aspectPath aspect);
+      nodeIdentity = identity.key (aspect);
       # Chain identity strips ctxId — the chain tracks includes provenance,
       # not fan-out dedup. This keeps chain entries aligned with entry
       # fullNames (provider/name) so parent resolution in graph.nix works.

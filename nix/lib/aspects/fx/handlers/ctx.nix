@@ -1,6 +1,3 @@
-# constantHandler: Handles <arg-name> effects — resumes with context values for parametric aspects.
-# ctxSeenHandler: Handles ctx-seen — dedup tracking for context stages.
-# State reads: seen | State writes: seen
 {
   lib,
   den,

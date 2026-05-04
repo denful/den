@@ -11,19 +11,9 @@ let
   inherit (den.lib.aspects.fx.traceUtil) traceSummary traceDetail;
   route = import ./route.nix { inherit lib den; };
 
-  # Compose two handler sets, chaining handlers for shared effect names.
-  # For overlapping keys: b's resume wins, a's state wins (a runs on b's output state).
-  #
-  # IMPORTANT LIMITATIONS:
-  # 1. Composed handlers MUST NOT write to the same state keys — a runs on b's output
-  #    state so shared keys would double-append.
-  # 2. When b returns an effectful resume (computation), the sub-computation runs with
-  #    b's state, not a's. State changes from a are lost for the duration of the
-  #    sub-computation. For shared effects, b MUST return plain values (not computations)
-  #    as resume, or a's state mutations will be discarded.
-  #
-  # Designed for the tracing use case: tracingHandler (b) controls resume,
-  # defaultHandlers (a) accumulates paths/imports. Both constraints hold for this case.
+  # Compose two handler sets: b's resume wins, a's state wins.
+  # Used for tracing: tracingHandler (b) controls resume,
+  # defaultHandlers (a) accumulates paths/imports.
   composeHandlers =
     a: b:
     let
@@ -46,15 +36,6 @@ let
     in
     a // b // sharedComposed;
 
-  # Each handler set MUST handle disjoint effect names — `//` merge is
-  # last-wins, so overlap silently shadows. constantHandler generates
-  # dynamic keys from ctx (host, user, class, etc.) which don't collide
-  # with the named handlers below.
-  #
-  # Priority (low→high, last wins via //):
-  # 1. constantHandler — den context args
-  # 2. Named handlers — emit-class, chain-*, etc. (no collision)
-  # 3. state.handler — always last
   defaultHandlers =
     { class, ctx }:
     handlers.constantHandler (
@@ -178,9 +159,10 @@ let
     scopeParent = _: { };
 
     # --- Policy dispatch tracking ---
-    # Maps "entityKind@scopeId" → list of policy names fired in that scope.
-    # Used by lateDispatchPass to identify policies registered after a scope resolved.
     firedPolicyNames = _: { };
+    dispatchedPolicies = _: { };
+    registeredRouteKeys = _: { };
+    inLateDispatch = false;
   };
 
   mkPipeline =

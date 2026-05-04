@@ -1,6 +1,3 @@
-# Handles: emit-include, include-unseen
-# emit-include delegates to emitIncludes (single-element classification).
-# include-unseen rolls back dedup state when exclude fires after eager registration.
 {
   lib,
   den,

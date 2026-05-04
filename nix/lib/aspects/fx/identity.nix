@@ -4,13 +4,22 @@
   ...
 }:
 let
-  # __ctxId differentiates fan-out contexts so the same target aspect
-  # with different context values produces distinct NixOS module dedup keys.
   aspectPath =
     a:
     (a.meta.provider or [ ]) ++ [ (a.name or "<anon>") ] ++ lib.optional (a ? __ctxId) "{${a.__ctxId}}";
 
   pathKey = path: lib.concatStringsSep "/" path;
+
+  # Composed: aspectPath → pathKey in one call.
+  key = a: pathKey (aspectPath a);
+
+  # True when an identity string refers to an anonymous/unresolved node.
+  isAnonIdentity =
+    id:
+    !(den.lib.aspects.isMeaningfulName id) || lib.hasPrefix "<root>/" id || lib.hasInfix "/<anon>:" id;
+
+  # Strip the {ctxId} suffix from an identity, yielding the base identity.
+  stripCtxSuffix = id: lib.head (lib.splitString "/{" id);
 
   toPathSet =
     paths:
@@ -77,6 +86,9 @@ in
   inherit
     aspectPath
     pathKey
+    key
+    isAnonIdentity
+    stripCtxSuffix
     toPathSet
     tombstone
     collectPathsHandler

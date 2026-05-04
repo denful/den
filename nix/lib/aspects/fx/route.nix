@@ -247,13 +247,6 @@ let
             adapterMod = route.adapterModule or null;
             modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
             guard = route.guard or null;
-            # Create an empty submodule definition so the target entry exists
-            # (e.g., users.users.tux for home-manager).
-            # Use _: { imports = []; } which is a valid module that doesn't
-            # set any config (avoids _: {} which is a bare function value
-            # rejected by non-submodule option types like lazyAttrsOf package).
-            # Only emit for routes targeting non-flake classes (flake output
-            # routes with no source modules should produce nothing).
             isFlakeRoute = route.intoClass == "flake";
             ensureEntry =
               if

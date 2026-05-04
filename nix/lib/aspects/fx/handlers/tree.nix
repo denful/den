@@ -1,19 +1,34 @@
-# constraintRegistryHandler: Handles register-constraint, check-constraint
-#   State reads: scopedConstraintRegistry, scopedConstraintFilters, scopedIncludesChain
-#   State writes: scopedConstraintRegistry, scopedConstraintFilters
-# chainHandler: Handles chain-push, chain-pop
-#   State reads/writes: scopedIncludesChain
-# classCollectorHandler: Handles emit-class
-#   State reads/writes: scopedClassImports
 {
   lib,
   den,
   ...
 }:
 let
-  # All growing state fields are thunk-wrapped (_: value) so the
-  # trampoline's deepSeq doesn't re-materialize them at every step.
-  # Unwrap with `(state.field or (_: default)) null`.
+  # Append an item to a scoped list field.
+  scopedAppend =
+    state: field: scope: item:
+    state
+    // {
+      ${field} =
+        _:
+        let
+          all = state.${field} null;
+        in
+        all // { ${scope} = (all.${scope} or [ ]) ++ [ item ]; };
+    };
+
+  # Merge attrs into a scoped attrset field.
+  scopedMerge =
+    state: field: scope: attrs:
+    state
+    // {
+      ${field} =
+        _:
+        let
+          all = state.${field} null;
+        in
+        all // { ${scope} = (all.${scope} or { }) // attrs; };
+    };
 
   constraintRegistryHandler = {
     "register-constraint" =
@@ -26,24 +41,10 @@ let
       if param.type == "filter" then
         {
           resume = null;
-          state = state // {
-            scopedConstraintFilters =
-              _:
-              let
-                all = (state.scopedConstraintFilters or (_: { })) null;
-                currentScope = state.currentScope;
-                existing = all.${currentScope} or [ ];
-              in
-              all
-              // {
-                ${currentScope} = existing ++ [
-                  {
-                    predicate = param.predicate;
-                    owner = param.owner or "<anon>";
-                    inherit scope ownerChain;
-                  }
-                ];
-              };
+          state = scopedAppend state "scopedConstraintFilters" currentScope {
+            predicate = param.predicate;
+            owner = param.owner or "<anon>";
+            inherit scope ownerChain;
           };
         }
       else
@@ -205,28 +206,22 @@ let
           else if param.isContextDependent or false then
             nodeIdentity
           else
-            lib.head (lib.splitString "/{" nodeIdentity);
+            den.lib.aspects.fx.identity.stripCtxSuffix nodeIdentity;
         loc = "${param.class}@${baseIdentity}";
         mod =
           if isRawEntry then
             # Store full param for post-pipeline wrapping
             param // { __loc = loc; }
           else
-            # Legacy path: construct module location wrapper
-            let
-              isAnon =
-                !(den.lib.aspects.isMeaningfulName nodeIdentity)
-                || lib.hasPrefix "<root>/" nodeIdentity
-                || lib.hasInfix "/<anon>:" nodeIdentity;
-            in
-            if isAnon then
-              lib.setDefaultModuleLocation loc param.module
-            else
-              {
-                key = loc;
-                _file = loc;
-                imports = [ param.module ];
-              };
+          # Legacy path: construct module location wrapper
+          if den.lib.aspects.fx.identity.isAnonIdentity nodeIdentity then
+            lib.setDefaultModuleLocation loc param.module
+          else
+            {
+              key = loc;
+              _file = loc;
+              imports = [ param.module ];
+            };
       in
       let
         scope = state.currentScope;
@@ -272,45 +267,19 @@ let
       { param, state }:
       {
         resume = [ ];
-        state = state // {
-          scopedDeferredIncludes =
-            x:
-            let
-              all = (state.scopedDeferredIncludes or (_: { })) x;
-              currentScope = state.currentScope;
-            in
-            all
-            // {
-              ${currentScope} = (all.${currentScope} or [ ]) ++ [ param ];
-            };
-        };
+        state = scopedAppend state "scopedDeferredIncludes" state.currentScope param;
       };
   };
 
   registerAspectPolicyHandler = {
     "register-aspect-policy" =
       { param, state }:
-      let
-        entry = {
-          inherit (param) fn ownerIdentity;
-        };
-      in
       {
         resume = null;
-        state = state // {
-          scopedAspectPolicies =
-            _:
-            let
-              all = (state.scopedAspectPolicies or (_: { })) null;
-              currentScope = state.currentScope;
-              scopeData = all.${currentScope} or { };
-            in
-            all
-            // {
-              ${currentScope} = scopeData // {
-                ${param.name} = entry;
-              };
-            };
+        state = scopedMerge state "scopedAspectPolicies" state.currentScope {
+          ${param.name} = {
+            inherit (param) fn ownerIdentity;
+          };
         };
       };
   };
@@ -374,17 +343,8 @@ let
           if alreadyRegistered then
             state
           else
-            state
+            scopedAppend state "scopedRoutes" scope route
             // {
-              scopedRoutes =
-                _:
-                let
-                  all = state.scopedRoutes null;
-                in
-                all
-                // {
-                  ${scope} = (all.${scope} or [ ]) ++ [ route ];
-                };
               registeredRouteKeys = _: registeredRoutes // { ${routeKey} = true; };
             };
       };
@@ -395,23 +355,10 @@ let
       { param, state }:
       let
         scope = state.currentScope;
-        spec = param // {
-          sourceScopeId = scope;
-        };
       in
       {
         resume = null;
-        state = state // {
-          scopedInstantiates =
-            _:
-            let
-              all = state.scopedInstantiates null;
-            in
-            all
-            // {
-              ${scope} = (all.${scope} or [ ]) ++ [ spec ];
-            };
-        };
+        state = scopedAppend state "scopedInstantiates" scope (param // { sourceScopeId = scope; });
       };
   };
 

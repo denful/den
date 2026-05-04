@@ -1,6 +1,3 @@
-# Handles: check-dedup
-# Queries includeSeen, eagerly registers key if not duplicate.
-# Returns { isDuplicate, dedupKey }.
 {
   lib,
   den,
@@ -19,7 +16,7 @@ in
         child = param;
         originalName = child.name or "<anon>";
         isSyntheticName = lib.hasPrefix "<" originalName && lib.hasSuffix ">" originalName;
-        childIdentity = identity.pathKey (identity.aspectPath child);
+        childIdentity = identity.key (child);
         rawDedupKey = if isMeaningfulName originalName && !isSyntheticName then childIdentity else null;
         scope = state.currentScope or "__unscoped";
         dedupKey = if rawDedupKey != null then "${scope}/${rawDedupKey}" else null;
