@@ -1,8 +1,7 @@
-# DEPRECATED: scheduled for removal after first stable release post-fx-pipeline merge.
-# Migration: remove provides from aspects; use policies for cross-entity routing.
-# Backwards-compatibility handler for main-era provides.X cross-provide patterns.
-# Synthesizes aspect policies that replicate mutual-provider routing.
-# Remove after migration period (see provides-removal spec).
+# Compatibility shim for provides.to-users, provides.to-hosts, and provides.<name>.
+# Translates legacy provides patterns into policy.include effects — the pipeline
+# handles include walking, parametric resolution, class extraction, and dedup.
+# Reserved keyword: provides.to-users / provides.to-hosts remain supported.
 {
   lib,
   den,
@@ -12,8 +11,6 @@ let
   fx = den.lib.fx;
   identity = den.lib.aspects.fx.identity;
   policy = den.lib.policy;
-
-  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
 
   schemaKinds = den.lib.schemaUtil.schemaEntityKinds;
 
@@ -29,52 +26,7 @@ let
     else
       value;
 
-  inherit (den.lib.aspects.fx.contentUtil) unwrapContentValues;
-
-  # Extract non-structural keys from an aspect result as class modules.
-  extractClassModules =
-    result:
-    let
-      allKeys = builtins.attrNames result;
-      classKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) allKeys;
-    in
-    map (k: {
-      class = k;
-      module = unwrapContentValues result.${k};
-    }) classKeys;
-
-  # Resolve an include for the compat shim.  Bare lambdas (parametric aspects)
-  # are called with ctx; attrsets are used directly — their __fn/__functor is a
-  # pipeline-level resolver (expects { class, ... }), not a provide-level one.
-  resolveInclude = ctx: inc: if builtins.isFunction inc then inc ctx else inc;
-
-  # Like extractClassModules but recursively walks `includes`, resolving each
-  # included aspect with ctx.  Needed for provides.to-users / provides.to-hosts
-  # where the value is { includes = [ base ... ]; } and class modules live inside
-  # the included aspects, not at the top level.
-  extractClassModulesDeep =
-    ctx: result:
-    if !(builtins.isAttrs result) then
-      [ ]
-    else
-      let
-        direct = extractClassModules result;
-        fromIncludes =
-          if result ? includes then
-            lib.concatMap (
-              inc:
-              let
-                resolved = resolveInclude ctx inc;
-              in
-              extractClassModulesDeep ctx resolved
-            ) result.includes
-          else
-            [ ];
-      in
-      direct ++ fromIncludes;
-
-  # to-hosts: fires for every host×user pair, delivers directly to host's nixos class.
-  # Uses policy.provide for direct delivery — no tree walk, no duplicate emissions.
+  # to-hosts: fires for every host×user pair, includes resolved content at current scope.
   mkToHostsPolicy =
     aspectName: key: value:
     {
@@ -83,16 +35,13 @@ let
       ...
     }:
     let
-      ctx = { inherit host user; };
-      result = applyProvide value ctx;
-      classModules = extractClassModulesDeep ctx result;
+      result = applyProvide value { inherit host user; };
     in
     lib.warn
-      "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.provide { class = \"<class>\"; module = { <config> }; }) ];"
-      (map (cm: policy.provide cm) classModules);
+      "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.include { <config> }) ];"
+      [ (policy.include result) ];
 
-  # to-users: fires for every host×user pair, delivers to user's homeManager class.
-  # Uses policy.provide for direct cross-class delivery into homeManager.
+  # to-users: fires for every host×user pair, includes resolved content at user scope.
   mkToUsersPolicy =
     aspectName: key: value:
     {
@@ -101,16 +50,13 @@ let
       ...
     }:
     let
-      ctx = { inherit host user; };
-      result = applyProvide value ctx;
-      classModules = extractClassModulesDeep ctx result;
+      result = applyProvide value { inherit host user; };
     in
     lib.warn
-      "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.provide { class = \"homeManager\"; module = { <config> }; }) ];"
-      (map (cm: policy.provide cm) classModules);
+      "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.include { <config> }) ];"
+      [ (policy.include result) ];
 
   # Named target: fires only when entity name matches key.
-  # Uses policy.provide for direct cross-class delivery into the target class.
   mkNamedTargetPolicy =
     aspectName: key: value:
     {
@@ -120,12 +66,11 @@ let
     }:
     let
       result = applyProvide value { inherit host user; };
-      classModules = extractClassModules result;
     in
     lib.optionals (host.name == key || user.name == key) (
       lib.warn
-        "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    lib.optional (host.name == \"${key}\" || user.name == \"${key}\")\n      (policy.provide { class = \"<class>\"; module = { <config> }; });"
-        (map (cm: policy.provide cm) classModules)
+        "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    lib.optional (host.name == \"${key}\" || user.name == \"${key}\")\n      (policy.include { <config> });"
+        [ (policy.include result) ]
     );
 in
 {
