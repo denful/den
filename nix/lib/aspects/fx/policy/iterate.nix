@@ -108,6 +108,9 @@ let
           dispatched = mkDispatch allDirectPolicies aspectPolicies firedPolicies currentResolveCtx;
           newFiredNames = builtins.filter (n: !(firedPolicies ? ${n})) dispatched.firedNames;
           updatedFired = firedPolicies // lib.genAttrs newFiredNames (_: true);
+          # Invariant: enrichment is key-monotonic — keys are only added, never
+          # changed.  Convergence checks new keys only; value changes don't
+          # trigger re-dispatch.
           newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (builtins.attrNames dispatched.enrichment);
           combinedEffects = mergeEffects accEffects dispatched;
         in

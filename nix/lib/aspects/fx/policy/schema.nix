@@ -113,6 +113,10 @@ let
       );
 
   # Post-resolve pass: re-dispatch aspect policies registered by later siblings.
+  # inLateDispatch is set true and intentionally never reset — this ensures
+  # only the FIRST fan-out resolution triggers late dispatch.  Subsequent
+  # fan-outs within the same pipeline run see the flag and skip, preventing
+  # O(N²) re-dispatch across multiple entity kinds.
   lateDispatchPass =
     siblingMetas:
     fx.bind (fx.effects.state.modify (st: st // { inLateDispatch = true; })) (
