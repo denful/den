@@ -138,5 +138,66 @@
       }
     );
 
+    # Registered substitute constraint replaces the aspect.
+    test-gate-blocks-constraint-substitute = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        handlers = den.lib.aspects.fx.handlers;
+        pipeline = den.lib.aspects.fx.pipeline;
+        aspect = {
+          name = "original-aspect";
+          meta.provider = [ ];
+          includes = [ ];
+        };
+        replacement = {
+          name = "replacement-aspect";
+          meta.provider = [ ];
+          includes = [ ];
+        };
+        nodeIdentity = den.lib.aspects.fx.identity.key aspect;
+        # Register a substitute constraint, then gate the aspect.
+        comp =
+          fx.bind
+            (fx.send "register-constraint" {
+              type = "substitute";
+              identity = nodeIdentity;
+              owner = "test-owner";
+              getReplacement = _: replacement;
+            })
+            (
+              _:
+              fx.send "gate" {
+                inherit aspect;
+                identity = nodeIdentity;
+              }
+            );
+        result = fx.handle {
+          handlers =
+            handlers.gateHandler
+            // handlers.checkDedupHandler
+            // handlers.constraintRegistryHandler
+            // handlers.includeHandler
+            // handlers.chainHandler
+            // den.lib.aspects.fx.identity.collectPathsHandler;
+          state = pipeline.defaultState;
+        } comp;
+      in
+      {
+        expr = {
+          blocked = result.value.blocked;
+          resultCount = builtins.length result.value.result;
+          tombstoneName = (builtins.elemAt result.value.result 0).name;
+          hasReplacedBy = (builtins.elemAt result.value.result 0).meta ? replacedBy;
+        };
+        expected = {
+          blocked = true;
+          resultCount = 2;
+          tombstoneName = "~original-aspect";
+          hasReplacedBy = true;
+        };
+      }
+    );
+
   };
 }

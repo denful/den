@@ -66,6 +66,7 @@ let
                     in
                     fx.bind (fx.send "resolve-complete" tombstone) (
                       _:
+                      # Coexistence: will become fx.send "resolve" in Task 12
                       fx.bind (den.lib.aspects.fx.aspect.aspectToEffect decision.replacement) (
                         resolved:
                         fx.pure {
