@@ -43,7 +43,11 @@ let
     entityKind: enrichedCtx: includeAspects: isFanOut: prevResults: schemaEffect:
     let
       inherit (decomposeSchemaEffect entityKind enrichedCtx schemaEffect)
-        targetKind resolveBindings scopedCtx entityClass;
+        targetKind
+        resolveBindings
+        scopedCtx
+        entityClass
+        ;
       ctxNames = mkScopeId scopedCtx;
       ctxKey = if isFanOut then "${targetKind}/{${ctxNames}}" else targetKind;
       scopeHandlersForCtx = constantHandler (
@@ -87,7 +91,9 @@ let
       dispatchKey = "${sib.targetKind}@${sib.scopeId}";
       alreadyFired = firedPerScope.${dispatchKey} or { };
       latePolicies = lib.filterAttrs (name: _: !(alreadyFired ? ${name})) allAspectPolicies;
-      resolveCtx = sib.scopedCtx // { __entityKind = sib.targetKind; };
+      resolveCtx = sib.scopedCtx // {
+        __entityKind = sib.targetKind;
+      };
       lateResults = dispatchAspect latePolicies alreadyFired resolveCtx;
       late = extractTaggedEffects (map classifyPolicyResult lateResults);
       hasLateEffects =
@@ -105,11 +111,9 @@ let
     else
       fx.bind (fx.effects.state.modify (st: st // { currentScope = sib.scopeId; })) (
         _:
-        fx.bind
-          (fx.effects.scope.provide scopeHandlersForCtx (
-            emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
-          ))
-          (_: fx.effects.state.modify (st: st // { currentScope = parentScope; }))
+        fx.bind (fx.effects.scope.provide scopeHandlersForCtx (
+          emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
+        )) (_: fx.effects.state.modify (st: st // { currentScope = parentScope; }))
       );
 
   # Post-resolve pass: re-dispatch aspect policies registered by later siblings.
@@ -129,8 +133,7 @@ let
           parentScope = state.currentScope;
         in
         builtins.foldl' (
-          acc: sib:
-          fx.bind acc (_: emitLateForSibling parentScope allAspectPolicies firedPerScope sib)
+          acc: sib: fx.bind acc (_: emitLateForSibling parentScope allAspectPolicies firedPerScope sib)
         ) (fx.pure null) siblingMetas
       )
     );

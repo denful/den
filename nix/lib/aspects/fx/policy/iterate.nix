@@ -57,10 +57,7 @@ let
       satisfiable:
       builtins.foldl' (
         acc: deferred:
-        fx.bind acc (
-          _:
-          aspectToEffect (deferred.child // { __scopeHandlers = scopeHandlers; })
-        )
+        fx.bind acc (_: aspectToEffect (deferred.child // { __scopeHandlers = scopeHandlers; }))
       ) (fx.pure null) satisfiable
     );
 
@@ -72,10 +69,14 @@ let
       let
         dispatchKey = "${entityKind}@${st.currentScope}";
       in
-      st // {
-        firedPolicyNames = _:
-          let all = (st.firedPolicyNames or (_: { })) null;
-          in all // { ${dispatchKey} = updatedFired; };
+      st
+      // {
+        firedPolicyNames =
+          _:
+          let
+            all = (st.firedPolicyNames or (_: { })) null;
+          in
+          all // { ${dispatchKey} = updatedFired; };
       }
     );
 
@@ -86,13 +87,16 @@ let
       combinedEnrichment = accEnrichment // dispatched.enrichment;
       enrichedCtx = currentCtx // combinedEnrichment;
       enrichHandlers = constantHandler combinedEnrichment;
-      nextResolveCtx = enrichedCtx // { __entityKind = entityKind; };
+      nextResolveCtx = enrichedCtx // {
+        __entityKind = entityKind;
+      };
     in
     fx.bind
-      (fx.effects.state.modify (st:
-        st // { scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; }; }
+      (fx.effects.state.modify (
+        st: st // { scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; }; }
       ))
-      (_:
+      (
+        _:
         fx.bind (fx.effects.scope.provide enrichHandlers (drainEnrichmentDeferred enrichedCtx)) (
           _: go (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx
         )
@@ -111,7 +115,9 @@ let
           # Invariant: enrichment is key-monotonic — keys are only added, never
           # changed.  Convergence checks new keys only; value changes don't
           # trigger re-dispatch.
-          newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (builtins.attrNames dispatched.enrichment);
+          newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
+            builtins.attrNames dispatched.enrichment
+          );
           combinedEffects = mergeEffects accEffects dispatched;
         in
         if newEnrichKeys == [ ] then
@@ -121,7 +127,8 @@ let
         else if iteration >= maxPolicyIterations then
           throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
         else
-          widenAndContinue go iteration entityKind currentCtx accEnrichment dispatched combinedEffects updatedFired;
+          widenAndContinue go iteration entityKind currentCtx accEnrichment dispatched combinedEffects
+            updatedFired;
     in
     go;
 in

@@ -79,8 +79,11 @@ let
           let
             res = guard args;
           in
-          if lib.isFunction res then res item
-          else assert builtins.isBool res; lib.optionalAttrs res;
+          if lib.isFunction res then
+            res item
+          else
+            assert builtins.isBool res;
+            lib.optionalAttrs res;
 
       adaptArgsFn =
         args:

@@ -21,7 +21,13 @@ let
   inherit (classify) classifyPolicyResult hasEffects extractTaggedEffects;
 
   dispatch = import ./dispatch.nix {
-    inherit lib resolveArgsSatisfied classifyPolicyResult extractTaggedEffects hasEffects;
+    inherit
+      lib
+      resolveArgsSatisfied
+      classifyPolicyResult
+      extractTaggedEffects
+      hasEffects
+      ;
   };
   inherit (dispatch) dispatchAspect mkDispatch;
 
@@ -44,7 +50,12 @@ let
       entityClass = schema.resolveEntityClass targetKind resolveBindings;
     in
     {
-      inherit targetKind resolveBindings scopedCtx entityClass;
+      inherit
+        targetKind
+        resolveBindings
+        scopedCtx
+        entityClass
+        ;
     };
 
   schema = import ./schema.nix {

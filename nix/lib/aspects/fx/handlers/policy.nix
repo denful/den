@@ -19,7 +19,9 @@ let
             ${param.name} = entry;
           })
           // {
-            flatAspectPolicies = (state.flatAspectPolicies or { }) // { ${param.name} = entry; };
+            flatAspectPolicies = (state.flatAspectPolicies or { }) // {
+              ${param.name} = entry;
+            };
           };
       };
   };

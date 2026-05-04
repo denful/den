@@ -37,15 +37,20 @@ let
     ctx: scopeContexts: scopedClassImportsRaw:
     let
       wrappedPerScope = lib.mapAttrs (
-        scopeId: scopeClasses:
-        wrapCollectedClasses (scopeContexts.${scopeId} or ctx) scopeClasses
+        scopeId: scopeClasses: wrapCollectedClasses (scopeContexts.${scopeId} or ctx) scopeClasses
       ) scopedClassImportsRaw;
       merged = builtins.foldl' (
         acc: scopeData:
-        lib.zipAttrsWith (_: builtins.concatLists) [ acc scopeData ]
+        lib.zipAttrsWith (_: builtins.concatLists) [
+          acc
+          scopeData
+        ]
       ) { } (builtins.attrValues wrappedPerScope);
     in
-    { classImports = merged; perScope = wrappedPerScope; };
+    {
+      classImports = merged;
+      perScope = wrappedPerScope;
+    };
 
   # Phase 2: Apply policy.provide — inject modules into target classes.
   applyProvides =
@@ -53,49 +58,52 @@ let
     let
       allProvides = dedupProvides (lib.concatLists (lib.attrValues scopedProvides));
     in
-    builtins.foldl'
-      (
-        prev: spec:
-        let
-          targetClass = spec.class;
-          path = spec.path or [ ];
-          sid = spec.sourceScopeId;
-          scopeCtx = scopeContexts.${sid} or ctx;
-          rawModule = if path == [ ] then spec.module else lib.setAttrByPath path spec.module;
-          wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
-            inherit ctx;
-            module = rawModule;
-            aspectPolicy = null;
-            globalPolicy = null;
+    builtins.foldl' (
+      prev: spec:
+      let
+        targetClass = spec.class;
+        path = spec.path or [ ];
+        sid = spec.sourceScopeId;
+        scopeCtx = scopeContexts.${sid} or ctx;
+        rawModule = if path == [ ] then spec.module else lib.setAttrByPath path spec.module;
+        wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
+          inherit ctx;
+          module = rawModule;
+          aspectPolicy = null;
+          globalPolicy = null;
+        };
+        wrappedMod =
+          if wrapped.unsatisfied or false then
+            [ ]
+          else
+            let
+              loc = "${targetClass}@<provide>/${lib.concatStringsSep "/" path}";
+            in
+            [ (lib.setDefaultModuleLocation loc wrapped.module) ];
+      in
+      {
+        classImports = prev.classImports // {
+          ${targetClass} = (prev.classImports.${targetClass} or [ ]) ++ wrappedMod;
+        };
+        perScope = prev.perScope // {
+          ${sid} = (prev.perScope.${sid} or { }) // {
+            ${targetClass} = ((prev.perScope.${sid} or { }).${targetClass} or [ ]) ++ wrappedMod;
           };
-          wrappedMod =
-            if wrapped.unsatisfied or false then
-              [ ]
-            else
-              let
-                loc = "${targetClass}@<provide>/${lib.concatStringsSep "/" path}";
-              in
-              [ (lib.setDefaultModuleLocation loc wrapped.module) ];
-        in
-        {
-          classImports = prev.classImports // {
-            ${targetClass} = (prev.classImports.${targetClass} or [ ]) ++ wrappedMod;
-          };
-          perScope = prev.perScope // {
-            ${sid} = (prev.perScope.${sid} or { }) // {
-              ${targetClass} = ((prev.perScope.${sid} or { }).${targetClass} or [ ]) ++ wrappedMod;
-            };
-          };
-        }
-      )
-      acc
-      allProvides;
+        };
+      }
+    ) acc allProvides;
 
   # Phase 3: Apply routes.
   applyRoutes =
     fxResolve: ctx: scopeContexts: rootScopeId: scopedRoutes: acc:
     route.applyRoutes {
-      inherit scopedRoutes scopeContexts ctx rootScopeId fxResolve;
+      inherit
+        scopedRoutes
+        scopeContexts
+        ctx
+        rootScopeId
+        fxResolve
+        ;
       wrappedPerScope = acc.perScope;
       classImports = acc.classImports;
       inherit (handlers) buildForwardAspect;
@@ -117,18 +125,24 @@ let
           let
             instantiateArgs =
               if spec ? pkgs then
-                { inherit (spec) pkgs; modules = [ spec.mainModule ]; }
+                {
+                  inherit (spec) pkgs;
+                  modules = [ spec.mainModule ];
+                }
               else
                 {
-                  modules = [ spec.mainModule ]
-                    ++ lib.optional (spec ? system) { nixpkgs.hostPlatform = lib.mkDefault spec.system; };
+                  modules = [
+                    spec.mainModule
+                  ]
+                  ++ lib.optional (spec ? system) { nixpkgs.hostPlatform = lib.mkDefault spec.system; };
                 };
             evaluated = spec.instantiate instantiateArgs;
           in
           [ { config = lib.setAttrByPath ([ "flake" ] ++ spec.intoAttr) evaluated; } ]
       ) allInstantiates;
     in
-    classImports // {
+    classImports
+    // {
       flake = (classImports.flake or [ ]) ++ instantiateModules;
     };
 
@@ -146,10 +160,15 @@ let
 
       phase1 = wrapPerScope ctx scopeContexts (result.state.scopedClassImports null);
       phase2 = applyProvides ctx scopeContexts (result.state.scopedProvides null) phase1;
-      phase3 = applyRoutes (fxResolve mkPipeline) ctx scopeContexts result.state.rootScopeId (result.state.scopedRoutes null) phase2;
+      phase3 =
+        applyRoutes (fxResolve mkPipeline) ctx scopeContexts result.state.rootScopeId
+          (result.state.scopedRoutes null)
+          phase2;
       phase4 = applyInstantiates (result.state.scopedInstantiates null) phase3.classImports;
     in
-    { imports = phase4.${class} or [ ]; };
+    {
+      imports = phase4.${class} or [ ];
+    };
 in
 {
   inherit fxResolve wrapCollectedClasses;

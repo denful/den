@@ -125,8 +125,18 @@ let
       };
       isContextDependent = result.wrapped || (entry.isContextDependent or false);
       inherit (computeModuleIdentity { inherit entry isContextDependent; })
-        nodeIdentity isAnon finalIdentity;
-      wrappedMod = wrapModule { inherit class finalModule isAnon finalIdentity; };
+        nodeIdentity
+        isAnon
+        finalIdentity
+        ;
+      wrappedMod = wrapModule {
+        inherit
+          class
+          finalModule
+          isAnon
+          finalIdentity
+          ;
+      };
       validatorMod = buildValidatorModule { inherit class nodeIdentity result; };
     in
     if result.unsatisfied or false then
@@ -143,11 +153,7 @@ let
     lib.mapAttrs (
       class: entries:
       lib.concatMap (
-        entry:
-        if !(entry.__rawEntry or false) then
-          [ entry ]
-        else
-          processEntry enrichedCtx class entry
+        entry: if !(entry.__rawEntry or false) then [ entry ] else processEntry enrichedCtx class entry
       ) entries
     ) classImports;
 in

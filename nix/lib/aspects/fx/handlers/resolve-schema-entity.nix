@@ -26,12 +26,14 @@ let
         parentScope = st.currentScope;
         isSameScope = newScopeId == parentScope;
       in
-      st // {
+      st
+      // {
         currentScope = newScopeId;
         scopeContexts = _: (st.scopeContexts null) // { ${newScopeId} = scopedCtx; };
         scopeParent =
           _: (st.scopeParent null) // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
-        scopedAspectPolicies = _:
+        scopedAspectPolicies =
+          _:
           let
             all = st.scopedAspectPolicies null;
             parentPolicies = all.${parentScope} or { };
@@ -49,12 +51,18 @@ let
         allScoped = (st.scopedDeferredIncludes or (_: { })) null;
         parentItems = allScoped.${parentScope} or [ ];
       in
-      if parentItems == [ ] then st
-      else st // {
-        scopedDeferredIncludes = _: allScoped // {
-          ${newScopeId} = (allScoped.${newScopeId} or [ ]) ++ parentItems;
-        };
-      }
+      if parentItems == [ ] then
+        st
+      else
+        st
+        // {
+          scopedDeferredIncludes =
+            _:
+            allScoped
+            // {
+              ${newScopeId} = (allScoped.${newScopeId} or [ ]) ++ parentItems;
+            };
+        }
     );
 
   # Strip stale __ctxId from aspects (prevents identity mismatches in fresh scope).
@@ -63,12 +71,14 @@ let
     if builtins.isAttrs a then
       (builtins.removeAttrs a [ "__ctxId" ])
       // lib.optionalAttrs (a ? includes) { includes = map stripCtxId (a.includes or [ ]); }
-    else a;
+    else
+      a;
 
   # Merge policy/resolve includes into raw entity.
   mergeEntityIncludes =
     rawEntity: includeAspects: policyIncludes: resolveIncludes:
-    rawEntity // {
+    rawEntity
+    // {
       includes =
         (rawEntity.includes or [ ])
         ++ map stripCtxId includeAspects
@@ -106,11 +116,18 @@ let
       if childRoutes == [ ] then
         fx.bind restoreScope (_: fx.pure allResults)
       else
-        fx.bind (fx.effects.state.modify (st: st // {
-          scopedRoutes = _:
-            let all = st.scopedRoutes null;
-            in all // { ${newScopeId} = (all.${newScopeId} or [ ]) ++ childRoutes; };
-        })) (_: fx.bind restoreScope (_: fx.pure allResults))
+        fx.bind (fx.effects.state.modify (
+          st:
+          st
+          // {
+            scopedRoutes =
+              _:
+              let
+                all = st.scopedRoutes null;
+              in
+              all // { ${newScopeId} = (all.${newScopeId} or [ ]) ++ childRoutes; };
+          }
+        )) (_: fx.bind restoreScope (_: fx.pure allResults))
     );
 
   # Resolve entity tree within scope: resolve-entity → walk → drain → propagate.
@@ -120,7 +137,9 @@ let
       fx.bind (fx.send "resolve-entity" { kind = param.targetKind; }) (
         rawEntity:
         let
-          entity = mergeEntityIncludes rawEntity param.includeAspects param.policyIncludes param.resolveIncludes;
+          entity =
+            mergeEntityIncludes rawEntity param.includeAspects param.policyIncludes
+              param.resolveIncludes;
         in
         fx.bind (aspectToEffect entity) (
           childResult:
@@ -144,12 +163,14 @@ let
         restoreScope = fx.effects.state.modify (st: st // { currentScope = scope; });
       in
       {
-        resume =
-          fx.bind (pushScope param.scopedCtx param.entityClass newScopeId) (_:
-            fx.bind (copyDeferredToScope scope newScopeId) (_:
-              resolveEntityInScope scopeHandlersForCtx param.scopedCtx param param.prevResults newScopeId restoreScope
-            )
-          );
+        resume = fx.bind (pushScope param.scopedCtx param.entityClass newScopeId) (
+          _:
+          fx.bind (copyDeferredToScope scope newScopeId) (
+            _:
+            resolveEntityInScope scopeHandlersForCtx param.scopedCtx param param.prevResults newScopeId
+              restoreScope
+          )
+        );
         inherit state;
       };
   };

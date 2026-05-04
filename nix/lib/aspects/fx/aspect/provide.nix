@@ -49,16 +49,25 @@ let
     let
       isParamWrapper = isParametricWrapper providerVal;
       innerFn =
-        if isParamWrapper then providerVal.__fn
-        else if builtins.isAttrs providerVal && providerVal ? __fn then providerVal.__fn
-        else if builtins.isAttrs providerVal && lib.isFunction providerVal then providerVal.__functor providerVal
-        else providerVal;
+        if isParamWrapper then
+          providerVal.__fn
+        else if builtins.isAttrs providerVal && providerVal ? __fn then
+          providerVal.__fn
+        else if builtins.isAttrs providerVal && lib.isFunction providerVal then
+          providerVal.__functor providerVal
+        else
+          providerVal;
       args =
-        if isParamWrapper then providerVal.__args
-        else if lib.isFunction innerFn then lib.functionArgs innerFn
-        else { };
+        if isParamWrapper then
+          providerVal.__args
+        else if lib.isFunction innerFn then
+          lib.functionArgs innerFn
+        else
+          { };
     in
-    { inherit innerFn args isParamWrapper; };
+    {
+      inherit innerFn args isParamWrapper;
+    };
 
   # Tag an include with scope/ctx propagation attrs.
   tagScopeAttrs =
@@ -102,10 +111,17 @@ let
     else
       tagScopeAttrs aspect scopeHandlers {
         name = aspectName;
-        meta = providerMeta // (
-          if isParamWrapper then builtins.removeAttrs (providerVal.meta or { }) [ "provider" "selfProvide" ]
-          else { }
-        );
+        meta =
+          providerMeta
+          // (
+            if isParamWrapper then
+              builtins.removeAttrs (providerVal.meta or { }) [
+                "provider"
+                "selfProvide"
+              ]
+            else
+              { }
+          );
         __fn = if lib.isFunction innerFn then innerFn else _: providerVal;
         __args = args;
       };

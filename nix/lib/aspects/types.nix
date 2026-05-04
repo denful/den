@@ -335,7 +335,13 @@ let
       };
       options.collisionPolicy = lib.mkOption {
         description = "Collision policy for flat-form class module arg/module-system arg overlap.";
-        type = lib.types.nullOr (lib.types.enum [ "error" "class-wins" "den-wins" ]);
+        type = lib.types.nullOr (
+          lib.types.enum [
+            "error"
+            "class-wins"
+            "den-wins"
+          ]
+        );
         default = null;
       };
     };
@@ -381,9 +387,12 @@ let
             default = { };
             type = lib.types.submodule {
               freeformType = lib.types.lazyAttrsOf (
-                providerType (typeCfg // {
-                  providerPrefix = (typeCfg.providerPrefix or [ ]) ++ [ config.name ];
-                })
+                providerType (
+                  typeCfg
+                  // {
+                    providerPrefix = (typeCfg.providerPrefix or [ ]) ++ [ config.name ];
+                  }
+                )
               );
             };
           };

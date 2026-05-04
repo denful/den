@@ -73,9 +73,7 @@ let
                 id = builtins.head ids;
                 rest = builtins.tail ids;
                 kids = childMap.${id} or [ ];
-                count =
-                  if kids == [ ] then 1
-                  else lib.foldl' (acc: k: acc + (memo.${k} or 1)) 0 kids;
+                count = if kids == [ ] then 1 else lib.foldl' (acc: k: acc + (memo.${k} or 1)) 0 kids;
               in
               go (memo // { ${id} = count; }) rest;
         in

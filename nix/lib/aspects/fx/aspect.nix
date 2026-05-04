@@ -28,8 +28,7 @@ let
     ;
 
   installPolicies =
-    (import ./policy { inherit lib den; } { inherit aspectToEffect ctxFromHandlers; })
-    .installPolicies;
+    (import ./policy { inherit lib den; } { inherit aspectToEffect ctxFromHandlers; }).installPolicies;
 
   # --- Class emission ---
 
@@ -44,9 +43,25 @@ let
 
   # Emit a single class module entry.
   emitClassEntry =
-    { class, identity, module, ctx, aspectPolicy, globalPolicy, isContextDependent }:
+    {
+      class,
+      identity,
+      module,
+      ctx,
+      aspectPolicy,
+      globalPolicy,
+      isContextDependent,
+    }:
     fx.send "emit-class" {
-      inherit class identity module ctx aspectPolicy globalPolicy isContextDependent;
+      inherit
+        class
+        identity
+        module
+        ctx
+        aspectPolicy
+        globalPolicy
+        isContextDependent
+        ;
       __rawEntry = true;
     };
 
@@ -56,11 +71,17 @@ let
     let
       modules = den.lib.aspects.fx.contentUtil.unwrapContentValuesList aspect.${k};
       isMulti = builtins.length modules > 1;
-      mkEntry = idx: module:
+      mkEntry =
+        idx: module:
         emitClassEntry {
           class = k;
           identity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
-          inherit module ctx aspectPolicy globalPolicy;
+          inherit
+            module
+            ctx
+            aspectPolicy
+            globalPolicy
+            ;
           isContextDependent = contextDep;
         };
     in
@@ -135,7 +156,9 @@ let
     fx.bind (chainWrap chainIdentity isMeaningful (resolveChildSequence aspect)) (
       allChildren:
       let
-        resolved = aspect // { includes = allChildren; };
+        resolved = aspect // {
+          includes = allChildren;
+        };
       in
       fx.bind (fx.send "resolve-complete" resolved) (_: fx.pure resolved)
     );
@@ -158,7 +181,10 @@ let
           allClassKeys = classified.classKeys ++ classified.unregisteredClassKeys;
         in
         fx.bind (fx.seq (
-          [ (emitClasses aspect allClassKeys nodeIdentity) (registerConstraints aspect) ]
+          [
+            (emitClasses aspect allClassKeys nodeIdentity)
+            (registerConstraints aspect)
+          ]
           ++ map (emitNestedAspect aspect) classified.nestedKeys
         )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
       )
@@ -174,7 +200,10 @@ let
       meta =
         (aspect.meta or { })
         // (if builtins.isAttrs resolved then resolved.meta or { } else { })
-        // { isParametric = true; fnArgNames = builtins.attrNames (aspect.__args or { }); };
+        // {
+          isParametric = true;
+          fnArgNames = builtins.attrNames (aspect.__args or { });
+        };
     }
     // lib.optionalAttrs (aspect ? into) { inherit (aspect) into; }
     // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; };
@@ -185,13 +214,20 @@ let
     if lib.isFunction resolved && !builtins.isAttrs resolved then
       if den.lib.aspects.isSubmoduleFn resolved then
         let
-          merged = den.lib.aspects.types.aspectType.merge
-            (aspect.meta.loc or [ (aspect.name or "<anon>") ])
-            [ { file = aspect.meta.file or "<parametric>"; value = resolved; } ];
+          merged = den.lib.aspects.types.aspectType.merge (aspect.meta.loc or [ (aspect.name or "<anon>") ]) [
+            {
+              file = aspect.meta.file or "<parametric>";
+              value = resolved;
+            }
+          ];
         in
         base // builtins.removeAttrs merged [ "meta" ]
       else
-        base // { __fn = resolved; __args = lib.functionArgs resolved; }
+        base
+        // {
+          __fn = resolved;
+          __args = lib.functionArgs resolved;
+        }
     else
       base // builtins.removeAttrs resolved [ "meta" ];
 
@@ -206,7 +242,10 @@ let
     next
     // lib.optionalAttrs (mergedScopeHandlers != { }) { __scopeHandlers = mergedScopeHandlers; }
     // lib.optionalAttrs (aspect ? __ctxId) { inherit (aspect) __ctxId; }
-    // { __parametricResolvedArgs = (aspect.__parametricResolvedArgs or [ ]) ++ builtins.attrNames (aspect.__args or { }); };
+    // {
+      __parametricResolvedArgs =
+        (aspect.__parametricResolvedArgs or [ ]) ++ builtins.attrNames (aspect.__args or { });
+    };
 
   maxParametricDepth = 10;
 
@@ -240,14 +279,21 @@ let
         let
           base = mkParametricBase aspect resolved;
           next = mkParametricNext aspect base resolved;
-          tagged = tagParametricResult aspect next // { __parametricDepth = depth + 1; };
+          tagged = tagParametricResult aspect next // {
+            __parametricDepth = depth + 1;
+          };
         in
         aspectToEffect tagged
       );
 
   # --- Top-level dispatch ---
 
-  parametricInternalKeys = [ "__fn" "__args" "__parametricDepth" "__parametricResolvedArgs" ];
+  parametricInternalKeys = [
+    "__fn"
+    "__args"
+    "__parametricDepth"
+    "__parametricResolvedArgs"
+  ];
 
   aspectToEffect =
     aspect:

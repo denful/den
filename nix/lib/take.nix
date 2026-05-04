@@ -32,10 +32,7 @@ let
             # Check 2: no extra context beyond declared args
             hasExtras = builtins.any (k: !(args ? ${k})) scopeKeys;
           in
-          if hasMissing || hasExtras then
-            { }
-          else
-            fn (lib.intersectAttrs args cleanArgs);
+          if hasMissing || hasExtras then { } else fn (lib.intersectAttrs args cleanArgs);
         # All args are optional so the wrapper is never deferred.
         # Missing args are detected in __fn and produce {} (no-op).
         __args = lib.mapAttrs (_: _: true) args;

@@ -119,16 +119,27 @@ let
       ) module missingDenArgNames;
     in
     if missingDenArgNames != [ ] then
-      { module = warnedModule; wrapped = false; unsatisfied = true; missingArgs = missingDenArgNames; }
+      {
+        module = warnedModule;
+        wrapped = false;
+        unsatisfied = true;
+        missingArgs = missingDenArgNames;
+      }
     else if denArgNames == [ ] then
-      { module = warnedModule; wrapped = false; }
+      {
+        module = warnedModule;
+        wrapped = false;
+      }
     else
       let
         denArgs = lib.genAttrs denArgNames (k: ctx.${k});
         remainingArgs = removeAttrs allArgs denArgNames;
       in
       if remainingArgs == { } then
-        { module = warnedModule denArgs; wrapped = true; }
+        {
+          module = warnedModule denArgs;
+          wrapped = true;
+        }
       else
         let
           policy = resolveCollisionPolicy { inherit ctx aspectPolicy globalPolicy; };
@@ -136,7 +147,9 @@ let
           classWinsDen = lib.genAttrs classWinsNames (k: denArgs.${k});
           denWinsDen = removeAttrs denArgs classWinsNames;
           wrapper = moduleArgs: warnedModule (classWinsDen // moduleArgs // denWinsDen);
-          validatorAdvertisedArgs = remainingArgs // { config = true; };
+          validatorAdvertisedArgs = remainingArgs // {
+            config = true;
+          };
           validator = mkCollisionValidator policy denArgNames;
           advertisedArgs = remainingArgs // lib.genAttrs denArgNames (_: true);
         in
@@ -160,7 +173,12 @@ let
       denArgNames = builtins.attrNames ctx;
       validator = mkCollisionValidator policy denArgNames;
     in
-    { module = module // { inherit (result) imports; }; inherit (result) wrapped; }
+    {
+      module = module // {
+        inherit (result) imports;
+      };
+      inherit (result) wrapped;
+    }
     // lib.optionalAttrs (result.wrapped && ctx != { }) {
       inherit validator;
       validatorAdvertisedArgs.config = true;
@@ -172,7 +190,10 @@ let
     if builtins.isAttrs args.module && args.module ? imports then
       wrapImportsModule args
     else if !builtins.isFunction args.module then
-      { inherit (args) module; wrapped = false; }
+      {
+        inherit (args) module;
+        wrapped = false;
+      }
     else
       wrapFunctionModule args;
 in
