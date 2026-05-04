@@ -9,6 +9,7 @@ args:
 // (import ./route.nix args)
 // (import ./instantiate.nix args)
 // (import ./include.nix args)
+// (import ./gate.nix args)
 // (import ./check-dedup.nix args)
 // (import ./resolve-conditional.nix args)
 // (import ./resolve-parametric.nix args)
