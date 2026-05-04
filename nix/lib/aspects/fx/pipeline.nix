@@ -7,7 +7,7 @@ let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) handlers identity;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
-  route = import ./route.nix { inherit lib den; };
+  route = import ./route { inherit lib den; };
 
   # Compose two handler sets: b's resume wins, a's state wins.
   # Used for tracing: tracingHandler (b) controls resume,

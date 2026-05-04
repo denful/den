@@ -26,7 +26,7 @@ let
       }).resume
     ) handlers;
 
-  inherit (import ./include-emit.nix { inherit lib den; } { inherit ctxFromHandlers; })
+  inherit (import ./aspect { inherit lib den; } { inherit ctxFromHandlers; })
     emitIncludes
     emitAspectPolicies
     registerConstraints
