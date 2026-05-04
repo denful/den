@@ -9,6 +9,42 @@
 let
   inherit (import ./state-util.nix) scopedAppend;
 
+  # Find all registry entries matching an identity (exact + prefix).
+  lookupEntries =
+    registry: nodeIdentity:
+    let
+      exact = registry.${nodeIdentity} or [ ];
+      parts = lib.splitString "/" nodeIdentity;
+      prefixes = lib.genList (i: lib.concatStringsSep "/" (lib.take (i + 1) parts)) (
+        builtins.length parts - 1
+      );
+    in
+    if registry == { } then
+      exact
+    else if builtins.length parts > 1 then
+      exact ++ builtins.concatMap (p: registry.${p} or [ ]) prefixes
+    else
+      exact;
+
+  # Filter entries/filters by scope ancestry.
+  filterByScope =
+    currentChain: entries:
+    let
+      isAncestor = ownerChain: lib.take (builtins.length ownerChain) currentChain == ownerChain;
+      inScope = entry: (entry.scope or "global") == "global" || isAncestor (entry.ownerChain or [ ]);
+    in
+    builtins.filter inScope entries;
+
+  # Determine constraint decision from a matching entry.
+  entryToDecision =
+    state: entry:
+    if entry.type == "exclude" then
+      { resume = { action = "exclude"; inherit (entry) owner; }; inherit state; }
+    else if entry.type == "substitute" then
+      { resume = { action = "substitute"; replacement = entry.getReplacement null; inherit (entry) owner; }; inherit state; }
+    else
+      { resume = { action = "keep"; }; inherit state; };
+
   constraintRegistryHandler = {
     "register-constraint" =
       { param, state }:
@@ -29,9 +65,7 @@ let
           resume = null;
           state =
             (scopedAppend state "scopedConstraintFilters" currentScope filterEntry)
-            // {
-              flatConstraintFilters = (state.flatConstraintFilters or [ ]) ++ [ filterEntry ];
-            };
+            // { flatConstraintFilters = (state.flatConstraintFilters or [ ]) ++ [ filterEntry ]; };
         }
       else
         let
@@ -47,30 +81,16 @@ let
         {
           resume = null;
           state =
-            (
-              state
-              // {
-                scopedConstraintRegistry =
-                  _:
-                  let
-                    all = (state.scopedConstraintRegistry or (_: { })) null;
-                    inherit (state) currentScope;
-                    scopeData = all.${currentScope} or { };
-                    existingScoped = scopeData.${param.identity} or [ ];
-                  in
-                  all
-                  // {
-                    ${currentScope} = scopeData // {
-                      ${param.identity} = existingScoped ++ [ entry ];
-                    };
-                  };
-              }
-            )
-            // {
-              flatConstraintRegistry = flatReg // {
-                ${param.identity} = existing ++ [ entry ];
-              };
-            };
+            (state // {
+              scopedConstraintRegistry = _:
+                let
+                  all = (state.scopedConstraintRegistry or (_: { })) null;
+                  inherit (state) currentScope;
+                  scopeData = all.${currentScope} or { };
+                in
+                all // { ${currentScope} = scopeData // { ${param.identity} = (scopeData.${param.identity} or [ ]) ++ [ entry ]; }; };
+            })
+            // { flatConstraintRegistry = flatReg // { ${param.identity} = existing ++ [ entry ]; }; };
         };
 
     "check-constraint" =
@@ -78,57 +98,23 @@ let
       let
         nodeIdentity = if builtins.isAttrs param then param.identity else param;
         aspect = if builtins.isAttrs param then param.aspect or null else null;
-        inherit (state) currentScope;
-        # Use pre-merged flat views (O(1) instead of O(S) rebuild per call).
-        registry = state.flatConstraintRegistry or { };
-        filters = state.flatConstraintFilters or [ ];
-        currentChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
-        isAncestor = ownerChain: lib.take (builtins.length ownerChain) currentChain == ownerChain;
-        inScope = entry: (entry.scope or "global") == "global" || isAncestor (entry.ownerChain or [ ]);
-        mkDecision = action: extra: {
-          resume = {
-            inherit action;
-          }
-          // extra;
-          inherit state;
-        };
-        entries = registry.${nodeIdentity} or [ ];
-        prefixEntries =
-          if registry == { } then
-            [ ]
-          else
-            let
-              parts = lib.splitString "/" nodeIdentity;
-              prefixes = lib.genList (i: lib.concatStringsSep "/" (lib.take (i + 1) parts)) (
-                builtins.length parts - 1
-              );
-              getEntries = p: registry.${p} or [ ];
-            in
-            if builtins.length parts > 1 then builtins.concatMap getEntries prefixes else [ ];
-        allEntries = entries ++ prefixEntries;
-        scopedEntries = builtins.filter inScope allEntries;
+        currentChain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
+        allEntries = lookupEntries (state.flatConstraintRegistry or { }) nodeIdentity;
+        scopedEntries = filterByScope currentChain allEntries;
         firstEntry = if scopedEntries == [ ] then null else builtins.head scopedEntries;
       in
       if firstEntry != null then
-        if firstEntry.type == "exclude" then
-          mkDecision "exclude" { inherit (firstEntry) owner; }
-        else if firstEntry.type == "substitute" then
-          mkDecision "substitute" {
-            replacement = firstEntry.getReplacement null;
-            inherit (firstEntry) owner;
-          }
-        else
-          mkDecision "keep" { }
+        entryToDecision state firstEntry
       else
         let
-          scopedFilters = builtins.filter inScope filters;
+          scopedFilters = filterByScope currentChain (state.flatConstraintFilters or [ ]);
           failedFilter =
             if aspect != null then lib.findFirst (f: !(f.predicate aspect)) null scopedFilters else null;
         in
         if failedFilter != null then
-          mkDecision "exclude" { inherit (failedFilter) owner; }
+          { resume = { action = "exclude"; inherit (failedFilter) owner; }; inherit state; }
         else
-          mkDecision "keep" { };
+          { resume = { action = "keep"; }; inherit state; };
   };
 in
 {
