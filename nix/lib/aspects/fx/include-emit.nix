@@ -238,148 +238,168 @@ let
     in
     go 0 (fx.pure [ ]);
 
-  # --- Include constructors (unchanged) ---
+  # --- Unified aspect policy + self-provide emission ---
 
-  mkPositionalInclude =
-    {
-      innerFn,
-      ctx,
-      name,
-      scopeHandlers,
-      aspect,
-      providerMeta,
-    }:
-    let
-      resolved = innerFn ctx;
-      resolvedArgs = if lib.isFunction resolved then lib.functionArgs resolved else { };
-    in
-    if lib.isFunction resolved && !builtins.isAttrs resolved then
-      {
-        inherit name;
-        meta = providerMeta;
-        __fn = resolved;
-        __args = resolvedArgs;
-      }
-      // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
-      // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; }
-    else
-      (if builtins.isAttrs resolved then resolved else { })
-      // {
-        inherit name;
-        meta = providerMeta;
-        includes = (if builtins.isAttrs resolved then resolved.includes or [ ] else [ ]);
-      }
-      // lib.optionalAttrs (aspect ? __ctxId) { __ctxId = aspect.__ctxId; };
+  schemaKinds = den.lib.schemaUtil.schemaEntityKinds;
+  policy = den.lib.policy;
+  applyProvide = den.lib.aspects.fx.contentUtil.applyProvide;
 
-  mkNamedInclude =
-    {
-      innerFn,
-      providerVal,
-      isParamWrapper,
-      name,
-      scopeHandlers,
-      aspect,
-      providerMeta,
-      providerArgs,
-    }:
-    {
-      inherit name;
-      meta =
-        providerMeta
-        // (
-          if isParamWrapper then
-            builtins.removeAttrs (providerVal.meta or { }) [
-              "provider"
-              "selfProvide"
-            ]
-          else
-            { }
-        );
-      __fn = if lib.isFunction innerFn then innerFn else _: providerVal;
-      __args = providerArgs;
-    }
-    // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
-    // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
-
-  # Emit register-aspect-policy for each entry in aspect.policies.
+  # Emit register-aspect-policy for each entry in aspect.policies AND
+  # aspect.provides (cross-entity keys), then emit self-provide as an
+  # emit-include (capturing its resolved children).  Returns the list
+  # of self-provide children (or [] if none).
   emitAspectPolicies =
     aspect:
     let
-      policies = aspect.policies or { };
       aspectName = aspect.name or "<anon>";
       nodeIdentity = identity.pathKey (identity.aspectPath aspect);
-    in
-    if policies == { } then
-      fx.pure null
-    else
-      fx.seq (
-        lib.mapAttrsToList (
-          policyName: policyFn:
-          fx.send "register-aspect-policy" {
-            name = "${aspectName}/${policyName}";
-            fn = policyFn;
-            ownerIdentity = nodeIdentity;
-          }
-        ) policies
-      );
 
-  emitSelfProvide =
-    aspect:
-    let
-      name = aspect.name or "<anon>";
+      # --- explicit policies ---
+      policies = aspect.policies or { };
+      policyRegistrations = lib.mapAttrsToList (
+        policyName: policyFn:
+        fx.send "register-aspect-policy" {
+          name = "${aspectName}/${policyName}";
+          fn = policyFn;
+          ownerIdentity = nodeIdentity;
+        }
+      ) policies;
+
+      # --- cross-entity provides → policy registrations ---
       provides = aspect.provides or { };
-      providerVal = provides.${name};
-      scopeHandlers = aspect.__scopeHandlers or null;
-      ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
-      isParamWrapper = isParametricWrapper providerVal;
-      innerFn =
-        if isParamWrapper then
-          providerVal.__fn
-        else if builtins.isAttrs providerVal && providerVal ? __fn then
-          providerVal.__fn
-        else if builtins.isAttrs providerVal && lib.isFunction providerVal then
-          providerVal.__functor providerVal
-        else
-          providerVal;
-      providerArgs =
-        if isParamWrapper then
-          providerVal.__args
-        else if lib.isFunction innerFn then
-          lib.functionArgs innerFn
-        else
-          { };
-    in
-    if provides ? ${name} then
-      let
-        isPositionalFn = lib.isFunction innerFn && providerArgs == { };
-        providerMeta = {
-          provider = (aspect.meta.provider or [ ]) ++ [ name ];
-          selfProvide = true;
+      crossKeys = builtins.filter (k: k != aspectName) (builtins.attrNames provides);
+      compatKeys = builtins.filter (k: !builtins.elem k schemaKinds) crossKeys;
+
+      mkCrossPolicy =
+        key:
+        let
+          value = provides.${key};
+          policyFn =
+            if key == "to-hosts" || key == "to-users" then
+              (
+                {
+                  host,
+                  user,
+                  ...
+                }:
+                let
+                  result = applyProvide value { inherit host user; };
+                in
+                [ (policy.include result) ]
+              )
+            else
+              (
+                {
+                  host,
+                  user,
+                  ...
+                }:
+                let
+                  result = applyProvide value { inherit host user; };
+                in
+                lib.optionals (host.name == key || user.name == key) [
+                  (policy.include result)
+                ]
+              );
+        in
+        fx.send "register-aspect-policy" {
+          name = "${aspectName}/${key}";
+          fn = policyFn;
+          ownerIdentity = nodeIdentity;
         };
-        shared = {
-          inherit
-            innerFn
-            name
-            scopeHandlers
-            aspect
-            providerMeta
-            ;
-        };
-        include =
-          if isPositionalFn then
-            mkPositionalInclude (shared // { inherit ctx; })
+
+      crossRegistrations = map mkCrossPolicy compatKeys;
+
+      allRegistrations = policyRegistrations ++ crossRegistrations;
+
+      # --- self-provide → emit-include (returns resolved children) ---
+      hasSelfProvide = provides ? ${aspectName};
+
+      mkSelfProvideInclude =
+        let
+          providerVal = provides.${aspectName};
+          scopeHandlers = aspect.__scopeHandlers or null;
+          ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
+          isParamWrapper = isParametricWrapper providerVal;
+          innerFn =
+            if isParamWrapper then
+              providerVal.__fn
+            else if builtins.isAttrs providerVal && providerVal ? __fn then
+              providerVal.__fn
+            else if builtins.isAttrs providerVal && lib.isFunction providerVal then
+              providerVal.__functor providerVal
+            else
+              providerVal;
+          providerArgs =
+            if isParamWrapper then
+              providerVal.__args
+            else if lib.isFunction innerFn then
+              lib.functionArgs innerFn
+            else
+              { };
+          isPositionalFn = lib.isFunction innerFn && providerArgs == { };
+          providerMeta = {
+            provider = (aspect.meta.provider or [ ]) ++ [ aspectName ];
+            selfProvide = true;
+          };
+        in
+        if isPositionalFn then
+          # Positional: apply innerFn to ctx, then wrap result
+          let
+            resolved = innerFn ctx;
+            resolvedArgs = if lib.isFunction resolved then lib.functionArgs resolved else { };
+          in
+          if lib.isFunction resolved && !builtins.isAttrs resolved then
+            {
+              name = aspectName;
+              meta = providerMeta;
+              __fn = resolved;
+              __args = resolvedArgs;
+            }
+            // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
+            // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; }
           else
-            mkNamedInclude (shared // { inherit providerVal isParamWrapper providerArgs; });
-      in
-      fx.send "emit-include" include
+            (if builtins.isAttrs resolved then resolved else { })
+            // {
+              name = aspectName;
+              meta = providerMeta;
+              includes = (if builtins.isAttrs resolved then resolved.includes or [ ] else [ ]);
+            }
+            // lib.optionalAttrs (aspect ? __ctxId) { __ctxId = aspect.__ctxId; }
+        else
+          # Named: wrap as parametric include
+          {
+            name = aspectName;
+            meta =
+              providerMeta
+              // (
+                if isParamWrapper then
+                  builtins.removeAttrs (providerVal.meta or { }) [
+                    "provider"
+                    "selfProvide"
+                  ]
+                else
+                  { }
+              );
+            __fn = if lib.isFunction innerFn then innerFn else _: providerVal;
+            __args = providerArgs;
+          }
+          // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
+          // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
+    in
+    if allRegistrations == [ ] && !hasSelfProvide then
+      fx.pure [ ]
+    else if allRegistrations == [ ] && hasSelfProvide then
+      fx.send "emit-include" mkSelfProvideInclude
+    else if !hasSelfProvide then
+      fx.bind (fx.seq allRegistrations) (_: fx.pure [ ])
     else
-      fx.pure [ ];
+      fx.bind (fx.seq allRegistrations) (_: fx.send "emit-include" mkSelfProvideInclude);
 
 in
 {
   inherit
     emitIncludes
-    emitSelfProvide
     emitAspectPolicies
     registerConstraints
     ;

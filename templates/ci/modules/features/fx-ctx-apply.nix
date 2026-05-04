@@ -1,4 +1,4 @@
-# Tests for context traversal helpers: emitSelfProvide, dedup.
+# Tests for context traversal helpers: emitAspectPolicies, dedup.
 {
   denTest,
   inputs,
@@ -62,7 +62,7 @@ in
 {
   flake.tests.fx-ctx-apply = {
 
-    # emitSelfProvide: produces include from aspect.provides.${name}.
+    # emitAspectPolicies: produces include from aspect.provides.${name} (self-provide).
     test-self-provide = denTest (
       { den, ... }:
       let
@@ -82,7 +82,7 @@ in
           };
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.emitSelfProvide aspect;
+        comp = den.lib.aspects.fx.aspect.emitAspectPolicies aspect;
         result = fx.handle {
           handlers = collectHandlers;
           state = { };
@@ -136,7 +136,7 @@ in
       }
     );
 
-    # emitSelfProvide returns empty when no matching provide.
+    # emitAspectPolicies returns empty when no matching provide.
     test-self-provide-absent = denTest (
       { den, ... }:
       let
@@ -147,7 +147,7 @@ in
           provides = { };
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.emitSelfProvide aspect;
+        comp = den.lib.aspects.fx.aspect.emitAspectPolicies aspect;
         result = fx.handle {
           handlers = collectHandlers;
           state = { };

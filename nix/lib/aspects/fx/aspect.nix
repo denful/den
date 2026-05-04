@@ -6,7 +6,6 @@
 let
   fx = den.lib.fx;
   identity = den.lib.aspects.fx.identity;
-  inherit (den.lib.aspects.fx.handlers) emitCrossProvideShims;
   inherit (den.lib.aspects) isMeaningfulName;
 
   inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet classifyKeys;
@@ -31,7 +30,6 @@ let
 
   inherit (import ./include-emit.nix { inherit lib den; } { inherit ctxFromHandlers; })
     emitIncludes
-    emitSelfProvide
     emitAspectPolicies
     registerConstraints
     ;
@@ -110,22 +108,16 @@ let
       };
       # Includes resolve before policy dispatch so deferred parametric
       # includes drain when context widens during entity resolution.
-      childResolution = fx.bind (emitSelfProvide aspect) (
+      childResolution = fx.bind (emitAspectPolicies aspect) (
         selfProvResults:
-        fx.bind (emitCrossProvideShims aspect) (
-          _:
-          fx.bind (emitAspectPolicies aspect) (
-            _:
-            fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
-              includeResults:
-              if !(aspect ? __entityKind) then
-                fx.pure (selfProvResults ++ includeResults)
-              else
-                fx.bind (installPolicies aspect) (
-                  policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
-                )
+        fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
+          includeResults:
+          if !(aspect ? __entityKind) then
+            fx.pure (selfProvResults ++ includeResults)
+          else
+            fx.bind (installPolicies aspect) (
+              policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
             )
-          )
         )
       );
     in
@@ -310,7 +302,7 @@ in
   inherit
     aspectToEffect
     emitIncludes
-    emitSelfProvide
+    emitAspectPolicies
     structuralKeysSet
     wrapClassModule
     ctxFromHandlers
