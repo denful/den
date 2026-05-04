@@ -386,7 +386,7 @@ let
           e:
           let
             rawParent = e.parent or null;
-            parentKind = if rawParent == null then null else entryEntityKindMap.${sanitize rawParent} or null;
+            parentKind = if rawParent == null then null else (entryEntityKindMap.${sanitize rawParent} or null);
             childKind = e.entityKind or null;
           in
           lib.optional (parentKind != null && childKind != null && parentKind != childKind) {

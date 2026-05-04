@@ -8,8 +8,7 @@ let
 
   # fixedTo pins context values via __scopeHandlers. The fx pipeline's
   # scope.provide installs these for parametric children via bind.fn.
-  # fixedTo pins context values via __scopeHandlers. Returns a parametric
-  # wrapper so it survives providerType submodule merge.
+  # Returns a parametric wrapper so it survives providerType submodule merge.
   mkFixedTo = ctx: aspect: {
     __fn = _: aspect;
     __args = lib.mapAttrs (_: _: true) ctx;
