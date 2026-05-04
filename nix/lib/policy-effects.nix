@@ -1,6 +1,6 @@
 # Typed policy effect constructors.
 # Policies return lists of these; the pipeline dispatches on __policyEffect.
-{ lib, ... }:
+{ ... }:
 {
   # Create a new context scope (fan-out). Each resolve creates a parallel
   # branch — a sibling context with new bindings merged into parent.

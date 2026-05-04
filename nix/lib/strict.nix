@@ -2,7 +2,7 @@
 {
   _module.freeformType = lib.mkOptionType {
     name = "strict type";
-    typeMerge = outer: {
+    typeMerge = _outer: {
       merge =
         path: decls:
         (

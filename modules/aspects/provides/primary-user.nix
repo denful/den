@@ -1,4 +1,4 @@
-{ lib, den, ... }:
+{ ... }:
 let
   description = ''
     Sets user as *primary*.

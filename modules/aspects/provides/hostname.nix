@@ -1,4 +1,4 @@
-{ den, ... }:
+{ ... }:
 let
   description = ''
     Sets the system hostname as defined in `den.hosts.<name>.hostName`:

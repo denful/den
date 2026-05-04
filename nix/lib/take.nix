@@ -5,7 +5,7 @@
 # take.exactly uses optional-arg detection to gate on context level.
 # take.atLeast and take.upTo are identity (the pipeline's deferral
 # provides atLeast semantics naturally).
-{ den, lib, ... }:
+{ lib, ... }:
 let
   take.unused = _unused: used: used;
 

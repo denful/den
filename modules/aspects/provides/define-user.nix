@@ -1,4 +1,4 @@
-{ lib, den, ... }:
+{ lib, ... }:
 let
   description = ''
     Defines a user at OS and Home levels.

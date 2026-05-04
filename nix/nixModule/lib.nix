@@ -1,9 +1,4 @@
-{
-  lib,
-  config,
-  den-lib,
-  ...
-}:
+{ lib, den-lib, ... }:
 {
   config.den.lib = den-lib;
   options.den.lib = lib.mkOption {

@@ -3,7 +3,7 @@ let
   inherit (den.lib.aspects) mkAspectsType;
 
   namespaceType = lib.types.submodule (
-    nsArgs@{ name, ... }:
+    { name, ... }:
     {
       options.schema = lib.mkOption {
         description = "namespace schema — freeform deferred modules per entity kind";

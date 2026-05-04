@@ -6,7 +6,6 @@
 # These are folded into den.classes so the
 # schema registry sees them alongside manual declarations.
 {
-  den,
   lib,
   config,
   ...

@@ -1,9 +1,5 @@
 # Policy scope and argument checking utilities.
-{
-  lib,
-  den,
-  ...
-}:
+{ lib, ... }:
 let
   # Check if policy.resolve's required args are present in ctx.
   # Policies with { system, ... }: won't fire with empty ctx.

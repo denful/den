@@ -1,9 +1,4 @@
-{
-  den,
-  lib,
-  withSystem,
-  ...
-}:
+{ withSystem, ... }:
 let
   description = ''
     Provides the `flake-parts` `inputs'` (the flake's `inputs` with system pre-selected)

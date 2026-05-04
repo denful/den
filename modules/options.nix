@@ -187,7 +187,7 @@ let
     };
 
   classSchemaType = lib.types.submodule (
-    { name, ... }:
+    { ... }:
     {
       options.description = lib.mkOption {
         description = "Human-readable description of this class domain.";

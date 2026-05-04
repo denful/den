@@ -1,4 +1,4 @@
-{ den, lib, ... }:
+{ lib, ... }:
 let
   description = ''
     This is a private aspect always included in den.default.

@@ -1,4 +1,4 @@
-{ den, ... }:
+{ ... }:
 let
 
   description = ''
