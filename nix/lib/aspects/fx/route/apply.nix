@@ -148,6 +148,44 @@ let
       inherit (acc) perScope;
     };
 
+  isDenDefaultModule =
+    mod: lib.hasSuffix "@default" (mod.key or mod._file or "");
+
+  # Collect adapterKeys that exist at child (non-root) scopes.
+  findChildScopeKeys =
+    rootScopeId: rawRoutes:
+    builtins.foldl' (
+      acc: r:
+      let ak = r.adapterKey or null;
+      in
+      if ak != null && rootScopeId != null && r.sourceScopeId != rootScopeId then
+        acc // { ${ak} = true; }
+      else acc
+    ) { } rawRoutes;
+
+  # Dedup routes: suppress root-scope when child-scope handles the same forward,
+  # and dedup same adapterKey@scope.
+  dedupRoutes =
+    rootScopeId: rawRoutes:
+    let
+      childScopeKeys = findChildScopeKeys rootScopeId rawRoutes;
+      go = seen: routes:
+        if routes == [ ] then [ ]
+        else
+          let
+            r = builtins.head routes;
+            rest = builtins.tail routes;
+            ak = r.adapterKey or null;
+            isRedundantRoot =
+              ak != null && rootScopeId != null && r.sourceScopeId == rootScopeId && childScopeKeys ? ${ak};
+            key = if ak != null then "${ak}@${r.sourceScopeId}" else null;
+          in
+          if isRedundantRoot then go seen rest
+          else if key != null && seen ? ${key} then go seen rest
+          else [ r ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
+    in
+    go { } rawRoutes;
+
   # Main entry: dedup routes, fold applying each.
   applyRoutes =
     {
@@ -161,73 +199,19 @@ let
       buildForwardAspect ? null,
     }:
     let
-      rawRoutes = lib.concatLists (lib.attrValues scopedRoutes);
-
-      # Dedup adapter routes by adapterKey@scope.
-      childScopeKeys = builtins.foldl' (
-        acc: r:
-        let
-          ak = r.adapterKey or null;
-        in
-        if ak != null && rootScopeId != null && r.sourceScopeId != rootScopeId then
-          acc // { ${ak} = true; }
-        else
-          acc
-      ) { } rawRoutes;
-
-      allRoutes =
-        let
-          go =
-            seen: routes:
-            if routes == [ ] then
-              [ ]
-            else
-              let
-                r = builtins.head routes;
-                rest = builtins.tail routes;
-                ak = r.adapterKey or null;
-                isRedundantRoot =
-                  ak != null && rootScopeId != null && r.sourceScopeId == rootScopeId && childScopeKeys ? ${ak};
-                key = if ak != null then "${ak}@${r.sourceScopeId}" else null;
-              in
-              if isRedundantRoot then
-                go seen rest
-              else if key != null && seen ? ${key} then
-                go seen rest
-              else
-                [ r ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
-        in
-        go { } rawRoutes;
-
-      isDenDefaultModule =
-        mod:
-        let
-          k = mod.key or mod._file or "";
-        in
-        lib.hasSuffix "@default" k;
+      allRoutes = dedupRoutes rootScopeId (lib.concatLists (lib.attrValues scopedRoutes));
     in
     builtins.foldl'
       (
         acc: route:
         if route.__complexForward or false then
           applyComplexRoute acc {
-            inherit
-              route
-              rootScopeId
-              scopeContexts
-              ctx
-              fxResolve
-              buildForwardAspect
-              isDenDefaultModule
-              ;
+            inherit route rootScopeId scopeContexts ctx fxResolve buildForwardAspect isDenDefaultModule;
           }
         else
           applySimpleRoute acc { inherit route wrappedPerScope; }
       )
-      {
-        inherit classImports;
-        perScope = wrappedPerScope;
-      }
+      { inherit classImports; perScope = wrappedPerScope; }
       allRoutes;
 in
 {

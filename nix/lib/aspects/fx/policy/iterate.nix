@@ -64,6 +64,40 @@ let
       ) (fx.pure null) satisfiable
     );
 
+  # Record which policies fired at this scope (for late-dispatch cross-sibling visibility).
+  recordFired =
+    entityKind: updatedFired:
+    fx.effects.state.modify (
+      st:
+      let
+        dispatchKey = "${entityKind}@${st.currentScope}";
+      in
+      st // {
+        firedPolicyNames = _:
+          let all = (st.firedPolicyNames or (_: { })) null;
+          in all // { ${dispatchKey} = updatedFired; };
+      }
+    );
+
+  # Widen enrichment: update scope context, drain deferred, continue iteration.
+  widenAndContinue =
+    go: iteration: entityKind: currentCtx: accEnrichment: dispatched: combinedEffects: updatedFired:
+    let
+      combinedEnrichment = accEnrichment // dispatched.enrichment;
+      enrichedCtx = currentCtx // combinedEnrichment;
+      enrichHandlers = constantHandler combinedEnrichment;
+      nextResolveCtx = enrichedCtx // { __entityKind = entityKind; };
+    in
+    fx.bind
+      (fx.effects.state.modify (st:
+        st // { scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; }; }
+      ))
+      (_:
+        fx.bind (fx.effects.scope.provide enrichHandlers (drainEnrichmentDeferred enrichedCtx)) (
+          _: go (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx
+        )
+      );
+
   # Fixed-point iteration.
   iterate =
     allDirectPolicies: aspectPolicies: entityKind: currentCtx:
@@ -74,52 +108,17 @@ let
           dispatched = mkDispatch allDirectPolicies aspectPolicies firedPolicies currentResolveCtx;
           newFiredNames = builtins.filter (n: !(firedPolicies ? ${n})) dispatched.firedNames;
           updatedFired = firedPolicies // lib.genAttrs newFiredNames (_: true);
-          newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (
-            builtins.attrNames dispatched.enrichment
-          );
+          newEnrichKeys = builtins.filter (k: !accEnrichment ? ${k}) (builtins.attrNames dispatched.enrichment);
           combinedEffects = mergeEffects accEffects dispatched;
         in
         if newEnrichKeys == [ ] then
-          fx.bind (fx.effects.state.modify (
-            st:
-            let
-              dispatchKey = "${entityKind}@${st.currentScope}";
-            in
-            st
-            // {
-              firedPolicyNames =
-                _:
-                let
-                  all = (st.firedPolicyNames or (_: { })) null;
-                in
-                all // { ${dispatchKey} = updatedFired; };
-            }
-          )) (_: emitFinalEffects entityKind currentCtx accEnrichment dispatched combinedEffects)
+          fx.bind (recordFired entityKind updatedFired) (
+            _: emitFinalEffects entityKind currentCtx accEnrichment dispatched combinedEffects
+          )
         else if iteration >= maxPolicyIterations then
           throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
         else
-          let
-            combinedEnrichment = accEnrichment // dispatched.enrichment;
-            enrichedCtx = currentCtx // combinedEnrichment;
-            enrichHandlers = constantHandler combinedEnrichment;
-            nextResolveCtx = enrichedCtx // {
-              __entityKind = entityKind;
-            };
-          in
-          fx.bind
-            (fx.effects.state.modify (
-              st:
-              st
-              // {
-                scopeContexts = _: (st.scopeContexts null) // { ${st.currentScope} = enrichedCtx; };
-              }
-            ))
-            (
-              _:
-              fx.bind (fx.effects.scope.provide enrichHandlers (drainEnrichmentDeferred enrichedCtx)) (
-                _: go (iteration + 1) combinedEnrichment combinedEffects updatedFired nextResolveCtx
-              )
-            );
+          widenAndContinue go iteration entityKind currentCtx accEnrichment dispatched combinedEffects updatedFired;
     in
     go;
 in
