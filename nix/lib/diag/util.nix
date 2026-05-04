@@ -361,28 +361,6 @@ let
     in
     provideWrappers ++ entityBridges;
 
-  # Symmetric to ancestorClosureBy. Not yet used — kept for API completeness.
-  descendantClosureBy =
-    pred: graph:
-    let
-      adj = adjacency graph.edges;
-      childrenOf = id: adj.outOf.${id} or [ ];
-      seeds = builtins.filter pred graph.nodes;
-      expand =
-        id: visited:
-        if visited ? ${id} then
-          visited
-        else
-          let
-            v = visited // {
-              ${id} = true;
-            };
-          in
-          lib.foldl' (acc: c: expand c acc) v (childrenOf id);
-      keptIds = lib.foldl' (acc: n: expand n.id acc) { } seeds;
-    in
-    subgraphByIds keptIds graph;
-
   # Null-coalescing accessor: treats both missing and explicit-null as
   # "use the default". Plain `attr or default` only falls through on
   # missing — explicit null still returns null.
@@ -410,7 +388,6 @@ in
     filterByNodes
     neighborhoodByNodes
     ancestorClosureBy
-    descendantClosureBy
     detectBridges
     ;
 }

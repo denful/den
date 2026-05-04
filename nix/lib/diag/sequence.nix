@@ -437,8 +437,10 @@ let
           # Aspects not parented to any top entity (kind-level).
           topEntityIds = map (n: n.id) topEntities;
           allEntityChildIds = lib.concatMap (e: childrenOf.${e.id} or [ ]) topEntities;
+          topEntityIdSet = lib.genAttrs topEntityIds (_: true);
+          allEntityChildIdSet = lib.genAttrs allEntityChildIds (_: true);
           orphans = builtins.filter (
-            n: !(builtins.elem n.id topEntityIds) && !(builtins.elem n.id allEntityChildIds)
+            n: !(topEntityIdSet ? ${n.id}) && !(allEntityChildIdSet ? ${n.id})
           ) targetAspects;
           orphanLabels = map (n: nodeLabel n) orphans;
           orphanNote = wrapLabels orphanLabels;

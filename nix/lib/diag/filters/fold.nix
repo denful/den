@@ -143,7 +143,19 @@ in
       rewriteMap = lib.listToAttrs rewritePairs;
 
       # Resolve transitively so chains (a -> b -> c) all fold into c.
-      rewireFinal = id: if rewriteMap ? ${id} then rewireFinal rewriteMap.${id} else id;
+      rewireFinal =
+        id:
+        let
+          go =
+            cur: visited:
+            if !(rewriteMap ? ${cur}) then
+              cur
+            else if visited ? ${cur} then
+              cur
+            else
+              go rewriteMap.${cur} (visited // { ${cur} = true; });
+        in
+        go id { };
 
       keptNodes = builtins.filter (n: !(rewriteMap ? ${n.id})) graph.nodes;
       rewiredEdges = map (

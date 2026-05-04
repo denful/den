@@ -59,21 +59,27 @@ let
 
       childMap = (adjacency uniqueEdges).outOf;
 
-      # Number of leaves reachable from `id`. Visited set guards against
-      # accidental cycles (e.g. cross-provide or provider-provenance edges).
-      # A leaf counts as 1; an interior node sums its children.
-      leafCount =
-        id: visited:
-        if visited ? ${id} then
-          1
-        else
-          let
-            next = visited // {
-              ${id} = true;
-            };
-            kids = childMap.${id} or [ ];
-          in
-          if kids == [ ] then 1 else lib.foldl' (acc: k: acc + leafCount k next) 0 kids;
+      # Precompute leaf counts bottom-up. Nodes processed in reverse so
+      # children are counted before parents. A leaf = 1; interior = sum of children.
+      allNodeIds = map (n: n.id) nodes;
+      leafCounts =
+        let
+          go =
+            memo: ids:
+            if ids == [ ] then
+              memo
+            else
+              let
+                id = builtins.head ids;
+                rest = builtins.tail ids;
+                kids = childMap.${id} or [ ];
+                count =
+                  if kids == [ ] then 1
+                  else lib.foldl' (acc: k: acc + (memo.${k} or 1)) 0 kids;
+              in
+              go (memo // { ${id} = count; }) rest;
+        in
+        go { } (lib.reverseList allNodeIds);
 
       nodeById = lib.listToAttrs (
         map (n: {
@@ -93,7 +99,7 @@ let
       edgeLine =
         e:
         let
-          w = leafCount e.to { };
+          w = leafCounts.${e.to} or 1;
         in
         "${csvQuote (labelOf e.from)},${csvQuote (labelOf e.to)},${toString w}";
     in
