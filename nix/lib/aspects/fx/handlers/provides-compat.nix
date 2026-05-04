@@ -43,6 +43,36 @@ let
       module = unwrapContentValues result.${k};
     }) classKeys;
 
+  # Resolve an include for the compat shim.  Bare lambdas (parametric aspects)
+  # are called with ctx; attrsets are used directly — their __fn/__functor is a
+  # pipeline-level resolver (expects { class, ... }), not a provide-level one.
+  resolveInclude = ctx: inc: if builtins.isFunction inc then inc ctx else inc;
+
+  # Like extractClassModules but recursively walks `includes`, resolving each
+  # included aspect with ctx.  Needed for provides.to-users / provides.to-hosts
+  # where the value is { includes = [ base ... ]; } and class modules live inside
+  # the included aspects, not at the top level.
+  extractClassModulesDeep =
+    ctx: result:
+    if !(builtins.isAttrs result) then
+      [ ]
+    else
+      let
+        direct = extractClassModules result;
+        fromIncludes =
+          if result ? includes then
+            lib.concatMap (
+              inc:
+              let
+                resolved = resolveInclude ctx inc;
+              in
+              extractClassModulesDeep ctx resolved
+            ) result.includes
+          else
+            [ ];
+      in
+      direct ++ fromIncludes;
+
   # to-hosts: fires for every host×user pair, delivers directly to host's nixos class.
   # Uses policy.provide for direct delivery — no tree walk, no duplicate emissions.
   mkToHostsPolicy =
@@ -53,8 +83,9 @@ let
       ...
     }:
     let
-      result = applyProvide value { inherit host user; };
-      classModules = extractClassModules result;
+      ctx = { inherit host user; };
+      result = applyProvide value ctx;
+      classModules = extractClassModulesDeep ctx result;
     in
     lib.warn
       "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.provide { class = \"<class>\"; module = { <config> }; }) ];"
@@ -70,8 +101,9 @@ let
       ...
     }:
     let
-      result = applyProvide value { inherit host user; };
-      classModules = extractClassModules result;
+      ctx = { inherit host user; };
+      result = applyProvide value ctx;
+      classModules = extractClassModulesDeep ctx result;
     in
     lib.warn
       "den: aspect '${aspectName}' uses provides.${key} — migrate to:\n  den.aspects.${aspectName}.policies.${key} = { host, user, ... }:\n    [ (policy.provide { class = \"homeManager\"; module = { <config> }; }) ];"
