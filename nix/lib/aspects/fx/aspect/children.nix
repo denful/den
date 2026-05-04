@@ -55,11 +55,15 @@ let
       owner = decision.owner or null;
     in
     if owner != null then
-      child // { meta = (child.meta or { }) // { constraintOwner = owner; }; }
+      child
+      // {
+        meta = (child.meta or { }) // {
+          constraintOwner = owner;
+        };
+      }
     else
       child;
 
-  # Dispatch a single child to the appropriate handler based on its shape.
   dispatchChild =
     child: dedupKey:
     let
@@ -91,8 +95,6 @@ let
             if isParametric then fx.send "resolve-parametric" tagged else fx.send "resolve-aspect" tagged
         );
 
-  # Fold includes, classifying each child and sending typed effects.
-  # Propagate parent scope/ctx to a child that doesn't define its own.
   propagateScope =
     parentScopeHandlers: parentCtxId: child:
     child
@@ -103,17 +105,18 @@ let
       __ctxId = parentCtxId;
     };
 
-  # Dedup-check a child then dispatch to appropriate handler.
   dedupAndDispatch =
     child:
     fx.bind (fx.send "check-dedup" child) (
-      { isDuplicate, dedupKey }:
-      if isDuplicate then fx.pure [ ] else dispatchChild child dedupKey
+      { isDuplicate, dedupKey }: if isDuplicate then fx.pure [ ] else dispatchChild child dedupKey
     );
 
-  # Process a single include: wrap, name, dedup, dispatch.
   processInclude =
-    { parentScopeHandlers, parentCtxId, skipNameAnon }:
+    {
+      parentScopeHandlers,
+      parentCtxId,
+      skipNameAnon,
+    }:
     idx: rawChild:
     let
       withScope = propagateScope parentScopeHandlers parentCtxId (wrapChild rawChild);
@@ -130,7 +133,6 @@ let
       dedupAndDispatch child
     );
 
-  # Walk includes list, collecting results in reverse then flattening.
   emitIncludes =
     {
       __parentScopeHandlers ? null,
@@ -145,17 +147,23 @@ let
         skipNameAnon = __skipNameAnon;
       };
       len = builtins.length incs;
-      go = idx: acc:
-        if idx >= len then acc
-        else go (idx + 1) (
-          fx.bind acc (results:
-            fx.bind (processOne idx (builtins.elemAt incs idx)) (
-              childResults: fx.pure ([ childResults ] ++ results)
+      go =
+        idx: acc:
+        if idx >= len then
+          acc
+        else
+          go (idx + 1) (
+            fx.bind acc (
+              results:
+              fx.bind (processOne idx (builtins.elemAt incs idx)) (
+                childResults: fx.pure ([ childResults ] ++ results)
+              )
             )
-          )
-        );
+          );
     in
-    fx.bind (go 0 (fx.pure [ ])) (revChunks: fx.pure (builtins.concatLists (lib.reverseList revChunks)));
+    fx.bind (go 0 (fx.pure [ ])) (
+      revChunks: fx.pure (builtins.concatLists (lib.reverseList revChunks))
+    );
 
   registerConstraints =
     aspect:

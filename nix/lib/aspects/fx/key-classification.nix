@@ -32,7 +32,6 @@ let
   # the evaluation cycle that existed when it lived inside den.schema.
   classRegistry = den.classes or { };
 
-  # Depth-limited recursive check: does val contain recognized class sub-keys?
   hasRecognizedSubKeys =
     depth: val:
     builtins.isAttrs val
@@ -40,28 +39,29 @@ let
       sk: classRegistry ? ${sk} || (depth > 0 && hasRecognizedSubKeys (depth - 1) val.${sk})
     ) (builtins.attrNames val);
 
-  # Classify a single non-class key as nested (has recognized sub-keys) or unregistered.
-  classifyNonClassKey =
+  isNestedKey =
     aspect: k:
-    let
-      innerValue = den.lib.aspects.fx.contentUtil.unwrapContentValuesForClassification aspect.${k};
-    in
-    if hasRecognizedSubKeys 3 innerValue then "nested" else "unregistered";
+    hasRecognizedSubKeys 3 (
+      den.lib.aspects.fx.contentUtil.unwrapContentValuesForClassification aspect.${k}
+    );
 
-  # Classify non-structural keys: class → nested → unregistered.
   classifyKeys =
     targetClass: aspect:
     let
       allKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
     in
     if classRegistry == { } then
-      { classKeys = allKeys; nestedKeys = [ ]; unregisteredClassKeys = [ ]; }
+      {
+        classKeys = allKeys;
+        nestedKeys = [ ];
+        unregisteredClassKeys = [ ];
+      }
     else
       let
         isClassKey = k: classRegistry ? ${k} || (targetClass != null && k == targetClass);
         classKeys = builtins.filter isClassKey allKeys;
         nonClassKeys = builtins.filter (k: !isClassKey k) allKeys;
-        classified = lib.partition (k: classifyNonClassKey aspect k == "nested") nonClassKeys;
+        classified = lib.partition (isNestedKey aspect) nonClassKeys;
       in
       {
         inherit classKeys;

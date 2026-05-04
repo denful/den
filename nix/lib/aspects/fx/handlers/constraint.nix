@@ -9,7 +9,6 @@
 let
   inherit (import ./state-util.nix) scopedAppend;
 
-  # Find all registry entries matching an identity (exact + prefix).
   lookupEntries =
     registry: nodeIdentity:
     let
@@ -26,7 +25,6 @@ let
     else
       exact;
 
-  # Filter entries/filters by scope ancestry.
   filterByScope =
     currentChain: entries:
     let
@@ -35,15 +33,21 @@ let
     in
     builtins.filter inScope entries;
 
-  # Determine constraint decision from a matching entry.
-  entryToDecision =
-    state: entry:
+  entryToResume =
+    entry:
     if entry.type == "exclude" then
-      { resume = { action = "exclude"; inherit (entry) owner; }; inherit state; }
+      {
+        action = "exclude";
+        inherit (entry) owner;
+      }
     else if entry.type == "substitute" then
-      { resume = { action = "substitute"; replacement = entry.getReplacement null; inherit (entry) owner; }; inherit state; }
+      {
+        action = "substitute";
+        replacement = entry.getReplacement null;
+        inherit (entry) owner;
+      }
     else
-      { resume = { action = "keep"; }; inherit state; };
+      { action = "keep"; };
 
   constraintRegistryHandler = {
     "register-constraint" =
@@ -63,9 +67,9 @@ let
         in
         {
           resume = null;
-          state =
-            (scopedAppend state "scopedConstraintFilters" currentScope filterEntry)
-            // { flatConstraintFilters = (state.flatConstraintFilters or [ ]) ++ [ filterEntry ]; };
+          state = (scopedAppend state "scopedConstraintFilters" currentScope filterEntry) // {
+            flatConstraintFilters = (state.flatConstraintFilters or [ ]) ++ [ filterEntry ];
+          };
         }
       else
         let
@@ -81,16 +85,29 @@ let
         {
           resume = null;
           state =
-            (state // {
-              scopedConstraintRegistry = _:
-                let
-                  all = (state.scopedConstraintRegistry or (_: { })) null;
-                  inherit (state) currentScope;
-                  scopeData = all.${currentScope} or { };
-                in
-                all // { ${currentScope} = scopeData // { ${param.identity} = (scopeData.${param.identity} or [ ]) ++ [ entry ]; }; };
-            })
-            // { flatConstraintRegistry = flatReg // { ${param.identity} = existing ++ [ entry ]; }; };
+            (
+              state
+              // {
+                scopedConstraintRegistry =
+                  _:
+                  let
+                    all = (state.scopedConstraintRegistry or (_: { })) null;
+                    inherit (state) currentScope;
+                    scopeData = all.${currentScope} or { };
+                  in
+                  all
+                  // {
+                    ${currentScope} = scopeData // {
+                      ${param.identity} = (scopeData.${param.identity} or [ ]) ++ [ entry ];
+                    };
+                  };
+              }
+            )
+            // {
+              flatConstraintRegistry = flatReg // {
+                ${param.identity} = existing ++ [ entry ];
+              };
+            };
         };
 
     "check-constraint" =
@@ -104,7 +121,10 @@ let
         firstEntry = if scopedEntries == [ ] then null else builtins.head scopedEntries;
       in
       if firstEntry != null then
-        entryToDecision state firstEntry
+        {
+          resume = entryToResume firstEntry;
+          inherit state;
+        }
       else
         let
           scopedFilters = filterByScope currentChain (state.flatConstraintFilters or [ ]);
@@ -112,9 +132,20 @@ let
             if aspect != null then lib.findFirst (f: !(f.predicate aspect)) null scopedFilters else null;
         in
         if failedFilter != null then
-          { resume = { action = "exclude"; inherit (failedFilter) owner; }; inherit state; }
+          {
+            resume = {
+              action = "exclude";
+              inherit (failedFilter) owner;
+            };
+            inherit state;
+          }
         else
-          { resume = { action = "keep"; }; inherit state; };
+          {
+            resume = {
+              action = "keep";
+            };
+            inherit state;
+          };
   };
 in
 {

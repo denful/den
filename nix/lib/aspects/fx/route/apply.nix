@@ -7,8 +7,6 @@
   collectClassMods,
 }:
 let
-  # Apply a complex forward-derived route (Tier 2 with submodule eval).
-  # Get pipeline-collected source modules for a forward spec (per-scope + shared root fallback).
   getCollectedSource =
     acc: spec: rootScopeId: isDenDefaultModule:
     let
@@ -23,10 +21,10 @@ let
     else
       acc.classImports.${spec.fromClass} or [ ];
 
-  # Resolve source modules via fxResolve fallback (for synthetic aspects).
   resolveSourceFallback =
     spec: fxResolve: scopeContexts: ctx:
-    if !(spec ? sourceAspect) || fxResolve == null then [ ]
+    if !(spec ? sourceAspect) || fxResolve == null then
+      [ ]
     else
       let
         normalized = den.lib.aspects.normalizeRoot spec.sourceAspect;
@@ -35,43 +33,49 @@ let
       (fxResolve {
         class = spec.fromClass;
         self = normalized;
-        ctx = sourceCtx // den.lib.aspects.fx.aspect.ctxFromHandlers (spec.sourceAspect.__scopeHandlers or { });
+        ctx =
+          sourceCtx // den.lib.aspects.fx.aspect.ctxFromHandlers (spec.sourceAspect.__scopeHandlers or { });
       }).imports;
 
-  # Append modules to both classImports and per-scope tracking.
-  appendToClass =
-    acc: cls: sid: newMods:
-    {
-      classImports = acc.classImports // {
-        ${cls} = (acc.classImports.${cls} or [ ]) ++ newMods;
-      };
-      perScope = acc.perScope // {
-        ${sid} = (acc.perScope.${sid} or { }) // {
-          ${cls} = ((acc.perScope.${sid} or { }).${cls} or [ ]) ++ newMods;
-        };
+  appendToClass = acc: cls: sid: newMods: {
+    classImports = acc.classImports // {
+      ${cls} = (acc.classImports.${cls} or [ ]) ++ newMods;
+    };
+    perScope = acc.perScope // {
+      ${sid} = (acc.perScope.${sid} or { }) // {
+        ${cls} = ((acc.perScope.${sid} or { }).${cls} or [ ]) ++ newMods;
       };
     };
+  };
 
   applyComplexRoute =
     acc:
-    { route, rootScopeId, scopeContexts, ctx, fxResolve, buildForwardAspect, isDenDefaultModule }:
+    {
+      route,
+      rootScopeId,
+      scopeContexts,
+      ctx,
+      fxResolve,
+      buildForwardAspect,
+      isDenDefaultModule,
+    }:
     let
       spec = route;
       collected = getCollectedSource acc spec rootScopeId isDenDefaultModule;
       sourceModules =
-        if collected != [ ] then collected
-        else resolveSourceFallback spec fxResolve scopeContexts ctx;
+        if collected != [ ] then collected else resolveSourceFallback spec fxResolve scopeContexts ctx;
       sourceModule = spec.mapModule { imports = sourceModules; };
       newMods = collectClassMods spec.intoClass (buildForwardAspect spec sourceModule);
     in
     appendToClass acc spec.intoClass spec.sourceScopeId newMods;
 
-  # Build an adapter functor module from a route spec and source modules.
   mkAdapterFunctor =
     route: sourceModules:
     let
       adapterMod = route.adapterModule or null;
-      sourceModule = { imports = sourceModules; };
+      sourceModule = {
+        imports = sourceModules;
+      };
       guardFn = route.guard or (_: lib.id);
       adaptArgsFn = route.adaptArgs or (_: { });
       intoPathFn = route.intoPathFn or (_: route.path);
@@ -79,10 +83,18 @@ let
       guardArgs = route.guardArgs or { };
       intoPathArgs = route.intoPathArgs or { };
       adaptArgv = route.adaptArgv or { };
-      freeformMod = route.freeformMod or {
-        config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
-      };
-      adapterMods = if adapterMod != null then [ freeformMod adapterMod ] else [ freeformMod ];
+      freeformMod =
+        route.freeformMod or {
+          config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+        };
+      adapterMods =
+        if adapterMod != null then
+          [
+            freeformMod
+            adapterMod
+          ]
+        else
+          [ freeformMod ];
     in
     {
       __functionArgs = guardArgs // intoPathArgs // adaptArgv;
@@ -99,7 +111,6 @@ let
       };
     };
 
-  # Apply a simple route (Tier 1 path nesting or Tier 2 adapter).
   applySimpleRoute =
     acc:
     {
@@ -125,7 +136,13 @@ let
           && route.path or [ ] != [ ]
           && modulesWithAdapter == [ ]
         then
-          [ (_: { config = lib.setAttrByPath route.path (_: { imports = [ ]; }); }) ]
+          [
+            (_: {
+              config = lib.setAttrByPath route.path (_: {
+                imports = [ ];
+              });
+            })
+          ]
         else
           [ ];
       isAdapterRoute = route.adapterKey or null != null;
@@ -150,20 +167,20 @@ let
       inherit (acc) perScope;
     };
 
-
-  isDenDefaultModule =
-    mod: lib.hasSuffix "@default" (mod.key or mod._file or "");
+  isDenDefaultModule = mod: lib.hasSuffix "@default" (mod.key or mod._file or "");
 
   # Collect adapterKeys that exist at child (non-root) scopes.
   findChildScopeKeys =
     rootScopeId: rawRoutes:
     builtins.foldl' (
       acc: r:
-      let ak = r.adapterKey or null;
+      let
+        ak = r.adapterKey or null;
       in
       if ak != null && rootScopeId != null && r.sourceScopeId != rootScopeId then
         acc // { ${ak} = true; }
-      else acc
+      else
+        acc
     ) { } rawRoutes;
 
   # Dedup routes: suppress root-scope when child-scope handles the same forward,
@@ -172,8 +189,10 @@ let
     rootScopeId: rawRoutes:
     let
       childScopeKeys = findChildScopeKeys rootScopeId rawRoutes;
-      go = seen: routes:
-        if routes == [ ] then [ ]
+      go =
+        seen: routes:
+        if routes == [ ] then
+          [ ]
         else
           let
             r = builtins.head routes;
@@ -183,9 +202,12 @@ let
               ak != null && rootScopeId != null && r.sourceScopeId == rootScopeId && childScopeKeys ? ${ak};
             key = if ak != null then "${ak}@${r.sourceScopeId}" else null;
           in
-          if isRedundantRoot then go seen rest
-          else if key != null && seen ? ${key} then go seen rest
-          else [ r ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
+          if isRedundantRoot then
+            go seen rest
+          else if key != null && seen ? ${key} then
+            go seen rest
+          else
+            [ r ] ++ go (if key != null then seen // { ${key} = true; } else seen) rest;
     in
     go { } rawRoutes;
 
@@ -209,12 +231,23 @@ let
         acc: route:
         if route.__complexForward or false then
           applyComplexRoute acc {
-            inherit route rootScopeId scopeContexts ctx fxResolve buildForwardAspect isDenDefaultModule;
+            inherit
+              route
+              rootScopeId
+              scopeContexts
+              ctx
+              fxResolve
+              buildForwardAspect
+              isDenDefaultModule
+              ;
           }
         else
           applySimpleRoute acc { inherit route wrappedPerScope; }
       )
-      { inherit classImports; perScope = wrappedPerScope; }
+      {
+        inherit classImports;
+        perScope = wrappedPerScope;
+      }
       allRoutes;
 in
 {
