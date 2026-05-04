@@ -32,62 +32,42 @@ let
   # the evaluation cycle that existed when it lived inside den.schema.
   classRegistry = den.classes or { };
 
-  # Classify non-structural keys using the schema registry.
-  # 3-step: class → nested aspect → unregistered class.
-  # When the registry is empty (no batteries), fall back to treating
-  # all non-structural keys as classes for backward compatibility.
+  # Depth-limited recursive check: does val contain recognized class sub-keys?
+  hasRecognizedSubKeys =
+    depth: val:
+    builtins.isAttrs val
+    && builtins.any (
+      sk: classRegistry ? ${sk} || (depth > 0 && hasRecognizedSubKeys (depth - 1) val.${sk})
+    ) (builtins.attrNames val);
+
+  # Classify a single non-class key as nested (has recognized sub-keys) or unregistered.
+  classifyNonClassKey =
+    aspect: k:
+    let
+      innerValue = den.lib.aspects.fx.contentUtil.unwrapContentValuesForClassification aspect.${k};
+    in
+    if hasRecognizedSubKeys 3 innerValue then "nested" else "unregistered";
+
+  # Classify non-structural keys: class → nested → unregistered.
   classifyKeys =
     targetClass: aspect:
     let
       allKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
-      isEmpty = classRegistry == { };
     in
-    if isEmpty then
-      {
-        classKeys = allKeys;
-        nestedKeys = [ ];
-        unregisteredClassKeys = [ ];
-      }
+    if classRegistry == { } then
+      { classKeys = allKeys; nestedKeys = [ ]; unregisteredClassKeys = [ ]; }
     else
       let
-        partition =
-          builtins.foldl'
-            (
-              acc: k:
-              if classRegistry ? ${k} || (targetClass != null && k == targetClass) then
-                acc // { classKeys = acc.classKeys ++ [ k ]; }
-              else
-                let
-                  rawValue = aspect.${k};
-                  # Unwrap aspectContentType to inspect sub-keys.
-                  # Multi-site defs: merge all attrset values for detection.
-                  innerValue = den.lib.aspects.fx.contentUtil.unwrapContentValuesForClassification rawValue;
-                  # Check if any sub-key is a registered class, or if any
-                  # sub-key is itself an attrset containing recognized keys
-                  # (multi-level nesting detection, depth-limited to 3).
-                  hasRecognizedSubKeysAt =
-                    depth: val:
-                    builtins.isAttrs val
-                    && builtins.any (
-                      sk: classRegistry ? ${sk} || (depth > 0 && hasRecognizedSubKeysAt (depth - 1) val.${sk})
-                    ) (builtins.attrNames val);
-                  hasRecognizedSubKeys = hasRecognizedSubKeysAt 3 innerValue;
-                in
-                if hasRecognizedSubKeys then
-                  acc // { nestedKeys = acc.nestedKeys ++ [ k ]; }
-                else
-                  # Unknown key with no recognized sub-keys — treat as class
-                  # (backward compat) but emit trace warning for future migration.
-                  acc // { unregisteredClassKeys = acc.unregisteredClassKeys ++ [ k ]; }
-            )
-            {
-              classKeys = [ ];
-              nestedKeys = [ ];
-              unregisteredClassKeys = [ ];
-            }
-            allKeys;
+        isClassKey = k: classRegistry ? ${k} || (targetClass != null && k == targetClass);
+        classKeys = builtins.filter isClassKey allKeys;
+        nonClassKeys = builtins.filter (k: !isClassKey k) allKeys;
+        classified = lib.partition (k: classifyNonClassKey aspect k == "nested") nonClassKeys;
       in
-      partition;
+      {
+        inherit classKeys;
+        nestedKeys = classified.right;
+        unregisteredClassKeys = classified.wrong;
+      };
 in
 {
   inherit structuralKeysSet classifyKeys;
