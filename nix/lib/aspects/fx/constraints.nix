@@ -1,15 +1,11 @@
-{
-  lib,
-  den,
-  ...
-}:
+{ den, ... }:
 let
   inherit (den.lib.aspects.fx.identity) aspectPath pathKey;
 
   # Add subtree (default) and .global variants to a constraint constructor.
   # mkFields returns the constraint record without scope.
   scoped = mkFields: {
-    __functor = self: args: (mkFields args) // { scope = "subtree"; };
+    __functor = _: args: (mkFields args) // { scope = "subtree"; };
     global = args: (mkFields args) // { scope = "global"; };
   };
 

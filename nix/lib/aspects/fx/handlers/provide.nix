@@ -1,9 +1,4 @@
-# Handler for policy.provide — collects provided modules for post-pipeline delivery.
-{
-  lib,
-  den,
-  ...
-}:
+{ ... }:
 let
   provideHandler = {
     "register-provide" =

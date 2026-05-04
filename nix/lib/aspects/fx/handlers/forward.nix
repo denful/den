@@ -1,10 +1,5 @@
-# Handles: emit-forward
-# Registers forward spec in pipeline state with captured context.
-# Post-processing in pipeline.nix resolves sources and wraps results
-# via buildForwardAspect.
 {
   lib,
-  den,
   ...
 }:
 let

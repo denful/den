@@ -4,7 +4,6 @@
   ...
 }:
 let
-  inherit (den.lib.aspects.fx.traceUtil) traceDetail;
   # Build handler set from context.
   # Each key in ctx becomes a handler that resumes with the value.
   # has-handler queries the handler scope directly, including scoped
@@ -48,9 +47,7 @@ let
         newAspectValues = map (i: builtins.elemAt aspectValues i) newIndices;
       in
       {
-        resume = traceDetail "ctx-seen key=${scopedKey} isFirst=${
-          if isFirst then "yes" else "no"
-        } newAspects=${toString (builtins.length newAspectValues)}" { inherit isFirst newAspectValues; };
+        resume = { inherit isFirst newAspectValues; };
         state = state // {
           seen =
             _:

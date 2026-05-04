@@ -189,11 +189,7 @@ let
     "emit-class" =
       { param, state }:
       let
-        inherit (den.lib.aspects.fx.traceUtil) traceDetail;
-        nodeIdentity =
-          traceDetail
-            "emit-class ${param.class or "?"}@${param.identity or "<anon>"} scope=${state.currentScope or "?"}"
-            (param.identity or "<anon>");
+        nodeIdentity = param.identity or "<anon>";
         isRawEntry = param.__rawEntry or false;
         # Raw entries always use full identity (conservative dedup).
         # Post-pipeline wrapping may relax identity if module turns out

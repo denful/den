@@ -246,7 +246,6 @@ let
                 wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
             adapterMod = route.adapterModule or null;
             modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
-            guard = route.guard or null;
             isFlakeRoute = route.intoClass == "flake";
             ensureEntry =
               if

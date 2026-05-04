@@ -26,7 +26,7 @@ let
       excludeList = map (ref: {
         type = "exclude";
         scope = "subtree";
-        identity = identity.key (ref);
+        identity = identity.key ref;
       }) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
@@ -214,7 +214,7 @@ let
                     else
                       fx.bind
                         (fx.send "check-constraint" {
-                          identity = identity.key (child);
+                          identity = identity.key child;
                           aspect = child;
                         })
                         (
@@ -252,7 +252,7 @@ let
     aspect:
     let
       aspectName = aspect.name or "<anon>";
-      nodeIdentity = identity.key (aspect);
+      nodeIdentity = identity.key aspect;
 
       # --- explicit policies ---
       policies = aspect.policies or { };

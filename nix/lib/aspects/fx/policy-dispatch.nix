@@ -244,7 +244,7 @@ let
         fx.send "register-constraint" {
           type = "exclude";
           scope = "subtree";
-          identity = identity.key (e.value);
+          identity = identity.key e.value;
           owner = "policy";
         }
       )
@@ -327,7 +327,7 @@ let
       );
       policyIncludes = schemaEffect.__policyIncludes or [ ];
       resolveIncludes = schemaEffect.schema.includes or [ ];
-      policyAspectPaths = map (a: identity.key (a)) (includeAspects ++ policyIncludes ++ resolveIncludes);
+      policyAspectPaths = map identity.key (includeAspects ++ policyIncludes ++ resolveIncludes);
     in
     fx.bind
       (fx.send "ctx-seen" {
@@ -611,8 +611,7 @@ let
   installPolicies =
     aspect:
     let
-      inherit (den.lib.aspects.fx.traceUtil) traceDetail;
-      entityKind = traceDetail "installPolicies entityKind=${aspect.__entityKind or "?"}" aspect.__entityKind;
+      entityKind = aspect.__entityKind;
       ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
     in
     fx.bind fx.effects.state.get (

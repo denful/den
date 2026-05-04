@@ -8,7 +8,6 @@
   constraints = import ./constraints.nix { inherit lib den; };
   includes = import ./includes.nix { inherit lib den; };
   trace = import ./trace.nix { inherit lib den; };
-  traceUtil = import ./trace-util.nix { inherit lib; };
   handlers = import ./handlers { inherit lib den; };
   aspect = import ./aspect.nix { inherit lib den; };
   contentUtil = import ./content-util.nix { inherit lib; };

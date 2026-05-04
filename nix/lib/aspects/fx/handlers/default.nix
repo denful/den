@@ -1,8 +1,4 @@
-{
-  lib,
-  den,
-  ...
-}@args:
+{ ... }@args:
 (import ./ctx.nix args)
 // (import ./tree.nix args)
 // (import ./include.nix args)

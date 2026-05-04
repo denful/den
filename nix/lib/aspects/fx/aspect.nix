@@ -9,8 +9,6 @@ let
   inherit (den.lib.aspects) isMeaningfulName;
 
   inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet classifyKeys;
-  inherit (den.lib.aspects.fx.traceUtil) traceSummary traceDetail;
-
   inherit (import ./class-module.nix { inherit lib den; }) wrapClassModule;
 
   # Reconstruct ctx from scope handlers. constantHandler maps each key
@@ -74,9 +72,8 @@ let
                 let
                   resolvedArgs = aspect.__parametricResolvedArgs or [ ];
                   usesCtxArgs = resolvedArgs != [ ] && builtins.any (ak: ctx ? ${ak}) resolvedArgs;
-                  result = usesCtxArgs || (aspect.meta.contextDependent or false);
                 in
-                traceDetail "isContextDependent ${k}@${elemIdentity} resolvedArgs=[${lib.concatStringsSep "," resolvedArgs}] ctxKeys=[${lib.concatStringsSep "," (builtins.attrNames ctx)}] usesCtx=${if usesCtxArgs then "yes" else "no"} result=${if result then "yes" else "no"}" result;
+                usesCtxArgs || (aspect.meta.contextDependent or false);
             })
           ]
         ) indexed
@@ -88,7 +85,7 @@ let
     .installPolicies;
 
   chainWrap =
-    aspect: nodeIdentity: isMeaningful: comp:
+    nodeIdentity: isMeaningful: comp:
     if isMeaningful then
       fx.bind (fx.send "chain-push" {
         identity = nodeIdentity;
@@ -121,7 +118,7 @@ let
         )
       );
     in
-    fx.bind (chainWrap aspect chainIdentity isMeaningful childResolution) (
+    fx.bind (chainWrap chainIdentity isMeaningful childResolution) (
       allChildren:
       let
         resolved = aspect // {
@@ -133,7 +130,7 @@ let
 
   # Build a nested sub-aspect from a freeform key and recurse via aspectToEffect.
   emitNestedAspect =
-    aspect: k: nodeIdentity:
+    aspect: k:
     let
       rawValue = aspect.${k};
       innerValue = den.lib.aspects.fx.contentUtil.unwrapContentValuesRaw rawValue;
@@ -157,7 +154,7 @@ let
   compileStatic =
     aspect:
     let
-      nodeIdentity = identity.key (aspect);
+      nodeIdentity = identity.key aspect;
       # Chain identity strips ctxId — the chain tracks includes provenance,
       # not fan-out dedup. This keeps chain entries aligned with entry
       # fullNames (provider/name) so parent resolution in graph.nix works.
@@ -183,7 +180,7 @@ let
             (emitClasses aspect allClassKeys nodeIdentity)
             (registerConstraints aspect)
           ]
-          ++ map (k: emitNestedAspect aspect k nodeIdentity) nestedKeys
+          ++ map (k: emitNestedAspect aspect k) nestedKeys
         )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
       )
     );
@@ -246,55 +243,49 @@ let
       scopeHandlers = aspect.__scopeHandlers or null;
       scopeFn = if scopeHandlers != null then fx.effects.scope.provide scopeHandlers else null;
     in
-    traceDetail
-      "aspectToEffect name=${aspect.name or "<anon>"} entity=${aspect.__entityKind or "-"} parametric=${
-        if isParametric then "yes" else "no"
-      }"
-      (
-        if isParametric then
-          if depth >= maxParametricDepth then
-            throw "den: parametric resolution exceeded ${toString maxParametricDepth} levels for '${aspect.name or "<anon>"}' — likely a curried function that never bottoms out"
-          else
-            let
-              rawFn = aspect.__fn;
-              fn =
-                if (aspect.meta.exactMatch or false) && scopeHandlers != null then
-                  args: rawFn (args // { __scopeKeys = builtins.attrNames scopeHandlers; })
-                else
-                  rawFn;
-              resolveFn = if scopeFn != null then scopeFn (fx.bind.fn userArgs fn) else fx.bind.fn userArgs fn;
-            in
-            fx.bind resolveFn (
-              resolved:
-              let
-                base = {
-                  inherit (aspect) name;
-                  meta =
-                    (aspect.meta or { })
-                    // (if builtins.isAttrs resolved then resolved.meta or { } else { })
-                    // {
-                      isParametric = true;
-                      fnArgNames = builtins.attrNames userArgs;
-                    };
-                }
-                // lib.optionalAttrs (aspect ? into) { inherit (aspect) into; }
-                // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; };
-                next = mkParametricNext aspect base resolved;
-                tagged = tagParametricResult aspect next // {
-                  __parametricDepth = depth + 1;
+    if isParametric then
+      if depth >= maxParametricDepth then
+        throw "den: parametric resolution exceeded ${toString maxParametricDepth} levels for '${aspect.name or "<anon>"}' — likely a curried function that never bottoms out"
+      else
+        let
+          rawFn = aspect.__fn;
+          fn =
+            if (aspect.meta.exactMatch or false) && scopeHandlers != null then
+              args: rawFn (args // { __scopeKeys = builtins.attrNames scopeHandlers; })
+            else
+              rawFn;
+          resolveFn = if scopeFn != null then scopeFn (fx.bind.fn userArgs fn) else fx.bind.fn userArgs fn;
+        in
+        fx.bind resolveFn (
+          resolved:
+          let
+            base = {
+              inherit (aspect) name;
+              meta =
+                (aspect.meta or { })
+                // (if builtins.isAttrs resolved then resolved.meta or { } else { })
+                // {
+                  isParametric = true;
+                  fnArgNames = builtins.attrNames userArgs;
                 };
-              in
-              aspectToEffect tagged
-            )
-        else
-          compileStatic (
-            builtins.removeAttrs aspect [
-              "__fn"
-              "__args"
-              "__parametricDepth"
-              "__parametricResolvedArgs"
-            ]
-          )
+            }
+            // lib.optionalAttrs (aspect ? into) { inherit (aspect) into; }
+            // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; };
+            next = mkParametricNext aspect base resolved;
+            tagged = tagParametricResult aspect next // {
+              __parametricDepth = depth + 1;
+            };
+          in
+          aspectToEffect tagged
+        )
+    else
+      compileStatic (
+        builtins.removeAttrs aspect [
+          "__fn"
+          "__args"
+          "__parametricDepth"
+          "__parametricResolvedArgs"
+        ]
       );
 
 in

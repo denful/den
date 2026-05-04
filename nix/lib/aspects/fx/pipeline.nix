@@ -8,7 +8,6 @@ let
   handlers = den.lib.aspects.fx.handlers;
   identity = den.lib.aspects.fx.identity;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
-  inherit (den.lib.aspects.fx.traceUtil) traceSummary traceDetail;
   route = import ./route.nix { inherit lib den; };
 
   # Compose two handler sets: b's resume wins, a's state wins.
@@ -78,7 +77,7 @@ let
     "resolve-entity" =
       { param, state }:
       let
-        kind = traceDetail "resolve-entity kind=${param.kind} scope=${state.currentScope or "?"}" param.kind;
+        kind = param.kind;
         scope = state.currentScope;
         currentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         entity = den.lib.resolveEntity kind currentCtx;
@@ -218,24 +217,9 @@ let
       ctx,
     }:
     let
-      _traceEntry = traceSummary "fxResolve called — class=${class} ctx={${lib.concatStringsSep "," (builtins.attrNames ctx)}}";
-      result = _traceEntry (mkPipeline { inherit class; } { inherit self ctx; });
-    in
-    let
-      # Build per-scope wrapped class imports from scoped partitions.
+      result = mkPipeline { inherit class; } { inherit self ctx; };
       scopeContexts = result.state.scopeContexts null;
       scopedClassImportsRaw = result.state.scopedClassImports null;
-
-      # === TRACING: scope inventory ===
-      _traceScopes = traceSummary "scopes = [${lib.concatStringsSep ", " (builtins.attrNames scopedClassImportsRaw)}]";
-      # === TRACING: per-scope raw module counts ===
-      _traceRawCounts = lib.mapAttrs (
-        scopeId: scopeClasses:
-        lib.mapAttrs (
-          cls: entries:
-          traceSummary "raw[${scopeId}][${cls}] = ${toString (builtins.length entries)} modules" entries
-        ) scopeClasses
-      ) scopedClassImportsRaw;
 
       wrappedPerScope = lib.mapAttrs (
         scopeId: scopeClasses:
@@ -243,45 +227,18 @@ let
           scopeCtx = scopeContexts.${scopeId} or ctx;
         in
         wrapCollectedClasses scopeCtx scopeClasses
-      ) (_traceScopes _traceRawCounts);
+      ) scopedClassImportsRaw;
 
-      # === TRACING: per-scope wrapped module counts + identities ===
-      _traceWrapped = lib.mapAttrs (
-        scopeId: scopeClasses:
-        lib.mapAttrs (
-          cls: entries:
-          let
-            keys = map (e: e.key or e._file or "<no-key>") entries;
-            count = builtins.length entries;
-          in
-          traceSummary "wrapped[${scopeId}][${cls}] = ${toString count} modules: [${lib.concatStringsSep ", " keys}]" entries
-        ) scopeClasses
-      ) wrappedPerScope;
+      wrappedClassImports = builtins.foldl' (
+        acc: scopeData:
+        lib.zipAttrsWith (_: builtins.concatLists) [
+          acc
+          scopeData
+        ]
+      ) { } (builtins.attrValues wrappedPerScope);
 
-      # Flatten per-scope wrapped imports into a single classImports map.
-      # Scoped partitions are the sole source of truth — flat classImports
-      # no longer needed (flake output forwards eliminated by policy.instantiate).
-      wrappedClassImports =
-        let
-          raw = builtins.foldl' (
-            acc: scopeData:
-            lib.zipAttrsWith (_: builtins.concatLists) [
-              acc
-              scopeData
-            ]
-          ) { } (builtins.attrValues _traceWrapped);
-        in
-        # === TRACING: post-flatten totals ===
-        lib.mapAttrs (
-          cls: entries: traceSummary "flat[${cls}] = ${toString (builtins.length entries)} modules" entries
-        ) raw;
-
-      # Apply policy.provide — inject new modules directly into target classes.
-      # Provides run BEFORE routes so that complex forward-derived routes
-      # (which read from classImports/perScope) can see provide-injected modules.
-      # This preserves the old ordering: provides → forwards.
-      # Dedup: same policy firing at multiple scopes produces identical provides.
-      # Keyed by policyName + class + path to preserve legitimate multi-policy provides.
+      # Apply policy.provide — inject modules directly into target classes.
+      # Runs before routes so forward-derived routes see provide-injected modules.
       scopedProvides = result.state.scopedProvides null;
       allProvides =
         let
@@ -348,44 +305,9 @@ let
       withProvides = providesResult.classImports;
       wrappedPerScopeWithProvides = providesResult.perScope;
 
-      # === TRACING: post-provides counts ===
-      _traceProvides = lib.mapAttrs (
-        cls: entries:
-        let
-          prevCount = builtins.length (wrappedClassImports.${cls} or [ ]);
-          newCount = builtins.length entries;
-          delta = newCount - prevCount;
-        in
-        if delta > 0 then
-          traceSummary "provides[${cls}] added ${toString delta} modules (${toString prevCount} → ${toString newCount})" entries
-        else
-          entries
-      ) withProvides;
-
-      # Apply all routes — both simple (path nesting) and complex (forward-derived).
-      # Runs after provides so complex routes can see provide-injected modules.
+      # Apply routes — both simple (path nesting) and complex (forward-derived).
       scopedRoutes = result.state.scopedRoutes null;
-      # === TRACING: route specs ===
-      _traceScopedRoutes =
-        let
-          allRoutes = lib.concatLists (lib.attrValues scopedRoutes);
-          routeDescs = map (
-            r:
-            let
-              isComplex = r.__complexForward or false;
-              from = r.fromClass or "?";
-              into = r.intoClass or "?";
-              path = lib.concatStringsSep "/" (r.path or [ ]);
-              scope = r.sourceScopeId or "?";
-              kind = if isComplex then "complex" else "simple";
-              adapter = if r.adapterKey or null != null then " adapter=${r.adapterKey}" else "";
-            in
-            "${kind}: ${from}→${into} path=[${path}] scope=${scope}${adapter}"
-          ) allRoutes;
-        in
-        traceSummary "${toString (builtins.length allRoutes)} routes: ${lib.concatStringsSep "; " routeDescs}" null;
-
-      rootScopeId = builtins.seq _traceScopedRoutes (mkScopeId ctx);
+      rootScopeId = mkScopeId ctx;
       withRoutes = route.applyRoutes {
         inherit
           scopedRoutes
@@ -399,104 +321,43 @@ let
         inherit (handlers) buildForwardAspect;
       };
 
-      # === TRACING: post-routes counts ===
-      _traceRoutes = lib.mapAttrs (
-        cls: entries:
-        let
-          prevCount = builtins.length (_traceProvides.${cls} or [ ]);
-          newCount = builtins.length entries;
-          delta = newCount - prevCount;
-        in
-        if delta > 0 then
-          traceSummary "routes[${cls}] added ${toString delta} modules (${toString prevCount} → ${toString newCount})" entries
-        else
-          entries
-      ) withRoutes.classImports;
-
       # Apply entity instantiation — evaluate entities and place in flake output.
       scopedInstantiates = result.state.scopedInstantiates null;
       allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
-      # === TRACING: instantiate specs ===
-      _traceInstantiates =
+      instantiateModules = lib.concatMap (
+        spec:
         let
-          descs = map (
-            spec:
-            let
-              attr = lib.concatStringsSep "." (spec.intoAttr or [ ]);
-              scope = spec.sourceScopeId or "?";
-            in
-            "${attr} (scope=${scope})"
-          ) allInstantiates;
+          hasOutput = (spec.intoAttr or [ ]) != [ ];
         in
-        traceSummary "${toString (builtins.length allInstantiates)} instantiates: [${lib.concatStringsSep ", " descs}]" null;
-      instantiateModules = builtins.seq _traceInstantiates (
-        lib.concatMap (
-          spec:
+        if !hasOutput then
+          [ ]
+        else
           let
-            entity = spec;
-            hasOutput = (entity.intoAttr or [ ]) != [ ];
-          in
-          if !hasOutput then
-            [ ]
-          else
-            let
-              # Home entities provide pkgs; OS entities provide system for hostPlatform.
-              instantiateArgs =
-                if entity ? pkgs then
-                  {
-                    inherit (entity) pkgs;
-                    modules = [ entity.mainModule ];
-                  }
-                else
-                  {
-                    modules = [
-                      entity.mainModule
-                    ]
-                    ++ lib.optional (entity ? system) {
-                      nixpkgs.hostPlatform = lib.mkDefault entity.system;
-                    };
+            instantiateArgs =
+              if spec ? pkgs then
+                {
+                  inherit (spec) pkgs;
+                  modules = [ spec.mainModule ];
+                }
+              else
+                {
+                  modules = [
+                    spec.mainModule
+                  ]
+                  ++ lib.optional (spec ? system) {
+                    nixpkgs.hostPlatform = lib.mkDefault spec.system;
                   };
-              evaluated = traceSummary "INSTANTIATE materializing ${lib.concatStringsSep "." (entity.intoAttr or [ "?" ])}" (
-                entity.instantiate instantiateArgs
-              );
-            in
-            [ { config = lib.setAttrByPath ([ "flake" ] ++ entity.intoAttr) evaluated; } ]
-        ) allInstantiates
-      );
-      withInstantiates = _traceRoutes // {
-        flake = (_traceRoutes.flake or [ ]) ++ instantiateModules;
+                };
+            evaluated = spec.instantiate instantiateArgs;
+          in
+          [ { config = lib.setAttrByPath ([ "flake" ] ++ spec.intoAttr) evaluated; } ]
+      ) allInstantiates;
+      withInstantiates = withRoutes.classImports // {
+        flake = (withRoutes.classImports.flake or [ ]) ++ instantiateModules;
       };
-
-      # === TRACING: per-module import tracing with key info ===
-      finalModules = withInstantiates.${class} or [ ];
-
-      # Dump key vs _file for each module to verify dedup capability
-      _traceKeyInfo =
-        let
-          info = lib.imap0 (
-            i: mod:
-            let
-              hasKey = builtins.isAttrs mod && mod ? key;
-              hasFile = builtins.isAttrs mod && mod ? _file;
-              isFn = builtins.isFunction mod;
-              label =
-                if hasKey then
-                  "KEY=${mod.key}"
-                else if hasFile then
-                  "_file=${mod._file}"
-                else if isFn then
-                  "fn#${toString i}"
-                else
-                  "bare#${toString i}";
-            in
-            "[${toString i}] ${label}"
-          ) finalModules;
-        in
-        traceSummary "${toString (builtins.length finalModules)} modules for class=${class}: ${lib.concatStringsSep "; " info}" null;
-
     in
     {
-      imports = builtins.seq _traceKeyInfo finalModules;
+      imports = withInstantiates.${class} or [ ];
     };
 in
 {

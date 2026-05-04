@@ -11,8 +11,6 @@ let
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
-  inherit (den.lib.aspects.fx.traceUtil) traceDetail;
-
   # Build scope transition operations for a schema effect.
   mkScopeTransition =
     scope: scopedCtx: entityClass: newScopeId:
@@ -82,7 +80,7 @@ let
 
   # Walk deferred aspects after entity resolution.
   walkDeferred =
-    scopeHandlersForCtx: ctxNames: prevResults: childResult: satisfiable:
+    scopeHandlersForCtx: prevResults: childResult: satisfiable:
     builtins.foldl' (
       acc': deferred:
       fx.bind acc' (
@@ -111,9 +109,7 @@ let
           prevResults
           ;
         scope = state.currentScope;
-        newScopeId = traceDetail "resolve-schema-entity kind=${param.targetKind} scope=${scope}→${mkScopeId scopedCtx} includeAspects=${toString (builtins.length includeAspects)} policyIncludes=${toString (builtins.length policyIncludes)}" (
-          mkScopeId scopedCtx
-        );
+        newScopeId = mkScopeId scopedCtx;
         scopeTransition = mkScopeTransition scope scopedCtx entityClass newScopeId;
       in
       {
@@ -173,9 +169,9 @@ let
                     childResult:
                     fx.bind (fx.send "drain-deferred" scopedCtx) (
                       satisfiable:
-                      fx.bind (walkDeferred scopeTransition.scopeHandlersForCtx ctxNames prevResults childResult
-                        satisfiable
-                      ) (allResults: propagateRootRoutes newScopeId scopeTransition.restoreScope allResults)
+                      fx.bind (walkDeferred scopeTransition.scopeHandlersForCtx prevResults childResult satisfiable) (
+                        allResults: propagateRootRoutes newScopeId scopeTransition.restoreScope allResults
+                      )
                     )
                   )
                 )

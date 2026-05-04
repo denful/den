@@ -1,10 +1,5 @@
-{
-  lib,
-  den,
-  ...
-}:
+{ den, ... }:
 let
-  fx = den.lib.fx;
   inherit (den.lib.aspects.fx.aspect) emitIncludes;
 
   includeHandler = {

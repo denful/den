@@ -58,7 +58,6 @@ let
   computeModuleIdentity =
     {
       entry,
-      wrapped,
       isContextDependent,
     }:
     let
@@ -140,9 +139,7 @@ let
             };
             isContextDependent = result.wrapped || (entry.isContextDependent or false);
             identityInfo = computeModuleIdentity {
-              inherit entry;
-              inherit (result) wrapped;
-              inherit isContextDependent;
+              inherit entry isContextDependent;
             };
             inherit (identityInfo) nodeIdentity isAnon finalIdentity;
             wrappedMod = wrapModule {

@@ -1,8 +1,4 @@
-{
-  lib,
-  den,
-  ...
-}:
+{ ... }:
 let
   # Conditional inclusion based on a guard function.
   # The guard receives { hasAspect = ref: bool; } where hasAspect checks the
