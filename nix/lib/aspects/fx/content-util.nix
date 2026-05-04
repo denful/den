@@ -68,6 +68,19 @@ let
       rawValue
     else
       null;
+  # Unwrap a provides value by detecting its shape and applying context.
+  # Handles __fn wrappers, __functor, bare functions, and plain attrsets.
+  # Used by emitAspectPolicies for cross-entity provides translation.
+  applyProvide =
+    value: ctx:
+    if builtins.isAttrs value && value ? __fn then
+      value.__fn ctx
+    else if builtins.isAttrs value && value ? __functor then
+      (value.__functor value) ctx
+    else if lib.isFunction value then
+      value ctx
+    else
+      value;
 in
 {
   inherit
@@ -75,5 +88,6 @@ in
     unwrapContentValuesRaw
     unwrapContentValuesList
     unwrapContentValuesForClassification
+    applyProvide
     ;
 }
