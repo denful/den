@@ -8,61 +8,63 @@
 }:
 let
   # Apply a complex forward-derived route (Tier 2 with submodule eval).
-  applyComplexRoute =
-    acc:
-    {
-      route,
-      rootScopeId,
-      scopeContexts,
-      ctx,
-      fxResolve,
-      buildForwardAspect,
-      isDenDefaultModule,
-    }:
+  # Get pipeline-collected source modules for a forward spec (per-scope + shared root fallback).
+  getCollectedSource =
+    acc: spec: rootScopeId: isDenDefaultModule:
     let
-      spec = route;
       sid = spec.sourceScopeId;
-      sourceModules =
-        if rootScopeId != null && sid != rootScopeId then
-          let
-            ownModules = (acc.perScope.${sid} or { }).${spec.fromClass} or [ ];
-            rootModules = (acc.perScope.${rootScopeId} or { }).${spec.fromClass} or [ ];
-            sharedModules = builtins.filter isDenDefaultModule rootModules;
-          in
-          sharedModules ++ ownModules
-        else
-          acc.classImports.${spec.fromClass} or [ ];
-      resolvedSourceModules =
-        if sourceModules != [ ] then
-          sourceModules
-        else if spec ? sourceAspect && fxResolve != null then
-          let
-            normalized = den.lib.aspects.normalizeRoot spec.sourceAspect;
-            sourceCtx = scopeContexts.${sid} or ctx;
-            sourceResult = fxResolve {
-              class = spec.fromClass;
-              self = normalized;
-              ctx =
-                sourceCtx // den.lib.aspects.fx.aspect.ctxFromHandlers (spec.sourceAspect.__scopeHandlers or { });
-            };
-          in
-          sourceResult.imports
-        else
-          [ ];
-      sourceModule = spec.mapModule { imports = resolvedSourceModules; };
-      forwardAspect = buildForwardAspect spec sourceModule;
-      newMods = collectClassMods spec.intoClass forwardAspect;
     in
+    if rootScopeId != null && sid != rootScopeId then
+      let
+        ownModules = (acc.perScope.${sid} or { }).${spec.fromClass} or [ ];
+        rootModules = (acc.perScope.${rootScopeId} or { }).${spec.fromClass} or [ ];
+      in
+      builtins.filter isDenDefaultModule rootModules ++ ownModules
+    else
+      acc.classImports.${spec.fromClass} or [ ];
+
+  # Resolve source modules via fxResolve fallback (for synthetic aspects).
+  resolveSourceFallback =
+    spec: fxResolve: scopeContexts: ctx:
+    if !(spec ? sourceAspect) || fxResolve == null then [ ]
+    else
+      let
+        normalized = den.lib.aspects.normalizeRoot spec.sourceAspect;
+        sourceCtx = scopeContexts.${spec.sourceScopeId} or ctx;
+      in
+      (fxResolve {
+        class = spec.fromClass;
+        self = normalized;
+        ctx = sourceCtx // den.lib.aspects.fx.aspect.ctxFromHandlers (spec.sourceAspect.__scopeHandlers or { });
+      }).imports;
+
+  # Append modules to both classImports and per-scope tracking.
+  appendToClass =
+    acc: cls: sid: newMods:
     {
       classImports = acc.classImports // {
-        ${spec.intoClass} = (acc.classImports.${spec.intoClass} or [ ]) ++ newMods;
+        ${cls} = (acc.classImports.${cls} or [ ]) ++ newMods;
       };
       perScope = acc.perScope // {
         ${sid} = (acc.perScope.${sid} or { }) // {
-          ${spec.intoClass} = ((acc.perScope.${sid} or { }).${spec.intoClass} or [ ]) ++ newMods;
+          ${cls} = ((acc.perScope.${sid} or { }).${cls} or [ ]) ++ newMods;
         };
       };
     };
+
+  applyComplexRoute =
+    acc:
+    { route, rootScopeId, scopeContexts, ctx, fxResolve, buildForwardAspect, isDenDefaultModule }:
+    let
+      spec = route;
+      collected = getCollectedSource acc spec rootScopeId isDenDefaultModule;
+      sourceModules =
+        if collected != [ ] then collected
+        else resolveSourceFallback spec fxResolve scopeContexts ctx;
+      sourceModule = spec.mapModule { imports = sourceModules; };
+      newMods = collectClassMods spec.intoClass (buildForwardAspect spec sourceModule);
+    in
+    appendToClass acc spec.intoClass spec.sourceScopeId newMods;
 
   # Build an adapter functor module from a route spec and source modules.
   mkAdapterFunctor =
@@ -147,6 +149,7 @@ let
       };
       inherit (acc) perScope;
     };
+
 
   isDenDefaultModule =
     mod: lib.hasSuffix "@default" (mod.key or mod._file or "");
