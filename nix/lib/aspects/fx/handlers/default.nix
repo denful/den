@@ -17,3 +17,5 @@ args:
 // (import ./forward.nix args)
 // (import ./provide.nix args)
 // (import ./resolve-schema-entity.nix args)
+// (import ./resolve.nix args)
+// (import ./compile.nix args)

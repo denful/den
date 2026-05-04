@@ -12,12 +12,16 @@ in
     "compile" =
       { param, state }:
       let
-        meta = param.aspect.meta or {};
+        meta = param.aspect.meta or { };
         effect =
-          if meta ? __forward then "compile-forward"
-          else if meta ? guard then "compile-conditional"
-          else if (param.aspect.__args or {}) != {} then "compile-parametric"
-          else "compile-static";
+          if meta ? __forward then
+            "compile-forward"
+          else if meta ? guard then
+            "compile-conditional"
+          else if (param.aspect.__args or { }) != { } then
+            "compile-parametric"
+          else
+            "compile-static";
       in
       {
         resume = fx.send effect param;
