@@ -2,7 +2,7 @@
 let
   # Unwrap aspectContentType's __contentValues wrapper to a single value.
   # Filters empty attrsets from multi-site defs, merges remainder.
-  # Used by provides-compat.
+  # Used by emitAspectPolicies for provides values.
   unwrapContentValues =
     rawValue:
     if builtins.isAttrs rawValue && rawValue ? __contentValues then
