@@ -44,6 +44,10 @@ let
     # structural queries don't depend on the rendering vocabulary.
     isExcluded = false;
     isReplaced = false;
+    isPolicyDispatch = false;
+    policyName = null;
+    from = null;
+    to = null;
   };
 
   # Defensive default for synthetic trace entries (phantom providers, etc.).
