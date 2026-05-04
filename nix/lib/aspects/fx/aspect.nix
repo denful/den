@@ -81,7 +81,7 @@ let
     );
 
   installPolicies =
-    (import ./policy-dispatch.nix { inherit lib den; } { inherit aspectToEffect ctxFromHandlers; })
+    (import ./policy { inherit lib den; } { inherit aspectToEffect ctxFromHandlers; })
     .installPolicies;
 
   chainWrap =
