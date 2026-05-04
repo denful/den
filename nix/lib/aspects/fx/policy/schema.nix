@@ -80,6 +80,38 @@ let
           fx.pure prevResults
       );
 
+  # Emit late policy effects into a single sibling scope.
+  emitLateForSibling =
+    parentScope: allAspectPolicies: firedPerScope: sib:
+    let
+      dispatchKey = "${sib.targetKind}@${sib.scopeId}";
+      alreadyFired = firedPerScope.${dispatchKey} or { };
+      latePolicies = lib.filterAttrs (name: _: !(alreadyFired ? ${name})) allAspectPolicies;
+      resolveCtx = sib.scopedCtx // { __entityKind = sib.targetKind; };
+      lateResults = dispatchAspect latePolicies alreadyFired resolveCtx;
+      late = extractTaggedEffects (map classifyPolicyResult lateResults);
+      hasLateEffects =
+        late.includeEffects != [ ]
+        || late.routeEffects != [ ]
+        || late.instantiateEffects != [ ]
+        || late.provideEffects != [ ]
+        || late.excludeEffects != [ ];
+      scopeHandlersForCtx = constantHandler (
+        sib.scopedCtx // lib.optionalAttrs (sib.entityClass != null) { class = sib.entityClass; }
+      );
+    in
+    if latePolicies == { } || !hasLateEffects then
+      fx.pure null
+    else
+      fx.bind (fx.effects.state.modify (st: st // { currentScope = sib.scopeId; })) (
+        _:
+        fx.bind
+          (fx.effects.scope.provide scopeHandlersForCtx (
+            emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
+          ))
+          (_: fx.effects.state.modify (st: st // { currentScope = parentScope; }))
+      );
+
   # Post-resolve pass: re-dispatch aspect policies registered by later siblings.
   lateDispatchPass =
     siblingMetas:
@@ -94,43 +126,7 @@ let
         in
         builtins.foldl' (
           acc: sib:
-          fx.bind acc (
-            _:
-            let
-              dispatchKey = "${sib.targetKind}@${sib.scopeId}";
-              alreadyFired = firedPerScope.${dispatchKey} or { };
-              latePolicies = lib.filterAttrs (name: _: !(alreadyFired ? ${name})) allAspectPolicies;
-              resolveCtx = sib.scopedCtx // {
-                __entityKind = sib.targetKind;
-              };
-              lateResults = dispatchAspect latePolicies alreadyFired resolveCtx;
-              classified = map classifyPolicyResult lateResults;
-              late = extractTaggedEffects classified;
-              hasLateEffects =
-                late.includeEffects != [ ]
-                || late.routeEffects != [ ]
-                || late.instantiateEffects != [ ]
-                || late.provideEffects != [ ]
-                || late.excludeEffects != [ ];
-              scopeHandlersForCtx = constantHandler (
-                sib.scopedCtx // lib.optionalAttrs (sib.entityClass != null) { class = sib.entityClass; }
-              );
-            in
-            if latePolicies == { } || !hasLateEffects then
-              fx.pure null
-            else
-              fx.bind (fx.effects.state.modify (st: st // { currentScope = sib.scopeId; })) (
-                _:
-                fx.bind
-                  (fx.effects.scope.provide scopeHandlersForCtx (
-                    emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
-                  ))
-                  (
-                    _:
-                    fx.effects.state.modify (st: st // { currentScope = parentScope; })
-                  )
-              )
-          )
+          fx.bind acc (_: emitLateForSibling parentScope allAspectPolicies firedPerScope sib)
         ) (fx.pure null) siblingMetas
       )
     );

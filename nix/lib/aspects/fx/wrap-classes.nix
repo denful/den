@@ -108,9 +108,36 @@ let
     in
     lib.setDefaultModuleLocation validatorLoc validatorModule;
 
-  # Post-pipeline wrapping pass: wrap raw class entries (__rawEntry = true)
-  # using wrapClassModule with the full enriched context they carry.
-  # Non-raw entries pass through unchanged.
+  # Process a single raw class entry through the wrapping pipeline.
+  processEntry =
+    enrichedCtx: class: entry:
+    let
+      enrichment = mergeEnrichment enrichedCtx entry.ctx;
+      inherit (enrichment) enrichmentKeys ctx;
+      result = den.lib.aspects.fx.aspect.wrapClassModule {
+        inherit ctx;
+        inherit (entry) module aspectPolicy globalPolicy;
+      };
+      finalModule = stripEnrichmentArgs {
+        inherit (result) module wrapped;
+        enrichmentOnlyKeys = builtins.attrNames enrichmentKeys;
+        inherit ctx;
+      };
+      isContextDependent = result.wrapped || (entry.isContextDependent or false);
+      inherit (computeModuleIdentity { inherit entry isContextDependent; })
+        nodeIdentity isAnon finalIdentity;
+      wrappedMod = wrapModule { inherit class finalModule isAnon finalIdentity; };
+      validatorMod = buildValidatorModule { inherit class nodeIdentity result; };
+    in
+    if result.unsatisfied or false then
+      builtins.trace
+        "den: class module ${class}@${nodeIdentity} skipped — context never provided: ${toString result.missingArgs}"
+        [ ]
+    else
+      [ wrappedMod ] ++ lib.optional (result ? validator) validatorMod;
+
+  # Post-pipeline wrapping pass: wrap raw class entries using wrapClassModule
+  # with the full enriched context. Non-raw entries pass through unchanged.
   wrapCollectedClasses =
     enrichedCtx: classImports:
     lib.mapAttrs (
@@ -118,48 +145,9 @@ let
       lib.concatMap (
         entry:
         if !(entry.__rawEntry or false) then
-          # Legacy or already-wrapped entry — pass through
           [ entry ]
         else
-          let
-            enrichment = mergeEnrichment enrichedCtx entry.ctx;
-            inherit (enrichment) enrichmentKeys ctx;
-            result = den.lib.aspects.fx.aspect.wrapClassModule {
-              inherit ctx;
-              inherit (entry)
-                module
-                aspectPolicy
-                globalPolicy
-                ;
-            };
-            enrichmentOnlyKeys = builtins.attrNames enrichmentKeys;
-            finalModule = stripEnrichmentArgs {
-              inherit (result) module wrapped;
-              inherit enrichmentOnlyKeys ctx;
-            };
-            isContextDependent = result.wrapped || (entry.isContextDependent or false);
-            identityInfo = computeModuleIdentity {
-              inherit entry isContextDependent;
-            };
-            inherit (identityInfo) nodeIdentity isAnon finalIdentity;
-            wrappedMod = wrapModule {
-              inherit
-                class
-                finalModule
-                isAnon
-                finalIdentity
-                ;
-            };
-            validatorMod = buildValidatorModule {
-              inherit class nodeIdentity result;
-            };
-          in
-          if result.unsatisfied or false then
-            builtins.trace
-              "den: class module ${class}@${nodeIdentity} skipped — context never provided: ${toString result.missingArgs}"
-              [ ]
-          else
-            [ wrappedMod ] ++ lib.optional (result ? validator) validatorMod
+          processEntry enrichedCtx class entry
       ) entries
     ) classImports;
 in

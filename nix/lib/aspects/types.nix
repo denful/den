@@ -303,6 +303,43 @@ let
       merge = loc: defs: contentType.merge loc defs;
     };
 
+  # Aspect meta submodule type: handleWith, excludes, provider, collisionPolicy.
+  metaType =
+    typeCfg: config:
+    lib.types.submodule {
+      freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+      config.self = config;
+      options.handleWith = lib.mkOption {
+        description = "Resolution handlers for this aspect's subtree";
+        type = lib.types.nullOr (
+          lib.types.mkOptionType {
+            name = "handlerValue";
+            description = "handler record or list of handler records";
+            check = v: builtins.isAttrs v || builtins.isList v;
+            merge = _: defs: (lib.last defs).value;
+          }
+        );
+        default = null;
+      };
+      options.excludes = lib.mkOption {
+        description = "Aspects to exclude from this subtree (sugar for handleWith)";
+        type = lib.types.listOf lib.types.unspecified;
+        default = [ ];
+      };
+      options.provider = lib.mkOption {
+        internal = true;
+        visible = false;
+        description = "Provider path tracking aspect provenance";
+        type = lib.types.listOf lib.types.str;
+        default = typeCfg.providerPrefix or [ ];
+      };
+      options.collisionPolicy = lib.mkOption {
+        description = "Collision policy for flat-form class module arg/module-system arg overlap.";
+        type = lib.types.nullOr (lib.types.enum [ "error" "class-wins" "den-wins" ]);
+        default = null;
+      };
+    };
+
   aspectSubmodule =
     typeCfg:
     lib.types.submodule (
@@ -313,102 +350,48 @@ let
           (lib.mkAliasOptionModule [ "_" ] [ "provides" ])
           (den.schema.aspect or { })
         ];
-
         options = {
           name = lib.mkOption {
             description = "Aspect name";
-            defaultText = lib.literalExpression "name";
             default = name;
             type = lib.types.str;
           };
-
           description = lib.mkOption {
             description = "Aspect description";
-            defaultText = lib.literalExpression "name";
             default = "Aspect ${name}";
             type = lib.types.str;
           };
-
           meta = lib.mkOption {
             description = "Aspect attached meta data";
-            type = lib.types.submodule {
-              freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
-              config.self = config;
-              options.handleWith = lib.mkOption {
-                description = "Resolution handlers for this aspect's subtree";
-                type = lib.types.nullOr (
-                  lib.types.mkOptionType {
-                    name = "handlerValue";
-                    description = "handler record or list of handler records";
-                    check = v: builtins.isAttrs v || builtins.isList v;
-                    merge = _: defs: (lib.last defs).value;
-                  }
-                );
-                default = null;
-              };
-              options.excludes = lib.mkOption {
-                description = "Aspects to exclude from this subtree (sugar for handleWith)";
-                type = lib.types.listOf lib.types.unspecified;
-                default = [ ];
-              };
-              options.provider = lib.mkOption {
-                internal = true;
-                visible = false;
-                description = "Provider path tracking aspect provenance";
-                type = lib.types.listOf lib.types.str;
-                default = typeCfg.providerPrefix or [ ];
-              };
-              options.collisionPolicy = lib.mkOption {
-                description = "Collision policy for flat-form class module arg/module-system arg overlap.";
-                type = lib.types.nullOr (
-                  lib.types.enum [
-                    "error"
-                    "class-wins"
-                    "den-wins"
-                  ]
-                );
-                default = null;
-              };
-            };
-            defaultText = lib.literalExpression "{ }";
+            type = metaType typeCfg config;
             default = { };
           };
-
           policies = lib.mkOption {
             description = "Named policy functions included when this aspect resolves.";
             type = lib.types.lazyAttrsOf lib.types.raw;
             default = { };
           };
-
           includes = lib.mkOption {
             description = "Providers to ask aspects from";
             type = lib.types.listOf (providerType typeCfg);
-            defaultText = lib.literalExpression "[ ]";
             default = [ ];
           };
-
           provides = lib.mkOption {
             description = "Providers of aspect for other aspects";
-            defaultText = lib.literalExpression "{ }";
             default = { };
             type = lib.types.submodule {
               freeformType = lib.types.lazyAttrsOf (
-                providerType (
-                  typeCfg
-                  // {
-                    providerPrefix = (typeCfg.providerPrefix or [ ]) ++ [ config.name ];
-                  }
-                )
+                providerType (typeCfg // {
+                  providerPrefix = (typeCfg.providerPrefix or [ ]) ++ [ config.name ];
+                })
               );
             };
           };
-
           classes = lib.mkOption {
             description = "Class schemas declared by this aspect, merged into den.classes.";
             type = lib.types.lazyAttrsOf lib.types.raw;
             default = { };
           };
-
         };
       }
     );
