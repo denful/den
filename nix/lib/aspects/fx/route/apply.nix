@@ -64,6 +64,39 @@ let
       };
     };
 
+  # Build an adapter functor module from a route spec and source modules.
+  mkAdapterFunctor =
+    route: sourceModules:
+    let
+      adapterMod = route.adapterModule or null;
+      sourceModule = { imports = sourceModules; };
+      guardFn = route.guard or (_: lib.id);
+      adaptArgsFn = route.adaptArgs or (_: { });
+      intoPathFn = route.intoPathFn or (_: route.path);
+      key = route.adapterKey;
+      guardArgs = route.guardArgs or { };
+      intoPathArgs = route.intoPathArgs or { };
+      adaptArgv = route.adaptArgv or { };
+      freeformMod = route.freeformMod or {
+        config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+      };
+      adapterMods = if adapterMod != null then [ freeformMod adapterMod ] else [ freeformMod ];
+    in
+    {
+      __functionArgs = guardArgs // intoPathArgs // adaptArgv;
+      __functor = _: args: {
+        options.den.fwd.${key} = lib.mkOption {
+          defaultText = lib.literalExpression "{ }";
+          default = { };
+          type = lib.types.submoduleWith {
+            specialArgs = adaptArgsFn args;
+            modules = adapterMods ++ [ sourceModule ];
+          };
+        };
+        config = guardFn args (lib.setAttrByPath (intoPathFn args) args.config.den.fwd.${key});
+      };
+    };
+
   # Apply a simple route (Tier 1 path nesting or Tier 2 adapter).
   applySimpleRoute =
     acc:
@@ -90,53 +123,11 @@ let
           && route.path or [ ] != [ ]
           && modulesWithAdapter == [ ]
         then
-          [
-            (_: {
-              config = lib.setAttrByPath route.path (_: { imports = [ ]; });
-            })
-          ]
+          [ (_: { config = lib.setAttrByPath route.path (_: { imports = [ ]; }); }) ]
         else
           [ ];
       isAdapterRoute = route.adapterKey or null != null;
-      adapterWrapped =
-        if !isAdapterRoute then
-          [ ]
-        else
-          let
-            sourceModule = { imports = sourceModules; };
-            guardFn = route.guard or (_: lib.id);
-            adaptArgsFn = route.adaptArgs or (_: { });
-            intoPathFn = route.intoPathFn or (_: route.path);
-            key = route.adapterKey;
-            guardArgs = route.guardArgs or { };
-            intoPathArgs = route.intoPathArgs or { };
-            adaptArgv = route.adaptArgv or { };
-            freeformMod =
-              route.freeformMod or {
-                config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
-              };
-            adapterMods =
-              if adapterMod != null then
-                [ freeformMod adapterMod ]
-              else
-                [ freeformMod ];
-          in
-          [
-            {
-              __functionArgs = guardArgs // intoPathArgs // adaptArgv;
-              __functor = _: args: {
-                options.den.fwd.${key} = lib.mkOption {
-                  defaultText = lib.literalExpression "{ }";
-                  default = { };
-                  type = lib.types.submoduleWith {
-                    specialArgs = adaptArgsFn args;
-                    modules = adapterMods ++ [ sourceModule ];
-                  };
-                };
-                config = guardFn args (lib.setAttrByPath (intoPathFn args) args.config.den.fwd.${key});
-              };
-            }
-          ];
+      adapterWrapped = if !isAdapterRoute then [ ] else [ (mkAdapterFunctor route sourceModules) ];
       wrappedModules =
         if modulesWithAdapter == [ ] then
           ensureEntry

@@ -43,31 +43,38 @@ let
       ownerIdentity = nodeIdentity;
     };
 
+  # Extract the inner function and args from a provider value.
+  resolveProviderFn =
+    providerVal:
+    let
+      isParamWrapper = isParametricWrapper providerVal;
+      innerFn =
+        if isParamWrapper then providerVal.__fn
+        else if builtins.isAttrs providerVal && providerVal ? __fn then providerVal.__fn
+        else if builtins.isAttrs providerVal && lib.isFunction providerVal then providerVal.__functor providerVal
+        else providerVal;
+      args =
+        if isParamWrapper then providerVal.__args
+        else if lib.isFunction innerFn then lib.functionArgs innerFn
+        else { };
+    in
+    { inherit innerFn args isParamWrapper; };
+
+  # Tag an include with scope/ctx propagation attrs.
+  tagScopeAttrs =
+    aspect: scopeHandlers: attrs:
+    attrs
+    // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
+    // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
+
   mkSelfProvideInclude =
     aspect: aspectName:
     let
-      provides = aspect.provides or { };
-      providerVal = provides.${aspectName};
+      providerVal = (aspect.provides or { }).${aspectName};
       scopeHandlers = aspect.__scopeHandlers or null;
       ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
-      isParamWrapper = isParametricWrapper providerVal;
-      innerFn =
-        if isParamWrapper then
-          providerVal.__fn
-        else if builtins.isAttrs providerVal && providerVal ? __fn then
-          providerVal.__fn
-        else if builtins.isAttrs providerVal && lib.isFunction providerVal then
-          providerVal.__functor providerVal
-        else
-          providerVal;
-      providerArgs =
-        if isParamWrapper then
-          providerVal.__args
-        else if lib.isFunction innerFn then
-          lib.functionArgs innerFn
-        else
-          { };
-      isPositionalFn = lib.isFunction innerFn && providerArgs == { };
+      inherit (resolveProviderFn providerVal) innerFn args isParamWrapper;
+      isPositionalFn = lib.isFunction innerFn && args == { };
       providerMeta = {
         provider = (aspect.meta.provider or [ ]) ++ [ aspectName ];
         selfProvide = true;
@@ -76,17 +83,14 @@ let
     if isPositionalFn then
       let
         resolved = innerFn ctx;
-        resolvedArgs = if lib.isFunction resolved then lib.functionArgs resolved else { };
       in
       if lib.isFunction resolved && !builtins.isAttrs resolved then
-        {
+        tagScopeAttrs aspect scopeHandlers {
           name = aspectName;
           meta = providerMeta;
           __fn = resolved;
-          __args = resolvedArgs;
+          __args = lib.functionArgs resolved;
         }
-        // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
-        // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; }
       else
         (if builtins.isAttrs resolved then resolved else { })
         // {
@@ -96,24 +100,15 @@ let
         }
         // lib.optionalAttrs (aspect ? __ctxId) { inherit (aspect) __ctxId; }
     else
-      {
+      tagScopeAttrs aspect scopeHandlers {
         name = aspectName;
-        meta =
-          providerMeta
-          // (
-            if isParamWrapper then
-              builtins.removeAttrs (providerVal.meta or { }) [
-                "provider"
-                "selfProvide"
-              ]
-            else
-              { }
-          );
+        meta = providerMeta // (
+          if isParamWrapper then builtins.removeAttrs (providerVal.meta or { }) [ "provider" "selfProvide" ]
+          else { }
+        );
         __fn = if lib.isFunction innerFn then innerFn else _: providerVal;
-        __args = providerArgs;
-      }
-      // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
-      // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
+        __args = args;
+      };
 
   emitAspectPolicies =
     aspect:
