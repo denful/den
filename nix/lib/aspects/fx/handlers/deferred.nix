@@ -18,10 +18,11 @@ let
       { param, state }:
       let
         ctx = param;
+        inherit (state) currentScope;
         allScoped = (state.scopedDeferredIncludes or (_: { })) null;
-        allDeferred = lib.concatLists (lib.attrValues allScoped);
+        scopeDeferred = allScoped.${currentScope} or [ ];
       in
-      if allDeferred == [ ] then
+      if scopeDeferred == [ ] then
         {
           resume = [ ];
           inherit state;
@@ -30,10 +31,9 @@ let
         let
           partitioned = lib.partition (
             d: builtins.all (k: builtins.hasAttr k ctx) d.requiredArgs
-          ) allDeferred;
+          ) scopeDeferred;
           satisfiable = partitioned.right;
           remaining = partitioned.wrong;
-          inherit (state) currentScope;
         in
         {
           resume = satisfiable;
