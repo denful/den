@@ -4,31 +4,7 @@
   ...
 }:
 let
-  # Append an item to a scoped list field.
-  scopedAppend =
-    state: field: scope: item:
-    state
-    // {
-      ${field} =
-        _:
-        let
-          all = state.${field} null;
-        in
-        all // { ${scope} = (all.${scope} or [ ]) ++ [ item ]; };
-    };
-
-  # Merge attrs into a scoped attrset field.
-  scopedMerge =
-    state: field: scope: attrs:
-    state
-    // {
-      ${field} =
-        _:
-        let
-          all = state.${field} null;
-        in
-        all // { ${scope} = (all.${scope} or { }) // attrs; };
-    };
+  inherit (import ./state-util.nix) scopedAppend scopedMerge;
 
   constraintRegistryHandler = {
     "register-constraint" =
@@ -39,13 +15,20 @@ let
         scope = param.scope or "subtree";
       in
       if param.type == "filter" then
-        {
-          resume = null;
-          state = scopedAppend state "scopedConstraintFilters" currentScope {
+        let
+          filterEntry = {
             inherit (param) predicate;
             owner = param.owner or "<anon>";
             inherit scope ownerChain;
           };
+        in
+        {
+          resume = null;
+          state =
+            (scopedAppend state "scopedConstraintFilters" currentScope filterEntry)
+            // {
+              flatConstraintFilters = (state.flatConstraintFilters or [ ]) ++ [ filterEntry ];
+            };
         }
       else
         let
@@ -55,25 +38,36 @@ let
             owner = param.owner or "<anon>";
             inherit scope ownerChain;
           };
+          flatReg = state.flatConstraintRegistry or { };
+          existing = flatReg.${param.identity} or [ ];
         in
         {
           resume = null;
-          state = state // {
-            scopedConstraintRegistry =
-              _:
-              let
-                all = (state.scopedConstraintRegistry or (_: { })) null;
-                inherit (state) currentScope;
-                scopeData = all.${currentScope} or { };
-                existingScoped = scopeData.${param.identity} or [ ];
-              in
-              all
+          state =
+            (
+              state
               // {
-                ${currentScope} = scopeData // {
-                  ${param.identity} = existingScoped ++ [ entry ];
-                };
+                scopedConstraintRegistry =
+                  _:
+                  let
+                    all = (state.scopedConstraintRegistry or (_: { })) null;
+                    inherit (state) currentScope;
+                    scopeData = all.${currentScope} or { };
+                    existingScoped = scopeData.${param.identity} or [ ];
+                  in
+                  all
+                  // {
+                    ${currentScope} = scopeData // {
+                      ${param.identity} = existingScoped ++ [ entry ];
+                    };
+                  };
+              }
+            )
+            // {
+              flatConstraintRegistry = flatReg // {
+                ${param.identity} = existing ++ [ entry ];
               };
-          };
+            };
         };
 
     "check-constraint" =
@@ -82,17 +76,9 @@ let
         nodeIdentity = if builtins.isAttrs param then param.identity else param;
         aspect = if builtins.isAttrs param then param.aspect or null else null;
         inherit (state) currentScope;
-        # Read constraints from ALL scopes — isAncestor filters by ownerChain.
-        allScopedRegistry = (state.scopedConstraintRegistry or (_: { })) null;
-        registry = builtins.foldl' (
-          acc: scopeData:
-          lib.zipAttrsWith (_: builtins.concatLists) [
-            acc
-            scopeData
-          ]
-        ) { } (builtins.attrValues allScopedRegistry);
-        allScopedFilters = (state.scopedConstraintFilters or (_: { })) null;
-        filters = lib.concatLists (lib.attrValues allScopedFilters);
+        # Use pre-merged flat views (O(1) instead of O(S) rebuild per call).
+        registry = state.flatConstraintRegistry or { };
+        filters = state.flatConstraintFilters or [ ];
         currentChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
         isAncestor = ownerChain: lib.take (builtins.length ownerChain) currentChain == ownerChain;
         inScope = entry: (entry.scope or "global") == "global" || isAncestor (entry.ownerChain or [ ]);
@@ -267,13 +253,20 @@ let
   registerAspectPolicyHandler = {
     "register-aspect-policy" =
       { param, state }:
+      let
+        entry = {
+          inherit (param) fn ownerIdentity;
+        };
+      in
       {
         resume = null;
-        state = scopedMerge state "scopedAspectPolicies" state.currentScope {
-          ${param.name} = {
-            inherit (param) fn ownerIdentity;
+        state =
+          (scopedMerge state "scopedAspectPolicies" state.currentScope {
+            ${param.name} = entry;
+          })
+          // {
+            flatAspectPolicies = (state.flatAspectPolicies or { }) // { ${param.name} = entry; };
           };
-        };
       };
   };
 
@@ -358,6 +351,8 @@ let
 in
 {
   inherit
+    scopedAppend
+    scopedMerge
     constraintRegistryHandler
     chainHandler
     classCollectorHandler

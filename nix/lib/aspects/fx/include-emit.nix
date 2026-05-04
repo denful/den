@@ -232,15 +232,15 @@ let
                   )
                 );
               in
-              fx.bind classifyAndSend (childResults: fx.pure (results ++ childResults))
+              fx.bind classifyAndSend (childResults: fx.pure ([ childResults ] ++ results))
             )
           );
     in
-    go 0 (fx.pure [ ]);
+    fx.bind (go 0 (fx.pure [ ])) (revChunks: fx.pure (builtins.concatLists (lib.reverseList revChunks)));
 
   # --- Unified aspect policy + self-provide emission ---
 
-  schemaKinds = den.lib.schemaUtil.schemaEntityKinds;
+  inherit (den.lib.schemaUtil) schemaEntityKinds;
   inherit (den.lib) policy;
   inherit (den.lib.aspects.fx.contentUtil) applyProvide;
 
@@ -268,7 +268,7 @@ let
       # --- cross-entity provides → policy registrations ---
       provides = aspect.provides or { };
       crossKeys = builtins.filter (k: k != aspectName) (builtins.attrNames provides);
-      compatKeys = builtins.filter (k: !builtins.elem k schemaKinds) crossKeys;
+      compatKeys = builtins.filter (k: !builtins.elem k schemaEntityKinds) crossKeys;
 
       mkCrossPolicy =
         key:

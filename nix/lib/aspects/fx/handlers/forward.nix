@@ -3,6 +3,7 @@
   ...
 }:
 let
+  inherit (import ./state-util.nix) scopedAppend;
 
   mkDirectAspect =
     {
@@ -237,17 +238,7 @@ let
       in
       {
         resume = null;
-        state = state // {
-          scopedRoutes =
-            _:
-            let
-              all = state.scopedRoutes null;
-            in
-            all
-            // {
-              ${scope} = (all.${scope} or [ ]) ++ [ route ];
-            };
-        };
+        state = scopedAppend state "scopedRoutes" scope route;
       };
   };
 

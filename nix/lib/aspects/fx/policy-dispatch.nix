@@ -14,15 +14,14 @@ let
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   inherit (den.lib.aspects.fx) identity;
 
-  # Schema entity kinds — used to classify resolve effects.
-  policySchemaKinds = den.lib.schemaUtil.schemaEntityKinds;
+  inherit (den.lib.schemaUtil) schemaEntityKinds;
 
   # Classify a resolve effect into schema vs enrichment (single-pass partition).
   classifyResolve =
     e:
     let
       keys = builtins.attrNames e.value;
-      partitioned = lib.partition (k: builtins.elem k policySchemaKinds) keys;
+      partitioned = lib.partition (k: builtins.elem k schemaEntityKinds) keys;
       schemaKeys = partitioned.right;
       enrichKeys = partitioned.wrong;
       hasTarget = e.__targetKind or null != null;
@@ -83,12 +82,7 @@ let
     let
       entries = lib.attrsToList aspectPolicies;
       matching = builtins.filter (
-        e:
-        let
-          fargs = lib.functionArgs e.value.fn;
-          requiredArgs = builtins.filter (k: !fargs.${k}) (builtins.attrNames fargs);
-        in
-        builtins.all (k: resolveCtx ? ${k}) requiredArgs && !(firedPolicies ? ${e.name})
+        e: resolveArgsSatisfied e.value.fn resolveCtx && !(firedPolicies ? ${e.name})
       ) entries;
     in
     map (
@@ -274,6 +268,16 @@ let
           )
       );
 
+  # Emit excludes, route/instantiate/provide effects, then run a continuation.
+  emitPolicyEffectsThen =
+    effects: cont:
+    fx.bind (policyEmitExcludes effects.excludeEffects) (
+      _:
+      fx.bind (policyEmitEffects effects.routeEffects effects.instantiateEffects effects.provideEffects) (
+        _: cont
+      )
+    );
+
   # Emit new aspects as includes for already-seen contexts.
   mkSupplementalResolution =
     scopeHandlersForCtx: ctxNames: prevResults: newAspectValues:
@@ -299,7 +303,7 @@ let
     if schemaEffect.schema.__targetKind or null != null then
       schemaEffect.schema.__targetKind
     else
-      lib.findFirst (k: builtins.elem k policySchemaKinds) (
+      lib.findFirst (k: builtins.elem k schemaEntityKinds) (
         if keys != [ ] then builtins.head keys else entityKind
       ) keys;
 
@@ -312,16 +316,27 @@ let
     in
     if classes != null && classes != [ ] then builtins.head classes else null;
 
-  # Process a single schema resolve effect within the fold.
-  processSingleResolve =
-    entityKind: enrichedCtx: includeAspects: isFanOut: prevResults: schemaEffect:
+  # Decompose a schema effect into its target kind, bindings, scoped ctx, and class.
+  decomposeSchemaEffect =
+    entityKind: enrichedCtx: schemaEffect:
     let
       targetKind = resolveTargetKind entityKind schemaEffect;
       resolveBindings = schemaEffect.schema.value;
       scopedCtx = enrichedCtx // resolveBindings;
+      entityClass = resolveEntityClass targetKind resolveBindings;
+    in
+    {
+      inherit targetKind resolveBindings scopedCtx entityClass;
+    };
+
+  # Process a single schema resolve effect within the fold.
+  processSingleResolve =
+    entityKind: enrichedCtx: includeAspects: isFanOut: prevResults: schemaEffect:
+    let
+      inherit (decomposeSchemaEffect entityKind enrichedCtx schemaEffect)
+        targetKind resolveBindings scopedCtx entityClass;
       ctxNames = mkScopeId scopedCtx;
       ctxKey = if isFanOut then "${targetKind}/{${ctxNames}}" else targetKind;
-      entityClass = resolveEntityClass targetKind resolveBindings;
       scopeHandlersForCtx = constantHandler (
         scopedCtx // lib.optionalAttrs (entityClass != null) { class = entityClass; }
       );
@@ -364,15 +379,13 @@ let
   # (e.g., "host") that processSchemaResolves receives. Each sibling's targetKind
   # from siblingMetas must be used for correct dispatchKey lookup.
   lateDispatchPass =
-    _entityKind: siblingMetas:
+    siblingMetas:
     fx.bind (fx.effects.state.modify (st: st // { inLateDispatch = true; })) (
       _:
       fx.bind fx.effects.state.get (
         state:
         let
-          allAspectPolicies = builtins.foldl' (acc: v: acc // v) { } (
-            builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
-          );
+          allAspectPolicies = state.flatAspectPolicies or { };
           firedPerScope = (state.firedPolicyNames or (_: { })) null;
           parentScope = state.currentScope;
         in
@@ -415,12 +428,7 @@ let
                 _:
                 fx.bind
                   (fx.effects.scope.provide scopeHandlersForCtx (
-                    fx.bind (policyEmitExcludes late.excludeEffects) (
-                      _:
-                      fx.bind (policyEmitEffects late.routeEffects late.instantiateEffects late.provideEffects) (
-                        _: policyEmitIncludes late.includeEffects
-                      )
-                    )
+                    emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
                   ))
                   (
                     _:
@@ -468,18 +476,15 @@ let
               siblingMetas = map (
                 schemaEffect:
                 let
-                  targetKind = resolveTargetKind entityKind schemaEffect;
-                  resolveBindings = schemaEffect.schema.value;
-                  scopedCtx = enrichedCtx // resolveBindings;
-                  entityClass = resolveEntityClass targetKind resolveBindings;
+                  d = decomposeSchemaEffect entityKind enrichedCtx schemaEffect;
                 in
                 {
-                  inherit targetKind scopedCtx entityClass;
-                  scopeId = mkScopeId scopedCtx;
+                  inherit (d) targetKind scopedCtx entityClass;
+                  scopeId = mkScopeId d.scopedCtx;
                 }
               ) schemaEffects;
             in
-            fx.bind (lateDispatchPass entityKind siblingMetas) (_: fx.pure allResults)
+            fx.bind (lateDispatchPass siblingMetas) (_: fx.pure allResults)
           )
       );
 
@@ -511,37 +516,26 @@ let
       includeAspects = map (e: e.value) combinedEffects.includeEffects;
       hasSchemaResolves = combinedEffects.schemaEffects != [ ];
     in
-    fx.bind (policyEmitExcludes combinedEffects.excludeEffects) (
-      _:
-      fx.bind
-        (policyEmitEffects combinedEffects.routeEffects combinedEffects.instantiateEffects
-          combinedEffects.provideEffects
-        )
-        (
-          _:
-          if hasSchemaResolves then
-            processSchemaResolves entityKind includeAspects combinedEffects.schemaEffects enrichedCtx
-          else
-            policyEmitIncludes combinedEffects.includeEffects
-        )
+    emitPolicyEffectsThen combinedEffects (
+      if hasSchemaResolves then
+        processSchemaResolves entityKind includeAspects combinedEffects.schemaEffects enrichedCtx
+      else
+        policyEmitIncludes combinedEffects.includeEffects
     );
 
-  # Drain deferred aspects after enrichment context widen.
+  # Drain deferred aspects after enrichment context widen (results discarded).
   drainEnrichmentDeferred =
     enrichedCtx:
+    let
+      scopeHandlers = constantHandler enrichedCtx;
+    in
     fx.bind (fx.send "drain-deferred" enrichedCtx) (
       satisfiable:
       builtins.foldl' (
         acc: deferred:
         fx.bind acc (
           _:
-          let
-            deferScopeHandlers = constantHandler enrichedCtx;
-            deferredTagged = deferred.child // {
-              __scopeHandlers = deferScopeHandlers;
-            };
-          in
-          fx.bind (aspectToEffect deferredTagged) (_: fx.pure null)
+          aspectToEffect (deferred.child // { __scopeHandlers = scopeHandlers; })
         )
       ) (fx.pure null) satisfiable
     );
@@ -629,9 +623,7 @@ let
         globalPolicies = den.policies or { };
         schemaPolicies = (den.schema.${entityKind} or { }).policies or { };
         allDirectPolicies = globalPolicies // schemaPolicies;
-        aspectPolicies = builtins.foldl' (acc: v: acc // v) { } (
-          builtins.attrValues ((state.scopedAspectPolicies or (_: { })) null)
-        );
+        aspectPolicies = state.flatAspectPolicies or { };
         resolveCtx = currentCtx // {
           __entityKind = entityKind;
         };

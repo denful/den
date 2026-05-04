@@ -300,12 +300,7 @@ let
       name = "aspectKey";
       description = "class module or nested aspect (dispatch by registry)";
       check = _: true;
-      merge =
-        loc: defs:
-        let
-          key = lib.last loc;
-        in
-        if classReg ? ${key} then contentType.merge loc defs else contentType.merge loc defs;
+      merge = loc: defs: contentType.merge loc defs;
     };
 
   aspectSubmodule =

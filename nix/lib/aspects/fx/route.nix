@@ -177,7 +177,7 @@ let
       (
         acc: route:
         if route.__complexForward or false then
-          # Complex route: port of applyForwardSpecs logic.
+          # Complex route: forward-derived adapter with submodule evaluation.
           let
             spec = route;
             sid = spec.sourceScopeId;
