@@ -1,8 +1,4 @@
-{
-  lib,
-  den,
-  ...
-}:
+{ lib, ... }:
 let
   # Build handler set from context.
   # Each key in ctx becomes a handler that resumes with the value.

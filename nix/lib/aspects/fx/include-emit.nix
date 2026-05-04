@@ -5,8 +5,8 @@
 }:
 { ctxFromHandlers }:
 let
-  fx = den.lib.fx;
-  identity = den.lib.aspects.fx.identity;
+  inherit (den.lib) fx;
+  inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.aspects) isParametricWrapper isMeaningfulName isSubmoduleFn;
 
   registerConstraints =
@@ -241,8 +241,8 @@ let
   # --- Unified aspect policy + self-provide emission ---
 
   schemaKinds = den.lib.schemaUtil.schemaEntityKinds;
-  policy = den.lib.policy;
-  applyProvide = den.lib.aspects.fx.contentUtil.applyProvide;
+  inherit (den.lib) policy;
+  inherit (den.lib.aspects.fx.contentUtil) applyProvide;
 
   # Emit register-aspect-policy for each entry in aspect.policies AND
   # aspect.provides (cross-entity keys), then emit self-provide as an
@@ -363,9 +363,9 @@ let
             // {
               name = aspectName;
               meta = providerMeta;
-              includes = (if builtins.isAttrs resolved then resolved.includes or [ ] else [ ]);
+              includes = if builtins.isAttrs resolved then resolved.includes or [ ] else [ ];
             }
-            // lib.optionalAttrs (aspect ? __ctxId) { __ctxId = aspect.__ctxId; }
+            // lib.optionalAttrs (aspect ? __ctxId) { inherit (aspect) __ctxId; }
         else
           # Named: wrap as parametric include
           {

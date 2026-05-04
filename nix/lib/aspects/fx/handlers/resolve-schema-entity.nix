@@ -7,7 +7,7 @@
   ...
 }:
 let
-  fx = den.lib.fx;
+  inherit (den.lib) fx;
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
@@ -50,7 +50,7 @@ let
   # need child-scope copies so applyRoutes can read per-scope source modules.
   propagateRootRoutes =
     newScopeId: restoreScope: allResults:
-    fx.bind (fx.effects.state.get) (
+    fx.bind fx.effects.state.get (
       postWalkState:
       let
         rootSid = postWalkState.rootScopeId;
@@ -105,7 +105,6 @@ let
           includeAspects
           policyIncludes
           resolveIncludes
-          ctxNames
           prevResults
           ;
         scope = state.currentScope;

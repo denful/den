@@ -3,8 +3,8 @@
   ...
 }:
 let
-  fx = den.lib.fx;
-  identity = den.lib.aspects.fx.identity;
+  inherit (den.lib) fx;
+  inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.aspects.fx.aspect) emitIncludes;
 
   tombstoneAll =

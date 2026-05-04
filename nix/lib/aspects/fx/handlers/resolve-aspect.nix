@@ -5,7 +5,7 @@
   ...
 }:
 let
-  fx = den.lib.fx;
+  inherit (den.lib) fx;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
 in
 {

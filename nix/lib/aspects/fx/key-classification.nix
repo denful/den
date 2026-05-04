@@ -69,7 +69,7 @@ let
                     depth: val:
                     builtins.isAttrs val
                     && builtins.any (
-                      sk: classRegistry ? ${sk} || (depth > 0 && hasRecognizedSubKeysAt (depth - 1) (val.${sk}))
+                      sk: classRegistry ? ${sk} || (depth > 0 && hasRecognizedSubKeysAt (depth - 1) val.${sk})
                     ) (builtins.attrNames val);
                   hasRecognizedSubKeys = hasRecognizedSubKeysAt 3 innerValue;
                 in

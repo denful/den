@@ -34,7 +34,7 @@ let
     "register-constraint" =
       { param, state }:
       let
-        currentScope = state.currentScope;
+        inherit (state) currentScope;
         ownerChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
         scope = param.scope or "subtree";
       in
@@ -42,7 +42,7 @@ let
         {
           resume = null;
           state = scopedAppend state "scopedConstraintFilters" currentScope {
-            predicate = param.predicate;
+            inherit (param) predicate;
             owner = param.owner or "<anon>";
             inherit scope ownerChain;
           };
@@ -50,7 +50,7 @@ let
       else
         let
           entry = {
-            type = param.type;
+            inherit (param) type;
             getReplacement = param.getReplacement or (_: null);
             owner = param.owner or "<anon>";
             inherit scope ownerChain;
@@ -63,7 +63,7 @@ let
               _:
               let
                 all = (state.scopedConstraintRegistry or (_: { })) null;
-                currentScope = state.currentScope;
+                inherit (state) currentScope;
                 scopeData = all.${currentScope} or { };
                 existingScoped = scopeData.${param.identity} or [ ];
               in
@@ -81,7 +81,7 @@ let
       let
         nodeIdentity = if builtins.isAttrs param then param.identity else param;
         aspect = if builtins.isAttrs param then param.aspect or null else null;
-        currentScope = state.currentScope;
+        inherit (state) currentScope;
         # Read constraints from ALL scopes — isAncestor filters by ownerChain.
         allScopedRegistry = (state.scopedConstraintRegistry or (_: { })) null;
         registry = builtins.foldl' (
@@ -122,11 +122,11 @@ let
       in
       if firstEntry != null then
         if firstEntry.type == "exclude" then
-          mkDecision "exclude" { owner = firstEntry.owner; }
+          mkDecision "exclude" { inherit (firstEntry) owner; }
         else if firstEntry.type == "substitute" then
           mkDecision "substitute" {
             replacement = firstEntry.getReplacement null;
-            owner = firstEntry.owner;
+            inherit (firstEntry) owner;
           }
         else
           mkDecision "keep" { }
@@ -137,7 +137,7 @@ let
             if aspect != null then lib.findFirst (f: !(f.predicate aspect)) null scopedFilters else null;
         in
         if failedFilter != null then
-          mkDecision "exclude" { owner = failedFilter.owner; }
+          mkDecision "exclude" { inherit (failedFilter) owner; }
         else
           mkDecision "keep" { };
   };
@@ -152,7 +152,7 @@ let
             _:
             let
               all = (state.scopedIncludesChain or (_: { })) null;
-              currentScope = state.currentScope;
+              inherit (state) currentScope;
               scopeChain = all.${currentScope} or [ ];
             in
             all
@@ -170,7 +170,7 @@ let
             _:
             let
               all = (state.scopedIncludesChain or (_: { })) null;
-              currentScope = state.currentScope;
+              inherit (state) currentScope;
               scopeChain = all.${currentScope} or [ ];
             in
             all
@@ -218,10 +218,7 @@ let
               _file = loc;
               imports = [ param.module ];
             };
-      in
-      let
         scope = state.currentScope;
-        # Dedup: skip if this loc was already emitted at this scope.
         emittedLocs = (state.scopedEmittedLocs or (_: { })) null;
         scopeLocs = emittedLocs.${scope} or { };
         alreadyEmitted = scopeLocs ? ${loc};
@@ -303,7 +300,7 @@ let
           satisfiable = partitioned.right;
           remaining = partitioned.wrong;
           # Remove satisfied items from current scope only, preserve other scopes.
-          currentScope = state.currentScope;
+          inherit (state) currentScope;
         in
         {
           resume = satisfiable;

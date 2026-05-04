@@ -124,7 +124,7 @@ let
       in
       {
         module = module // {
-          imports = result.imports;
+          inherit (result) imports;
         };
         inherit (result) wrapped;
       }

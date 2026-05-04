@@ -4,7 +4,7 @@
   ...
 }:
 let
-  identity = den.lib.aspects.fx.identity;
+  inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.aspects) isMeaningfulName;
 in
 {

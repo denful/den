@@ -4,8 +4,8 @@
   ...
 }:
 let
-  fx = den.lib.fx;
-  identity = den.lib.aspects.fx.identity;
+  inherit (den.lib) fx;
+  inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.aspects) isMeaningfulName;
 
   inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet classifyKeys;

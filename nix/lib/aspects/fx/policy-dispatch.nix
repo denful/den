@@ -8,11 +8,11 @@
   ctxFromHandlers,
 }:
 let
-  fx = den.lib.fx;
+  inherit (den.lib) fx;
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
-  identity = den.lib.aspects.fx.identity;
+  inherit (den.lib.aspects.fx) identity;
 
   # Schema entity kinds — used to classify resolve effects.
   policySchemaKinds = den.lib.schemaUtil.schemaEntityKinds;
@@ -514,9 +514,9 @@ let
     fx.bind (policyEmitExcludes combinedEffects.excludeEffects) (
       _:
       fx.bind
-        (policyEmitEffects (combinedEffects.routeEffects) (combinedEffects.instantiateEffects) (
+        (policyEmitEffects combinedEffects.routeEffects combinedEffects.instantiateEffects
           combinedEffects.provideEffects
-        ))
+        )
         (
           _:
           if hasSchemaResolves then

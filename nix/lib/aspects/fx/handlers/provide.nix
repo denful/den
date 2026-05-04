@@ -1,4 +1,4 @@
-{ ... }:
+_:
 let
   provideHandler = {
     "register-provide" =

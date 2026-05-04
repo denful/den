@@ -4,9 +4,8 @@
   ...
 }:
 let
-  fx = den.lib.fx;
-  handlers = den.lib.aspects.fx.handlers;
-  identity = den.lib.aspects.fx.identity;
+  inherit (den.lib) fx;
+  inherit (den.lib.aspects.fx) handlers identity;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   route = import ./route.nix { inherit lib den; };
 
@@ -24,12 +23,12 @@ let
           rb = b.${name} { inherit param state; };
           ra = a.${name} {
             inherit param;
-            state = rb.state;
+            inherit (rb) state;
           };
         in
         {
-          resume = rb.resume;
-          state = ra.state;
+          inherit (rb) resume;
+          inherit (ra) state;
         }
       ) shared;
     in
@@ -77,7 +76,7 @@ let
     "resolve-entity" =
       { param, state }:
       let
-        kind = param.kind;
+        inherit (param) kind;
         scope = state.currentScope;
         currentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         entity = den.lib.resolveEntity kind currentCtx;
