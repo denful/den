@@ -29,3 +29,4 @@ args:
 // (import ./compile-conditional.nix args)
 // (import ./compile-parametric.nix args)
 // (import ./compile-static.nix args)
+// (import ./dispatch-policies.nix args)
