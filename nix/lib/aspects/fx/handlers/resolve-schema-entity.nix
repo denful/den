@@ -10,7 +10,6 @@ let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx.handlers) constantHandler;
   inherit (den.lib.aspects.fx) identity;
-  inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
 
   # Build scope handler set for entity context.
@@ -150,15 +149,25 @@ let
             mergeEntityIncludes rawEntity param.includeAspects param.policyIncludes
               param.resolveIncludes;
         in
-        fx.bind (aspectToEffect entity) (
-          childResult:
-          fx.bind (fx.send "drain" scopedCtx) (
-            satisfiable:
-            fx.bind (walkDeferred scopeHandlersForCtx scopedCtx prevResults childResult satisfiable) (
-              allResults: propagateRootRoutes newScopeId restoreScope allResults
+        fx.bind
+          (fx.send "resolve" {
+            aspect = entity;
+            identity = identity.key entity;
+            ctx = scopedCtx;
+            gated = true;
+          })
+          (
+            resolvedList:
+            let
+              childResult = builtins.head resolvedList;
+            in
+            fx.bind (fx.send "drain" scopedCtx) (
+              satisfiable:
+              fx.bind (walkDeferred scopeHandlersForCtx scopedCtx prevResults childResult satisfiable) (
+                allResults: propagateRootRoutes newScopeId restoreScope allResults
+              )
             )
           )
-        )
       )
     );
 

@@ -6,7 +6,6 @@
   ...
 }:
 {
-  aspectToEffect,
   ctxFromHandlers,
 }:
 let
@@ -84,7 +83,6 @@ let
       fx
       identity
       constantHandler
-      aspectToEffect
       mkDispatch
       emitPolicyEffectsThen
       policyEmitIncludes

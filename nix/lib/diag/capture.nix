@@ -17,7 +17,11 @@ let
   captureRaw =
     class: root:
     let
-      comp = fxLib.aspect.aspectToEffect root;
+      comp = nxFx.send "resolve" {
+        aspect = root;
+        identity = fxLib.identity.key root;
+        ctx = { };
+      };
     in
     nxFx.handle {
       handlers = fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {
@@ -44,7 +48,11 @@ let
       rawPerClass = lib.genAttrs classes (
         class:
         let
-          comp = fxLib.aspect.aspectToEffect root;
+          comp = nxFx.send "resolve" {
+            aspect = root;
+            identity = fxLib.identity.key root;
+            ctx = { };
+          };
         in
         nxFx.handle {
           handlers = fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {

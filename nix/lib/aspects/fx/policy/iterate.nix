@@ -4,7 +4,6 @@
   fx,
   identity,
   constantHandler,
-  aspectToEffect,
   mkDispatch,
   emitPolicyEffectsThen,
   policyEmitIncludes,

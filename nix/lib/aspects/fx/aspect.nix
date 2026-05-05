@@ -6,9 +6,7 @@
 let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
-  inherit (den.lib.aspects) isMeaningfulName;
-
-  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet classifyKeys;
+  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
   inherit (import ./class-module.nix { inherit lib den; }) wrapClassModule;
 
   ctxFromHandlers =
@@ -24,7 +22,6 @@ let
   inherit (import ./aspect { inherit lib den; } { inherit ctxFromHandlers; })
     emitIncludes
     emitAspectPolicies
-    registerConstraints
     ;
 
   enterScope =
@@ -33,168 +30,10 @@ let
       fx.bind (fx.send "scope-widened" { ctx = ctxFromHandlers handlers; }) (_: computation)
     );
 
-  installPolicies =
-    (import ./policy { inherit lib den; } { inherit aspectToEffect ctxFromHandlers; }).installPolicies;
-
-  # --- Class emission ---
-
-  # Determine if an aspect's class modules are context-dependent.
-  isContextDep =
-    aspect: ctx:
-    let
-      resolvedArgs = aspect.__parametricResolvedArgs or [ ];
-    in
-    (resolvedArgs != [ ] && builtins.any (ak: ctx ? ${ak}) resolvedArgs)
-    || (aspect.meta.contextDependent or false);
-
-  # Emit a single class module entry.
-  emitClassEntry =
-    {
-      class,
-      identity,
-      module,
-      ctx,
-      aspectPolicy,
-      globalPolicy,
-      isContextDependent,
-    }:
-    fx.send "emit-class" {
-      inherit
-        class
-        identity
-        module
-        ctx
-        aspectPolicy
-        globalPolicy
-        isContextDependent
-        ;
-      __rawEntry = true;
-    };
-
-  # Emit all class entries for a single key (unwraps multi-value content).
-  emitClassKey =
-    aspect: ctx: aspectPolicy: globalPolicy: contextDep: nodeIdentity: k:
-    let
-      modules = den.lib.aspects.fx.contentUtil.unwrapContentValuesList aspect.${k};
-      isMulti = builtins.length modules > 1;
-      mkEntry =
-        idx: module:
-        emitClassEntry {
-          class = k;
-          identity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
-          inherit
-            module
-            ctx
-            aspectPolicy
-            globalPolicy
-            ;
-          isContextDependent = contextDep;
-        };
-    in
-    fx.seq (lib.imap0 mkEntry modules);
-
-  # Emit all class keys for an aspect.
-  emitClasses =
-    aspect: classKeys: nodeIdentity:
-    let
-      ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
-      aspectPolicy = aspect.meta.collisionPolicy or null;
-      globalPolicy = den.config.classModuleCollisionPolicy or "error";
-      contextDep = isContextDep aspect ctx;
-    in
-    fx.seq (map (emitClassKey aspect ctx aspectPolicy globalPolicy contextDep nodeIdentity) classKeys);
-
-  # --- Tree walk ---
-
-  chainWrap =
-    nodeIdentity: isMeaningful: comp:
-    if isMeaningful then
-      fx.bind (fx.send "chain-push" { identity = nodeIdentity; }) (
-        _: fx.bind comp (result: fx.bind (fx.send "chain-pop" null) (_: fx.pure result))
-      )
-    else
-      comp;
-
-  # Build a nested sub-aspect from a freeform key and recurse.
-  emitNestedAspect =
-    aspect: k:
-    let
-      innerValue = den.lib.aspects.fx.contentUtil.unwrapContentValuesRaw aspect.${k};
-      subAspect =
-        (if builtins.isAttrs innerValue then innerValue else { })
-        // {
-          name = k;
-          meta = (aspect.meta or { }) // {
-            provider = (aspect.meta.provider or [ ]) ++ [ (aspect.name or "<anon>") ];
-          };
-        }
-        // lib.optionalAttrs (aspect ? __scopeHandlers) { inherit (aspect) __scopeHandlers; }
-        // lib.optionalAttrs (aspect ? __ctxId) { inherit (aspect) __ctxId; };
-    in
-    aspectToEffect subAspect;
-
-  # Run the child resolution sequence: policies → includes → entity policies.
-  resolveChildSequence =
-    aspect:
-    let
-      emitCtx = {
-        __parentScopeHandlers = aspect.__scopeHandlers or null;
-        __parentCtxId = aspect.__ctxId or null;
-      };
-    in
-    fx.bind (emitAspectPolicies aspect) (
-      selfProvResults:
-      fx.bind (emitIncludes emitCtx (aspect.includes or [ ])) (
-        includeResults:
-        if !(aspect ? __entityKind) then
-          fx.pure (selfProvResults ++ includeResults)
-        else
-          fx.bind (installPolicies aspect) (
-            policyResults: fx.pure (selfProvResults ++ includeResults ++ policyResults)
-          )
-      )
-    );
-
-  # Resolve children with chain tracking and resolve-complete emission.
-  resolveChildren =
-    aspect:
-    { isMeaningful, chainIdentity }:
-    fx.bind (chainWrap chainIdentity isMeaningful (resolveChildSequence aspect)) (
-      allChildren:
-      let
-        resolved = aspect // {
-          includes = allChildren;
-        };
-      in
-      fx.bind (fx.send "resolve-complete" resolved) (_: fx.pure resolved)
-    );
-
-  # --- Static compilation ---
-
-  compileStatic =
-    aspect:
-    let
-      nodeIdentity = identity.key aspect;
-      chainIdentity = identity.pathKey ((aspect.meta.provider or [ ]) ++ [ (aspect.name or "<anon>") ]);
-      isMeaningful = isMeaningfulName (aspect.name or "<anon>");
-    in
-    fx.bind (fx.effects.hasHandler "class") (
-      hasClassHandler:
-      fx.bind (if hasClassHandler then fx.send "class" null else fx.pure null) (
-        targetClass:
-        let
-          classified = classifyKeys targetClass aspect;
-          allClassKeys = classified.classKeys ++ classified.unregisteredClassKeys;
-        in
-        fx.bind (fx.seq (
-          [
-            (emitClasses aspect allClassKeys nodeIdentity)
-            (registerConstraints aspect)
-          ]
-          ++ map (emitNestedAspect aspect) classified.nestedKeys
-        )) (_: resolveChildren aspect { inherit isMeaningful chainIdentity; })
-      )
-    );
+  # --- Dead code removed: installPolicies, isContextDep, emitClassEntry,
+  # emitClassKey, emitClasses, chainWrap, emitNestedAspect,
+  # resolveChildSequence, resolveChildren, compileStatic —
+  # now live in effect handlers. ---
 
   # --- Parametric resolution ---
 
@@ -271,42 +110,14 @@ let
     in
     if scopeFn != null then scopeFn bound else bound;
 
-  # Resolve a parametric aspect: bind fn, build result, tag, recurse.
-  resolveParametric =
-    aspect:
-    let
-      depth = aspect.__parametricDepth or 0;
-    in
-    if depth >= maxParametricDepth then
-      throw "den: parametric resolution exceeded ${toString maxParametricDepth} levels for '${aspect.name or "<anon>"}'"
-    else
-      fx.bind (prepareParametricFn aspect) (
-        resolved:
-        let
-          base = mkParametricBase aspect resolved;
-          next = mkParametricNext aspect base resolved;
-          tagged = tagParametricResult aspect next // {
-            __parametricDepth = depth + 1;
-          };
-        in
-        aspectToEffect tagged
-      );
-
-  # --- Top-level dispatch ---
-
-  parametricInternalKeys = [
-    "__fn"
-    "__args"
-    "__parametricDepth"
-    "__parametricResolvedArgs"
-  ];
-
+  # Thin delegate: all logic now lives in resolve/compile-parametric/compile-static handlers.
   aspectToEffect =
     aspect:
-    if (aspect.__args or { }) != { } then
-      resolveParametric aspect
-    else
-      compileStatic (builtins.removeAttrs aspect parametricInternalKeys);
+    fx.send "resolve" {
+      inherit aspect;
+      identity = identity.key aspect;
+      ctx = { };
+    };
 
 in
 {

@@ -6,7 +6,6 @@
 let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) handlers identity;
-  inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   # Compose two handler sets: b's resume wins, a's state wins.
   # Used for tracing: tracingHandler (b) controls resume,
   # defaultHandlers (a) accumulates paths/imports.
@@ -185,7 +184,11 @@ let
       ctx,
     }:
     let
-      bootstrapAndResolve = aspectToEffect self;
+      bootstrapAndResolve = fx.send "resolve" {
+        aspect = self;
+        identity = identity.key self;
+        ctx = ctx;
+      };
 
       rootHandlers = defaultHandlers {
         inherit class;

@@ -22,7 +22,7 @@ let
         __fn =
           resolvedArgs:
           let
-            # __scopeKeys is injected by aspectToEffect when meta.exactMatch is set.
+            # __scopeKeys is injected by the compile-parametric handler when meta.exactMatch is set.
             # It contains all scope handler keys so we can detect extra context beyond
             # the function's declared args.
             scopeKeys = resolvedArgs.__scopeKeys or [ ];

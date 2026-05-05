@@ -7,7 +7,7 @@
 }:
 let
   inherit (den.lib) fx;
-  inherit (den.lib.aspects.fx.aspect) ctxFromHandlers aspectToEffect;
+  inherit (den.lib.aspects.fx.aspect) ctxFromHandlers;
 
   inherit (import ../aspect { inherit lib den; } { inherit ctxFromHandlers; })
     emitIncludes
@@ -17,7 +17,7 @@ let
 
   installPolicies =
     (import ../policy { inherit lib den; } {
-      inherit ctxFromHandlers aspectToEffect;
+      inherit ctxFromHandlers;
     }).installPolicies;
 
   chainWrap =
