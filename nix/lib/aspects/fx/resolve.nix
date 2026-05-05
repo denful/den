@@ -33,19 +33,60 @@ let
     go { } raw;
 
   # Phase 1: Wrap collected class imports per-scope.
+  # Deduplicates modules with identical keys across scopes: when a shared
+  # aspect is included by both host and user, it emits class modules in
+  # both scopes.  The NixOS module system would eventually dedup by key,
+  # but keeping duplicates wastes evaluation and can amplify lib.warn noise.
   wrapPerScope =
     ctx: scopeContexts: scopedClassImportsRaw:
     let
       wrappedPerScope = lib.mapAttrs (
         scopeId: scopeClasses: wrapCollectedClasses (scopeContexts.${scopeId} or ctx) scopeClasses
       ) scopedClassImportsRaw;
-      merged = builtins.foldl' (
-        acc: scopeData:
-        lib.zipAttrsWith (_: builtins.concatLists) [
-          acc
-          scopeData
-        ]
-      ) { } (builtins.attrValues wrappedPerScope);
+      # Fold scopes, deduplicating keyed modules (first occurrence wins).
+      merged =
+        let
+          go =
+            acc: scopeData:
+            let
+              allClasses = lib.unique (builtins.attrNames acc.classes ++ builtins.attrNames scopeData);
+            in
+            builtins.foldl' (
+              a: cls:
+              let
+                existing = a.classes.${cls} or [ ];
+                seenKeys = a.keys.${cls} or { };
+                newMods = scopeData.${cls} or [ ];
+                filtered = builtins.filter (
+                  m:
+                  let
+                    k = m.key or null;
+                  in
+                  k == null || !(seenKeys ? ${k})
+                ) newMods;
+                addedKeys = builtins.foldl' (
+                  ks: m:
+                  let
+                    k = m.key or null;
+                  in
+                  if k == null then ks else ks // { ${k} = true; }
+                ) seenKeys filtered;
+              in
+              {
+                classes = a.classes // {
+                  ${cls} = existing ++ filtered;
+                };
+                keys = a.keys // {
+                  ${cls} = addedKeys;
+                };
+              }
+            ) acc allClasses;
+          final = builtins.foldl' go {
+            classes = { };
+            keys = { };
+          } (builtins.attrValues wrappedPerScope);
+        in
+        final.classes;
     in
     {
       classImports = merged;
