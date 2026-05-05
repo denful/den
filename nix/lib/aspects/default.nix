@@ -5,6 +5,7 @@
 }:
 let
   rawTypes = import ./types.nix { inherit den lib; };
+  policyTypes = import ./policy-type.nix { inherit lib; };
   hasAspect = import ./has-aspect.nix { inherit den lib; };
   fx = import ./fx { inherit den lib; };
 
@@ -76,7 +77,12 @@ let
   types = lib.mapAttrs (_: v: v { }) rawTypes;
 in
 {
-  inherit types fx normalizeRoot;
+  inherit
+    types
+    fx
+    normalizeRoot
+    policyTypes
+    ;
   resolve = fxResolveTree;
   resolveWithState = fxResolveTreeFull;
   inherit (hasAspect) hasAspectIn collectPathSet mkEntityHasAspect;

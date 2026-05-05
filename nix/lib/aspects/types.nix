@@ -194,61 +194,70 @@ let
       merge =
         loc: defs:
         let
-          parametrics = builtins.filter (d: isParametricWrapper d.value) defs;
+          policyDefs = builtins.filter (d: builtins.isAttrs d.value && d.value.__isPolicy or false) defs;
         in
-        if parametrics != [ ] then
+        if policyDefs != [ ] then
           let
-            nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
+            p = (builtins.head policyDefs).value;
           in
-          # Single wrapper with no other defs: return wrapper directly.
-          # Avoid baseType.merge here — it triggers a full aspectSubmodule evaluation
-          # (module system fixed-point + den.schema.aspect import) which is expensive
-          # and causes OOM when applied to every single-def provides child in the tree.
-          # The pipeline handles raw wrappers identically via wrapChild normalization.
-          # Multiple wrappers or mixed: coerce __fn to includes, merge through aspectType.
-          if builtins.length parametrics == 1 && nonParametrics == [ ] then
-            let
-              wrapper = (builtins.head parametrics).value;
-              nameFromLoc = lib.last loc;
-            in
-            wrapper // lib.optionalAttrs (!(wrapper ? name) || wrapper.name == "<anon>") { name = nameFromLoc; }
-          else
-            baseType.merge loc (
-              map (
-                d:
-                d
-                // {
-                  value = {
-                    includes = [ d.value.__fn ];
-                  };
-                }
-              ) parametrics
-              ++ nonParametrics
-            )
+          p // { name = p.name or (lib.last loc); }
         else
           let
-            nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
-            # Error on conflicting __functor defs (callable aspect factories).
-            # Two factories at the same path is ambiguous — can't be mechanically composed.
-            explicitFunctors = builtins.filter (
-              d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
-            ) nonParametrics;
-            _functorCheck =
-              if builtins.length explicitFunctors > 1 then
-                throw "den: multiple __functor definitions at ${
-                  lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc)
-                } — merge is ambiguous. Use lib.mkForce to override."
-              else
-                null;
-            hasFns = builtins.seq _functorCheck (builtins.any (d: lib.isFunction d.value) nonParametrics);
-            hasNonFns = builtins.any (d: !lib.isFunction d.value) nonParametrics;
+            parametrics = builtins.filter (d: isParametricWrapper d.value) defs;
           in
-          if hasFns && hasNonFns then
-            mergeMixed baseType loc nonParametrics
-          else if hasFns then
-            mergeFunctions baseType typeCfg loc nonParametrics
+          if parametrics != [ ] then
+            let
+              nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
+            in
+            # Single wrapper with no other defs: return wrapper directly.
+            # Avoid baseType.merge here — it triggers a full aspectSubmodule evaluation
+            # (module system fixed-point + den.schema.aspect import) which is expensive
+            # and causes OOM when applied to every single-def provides child in the tree.
+            # The pipeline handles raw wrappers identically via wrapChild normalization.
+            # Multiple wrappers or mixed: coerce __fn to includes, merge through aspectType.
+            if builtins.length parametrics == 1 && nonParametrics == [ ] then
+              let
+                wrapper = (builtins.head parametrics).value;
+                nameFromLoc = lib.last loc;
+              in
+              wrapper // lib.optionalAttrs (!(wrapper ? name) || wrapper.name == "<anon>") { name = nameFromLoc; }
+            else
+              baseType.merge loc (
+                map (
+                  d:
+                  d
+                  // {
+                    value = {
+                      includes = [ d.value.__fn ];
+                    };
+                  }
+                ) parametrics
+                ++ nonParametrics
+              )
           else
-            baseType.merge loc nonParametrics;
+            let
+              nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs;
+              # Error on conflicting __functor defs (callable aspect factories).
+              # Two factories at the same path is ambiguous — can't be mechanically composed.
+              explicitFunctors = builtins.filter (
+                d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
+              ) nonParametrics;
+              _functorCheck =
+                if builtins.length explicitFunctors > 1 then
+                  throw "den: multiple __functor definitions at ${
+                    lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc)
+                  } — merge is ambiguous. Use lib.mkForce to override."
+                else
+                  null;
+              hasFns = builtins.seq _functorCheck (builtins.any (d: lib.isFunction d.value) nonParametrics);
+              hasNonFns = builtins.any (d: !lib.isFunction d.value) nonParametrics;
+            in
+            if hasFns && hasNonFns then
+              mergeMixed baseType loc nonParametrics
+            else if hasFns then
+              mergeFunctions baseType typeCfg loc nonParametrics
+            else
+              baseType.merge loc nonParametrics;
     };
 
   # Generic content wrapper for aspect freeform keys.

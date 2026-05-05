@@ -13,11 +13,14 @@ let
     lib.concatLists (
       lib.mapAttrsToList (
         name: policy:
-        if !resolveArgsSatisfied policy resolveCtx || firedPolicies ? ${name} then
+        let
+          policyFn = if builtins.isAttrs policy && policy.__isPolicy or false then policy.fn else policy;
+        in
+        if !resolveArgsSatisfied policyFn resolveCtx || firedPolicies ? ${name} then
           [ ]
         else
           let
-            result = policy resolveCtx;
+            result = policyFn resolveCtx;
             rawEffects = if builtins.isList result then result else [ result ];
           in
           if rawEffects == [ ] then
