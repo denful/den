@@ -102,4 +102,66 @@
         __functor = _: value;
         collisionPolicy = "class-wins";
       };
+
+  # Wrap a policy (or list of policies) to only fire for a specific entity.
+  # Uses id_hash for robust identity matching.
+  for =
+    entity: policiesOrSingle:
+    let
+      policies = if builtins.isList policiesOrSingle then policiesOrSingle else [ policiesOrSingle ];
+      wrap =
+        p:
+        let
+          inner =
+            if p.__isPolicy or false then
+              p
+            else
+              {
+                __isPolicy = true;
+                name = "<inline>";
+                fn = p;
+              };
+        in
+        {
+          __isPolicy = true;
+          inherit (inner) name;
+          fn =
+            ctx:
+            let
+              entityKind = ctx.__entityKind or null;
+              ctxEntity = if entityKind != null then ctx.${entityKind} or null else null;
+            in
+            if ctxEntity != null && (ctxEntity.id_hash or null) == (entity.id_hash or null) then
+              inner.fn ctx
+            else
+              [ ];
+        };
+    in
+    if builtins.isList policiesOrSingle then map wrap policies else wrap (builtins.head policies);
+
+  # Wrap a policy (or list of policies) to only fire when predicate is true.
+  when =
+    predicate: policiesOrSingle:
+    let
+      policies = if builtins.isList policiesOrSingle then policiesOrSingle else [ policiesOrSingle ];
+      wrap =
+        p:
+        let
+          inner =
+            if p.__isPolicy or false then
+              p
+            else
+              {
+                __isPolicy = true;
+                name = "<inline>";
+                fn = p;
+              };
+        in
+        {
+          __isPolicy = true;
+          inherit (inner) name;
+          fn = ctx: if predicate ctx then inner.fn ctx else [ ];
+        };
+    in
+    if builtins.isList policiesOrSingle then map wrap policies else wrap (builtins.head policies);
 }
