@@ -161,7 +161,6 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.default.includes = [ den.provides.flake-scope ];
 
         den.policies.custom-enrichment =
           { host, ... }:
@@ -170,6 +169,11 @@
               myArg = host.class;
             })
           ];
+
+        den.default.includes = [
+          den.provides.flake-scope
+          den.policies.custom-enrichment
+        ];
 
         den.aspects.mixed-collision = {
           nixos =

@@ -42,6 +42,8 @@ in
             })
           ];
 
+        den.default.includes = [ den.policies.route-custom-toplevel ];
+
         den.aspects.igloo = {
           custom.networking.hostName = "routed-toplevel";
         };
@@ -68,6 +70,8 @@ in
               path = [ "route-box" ];
             })
           ];
+
+        den.default.includes = [ den.policies.route-src-subpath ];
 
         den.aspects.igloo = {
           nixos.imports = [ (mkListSubmodule "route-box") ];
@@ -102,6 +106,8 @@ in
             })
           ];
 
+        den.default.includes = [ den.policies.route-guarded-false ];
+
         den.aspects.igloo = {
           nixos.imports = [ (mkListSubmodule "guarded-box") ];
           nixos.guarded-box.items = [ "original" ];
@@ -131,6 +137,8 @@ in
             })
           ];
 
+        den.default.includes = [ den.policies.route-phantom ];
+
         den.aspects.igloo = {
           nixos.networking.hostName = "untouched";
         };
@@ -158,6 +166,8 @@ in
               guard = { options, ... }: options ? gp-box;
             })
           ];
+
+        den.default.includes = [ den.policies.route-guarded-path ];
 
         den.aspects.igloo = {
           nixos.imports = [ (mkListSubmodule "gp-box") ];

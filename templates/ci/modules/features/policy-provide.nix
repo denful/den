@@ -40,6 +40,8 @@ in
             })
           ];
 
+        den.default.includes = [ den.policies.provide-direct ];
+
         den.aspects.igloo = { };
 
         expr = igloo.networking.hostName;
@@ -62,6 +64,8 @@ in
               path = [ "provide-box" ];
             })
           ];
+
+        den.default.includes = [ den.policies.provide-with-path ];
 
         den.aspects.igloo = {
           nixos.imports = [ (mkListSubmodule "provide-box") ];
@@ -99,6 +103,8 @@ in
             })
           ];
 
+        den.default.includes = [ den.policies.provide-and-route ];
+
         den.aspects.igloo = {
           nixos.imports = [ (mkListSubmodule "combo-box") ];
           nixos.combo-box.items = [ "from-aspect" ];
@@ -126,6 +132,16 @@ in
 
         den.aspects.igloo = { };
 
+        den.policies.user-routing =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) resolve include;
+          in
+          map (user: resolve { inherit user; }) (builtins.attrValues host.users)
+          ++ [
+            (include den.policies.provide-cross-class)
+          ];
+
         den.policies.provide-cross-class =
           { host, user, ... }:
           [
@@ -136,6 +152,8 @@ in
               };
             })
           ];
+
+        den.default.includes = [ den.policies.user-routing ];
 
         expr = tuxHm.programs.direnv.enable;
         expected = true;

@@ -121,6 +121,13 @@ let
     {
       battery = {
         policies."host-to-${ctxName}-users" = policyFn;
+        includes = [
+          {
+            __isPolicy = true;
+            name = "host-to-${ctxName}-users";
+            fn = policyFn;
+          }
+        ];
       };
 
       hostConf = hostOptions {

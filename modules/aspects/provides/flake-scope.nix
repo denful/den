@@ -22,5 +22,18 @@ in
         den = pipelineOnly den;
       })
     ];
+    includes = [
+      {
+        __isPolicy = true;
+        name = "den-flake-scope";
+        fn = _: [
+          (resolve {
+            lib = pipelineOnly lib;
+            inputs = pipelineOnly inputs;
+            den = pipelineOnly den;
+          })
+        ];
+      }
+    ];
   };
 }

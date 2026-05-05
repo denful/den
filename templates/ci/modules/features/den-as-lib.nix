@@ -104,6 +104,7 @@ in
                 [ ];
 
             den.aspects.foobar.includes = [
+              den.policies.foo-to-bar
               # resolveEntity results carry __scopeHandlers which are
               # destroyed by providerType merge. Wrap in a function
               # so it's called at resolution time, not definition time.

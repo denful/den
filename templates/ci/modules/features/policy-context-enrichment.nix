@@ -19,6 +19,8 @@
             })
           ];
 
+        den.default.includes = [ den.policies.host-guards ];
+
         den.aspects.gpg-agent =
           { isNixos }:
           {
@@ -48,6 +50,8 @@
               isDarwin = host.class == "darwin";
             })
           ];
+
+        den.default.includes = [ den.policies.host-guards ];
 
         den.aspects.wayprompt = {
           nixos =
@@ -80,6 +84,8 @@
             })
           ];
 
+        den.default.includes = [ den.policies.host-guards ];
+
         den.aspects.apple = {
           darwin =
             { isDarwin, lib, ... }:
@@ -101,7 +107,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.schema.host.policies.mixed =
+        den.policies.mixed =
           {
             host,
             ...
@@ -119,6 +125,8 @@
           ++ [
             (include den.aspects.user-check)
           ];
+
+        den.schema.host.includes = [ den.policies.mixed ];
 
         den.aspects.user-check = {
           nixos =
@@ -159,6 +167,11 @@
             })
           ];
 
+        den.default.includes = [
+          den.policies.host-guards
+          den.policies.platform-info
+        ];
+
         den.aspects.platform-test =
           { platform }:
           {
@@ -195,7 +208,7 @@
             })
           ];
 
-        den.schema.host.policies.user-routing =
+        den.policies.user-routing =
           {
             host,
             ...
@@ -207,6 +220,11 @@
           ++ [
             (include den.aspects.user-config)
           ];
+
+        den.default.includes = [
+          den.policies.host-guards
+          den.policies.user-routing
+        ];
 
         den.aspects.user-config = {
           nixos =
@@ -273,6 +291,11 @@
             })
           ];
 
+        den.default.includes = [
+          den.policies.host-guards
+          den.policies.feature-flags
+        ];
+
         den.aspects.bt-config =
           { isNixos, enableBluetooth }:
           {
@@ -302,6 +325,8 @@
               isNixos = host.class == "nixos";
             })
           ];
+
+        den.default.includes = [ den.policies.host-guards ];
 
         den.aspects.static-config = {
           nixos = {
@@ -338,6 +363,8 @@
               isNixos = host.class == "nixos";
             })
           ];
+
+        den.default.includes = [ den.policies.host-guards ];
 
         # Parametric wrapper with only den args → fully applied.
         # The inner homeManager value is a plain attrset.
