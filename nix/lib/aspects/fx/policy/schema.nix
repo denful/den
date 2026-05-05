@@ -102,19 +102,22 @@ let
         || late.instantiateEffects != [ ]
         || late.provideEffects != [ ]
         || late.excludeEffects != [ ];
-      scopeHandlersForCtx = constantHandler (
-        sib.scopedCtx // lib.optionalAttrs (sib.entityClass != null) { class = sib.entityClass; }
-      );
     in
     if latePolicies == { } || !hasLateEffects then
       fx.pure null
     else
-      fx.bind (fx.effects.state.modify (st: st // { currentScope = sib.scopeId; })) (
-        _:
-        fx.bind (fx.effects.scope.provide scopeHandlersForCtx (
-          emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
-        )) (_: fx.effects.state.modify (st: st // { currentScope = parentScope; }))
-      );
+      fx.bind
+        (fx.send "push-scope" {
+          scopedCtx = sib.scopedCtx;
+          entityClass = sib.entityClass;
+          inherit parentScope;
+        })
+        (
+          { scopeHandlers, ... }:
+          fx.bind (fx.effects.scope.provide scopeHandlers (
+            emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
+          )) (_: fx.send "restore-scope" { inherit parentScope; })
+        );
 
   # Post-resolve pass: re-dispatch aspect policies registered by later siblings.
   # inLateDispatch is set true and intentionally never reset — this ensures
