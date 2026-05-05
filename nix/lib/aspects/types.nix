@@ -1,6 +1,7 @@
 { lib, den, ... }:
 let
   inherit (den.lib) canTake;
+  inherit (import ./policy-type.nix { inherit lib; }) policyRegistryType;
 
   isSubmoduleFn = canTake.upTo {
     lib = true;
@@ -390,8 +391,8 @@ let
             default = { };
           };
           policies = lib.mkOption {
-            description = "Named policy functions included when this aspect resolves.";
-            type = lib.types.lazyAttrsOf lib.types.raw;
+            description = "Named policy functions — activated by placing in includes.";
+            type = policyRegistryType;
             default = { };
           };
           includes = lib.mkOption {
