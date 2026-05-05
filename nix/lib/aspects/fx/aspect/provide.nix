@@ -133,15 +133,7 @@ let
       aspectName = aspect.name or "<anon>";
       nodeIdentity = identity.key aspect;
 
-      policies = aspect.policies or { };
-      policyRegistrations = lib.mapAttrsToList (
-        policyName: policyFn:
-        fx.send "register-aspect-policy" {
-          name = "${aspectName}/${policyName}";
-          fn = policyFn;
-          ownerIdentity = nodeIdentity;
-        }
-      ) policies;
+      policyRegistrations = [ ];
 
       provides = aspect.provides or { };
       crossKeys = builtins.filter (k: k != aspectName) (builtins.attrNames provides);
