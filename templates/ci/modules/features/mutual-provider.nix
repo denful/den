@@ -20,6 +20,7 @@
           lib.optional (user.name == "tux") (include {
             homeManager.home.shellAliases.g = "git";
           });
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-tux ];
 
         expr = igloo.home-manager.users.tux.home.shellAliases;
 
@@ -45,6 +46,7 @@
           lib.optional (host.name == "igloo") (include {
             nixos.boot.crashDump.reservedMemory = "99999M";
           });
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-igloo ];
 
         expr = igloo.boot.crashDump.reservedMemory;
 
@@ -70,12 +72,14 @@
           lib.optional (user.name == "tux") (include {
             homeManager.home.keyboard.model = "denboard";
           });
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-tux ];
 
         den.aspects.tux.policies.to-igloo =
           { host, user, ... }:
           lib.optional (host.name == "igloo") (include {
             nixos.boot.kernel.randstructSeed = "denseed";
           });
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-igloo ];
 
         expr = [
           igloo.boot.kernel.randstructSeed
@@ -109,6 +113,7 @@
               homeManager.home.keyboard.model = "denboard";
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         den.aspects.tux.policies.to-hosts =
           { host, user, ... }:
@@ -117,6 +122,7 @@
               nixos.boot.kernel.randstructSeed = "denseed@${host.name}";
             })
           ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
 
         expr = [
           igloo.boot.kernel.randstructSeed

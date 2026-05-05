@@ -15,13 +15,36 @@ in
       { param, state }:
       let
         inherit (param) effects entityKind enrichedCtx;
-        includeAspects = map (e: e.value) effects.includeEffects;
         hasSchemaResolves = effects.schemaEffects != [ ];
+        # Separate include effects: cross-provider includes (from policies that
+        # also produced schema resolves) go with processSchemaResolves.
+        # Independent includes (from policies that only produced includes) get
+        # emitted directly via policyEmitIncludes.  Without this separation,
+        # unrelated policies' includes would be incorrectly bundled into schema
+        # entity resolution when multiple policies fire at the same scope.
+        crossProviderIncludes = builtins.filter (
+          e:
+          builtins.any (
+            se: (se.__sourcePolicyName or "") == (e.__sourcePolicyName or "")
+          ) effects.schemaEffects
+        ) effects.includeEffects;
+        independentIncludes = builtins.filter (
+          e:
+          !builtins.any (
+            se: (se.__sourcePolicyName or "") == (e.__sourcePolicyName or "")
+          ) effects.schemaEffects
+        ) effects.includeEffects;
+        includeAspects = map (e: e.value) crossProviderIncludes;
       in
       {
         resume = emitPolicyEffectsThen effects (
           if hasSchemaResolves then
-            processSchemaResolves entityKind includeAspects effects.schemaEffects enrichedCtx
+            fx.bind (processSchemaResolves entityKind includeAspects effects.schemaEffects enrichedCtx) (
+              schemaResults:
+              fx.bind (policyEmitIncludes independentIncludes) (
+                includeResults: fx.pure (schemaResults ++ includeResults)
+              )
+            )
           else
             policyEmitIncludes effects.includeEffects
         );

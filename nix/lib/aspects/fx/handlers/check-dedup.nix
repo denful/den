@@ -39,18 +39,16 @@ in
         seen = (state.includeSeen or (_: { })) null;
         isDuplicate = dedupKey != null && seen ? ${dedupKey};
       in
-      builtins.seq
-        (builtins.trace "DEDUP: name=${originalName} isPol=${toString isPolicyInclude} key=${toString dedupKey} dup=${toString isDuplicate}" null)
-        {
-          resume = { inherit isDuplicate dedupKey; };
-          state =
-            if isDuplicate || dedupKey == null then
-              state
-            else
-              state
-              // {
-                includeSeen = _: seen // { ${dedupKey} = true; };
-              };
-        };
+      {
+        resume = { inherit isDuplicate dedupKey; };
+        state =
+          if isDuplicate || dedupKey == null then
+            state
+          else
+            state
+            // {
+              includeSeen = _: seen // { ${dedupKey} = true; };
+            };
+      };
   };
 }

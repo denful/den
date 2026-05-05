@@ -97,6 +97,7 @@
               includes = [ den.aspects.strict-helper ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         # strict-helper requires exactly { host, user } — since ctx.host only provides
         # { host }, strict-helper is skipped at host level (by exactly semantics).
@@ -154,6 +155,7 @@
               includes = [ den.aspects.helper ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = [
           igloo.networking.hostName
@@ -198,6 +200,7 @@
               includes = [ den.aspects.helper ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = [
           igloo.networking.hostName
