@@ -63,8 +63,8 @@
       }
     );
 
-    # push-scope: idempotent — re-entry does not duplicate deferred items.
-    test-push-scope-idempotent = denTest (
+    # push-scope: re-entry appends parent deferred to child (fan-out on every entry).
+    test-push-scope-reentry-deferred = denTest (
       { den, ... }:
       let
         fx = den.lib.fx;
@@ -107,9 +107,9 @@
         } comp;
       in
       {
-        # On re-entry, deferred should NOT be duplicated.
+        # On re-entry, parent deferred items are appended (matching old copyDeferredToScope behavior).
         expr = builtins.length ((result.state.scopedDeferredIncludes null).${childScope} or [ ]);
-        expected = builtins.length deferred;
+        expected = 2;
       }
     );
 

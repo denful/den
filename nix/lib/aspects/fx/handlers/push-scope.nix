@@ -1,7 +1,6 @@
 # Effect handler: push-scope
 # Atomically sets currentScope, scopeContexts, scopeParent,
-# inherits scopedAspectPolicies, and fans out scopedDeferredIncludes
-# (only on first entry — idempotent guard prevents duplicate fan-out).
+# inherits scopedAspectPolicies, and fans out scopedDeferredIncludes.
 {
   lib,
   den,
@@ -23,7 +22,6 @@ let
         );
         allDeferred = (state.scopedDeferredIncludes or (_: { })) null;
         parentItems = allDeferred.${parentScope} or [ ];
-        isNewScope = !(state.scopeContexts null) ? ${newScopeId};
       in
       {
         resume = {
@@ -45,7 +43,7 @@ let
               in
               all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
           }
-          // lib.optionalAttrs (isNewScope && parentItems != [ ]) {
+          // lib.optionalAttrs (parentItems != [ ]) {
             scopedDeferredIncludes =
               _:
               allDeferred

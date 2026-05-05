@@ -53,6 +53,11 @@ let
     // handlers.registerInstantiateHandler
     // handlers.provideHandler
     // resolveEntityHandler
+    // handlers.pushScopeHandler
+    // handlers.restoreScopeHandler
+    // handlers.propagateRoutesHandler
+    // handlers.recordFiredHandler
+    // handlers.widenContextHandler
     // handlers.resolveSchemaEntityHandler
     // handlers.gateHandler
     // handlers.resolveHandler
