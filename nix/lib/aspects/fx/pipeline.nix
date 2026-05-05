@@ -73,6 +73,8 @@ let
     // handlers.classifyHandler
     // handlers.emitClassesHandler
     // handlers.resolveChildrenHandler
+    // handlers.dispatchPoliciesHandler
+    // handlers.emitPolicyEffectsHandler
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.

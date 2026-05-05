@@ -15,10 +15,10 @@ let
     registerConstraints
     ;
 
-  installPolicies =
-    (import ../policy { inherit lib den; } {
-      inherit ctxFromHandlers;
-    }).installPolicies;
+  policyMod = import ../policy { inherit lib den; } {
+    inherit ctxFromHandlers;
+  };
+  inherit (policyMod) installPolicies dispatchPoliciesHandler emitPolicyEffectsHandler;
 
   chainWrap =
     nodeIdentity: isMeaningful: comp:
@@ -51,6 +51,7 @@ let
     );
 in
 {
+  inherit dispatchPoliciesHandler emitPolicyEffectsHandler;
   resolveChildrenHandler = {
     "resolve-children" =
       { param, state }:

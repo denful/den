@@ -10,7 +10,12 @@
 }:
 let
   inherit (den.lib) fx;
-  inherit (den.lib.aspects.fx.handlers) constantHandler;
+  inherit (den.lib.aspects.fx.handlers)
+    constantHandler
+    mkDispatchPoliciesHandler
+    mkEmitPolicyEffectsHandler
+    ;
+  inherit (den.lib.aspects.fx.aspect) enterScope;
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   inherit (den.lib.aspects.fx) identity;
@@ -81,15 +86,15 @@ let
     inherit
       lib
       fx
-      identity
       constantHandler
-      mkDispatch
-      emitPolicyEffectsThen
-      policyEmitIncludes
-      processSchemaResolves
+      enterScope
       ;
   };
   inherit (iterateMod) emptyAcc iterate;
+
+  # Constructed handler instances for pipeline wiring.
+  dispatchPoliciesHandler = mkDispatchPoliciesHandler mkDispatch;
+  emitPolicyEffectsHandler = mkEmitPolicyEffectsHandler processSchemaResolves;
 
   # Entry point: read state, check dedup, call iterate.
   installPolicies =
@@ -127,5 +132,5 @@ let
     );
 in
 {
-  inherit installPolicies;
+  inherit installPolicies dispatchPoliciesHandler emitPolicyEffectsHandler;
 }
