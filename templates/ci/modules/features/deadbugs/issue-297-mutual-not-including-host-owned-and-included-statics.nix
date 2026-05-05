@@ -23,6 +23,7 @@
               homeManager.home.keyboard.model = "denkbd";
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = tuxHm.home.keyboard.model;
         expected = "denkbd";
@@ -51,6 +52,7 @@
               includes = [ den.aspects.base ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = tuxHm.home.keyboard.model;
         expected = "denkbd";
@@ -80,6 +82,7 @@
           [
             (include den.aspects.igloo-foo-option)
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = tuxHm.foo;
         expected = "foo";

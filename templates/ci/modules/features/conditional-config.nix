@@ -50,6 +50,7 @@
               includes = [ conditionalAspect ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = igloo.something;
         expected = "was-true";
@@ -85,6 +86,7 @@
               includes = [ git-for-linux-only ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = [
           tuxHm.programs.git.enable

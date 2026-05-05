@@ -97,6 +97,7 @@
               includes = [ provider.tools.provides.dev.provides.user-stamp ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
         expr = igloo.users.users.tux.description;
         expected = "user-of-igloo";
       }

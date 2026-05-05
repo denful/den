@@ -120,6 +120,7 @@
               ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         den.aspects.tux.includes = [
           (den.lib.perHost { nixos.funny = [ "atUser ignored perHost static" ]; })

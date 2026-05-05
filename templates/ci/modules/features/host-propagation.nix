@@ -24,6 +24,7 @@
 
       den.aspects.igloo.funny.names = [ "host-owned" ];
       den.aspects.igloo.includes = [
+        den.aspects.igloo.policies.to-users
         (take.exactly (
           { host }:
           {

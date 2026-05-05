@@ -7,7 +7,7 @@
 {
   flake.tests.fx-scope-effects = {
 
-    # push-scope: sets currentScope, registers scopeContexts, inherits parent policies.
+    # push-scope: sets currentScope, registers scopeContexts, scope-local policies (no inheritance).
     test-push-scope-basic = denTest (
       { den, ... }:
       let
@@ -49,7 +49,9 @@
           hasScopeHandlers = result.value ? scopeHandlers;
           currentScope = result.state.currentScope;
           hasCtx = (result.state.scopeContexts null) ? ${expectedScope};
-          inheritedPolicy = (result.state.scopedAspectPolicies null).${expectedScope}.some-policy or false;
+          # Policies no longer inherit from parent — scope-local dispatch only.
+          noInheritedPolicy =
+            !((result.state.scopedAspectPolicies null).${expectedScope} or { }) ? some-policy;
           hasParent = (result.state.scopeParent null) ? ${expectedScope};
         };
         expected = {
@@ -57,7 +59,7 @@
           hasScopeHandlers = true;
           currentScope = expectedScope;
           hasCtx = true;
-          inheritedPolicy = true;
+          noInheritedPolicy = true;
           hasParent = true;
         };
       }

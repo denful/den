@@ -53,6 +53,7 @@
               homeManager.programs.direnv.enable = true;
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = [
           tuxHm.programs.direnv.enable
@@ -93,6 +94,7 @@
               ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = [
           tuxHm.programs.direnv.enable
@@ -173,6 +175,7 @@
               ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
 
         expr = [
           tuxHm.programs.direnv.enable
@@ -300,6 +303,10 @@
           lib.optional (user.name == "alice") (include {
             homeManager.programs.tmux.enable = true;
           });
+        den.aspects.tux.includes = [
+          den.aspects.tux.policies.to-users
+          den.aspects.tux.policies.to-alice
+        ];
 
         expr = with igloo.home-manager.users; {
           tux = tux.programs.vim.enable;

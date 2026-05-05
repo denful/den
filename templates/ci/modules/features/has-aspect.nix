@@ -396,6 +396,7 @@
               includes = [ den.aspects.user-target ];
             })
           ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.self-inject ];
         den.aspects.user-target.homeManager = { };
 
         expr = den.hosts.x86_64-linux.igloo.users.tux.hasAspect den.aspects.user-target;
@@ -419,6 +420,7 @@
               includes = [ den.aspects.user-target ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
         den.aspects.user-target.homeManager = { };
 
         # Host policyFn includes ARE delivered (config works) but NOT
@@ -446,6 +448,7 @@
               includes = [ den.aspects.host-target ];
             })
           ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
         den.aspects.host-target.nixos = { };
 
         expr = den.hosts.x86_64-linux.igloo.hasAspect den.aspects.host-target;

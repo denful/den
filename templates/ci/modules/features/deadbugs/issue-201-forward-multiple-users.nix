@@ -32,6 +32,7 @@
               ];
             })
           ];
+        den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
         den.aspects.tux.includes = [ den.provides.primary-user ];
 
         den.aspects.set-user-desc =

@@ -35,6 +35,7 @@
             includes = [ den.provides.define-user ];
           })
         ];
+      den.aspects.igloo.includes = [ den.aspects.igloo.policies.to-users ];
       expr = igloo.users.users.tux.isNormalUser;
       expected = true;
     }

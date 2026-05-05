@@ -22,8 +22,11 @@ let
       lib.recursiveUpdate baseStage (
         if i + 1 < n then
           {
-            den.schema.${name}.policies."${name}-to-${next}" =
+            den.policies."${name}-to-${next}" =
               { x, ... }: [ (den.lib.policy.resolve.to next { x = "${x}+${toString i}"; }) ];
+            den.schema.${name}.includes = baseStage.den.schema.${name}.includes ++ [
+              den.policies."${name}-to-${next}"
+            ];
           }
         else
           { }
@@ -34,16 +37,8 @@ let
     n:
     { den, ... }:
     {
-      den.schema.root.includes = [
-        (
-          { x }:
-          {
-            funny.names = [ "root-${x}" ];
-          }
-        )
-      ];
       den.schema.leaf.includes = [ ];
-      den.schema.root.policies.root-to-leaf =
+      den.policies.root-to-leaf =
         { x, ... }:
         let
           inherit (den.lib.policy) resolve include;
@@ -57,6 +52,15 @@ let
             }
           ))
         ];
+      den.schema.root.includes = [
+        den.policies.root-to-leaf
+        (
+          { x }:
+          {
+            funny.names = [ "root-${x}" ];
+          }
+        )
+      ];
     };
 
   mkCrossProviders =
@@ -66,15 +70,7 @@ let
       srcMod =
         { den, ... }:
         {
-          den.schema.src.includes = [
-            (
-              { v }:
-              {
-                funny.names = [ "src-${v}" ];
-              }
-            )
-          ];
-          den.schema.src.policies = lib.listToAttrs (
+          den.policies = lib.listToAttrs (
             map (tgt: {
               name = "src-to-${tgt}";
               value =
@@ -99,6 +95,15 @@ let
                 ];
             }) targetNames
           );
+          den.schema.src.includes = [
+            (
+              { v }:
+              {
+                funny.names = [ "src-${v}" ];
+              }
+            )
+          ]
+          ++ map (tgt: den.policies."src-to-${tgt}") targetNames;
         };
       targetMods = lib.genList (
         i:

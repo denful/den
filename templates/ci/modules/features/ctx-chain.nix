@@ -22,8 +22,11 @@ let
       lib.recursiveUpdate baseStage (
         if i + 1 < n then
           {
-            den.schema.${name}.policies."${name}-to-${next}" =
+            den.policies."${name}-to-${next}" =
               { x, ... }: [ (den.lib.policy.resolve.to next { x = "${x}+${toString i}"; }) ];
+            den.schema.${name}.includes = baseStage.den.schema.${name}.includes ++ [
+              den.policies."${name}-to-${next}"
+            ];
           }
         else
           { }
@@ -67,16 +70,7 @@ in
           (
             { den, ... }:
             {
-              den.schema.root.includes = [
-                (
-                  { x }:
-                  {
-                    funny.names = [ "root-${x}" ];
-                  }
-                )
-              ];
-              den.schema.leaf.includes = [ ];
-              den.schema.root.policies.root-to-leaf =
+              den.policies.root-to-leaf =
                 { x, ... }:
                 let
                   inherit (den.lib.policy) resolve include;
@@ -90,6 +84,16 @@ in
                     }
                   ))
                 ];
+              den.schema.root.includes = [
+                den.policies.root-to-leaf
+                (
+                  { x }:
+                  {
+                    funny.names = [ "root-${x}" ];
+                  }
+                )
+              ];
+              den.schema.leaf.includes = [ ];
             }
           )
         ];

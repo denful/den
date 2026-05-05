@@ -68,8 +68,6 @@
       {
         den.homes.x86_64-linux."tux@igloo" = { };
 
-        den.aspects.tux.includes = [ den.provides.define-user ];
-
         den.aspects.tux.homeManager = args: {
           home.keyboard.model = if args ? osConfig then "os-bound" else "standalone";
         };
@@ -87,6 +85,10 @@
               ))
             ];
           });
+        den.aspects.tux.includes = [
+          den.provides.define-user
+          den.aspects.tux.policies.to-igloo
+        ];
 
         expr = {
           homeSchema = {

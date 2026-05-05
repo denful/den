@@ -112,17 +112,8 @@
         };
       in
       {
-        den.schema.a.includes = [
-          (
-            { tag }:
-            {
-              funny.names = [ "a-${tag}" ];
-            }
-          )
-          shared
-        ];
         den.schema.b.includes = [ ];
-        den.schema.a.policies.a-to-b =
+        den.policies.a-to-b =
           { tag, ... }:
           let
             inherit (den.lib.policy) resolve include;
@@ -137,6 +128,16 @@
             ))
             (include shared)
           ];
+        den.schema.a.includes = [
+          den.policies.a-to-b
+          (
+            { tag }:
+            {
+              funny.names = [ "a-${tag}" ];
+            }
+          )
+          shared
+        ];
         expr = builtins.length (funnyNames (den.lib.resolveEntity "a" { tag = "v"; }));
         expected = 6;
       }

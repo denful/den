@@ -11,47 +11,26 @@ let
     builtins.foldl' (acc: e: fx.bind acc (_: fx.send effect (transform e))) (fx.pure null) effects;
 
   # Emit policy include effects via existing handlers.
-  # Each include is tagged with a stable name (policy + index) for cross-scope dedup.
   policyEmitIncludes =
     effects:
-    let
-      len = builtins.length effects;
-      go =
-        i: acc:
-        if i >= len then
-          acc
-        else
-          let
-            e = builtins.elemAt effects i;
-          in
-          go (i + 1) (
-            fx.bind acc (
-              prev:
-              let
-                policyName = e.__sourcePolicyName or null;
-                tag = if policyName != null then "<policy:${policyName}:${toString i}>" else null;
-                child =
-                  if tag == null then
-                    e.value
-                  else if builtins.isAttrs e.value && !(e.value ? name) then
-                    e.value // { name = tag; }
-                  else if builtins.isFunction e.value then
-                    {
-                      name = tag;
-                      __fn = e.value;
-                      __args = builtins.functionArgs e.value;
-                    }
-                  else
-                    e.value;
-              in
-              fx.bind (fx.send "emit-include" {
-                inherit child;
-                idx = null;
-              }) (r: fx.pure (prev ++ r))
-            )
-          );
-    in
-    go 0 (fx.pure [ ]);
+    builtins.foldl' (
+      acc: e:
+      fx.bind acc (
+        prev:
+        let
+          policyName = e.__sourcePolicyName or null;
+          child =
+            if policyName != null && builtins.isAttrs e.value && !(e.value ? name) then
+              e.value // { name = "<policy:${policyName}>"; }
+            else
+              e.value;
+        in
+        fx.bind (fx.send "emit-include" {
+          inherit child;
+          idx = null;
+        }) (r: fx.pure (prev ++ r))
+      )
+    ) (fx.pure [ ]) effects;
 
   # Emit policy exclude effects.
   policyEmitExcludes = sendEach "register-constraint" (e: {

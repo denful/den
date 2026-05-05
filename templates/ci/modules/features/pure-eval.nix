@@ -78,7 +78,7 @@ in
         );
         entity = ev.config.den.lib.resolveEntity "a" { v = "x"; };
         asp = entity // {
-          includes = entity.includes ++ aIncludes;
+          includes = entity.includes ++ [ ev.config.den.policies.a-to-b ] ++ aIncludes;
         };
         mod = ev.config.den.lib.aspects.resolve "my" asp;
         ev2 = lib.evalModules {
