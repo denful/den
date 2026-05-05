@@ -9,9 +9,7 @@ let
         nodeIdentity = param.identity or "<anon>";
         isRawEntry = param.__rawEntry or false;
         baseIdentity =
-          if isRawEntry then
-            nodeIdentity
-          else if param.isContextDependent or false then
+          if param.isContextDependent or false then
             nodeIdentity
           else
             den.lib.aspects.fx.identity.stripCtxSuffix nodeIdentity;

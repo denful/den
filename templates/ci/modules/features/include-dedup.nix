@@ -272,7 +272,10 @@
         };
       in
       {
-        # Different contexts → different dedup keys → both resolve.
+        # Non-context-dependent aspects with same content dedup even
+        # across different __ctxId values — __ctxId is stripped from
+        # the class-collector dedup identity since it doesn't affect
+        # the module output.
         expr = builtins.length (
           (builtins.foldl' (
             acc: sd:
@@ -282,7 +285,7 @@
             ]
           ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
         );
-        expected = 2;
+        expected = 1;
       }
     );
 
