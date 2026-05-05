@@ -26,3 +26,4 @@ args:
 // (import ./resolve-children.nix args)
 // (import ./compile.nix args)
 // (import ./compile-forward.nix args)
+// (import ./compile-conditional.nix args)
