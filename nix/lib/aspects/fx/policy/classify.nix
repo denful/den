@@ -100,7 +100,23 @@ let
           __sourcePolicyName = r.policyName;
         }
         // lib.optionalAttrs r.isCrossProvider {
-          __policyIncludes = map (e: e.value) r.includeEffects;
+          __policyIncludes = lib.imap0 (
+            i: e:
+            let
+              v = e.value;
+              tag = "<policy:${r.policyName}:${toString i}>";
+            in
+            if builtins.isFunction v then
+              {
+                name = tag;
+                __fn = v;
+                __args = builtins.functionArgs v;
+              }
+            else if builtins.isAttrs v && !(v ? name) then
+              v // { name = tag; }
+            else
+              v
+          ) r.includeEffects;
         }
       ) r.schemaEffects
     ) paired;

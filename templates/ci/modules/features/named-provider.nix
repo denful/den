@@ -132,11 +132,11 @@
         den.schema.size.includes = [ ];
         den.schema.num.includes = [ ];
         den.policies.test-greet-to-yell-fn =
-          { who, __entityKind, ... }:
+          { who, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          lib.optionals (__entityKind == "greet") [
+          [
             (resolve.to "yell" { shout = lib.toUpper who; })
             (include (
               { shout }:
@@ -146,11 +146,11 @@
             ))
           ];
         den.policies.test-greet-to-size =
-          { who, __entityKind, ... }:
+          { who, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          lib.optionals (__entityKind == "greet") [
+          [
             (resolve.to "size" { length = lib.stringLength who; })
             (include (
               { length }:
@@ -160,11 +160,11 @@
             ))
           ];
         den.policies.test-greet-to-num =
-          { who, __entityKind, ... }:
+          { who, ... }:
           let
             inherit (den.lib.policy) resolve include;
           in
-          lib.optionals (__entityKind == "greet") [
+          [
             (resolve.to "num" { number = lib.stringLength who; })
             (include (
               { number }:
