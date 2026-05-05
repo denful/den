@@ -120,12 +120,7 @@ let
     let
       scopeExists = wrappedPerScope ? ${route.sourceScopeId};
       sourceModules =
-        if !scopeExists then
-          builtins.trace
-            "den: route from '${route.fromClass}' — source scope '${route.sourceScopeId}' not found in pipeline (cross-pipeline routing requires fleet scope)"
-            [ ]
-        else
-          wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
+        if !scopeExists then [ ] else wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
       adapterMod = route.adapterModule or null;
       modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
       isFlakeRoute = route.intoClass == "flake";

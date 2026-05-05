@@ -140,9 +140,7 @@ let
       validatorMod = buildValidatorModule { inherit class nodeIdentity result; };
     in
     if result.unsatisfied or false then
-      builtins.trace
-        "den: class module ${class}@${nodeIdentity} skipped — context never provided: ${toString result.missingArgs}"
-        [ ]
+      [ ]
     else
       [ wrappedMod ] ++ lib.optional (result ? validator) validatorMod;
 
