@@ -76,6 +76,20 @@
         result = fx.handle {
           handlers =
             handlers.compileConditionalHandler
+            // handlers.resolveHandler
+            // handlers.compileHandler
+            // handlers.gateHandler
+            // handlers.compileStaticHandler
+            // handlers.compileParametricHandler
+            // handlers.compileForwardHandler
+            // handlers.bindHandler
+            // handlers.deferHandler
+            // handlers.drainHandler
+            // handlers.classifyHandler
+            // handlers.emitClassesHandler
+            // handlers.resolveChildrenHandler
+            // handlers.checkDedupHandler
+            // handlers.chainHandler
             // identity.pathSetHandler
             // identity.collectPathsHandler
             // stubs;
@@ -264,6 +278,20 @@
         result = fx.handle {
           handlers =
             handlers.compileConditionalHandler
+            // handlers.resolveHandler
+            // handlers.compileHandler
+            // handlers.gateHandler
+            // handlers.compileStaticHandler
+            // handlers.compileParametricHandler
+            // handlers.compileForwardHandler
+            // handlers.bindHandler
+            // handlers.deferHandler
+            // handlers.drainHandler
+            // handlers.classifyHandler
+            // handlers.emitClassesHandler
+            // handlers.resolveChildrenHandler
+            // handlers.checkDedupHandler
+            // handlers.chainHandler
             // identity.pathSetHandler
             // identity.collectPathsHandler
             // stubs;

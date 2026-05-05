@@ -21,6 +21,19 @@ let
     // den.lib.aspects.fx.handlers.resolveParametricHandler
     // den.lib.aspects.fx.handlers.resolveAspectHandler
     // den.lib.aspects.fx.handlers.constraintRegistryHandler
+    // den.lib.aspects.fx.handlers.resolveHandler
+    // den.lib.aspects.fx.handlers.compileHandler
+    // den.lib.aspects.fx.handlers.gateHandler
+    // den.lib.aspects.fx.handlers.compileStaticHandler
+    // den.lib.aspects.fx.handlers.compileParametricHandler
+    // den.lib.aspects.fx.handlers.compileConditionalHandler
+    // den.lib.aspects.fx.handlers.compileForwardHandler
+    // den.lib.aspects.fx.handlers.bindHandler
+    // den.lib.aspects.fx.handlers.deferHandler
+    // den.lib.aspects.fx.handlers.drainHandler
+    // den.lib.aspects.fx.handlers.classifyHandler
+    // den.lib.aspects.fx.handlers.emitClassesHandler
+    // den.lib.aspects.fx.handlers.resolveChildrenHandler
     // {
       # Fallback probe-arg for custom handler sets without constantHandler.
       "probe-arg" =

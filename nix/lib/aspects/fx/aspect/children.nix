@@ -1,4 +1,4 @@
-# Walk an aspect's includes list — classify each child and dispatch to handlers.
+# Walk an aspect's includes list — send each child through the resolve chain.
 {
   lib,
   den,
@@ -17,84 +17,6 @@ let
     in
     "${parent}/<anon>:${toString idx}${suffix}";
 
-  excludeChild =
-    child: owner: dedupKey:
-    let
-      tombstone = identity.tombstone child { excludedFrom = owner; };
-    in
-    fx.bind (fx.send "resolve-complete" tombstone) (
-      _:
-      if dedupKey == null then
-        fx.pure [ tombstone ]
-      else
-        fx.bind (fx.send "include-unseen" dedupKey) (_: fx.pure [ tombstone ])
-    );
-
-  substituteChild =
-    child: decision:
-    let
-      tombstone = identity.tombstone child {
-        excludedFrom = decision.owner;
-        replacedBy = decision.replacement.name or "<anon>";
-      };
-    in
-    fx.bind (fx.send "resolve-complete" tombstone) (
-      _:
-      fx.bind (den.lib.aspects.fx.aspect.aspectToEffect decision.replacement) (
-        resolved:
-        fx.pure [
-          tombstone
-          resolved
-        ]
-      )
-    );
-
-  tagConstraintOwner =
-    child: decision:
-    let
-      owner = decision.owner or null;
-    in
-    if owner != null then
-      child
-      // {
-        meta = (child.meta or { }) // {
-          constraintOwner = owner;
-        };
-      }
-    else
-      child;
-
-  dispatchChild =
-    child: dedupKey:
-    let
-      isConditional = builtins.isAttrs child && child ? meta && child.meta ? guard;
-      isForward =
-        builtins.isAttrs child && child ? meta && builtins.isAttrs child.meta && child.meta ? __forward;
-      isParametric = (child.__args or { }) != { };
-    in
-    if isForward then
-      fx.bind (fx.send "emit-forward" child.meta.__forward) (_: fx.pure [ ])
-    else if isConditional then
-      fx.send "resolve-conditional" child
-    else
-      fx.bind
-        (fx.send "check-constraint" {
-          identity = identity.key child;
-          aspect = child;
-        })
-        (
-          decision:
-          if decision.action == "exclude" then
-            excludeChild child decision.owner dedupKey
-          else if decision.action == "substitute" then
-            substituteChild child decision
-          else
-            let
-              tagged = tagConstraintOwner child decision;
-            in
-            if isParametric then fx.send "resolve-parametric" tagged else fx.send "resolve-aspect" tagged
-        );
-
   propagateScope =
     parentScopeHandlers: parentCtxId: child:
     child
@@ -107,9 +29,11 @@ let
 
   dedupAndDispatch =
     child:
-    fx.bind (fx.send "check-dedup" child) (
-      { isDuplicate, dedupKey }: if isDuplicate then fx.pure [ ] else dispatchChild child dedupKey
-    );
+    fx.send "resolve" {
+      aspect = child;
+      identity = identity.key child;
+      ctx = { };
+    };
 
   processInclude =
     {

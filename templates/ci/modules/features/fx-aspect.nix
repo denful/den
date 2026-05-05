@@ -14,8 +14,31 @@ let
     den:
     let
       fx = den.lib.fx;
+      handlers = den.lib.aspects.fx.handlers;
     in
-    {
+    handlers.includeHandler
+    // handlers.checkDedupHandler
+    // handlers.resolveConditionalHandler
+    // handlers.resolveParametricHandler
+    // handlers.resolveAspectHandler
+    // handlers.constraintRegistryHandler
+    // handlers.chainHandler
+    // den.lib.aspects.fx.identity.pathSetHandler
+    // den.lib.aspects.fx.identity.collectPathsHandler
+    // handlers.resolveHandler
+    // handlers.compileHandler
+    // handlers.gateHandler
+    // handlers.compileStaticHandler
+    // handlers.compileParametricHandler
+    // handlers.compileConditionalHandler
+    // handlers.compileForwardHandler
+    // handlers.bindHandler
+    // handlers.deferHandler
+    // handlers.drainHandler
+    // handlers.classifyHandler
+    // handlers.emitClassesHandler
+    // handlers.resolveChildrenHandler
+    // {
       "emit-class" =
         { param, state }:
         {
@@ -23,47 +46,6 @@ let
           state = state // {
             classes = (state.classes or [ ]) ++ [ param ];
           };
-        };
-      "emit-include" =
-        { param, state }:
-        {
-          # For these tests, just return the child as-is (no recursive resolution).
-          # emitIncludes sends { child, idx } — extract the child.
-          resume = [ (param.child or param) ];
-          inherit state;
-        };
-      # check-dedup: never report duplicates in unit tests.
-      "check-dedup" =
-        { param, state }:
-        {
-          resume = {
-            isDuplicate = false;
-            dedupKey = null;
-          };
-          inherit state;
-        };
-      # check-constraint: always keep.
-      "check-constraint" =
-        { param, state }:
-        {
-          resume = {
-            action = "keep";
-          };
-          inherit state;
-        };
-      # resolve-aspect: return param as-is (no recursive resolution).
-      "resolve-aspect" =
-        { param, state }:
-        {
-          resume = fx.pure [ param ];
-          inherit state;
-        };
-      # resolve-parametric: return param as-is.
-      "resolve-parametric" =
-        { param, state }:
-        {
-          resume = fx.pure [ param ];
-          inherit state;
         };
       "register-constraint" =
         { param, state }:
@@ -73,18 +55,6 @@ let
             constraints = (state.constraints or [ ]) ++ [ param ];
           };
         };
-      "chain-push" =
-        { param, state }:
-        {
-          resume = null;
-          inherit state;
-        };
-      "chain-pop" =
-        { param, state }:
-        {
-          resume = null;
-          inherit state;
-        };
       "resolve-complete" =
         { param, state }:
         {
@@ -93,6 +63,14 @@ let
         };
     }
     // fx.effects.state.handler;
+
+  defaultState = {
+    currentScope = "__test";
+    scopedIncludesChain = _: { };
+    scopedConstraintRegistry = _: { };
+    scopedConstraintFilters = _: { };
+    paths = [ ];
+  };
 in
 {
   flake.tests.fx-aspect = {
@@ -112,7 +90,7 @@ in
         comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
         result = den.lib.fx.handle {
           handlers = mkCollectHandlers den;
-          state = { };
+          state = defaultState;
         } comp;
       in
       {
@@ -151,7 +129,7 @@ in
         comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
         result = den.lib.fx.handle {
           handlers = mkCollectHandlers den;
-          state = { };
+          state = defaultState;
         } comp;
         classNames = map (c: c.class) result.state.classes;
       in
@@ -193,7 +171,7 @@ in
                 inherit state;
               };
           };
-          state = { };
+          state = defaultState;
         } comp;
       in
       {
@@ -229,7 +207,7 @@ in
         comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
         result = den.lib.fx.handle {
           handlers = mkCollectHandlers den;
-          state = { };
+          state = defaultState;
         } comp;
       in
       {
@@ -271,7 +249,7 @@ in
         comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
         result = den.lib.fx.handle {
           handlers = mkCollectHandlers den;
-          state = { };
+          state = defaultState;
         } comp;
       in
       {
@@ -310,7 +288,7 @@ in
         comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
         result = den.lib.fx.handle {
           handlers = mkCollectHandlers den;
-          state = { };
+          state = defaultState;
         } comp;
       in
       {

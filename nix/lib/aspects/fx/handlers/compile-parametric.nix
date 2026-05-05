@@ -76,10 +76,11 @@ in
                     (
                       bindResult:
                       if bindResult ? value then
-                        # Re-enter resolution with the compiled result
+                        # Re-enter resolution (gated = true skips gate on re-entry)
                         fx.send "resolve" {
                           aspect = bindResult.value;
                           inherit (param) identity ctx;
+                          gated = true;
                         }
                       else
                         # Deferred — no resolution possible

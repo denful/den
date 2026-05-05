@@ -22,6 +22,19 @@ let
     // handlers.chainHandler
     // den.lib.aspects.fx.identity.pathSetHandler
     // den.lib.aspects.fx.identity.collectPathsHandler
+    // handlers.resolveHandler
+    // handlers.compileHandler
+    // handlers.gateHandler
+    // handlers.compileStaticHandler
+    // handlers.compileParametricHandler
+    // handlers.compileConditionalHandler
+    // handlers.compileForwardHandler
+    // handlers.bindHandler
+    // handlers.deferHandler
+    // handlers.drainHandler
+    // handlers.classifyHandler
+    // handlers.emitClassesHandler
+    // handlers.resolveChildrenHandler
     // {
       "emit-class" =
         { param, state }:

@@ -57,65 +57,71 @@ in
       in
       {
         resume =
-          # Step 1: gate check (dedup + constraint)
-          fx.bind
-            (fx.send "gate" {
-              inherit aspect;
-              inherit (param) identity ctx;
-            })
-            (
-              gateResult:
-              if gateResult ? blocked then
-                fx.pure gateResult.result
+          let
+            alreadyGated = param.gated or false;
+            gateOrSkip =
+              if alreadyGated then
+                fx.pure { passed = true; }
               else
-                let
-                  # Tag constraint owner if present
-                  tagged =
-                    if (gateResult ? owner) && gateResult.owner != null then
-                      aspect
-                      // {
-                        meta = (aspect.meta or { }) // {
-                          constraintOwner = gateResult.owner;
-                        };
-                      }
-                    else
-                      aspect;
-                in
-                # Step 2: probe for class handler, classify, emit, nest, resolve-children
-                fx.bind (fx.effects.hasHandler "class") (
-                  hasClassHandler:
-                  fx.bind (if hasClassHandler then fx.send "class" null else fx.pure null) (
-                    targetClass:
-                    fx.bind
-                      (fx.send "classify" {
-                        aspect = tagged;
-                        inherit targetClass;
-                      })
-                      (
-                        classified:
-                        fx.bind
-                          (fx.seq (
-                            [
-                              (fx.send "emit-classes" {
-                                aspect = tagged;
-                                classKeys = classified.classKeys;
-                                identity = nodeIdentity;
-                              })
-                              (registerConstraints tagged)
-                            ]
-                            ++ map (emitNestedAspect tagged (param.ctx or { })) classified.nestedKeys
-                          ))
-                          (
-                            _:
-                            fx.bind (fx.send "resolve-children" {
+                fx.send "gate" {
+                  inherit aspect;
+                  inherit (param) identity ctx;
+                };
+          in
+          # Step 1: gate check (dedup + constraint) — skipped on parametric re-entry
+          fx.bind gateOrSkip (
+            gateResult:
+            if gateResult ? blocked then
+              fx.pure gateResult.result
+            else
+              let
+                # Tag constraint owner if present
+                tagged =
+                  if (gateResult ? owner) && gateResult.owner != null then
+                    aspect
+                    // {
+                      meta = (aspect.meta or { }) // {
+                        constraintOwner = gateResult.owner;
+                      };
+                    }
+                  else
+                    aspect;
+              in
+              # Step 2: probe for class handler, classify, emit, nest, resolve-children
+              fx.bind (fx.effects.hasHandler "class") (
+                hasClassHandler:
+                fx.bind (if hasClassHandler then fx.send "class" null else fx.pure null) (
+                  targetClass:
+                  fx.bind
+                    (fx.send "classify" {
+                      aspect = tagged;
+                      inherit targetClass;
+                    })
+                    (
+                      classified:
+                      fx.bind
+                        (fx.seq (
+                          [
+                            (fx.send "emit-classes" {
                               aspect = tagged;
-                              inherit isMeaningful chainIdentity;
-                            }) (resolved: fx.pure [ resolved ])
-                          )
-                      )
-                  )
+                              classKeys = classified.classKeys;
+                              identity = nodeIdentity;
+                            })
+                            (registerConstraints tagged)
+                          ]
+                          ++ map (emitNestedAspect tagged (param.ctx or { })) classified.nestedKeys
+                        ))
+                        (
+                          _:
+                          fx.bind (fx.send "resolve-children" {
+                            aspect = tagged;
+                            inherit isMeaningful chainIdentity;
+                          }) (resolved: fx.pure [ resolved ])
+                        )
+                    )
                 )
-            );
+              )
+          );
         inherit state;
       };
   };
