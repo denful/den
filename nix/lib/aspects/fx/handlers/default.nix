@@ -21,4 +21,8 @@ args:
 // (import ./bind.nix args)
 // (import ./defer.nix args)
 // (import ./drain.nix args)
+// (import ./classify.nix args)
+// (import ./emit-classes.nix args)
+// (import ./resolve-children.nix args)
 // (import ./compile.nix args)
+// (import ./compile-forward.nix args)
