@@ -183,7 +183,11 @@ let
     lib.types.mkOptionType {
       name = "provider";
       description = "aspect or function returning aspect";
-      check = v: builtins.isAttrs v || lib.isFunction v;
+      check =
+        v:
+        builtins.isAttrs v
+        || lib.isFunction v
+        || (builtins.isList v && builtins.all (i: builtins.isAttrs i && i.__isPolicy or false) v);
       # Merge dispatch:
       #   parametric wrappers (__fn/__args) → single: preserve wrapper; multi: coerce to includes
       #   mixed fns + attrsets → coerce parametric fns to { includes = [fn]; }
@@ -194,9 +198,13 @@ let
       merge =
         loc: defs:
         let
+          listDefs = builtins.filter (d: builtins.isList d.value) defs;
           policyDefs = builtins.filter (d: builtins.isAttrs d.value && d.value.__isPolicy or false) defs;
         in
-        if policyDefs != [ ] then
+        # Policy list (from policy.when/policy.for with list input) — pass through as-is.
+        if listDefs != [ ] then
+          (builtins.head listDefs).value
+        else if policyDefs != [ ] then
           let
             p = (builtins.head policyDefs).value;
           in

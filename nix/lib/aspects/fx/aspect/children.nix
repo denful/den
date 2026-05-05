@@ -35,6 +35,16 @@ let
       ctx = { };
     };
 
+  # Route a single __isPolicy value to the policy registry.
+  registerPolicy =
+    p:
+    fx.send "register-aspect-policy" {
+      inherit (p) name fn;
+      ownerIdentity = identity.key p;
+    };
+
+  isPolicy = v: builtins.isAttrs v && v.__isPolicy or false;
+
   processInclude =
     {
       parentScopeHandlers,
@@ -42,20 +52,38 @@ let
       skipNameAnon,
     }:
     idx: rawChild:
-    let
-      withScope = propagateScope parentScopeHandlers parentCtxId (wrapChild rawChild);
-    in
-    fx.bind fx.effects.state.get (
-      state:
+    # Route policy values to register-aspect-policy instead of aspect walk.
+    if isPolicy rawChild then
+      registerPolicy rawChild
+    else if builtins.isList rawChild then
       let
-        child =
-          if !skipNameAnon && !(isMeaningfulName (withScope.name or "<anon>")) then
-            withScope // { name = nameAnon state idx (withScope.__ctxId or null); }
-          else
-            withScope;
+        policyItems = builtins.filter isPolicy rawChild;
+        nonPolicyItems = builtins.filter (item: !isPolicy item) rawChild;
+        recurse = processInclude { inherit parentScopeHandlers parentCtxId skipNameAnon; };
       in
-      dedupAndDispatch child
-    );
+      fx.bind (fx.seq (map registerPolicy policyItems)) (
+        _:
+        if nonPolicyItems == [ ] then
+          fx.pure [ ]
+        else
+          fx.seq (lib.imap0 (i: item: recurse (idx * 100 + i) item) nonPolicyItems)
+      )
+    else
+      # Existing behavior: wrap and dispatch as aspect.
+      let
+        withScope = propagateScope parentScopeHandlers parentCtxId (wrapChild rawChild);
+      in
+      fx.bind fx.effects.state.get (
+        state:
+        let
+          child =
+            if !skipNameAnon && !(isMeaningfulName (withScope.name or "<anon>")) then
+              withScope // { name = nameAnon state idx (withScope.__ctxId or null); }
+            else
+              withScope;
+        in
+        dedupAndDispatch child
+      );
 
   emitIncludes =
     {
