@@ -92,9 +92,7 @@ let
         currentCtx = scopeCtx // ctx;
         dispatchKey = "${entityKind}@${scope}";
         alreadyDispatched = ((state.dispatchedPolicies or (_: { })) null) ? ${dispatchKey};
-        globalPolicies = den.policies or { };
-        schemaPolicies = (den.schema.${entityKind} or { }).policies or { };
-        allDirectPolicies = globalPolicies // schemaPolicies;
+        allDirectPolicies = { };
         aspectPolicies = state.flatAspectPolicies or { };
         resolveCtx = currentCtx // {
           __entityKind = entityKind;
