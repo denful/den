@@ -10,16 +10,8 @@
         ...
       }:
       {
-        den.schema.greeting.includes = [
-          (
-            { hello }:
-            {
-              funny.names = [ hello ];
-            }
-          )
-        ];
         den.schema.shout.includes = [ ];
-        den.schema.greeting.policies.test-greeting-to-shout =
+        den.policies.test-greeting-to-shout =
           { hello, ... }:
           let
             inherit (den.lib.policy) resolve include;
@@ -33,6 +25,15 @@
               }
             ))
           ];
+        den.schema.greeting.includes = [
+          (
+            { hello }:
+            {
+              funny.names = [ hello ];
+            }
+          )
+          den.policies.test-greeting-to-shout
+        ];
         expr = funnyNames (den.lib.resolveEntity "greeting" { hello = "world"; });
         expected = [
           "WORLD"

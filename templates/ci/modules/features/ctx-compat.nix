@@ -38,7 +38,7 @@
 
         den.schema.test-into-target.includes = [ ];
 
-        den.schema.host.policies.host-to-into-target =
+        den.policies.host-to-into-target =
           _:
           let
             inherit (den.lib.policy) include;
@@ -46,6 +46,8 @@
           [
             (include { nixos.users.users.tux.description = "from-into-target"; })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-into-target ];
         expr = igloo.users.users.tux.description;
         expected = "from-into-target";
       }

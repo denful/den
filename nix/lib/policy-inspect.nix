@@ -50,6 +50,10 @@ let
       routing = if kind == targetKey then "sibling" else "child";
     };
 
+  # Unwrap policy registry entries to raw functions.
+  unwrapPolicy =
+    policy: if builtins.isAttrs policy && policy.__isPolicy or false then policy.fn else policy;
+
   # Inspect all applicable policies for a given entity kind and context.
   # Returns: { policyName = { targetKey, targets, from, to, as, routing }; }
   #
@@ -59,11 +63,11 @@ let
     let
       policies = den.policies or { };
       matching = lib.filterAttrs (
-        _: policy: resolveArgsSatisfied policy (context // { __entityKind = kind; })
+        _: policy: resolveArgsSatisfied (unwrapPolicy policy) (context // { __entityKind = kind; })
       ) policies;
     in
     lib.mapAttrs (
-      _name: policy: inspectPolicy policy (context // { __entityKind = kind; }) kind
+      _name: policy: inspectPolicy (unwrapPolicy policy) (context // { __entityKind = kind; }) kind
     ) matching;
 in
 {

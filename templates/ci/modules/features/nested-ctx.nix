@@ -9,7 +9,7 @@
       {
         den.schema.flat.includes = [ ];
 
-        den.schema.root.policies.test-root-to-flat =
+        den.policies.test-root-to-flat =
           { ... }@ctx:
           let
             inherit (den.lib.policy) resolve include;
@@ -23,6 +23,7 @@
               }
             ))
           ];
+        den.schema.root.includes = [ den.policies.test-root-to-flat ];
         expr = funnyNames (den.lib.resolveEntity "root" { x = "hi"; });
         expected = [ "hi" ];
       }
@@ -40,54 +41,39 @@
           )
         ];
 
-        imports = [
-          (
-            { den, ... }:
-            {
-              den.schema.root.policies.test-root-to-leaf-a =
-                _:
-                let
-                  inherit (den.lib.policy) resolve;
-                in
-                [ (resolve.to "leaf" { v = "a"; }) ];
-            }
-          )
+        den.policies.test-root-to-leaf-a =
+          _:
+          let
+            inherit (den.lib.policy) resolve;
+          in
+          [ (resolve.to "leaf" { v = "a"; }) ];
 
-          (
-            { den, ... }:
-            {
-              den.schema.root.policies.test-root-to-leaf-b =
-                _:
-                let
-                  inherit (den.lib.policy) resolve;
-                in
-                [ (resolve.to "leaf" { v = "b"; }) ];
-            }
-          )
+        den.policies.test-root-to-leaf-b =
+          _:
+          let
+            inherit (den.lib.policy) resolve;
+          in
+          [ (resolve.to "leaf" { v = "b"; }) ];
 
-          (
-            { den, ... }:
-            {
-              den.schema.root.policies.test-root-to-leaf-c =
-                _:
-                let
-                  inherit (den.lib.policy) resolve;
-                in
-                [ (resolve.to "leaf" { v = "c"; }) ];
-            }
-          )
+        den.policies.test-root-to-leaf-c =
+          _:
+          let
+            inherit (den.lib.policy) resolve;
+          in
+          [ (resolve.to "leaf" { v = "c"; }) ];
 
-          (
-            { den, ... }:
-            {
-              den.schema.root.policies.test-root-to-leaf-d =
-                _:
-                let
-                  inherit (den.lib.policy) resolve;
-                in
-                [ (resolve.to "leaf" { v = "d"; }) ];
-            }
-          )
+        den.policies.test-root-to-leaf-d =
+          _:
+          let
+            inherit (den.lib.policy) resolve;
+          in
+          [ (resolve.to "leaf" { v = "d"; }) ];
+
+        den.schema.root.includes = [
+          den.policies.test-root-to-leaf-a
+          den.policies.test-root-to-leaf-b
+          den.policies.test-root-to-leaf-c
+          den.policies.test-root-to-leaf-d
         ];
 
         expr = funnyNames (den.lib.resolveEntity "root" { });

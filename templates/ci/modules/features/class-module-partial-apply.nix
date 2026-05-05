@@ -12,7 +12,7 @@
 
         den.schema.test-flat.includes = [ ];
 
-        den.schema.host.policies.host-to-test-flat =
+        den.policies.host-to-test-flat =
           _:
           let
             inherit (den.lib.policy) include;
@@ -26,6 +26,8 @@
                 };
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-test-flat ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -42,7 +44,7 @@
 
         den.schema.test-twolayer.includes = [ ];
 
-        den.schema.host.policies.host-to-test-twolayer =
+        den.policies.host-to-test-twolayer =
           _:
           let
             inherit (den.lib.policy) include;
@@ -60,6 +62,8 @@
             ))
           ];
 
+        den.schema.host.includes = [ den.policies.host-to-test-twolayer ];
+
         expr = igloo.networking.hostName;
         expected = "igloo";
       }
@@ -75,7 +79,7 @@
 
         den.schema.test-multi-args.includes = [ ];
 
-        den.schema.host.policies.host-to-test-multi-args =
+        den.policies.host-to-test-multi-args =
           {
             host,
             ...
@@ -98,6 +102,8 @@
                 };
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-test-multi-args ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";
@@ -139,7 +145,7 @@
 
         den.schema.test-functor.includes = [ ];
 
-        den.schema.host.policies.host-to-test-functor =
+        den.policies.host-to-test-functor =
           _:
           let
             inherit (den.lib.policy) include;
@@ -158,6 +164,8 @@
             })
           ];
 
+        den.schema.host.includes = [ den.policies.host-to-test-functor ];
+
         expr = igloo.networking.hostName;
         expected = "from-functor";
       }
@@ -174,7 +182,7 @@
 
         den.schema.test-funcargs.includes = [ ];
 
-        den.schema.host.policies.host-to-test-funcargs =
+        den.policies.host-to-test-funcargs =
           _:
           let
             inherit (den.lib.policy) include;
@@ -194,6 +202,8 @@
                 };
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-test-funcargs ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo";
@@ -258,7 +268,7 @@
 
         den.schema.test-static-flat.includes = [ ];
 
-        den.schema.host.policies.host-to-test-static-flat =
+        den.policies.host-to-test-static-flat =
           _:
           let
             inherit (den.lib.policy) include;
@@ -266,6 +276,8 @@
           [
             (include den.aspects.static-flat)
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-test-static-flat ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -282,7 +294,7 @@
 
         den.schema.test-cross-param.includes = [ ];
 
-        den.schema.host.policies.host-to-test-cross-param =
+        den.policies.host-to-test-cross-param =
           {
             host,
             ...
@@ -304,6 +316,8 @@
             ))
           ];
 
+        den.schema.host.includes = [ den.policies.host-to-test-cross-param ];
+
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";
       }
@@ -319,7 +333,7 @@
 
         den.schema.test-paren.includes = [ ];
 
-        den.schema.host.policies.host-to-test-paren =
+        den.policies.host-to-test-paren =
           _:
           let
             inherit (den.lib.policy) include;
@@ -338,6 +352,8 @@
             ))
           ];
 
+        den.schema.host.includes = [ den.policies.host-to-test-paren ];
+
         expr = igloo.networking.hostName;
         expected = "igloo";
       }
@@ -353,7 +369,7 @@
 
         den.schema.test-full-apply.includes = [ ];
 
-        den.schema.host.policies.host-to-test-full-apply =
+        den.policies.host-to-test-full-apply =
           _:
           let
             inherit (den.lib.policy) include;
@@ -370,6 +386,8 @@
                 );
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-test-full-apply ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -423,7 +441,7 @@
 
         den.schema.test-collision-err-int.includes = [ ];
 
-        den.schema.host.policies.host-to-collision-err-int =
+        den.policies.host-to-collision-err-int =
           _:
           let
             inherit (den.lib.policy) include;
@@ -438,6 +456,8 @@
                 };
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-collision-err-int ];
 
         # The throw from the validator propagates when any part of igloo
         # config that depends on warnings is accessed. tryEval catches it.
@@ -455,7 +475,7 @@
 
         den.schema.test-collision-dw.includes = [ ];
 
-        den.schema.host.policies.host-to-collision-dw =
+        den.policies.host-to-collision-dw =
           _:
           let
             inherit (den.lib.policy) include;
@@ -470,6 +490,8 @@
                 };
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-collision-dw ];
 
         # Den value wins — host is the den entity, not the string.
         expr = igloo.networking.hostName;
@@ -486,7 +508,7 @@
 
         den.schema.test-collision-global.includes = [ ];
 
-        den.schema.host.policies.host-to-collision-global =
+        den.policies.host-to-collision-global =
           _:
           let
             inherit (den.lib.policy) include;
@@ -501,6 +523,8 @@
                 };
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-collision-global ];
 
         expr = igloo.networking.hostName;
         expected = "igloo";
@@ -516,7 +540,7 @@
 
         den.schema.test-collision-cw.includes = [ ];
 
-        den.schema.host.policies.host-to-collision-cw =
+        den.policies.host-to-collision-cw =
           _:
           let
             inherit (den.lib.policy) include;
@@ -531,6 +555,8 @@
                 };
             })
           ];
+
+        den.schema.host.includes = [ den.policies.host-to-collision-cw ];
 
         expr = igloo.networking.hostName;
         expected = "from-module-system";

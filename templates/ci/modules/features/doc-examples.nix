@@ -99,7 +99,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
 
-        den.schema.host.policies.host-to-peers =
+        den.policies.host-to-peers =
           {
             host,
             ...
@@ -107,6 +107,8 @@
           map (h: den.lib.policy.resolve { host = h; }) (
             lib.filter (h: h.hostName != host.hostName) (lib.attrValues den.hosts.x86_64-linux)
           );
+
+        den.schema.host.includes = [ den.policies.host-to-peers ];
 
         expr =
           let
