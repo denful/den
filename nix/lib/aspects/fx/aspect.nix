@@ -311,5 +311,10 @@ in
     structuralKeysSet
     wrapClassModule
     ctxFromHandlers
+    mkParametricBase
+    mkParametricNext
+    tagParametricResult
+    prepareParametricFn
+    maxParametricDepth
     ;
 }
