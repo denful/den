@@ -28,3 +28,4 @@ args:
 // (import ./compile-forward.nix args)
 // (import ./compile-conditional.nix args)
 // (import ./compile-parametric.nix args)
+// (import ./compile-static.nix args)
