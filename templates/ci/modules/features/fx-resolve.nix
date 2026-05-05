@@ -444,8 +444,8 @@
       }
     );
 
-    # Missing required arg produces readable error.
-    test-missing-arg-throws = denTest (
+    # Missing required arg defers the aspect (returns empty resolution).
+    test-missing-arg-defers = denTest (
       { den, ... }:
       let
         fx = den.lib.fx;
@@ -466,13 +466,7 @@
           identity = den.lib.aspects.fx.identity.key aspect;
           ctx = { };
         };
-      in
-      {
-        expectedError = {
-          type = "ThrownError";
-          msg = "host";
-        };
-        expr = fx.handle {
+        result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
             ctx = {
@@ -481,6 +475,10 @@
           };
           state = den.lib.aspects.fx.pipeline.defaultState;
         } comp;
+      in
+      {
+        expr = result.value;
+        expected = [ ];
       }
     );
 
