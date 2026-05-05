@@ -27,6 +27,12 @@ let
     registerConstraints
     ;
 
+  enterScope =
+    handlers: computation:
+    fx.effects.scope.provide handlers (
+      fx.bind (fx.send "scope-widened" { ctx = ctxFromHandlers handlers; }) (_: computation)
+    );
+
   installPolicies =
     (import ./policy { inherit lib den; } { inherit aspectToEffect ctxFromHandlers; }).installPolicies;
 
@@ -311,6 +317,7 @@ in
     structuralKeysSet
     wrapClassModule
     ctxFromHandlers
+    enterScope
     mkParametricBase
     mkParametricNext
     tagParametricResult
