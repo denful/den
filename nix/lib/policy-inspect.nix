@@ -57,9 +57,7 @@ let
   inspect =
     { kind, context }:
     let
-      globalPolicies = den.policies or { };
-      schemaPolicies = (den.schema.${kind} or { }).policies or { };
-      policies = globalPolicies // schemaPolicies;
+      policies = den.policies or { };
       matching = lib.filterAttrs (
         _: policy: resolveArgsSatisfied policy (context // { __entityKind = kind; })
       ) policies;

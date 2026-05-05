@@ -21,6 +21,8 @@ in
   # Replaces os-host-fwd and os-user-fwd forward aspects.
   # Fires in every scope where host is bound (including user scopes),
   # routing per-scope os content to the host's target class.
+  den.default.includes = [ den.policies.os-to-host ];
+
   den.policies.os-to-host =
     { host, ... }:
     lib.optional

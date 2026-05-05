@@ -1,4 +1,4 @@
-# Flake output policies — schema-scoped, no __entityKind guards.
+# Flake output policies — activated via schema includes.
 {
   den,
   lib,
@@ -19,6 +19,22 @@ let
 
   has-flake-output =
     output: ((options.flake.type.getSubOptions or (_: options.flake)) { }) ? ${output};
+
+  mkOutputPolicy =
+    output:
+    { system, ... }:
+    lib.optional (has-flake-output output) (
+      den.lib.policy.route {
+        fromClass = output;
+        intoClass = "flake";
+        path = [
+          "flake"
+          output
+          system
+        ];
+        adaptArgs = _: { pkgs = inputs.nixpkgs.legacyPackages.${system}; };
+      }
+    );
 in
 {
   # Register system output names as classes so aspect keys dispatch correctly.
@@ -29,47 +45,41 @@ in
     }) systemOutputs
   );
 
+  # All policies defined as individual attributes.
   # flake -> flake-system: fan out per system
-  den.schema.flake.policies.to-systems =
+  den.policies.to-systems =
     _: map (system: resolve.to "flake-system" { inherit system; }) den.systems;
 
-  # flake-system -> OS/HM outputs + per-output routes
-  den.schema.flake-system.policies = {
-    to-os-outputs =
-      { system, ... }:
-      let
-        hosts = den.hosts.${system} or { };
-      in
-      lib.concatMap (host: lib.optional (host.intoAttr != [ ]) (den.lib.policy.instantiate host)) (
-        builtins.attrValues hosts
-      );
+  # flake-system -> OS/HM outputs
+  den.policies.to-os-outputs =
+    { system, ... }:
+    let
+      hosts = den.hosts.${system} or { };
+    in
+    lib.concatMap (host: lib.optional (host.intoAttr != [ ]) (den.lib.policy.instantiate host)) (
+      builtins.attrValues hosts
+    );
 
-    to-hm-outputs =
-      { system, ... }:
-      let
-        homes = den.homes.${system} or { };
-      in
-      lib.concatMap (home: lib.optional (home.intoAttr != [ ]) (den.lib.policy.instantiate home)) (
-        builtins.attrValues homes
-      );
-  }
-  // lib.listToAttrs (
-    map (output: {
-      name = "to-${output}";
-      value =
-        { system, ... }:
-        lib.optional (has-flake-output output) (
-          den.lib.policy.route {
-            fromClass = output;
-            intoClass = "flake";
-            path = [
-              "flake"
-              output
-              system
-            ];
-            adaptArgs = _: { pkgs = inputs.nixpkgs.legacyPackages.${system}; };
-          }
-        );
-    }) systemOutputs
-  );
+  den.policies.to-hm-outputs =
+    { system, ... }:
+    let
+      homes = den.homes.${system} or { };
+    in
+    lib.concatMap (home: lib.optional (home.intoAttr != [ ]) (den.lib.policy.instantiate home)) (
+      builtins.attrValues homes
+    );
+
+  # Per-output route policies
+  den.policies.to-packages = mkOutputPolicy "packages";
+  den.policies.to-apps = mkOutputPolicy "apps";
+  den.policies.to-checks = mkOutputPolicy "checks";
+  den.policies.to-devShells = mkOutputPolicy "devShells";
+  den.policies.to-legacyPackages = mkOutputPolicy "legacyPackages";
+
+  den.schema.flake.includes = [ den.policies.to-systems ];
+  den.schema.flake-system.includes = [
+    den.policies.to-os-outputs
+    den.policies.to-hm-outputs
+  ]
+  ++ map (output: den.policies."to-${output}") systemOutputs;
 }

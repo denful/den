@@ -47,13 +47,6 @@ let
             else
               [ ]
           ) defs;
-          allPolicies = builtins.foldl' (
-            acc: d:
-            if builtins.isAttrs d.value && d.value ? policies && builtins.isAttrs d.value.policies then
-              acc // d.value.policies
-            else
-              acc
-          ) { } defs;
           strippedDefs = map (
             d:
             if builtins.isAttrs d.value then
@@ -174,14 +167,12 @@ let
                 ];
               };
             includes = allIncludes;
-            policies = allPolicies;
             isEntity = hasStructuralContent;
           }
         else
           {
             __functor = _: { ... }: merged;
             includes = [ ];
-            policies = allPolicies;
             isEntity = false;
           };
     };

@@ -38,6 +38,8 @@ in
   # can reference the parent NixOS/Darwin config.
   # The route's ensureEntry mechanism creates users.users.<name> even
   # when no user-class content exists (home-manager references the entry).
+  den.default.includes = [ den.policies.user-to-host ];
+
   den.policies.user-to-host =
     { user, host, ... }:
     [

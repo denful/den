@@ -52,7 +52,7 @@ in
 
   den.schema.host.imports = [ hostConf ];
 
-  den.schema.host.policies.host-to-wsl-host =
+  den.policies.host-to-wsl-host =
     {
       host,
       ...
@@ -64,6 +64,10 @@ in
       ]
     else
       [ ];
+
+  den.schema.host.includes = [ den.policies.host-to-wsl-host ];
+
+  den.default.includes = [ den.policies.wsl-to-host ];
 
   # Route wsl class content to host class at ["wsl"]. Fires in ALL scopes
   # (host + user) so user-scope wsl content (e.g., from primary-user) is

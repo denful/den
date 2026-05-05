@@ -8,10 +8,12 @@ let
   inherit (den.lib.policy) resolve;
 in
 {
-  den.schema.host.policies.host-to-users =
+  den.policies.host-to-users =
     {
       host,
       ...
     }:
     map (user: resolve.shared { inherit user; }) (lib.attrValues host.users);
+
+  den.schema.host.includes = [ den.policies.host-to-users ];
 }
