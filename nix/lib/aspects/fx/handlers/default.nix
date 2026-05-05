@@ -30,3 +30,6 @@ args:
 // (import ./compile-parametric.nix args)
 // (import ./compile-static.nix args)
 // (import ./dispatch-policies.nix args)
+// (import ./record-fired.nix args)
+// (import ./emit-policy-effects.nix args)
+// (import ./widen-context.nix args)
