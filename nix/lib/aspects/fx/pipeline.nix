@@ -63,6 +63,20 @@ let
     // resolveEntityHandler
     // handlers.forwardHandler
     // handlers.resolveSchemaEntityHandler
+    // handlers.gateHandler
+    // handlers.resolveHandler
+    // handlers.compileHandler
+    // handlers.compileForwardHandler
+    // handlers.compileConditionalHandler
+    // handlers.compileParametricHandler
+    // handlers.compileStaticHandler
+    // handlers.bindHandler
+    // handlers.deferHandler
+    // handlers.drainHandler
+    // handlers.scopeWidenHandler
+    // handlers.classifyHandler
+    // handlers.emitClassesHandler
+    // handlers.resolveChildrenHandler
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.
