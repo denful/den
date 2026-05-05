@@ -111,13 +111,15 @@ let
     if scopeFn != null then scopeFn bound else bound;
 
   # Thin delegate: all logic now lives in resolve/compile-parametric/compile-static handlers.
+  # Unwraps the single-element list returned by the resolve handler chain
+  # so callers see a bare resolved aspect (backward-compatible return type).
   aspectToEffect =
     aspect:
-    fx.send "resolve" {
+    fx.bind (fx.send "resolve" {
       inherit aspect;
       identity = identity.key aspect;
       ctx = { };
-    };
+    }) (results: fx.pure (builtins.head results));
 
 in
 {

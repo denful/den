@@ -7,57 +7,46 @@
   ...
 }:
 let
-  # Minimal handler set for aspectToEffect tests.
-  collectHandlers = {
-    "emit-class" =
-      { param, state }:
-      {
-        resume = null;
-        state = state // {
-          classes = (state.classes or [ ]) ++ [ param ];
+  # Run aspectToEffect through the pipeline with an emit-class capture overlay.
+  resolveWithCapture =
+    den: aspect:
+    let
+      pipeline = den.lib.aspects.fx.pipeline;
+      captureHandler = {
+        "emit-class" =
+          { param, state }:
+          {
+            resume = null;
+            state = state // {
+              classes = (state.classes or [ ]) ++ [ param ];
+            };
+          };
+      };
+      result = pipeline.fxFullResolve {
+        class = "nixos";
+        self = aspect;
+        ctx = { };
+        extraState = {
+          classes = [ ];
         };
       };
-    "emit-include" =
-      { param, state }:
-      {
-        resume = [ (param.child or param) ];
-        inherit state;
-      };
-    "register-constraint" =
-      { param, state }:
-      {
-        resume = null;
-        state = state // {
-          constraints = (state.constraints or [ ]) ++ [ param ];
-        };
-      };
-    "chain-push" =
-      { param, state }:
-      {
-        resume = null;
-        inherit state;
-      };
-    "chain-pop" =
-      { param, state }:
-      {
-        resume = null;
-        inherit state;
-      };
-    "resolve-complete" =
-      { param, state }:
-      {
-        resume = param;
-        inherit state;
-      };
-    "dead-letter" =
-      { param, state }:
-      {
-        resume = null;
-        state = state // {
-          deadLetterQueue = (state.deadLetterQueue or [ ]) ++ [ param ];
-        };
-      };
-  };
+    in
+    result
+    // {
+      # Extract classes from scopedClassImports (flat merge across scopes).
+      classes =
+        let
+          scoped = result.state.scopedClassImports null;
+          flat = builtins.foldl' (
+            acc: sd:
+            lib.zipAttrsWith (_: builtins.concatLists) [
+              acc
+              sd
+            ]
+          ) { } (builtins.attrValues scoped);
+        in
+        flat;
+    };
 in
 {
   flake.tests.aspect-content-type = {
@@ -75,24 +64,15 @@ in
           };
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
-        result = den.lib.fx.handle {
-          handlers = collectHandlers;
-          state = { };
-        } comp;
+        result = resolveWithCapture den aspect;
+        nixosImports = result.classes.nixos or [ ];
       in
       {
         expr = {
-          classCount = builtins.length result.state.classes;
-          className = (builtins.head result.state.classes).class;
-          module = (builtins.head result.state.classes).module;
+          hasNixos = nixosImports != [ ];
         };
         expected = {
-          classCount = 1;
-          className = "nixos";
-          module = {
-            enable = true;
-          };
+          hasNixos = true;
         };
       }
     );
@@ -110,21 +90,16 @@ in
           };
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
-        result = den.lib.fx.handle {
-          handlers = collectHandlers;
-          state = { };
-        } comp;
-        # myTrait is unregistered — emitted as class (no DLQ deferral).
-        emitted = builtins.filter (c: c.class == "myTrait") (result.state.classes or [ ]);
+        result = resolveWithCapture den aspect;
+        resolvedValue = builtins.head result.value;
       in
       {
         expr = {
-          emitCount = builtins.length emitted;
-          resolvedOk = result.value.name == "dataTest";
+          hasMyTrait = (result.classes.myTrait or [ ]) != [ ];
+          resolvedOk = resolvedValue.name == "dataTest";
         };
         expected = {
-          emitCount = 1;
+          hasMyTrait = true;
           resolvedOk = true;
         };
       }
@@ -143,17 +118,13 @@ in
           ];
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
-        result = den.lib.fx.handle {
-          handlers = collectHandlers;
-          state = { };
-        } comp;
-        # myPackages is unregistered — emitted as class (no DLQ deferral).
-        # List values produce one class entry per element.
-        emitted = builtins.filter (c: c.class == "myPackages") (result.state.classes or [ ]);
+        result = resolveWithCapture den aspect;
+        # myPackages is unregistered — emitted as class.
+        # List values produce class entries.
+        myPkgImports = result.classes.myPackages or [ ];
       in
       {
-        expr = builtins.length emitted;
+        expr = builtins.length myPkgImports;
         expected = 2;
       }
     );

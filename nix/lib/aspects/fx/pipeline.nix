@@ -188,6 +188,7 @@ let
         aspect = self;
         identity = identity.key self;
         ctx = ctx;
+        gated = true;
       };
 
       rootHandlers = defaultHandlers {

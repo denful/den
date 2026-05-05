@@ -104,7 +104,7 @@ in
     test-into-not-class = denTest (
       { den, ... }:
       let
-        fx = den.lib.fx;
+        pipeline = den.lib.aspects.fx.pipeline;
         aspect = {
           name = "host";
           meta = { };
@@ -114,21 +114,20 @@ in
           };
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
-        result = fx.handle {
-          handlers = collectHandlers // {
-            "emit-class" =
-              { param, state }:
-              {
-                resume = null;
-                state = state // {
-                  classes = (state.classes or [ ]) ++ [ param ];
-                };
-              };
-          };
-          state = { };
-        } comp;
-        classNames = map (c: c.class) (result.state.classes or [ ]);
+        result = pipeline.fxFullResolve {
+          class = "nixos";
+          self = aspect;
+          ctx = { };
+        };
+        scoped = result.state.scopedClassImports null;
+        flat = builtins.foldl' (
+          acc: sd:
+          lib.zipAttrsWith (_: builtins.concatLists) [
+            acc
+            sd
+          ]
+        ) { } (builtins.attrValues scoped);
+        classNames = builtins.attrNames flat;
       in
       {
         expr = classNames;
@@ -163,7 +162,7 @@ in
     test-functor-preserves-into = denTest (
       { den, ... }:
       let
-        fx = den.lib.fx;
+        pipeline = den.lib.aspects.fx.pipeline;
         aspect = {
           name = "host";
           meta = { };
@@ -182,23 +181,19 @@ in
             host = false;
           };
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
-        result = fx.handle {
-          handlers = collectHandlers // {
-            host =
-              { param, state }:
-              {
-                resume = "igloo";
-                inherit state;
-              };
+        result = pipeline.fxFullResolve {
+          class = "nixos";
+          self = aspect;
+          ctx = {
+            host = "igloo";
           };
-          state = { };
-        } comp;
+        };
+        resolved = builtins.head result.value;
       in
       {
         # Verify into is preserved through functor resolution
         # (the resolved aspect still has into, visible via structural attrs)
-        expr = result.value ? into;
+        expr = resolved ? into;
         expected = true;
       }
     );
