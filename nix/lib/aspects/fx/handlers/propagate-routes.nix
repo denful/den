@@ -2,6 +2,8 @@
 # Copies relevant root-scope complex routes to a child scope.
 { lib, ... }:
 let
+  inherit (import ./state-util.nix) scopedAppendMany;
+
   propagateRoutesHandler = {
     "propagate-routes" =
       { param, state }:
@@ -23,14 +25,7 @@ let
       else
         {
           resume = null;
-          state = state // {
-            scopedRoutes =
-              _:
-              let
-                all = state.scopedRoutes null;
-              in
-              all // { ${scopeId} = (all.${scopeId} or [ ]) ++ childRoutes; };
-          };
+          state = scopedAppendMany state "scopedRoutes" scopeId childRoutes;
         };
   };
 in

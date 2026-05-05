@@ -22,7 +22,7 @@ let
     "__scopeHandlers"
     "__ctxId"
     "__entityKind"
-    "__parametricResolved"
+    "__parametricResolvedArgs"
     "_module"
     "_"
   ] (_: true);

@@ -44,24 +44,6 @@ let
     mkSupplementalResolution
     ;
 
-  # Decompose a schema effect into its target kind, bindings, scoped ctx, and class.
-  decomposeSchemaEffect =
-    entityKind: enrichedCtx: schemaEffect:
-    let
-      targetKind = schema.resolveTargetKind entityKind schemaEffect;
-      resolveBindings = schemaEffect.schema.value;
-      scopedCtx = enrichedCtx // resolveBindings;
-      entityClass = schema.resolveEntityClass targetKind resolveBindings;
-    in
-    {
-      inherit
-        targetKind
-        resolveBindings
-        scopedCtx
-        entityClass
-        ;
-    };
-
   schema = import ./schema.nix {
     inherit
       lib
@@ -77,7 +59,6 @@ let
       emitPolicyEffectsThen
       policyEmitIncludes
       mkSupplementalResolution
-      decomposeSchemaEffect
       ;
   };
   inherit (schema) processSchemaResolves;

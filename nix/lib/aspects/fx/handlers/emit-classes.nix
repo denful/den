@@ -10,15 +10,7 @@ let
   inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList;
 
-  ctxFromHandlers =
-    handlers:
-    lib.mapAttrs (
-      _: handler:
-      (handler {
-        param = null;
-        state = { };
-      }).resume
-    ) handlers;
+  inherit (den.lib.aspects.fx.aspect) ctxFromHandlers;
 
   isContextDep =
     aspect: ctx:

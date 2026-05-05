@@ -50,7 +50,7 @@ let
             seenSet
             // {
               ${scopedKey} = {
-                ids = (if isFirst then [ ] else seenSet.${scopedKey}.ids) ++ newAspectIds;
+                ids = previousAspects ++ newAspectIds;
               };
             };
         };

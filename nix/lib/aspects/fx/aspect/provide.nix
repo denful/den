@@ -12,6 +12,7 @@ let
   inherit (den.lib.aspects.fx.contentUtil) applyProvide;
   inherit (den.lib.aspects) isParametricWrapper;
   inherit (den.lib.schemaUtil) schemaEntityKinds;
+  schemaEntityKindsSet = lib.genAttrs schemaEntityKinds (_: true);
 
   mkCrossPolicy =
     aspectName: nodeIdentity: provides: key:
@@ -144,7 +145,7 @@ let
 
       provides = aspect.provides or { };
       crossKeys = builtins.filter (k: k != aspectName) (builtins.attrNames provides);
-      compatKeys = builtins.filter (k: !builtins.elem k schemaEntityKinds) crossKeys;
+      compatKeys = builtins.filter (k: !(schemaEntityKindsSet ? ${k})) crossKeys;
       crossRegistrations = map (mkCrossPolicy aspectName nodeIdentity provides) compatKeys;
 
       allRegistrations = policyRegistrations ++ crossRegistrations;

@@ -2,7 +2,7 @@
 # Wraps mkDispatch to make policy dispatch observable.
 # Exported as a constructor (mkDispatchPoliciesHandler) because mkDispatch
 # lives in policy/dispatch.nix and cannot be imported directly here.
-# pipeline.nix calls the constructor with mkDispatch bound.
+# resolve-children.nix constructs this via policy/default.nix.
 _: {
   mkDispatchPoliciesHandler = mkDispatch: {
     "dispatch-policies" =

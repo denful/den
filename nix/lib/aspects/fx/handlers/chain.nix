@@ -2,24 +2,14 @@
 # Tracks the include ancestry chain per scope for constraint scoping.
 { lib, ... }:
 let
+  inherit (import ./state-util.nix) scopedAppend;
+
   chainHandler = {
     "chain-push" =
       { param, state }:
       {
         resume = null;
-        state = state // {
-          scopedIncludesChain =
-            _:
-            let
-              all = (state.scopedIncludesChain or (_: { })) null;
-              inherit (state) currentScope;
-              scopeChain = all.${currentScope} or [ ];
-            in
-            all
-            // {
-              ${currentScope} = scopeChain ++ [ param.identity ];
-            };
-        };
+        state = scopedAppend state "scopedIncludesChain" state.currentScope param.identity;
       };
     "chain-pop" =
       { param, state }:
@@ -29,13 +19,12 @@ let
           scopedIncludesChain =
             _:
             let
-              all = (state.scopedIncludesChain or (_: { })) null;
-              inherit (state) currentScope;
-              scopeChain = all.${currentScope} or [ ];
+              all = state.scopedIncludesChain null;
+              scopeChain = all.${state.currentScope} or [ ];
             in
             all
             // {
-              ${currentScope} =
+              ${state.currentScope} =
                 if scopeChain == [ ] then
                   throw "fx: chain-pop on empty scopedIncludesChain"
                 else

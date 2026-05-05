@@ -13,9 +13,10 @@
   emitPolicyEffectsThen,
   policyEmitIncludes,
   mkSupplementalResolution,
-  decomposeSchemaEffect,
 }:
 let
+  schemaEntityKindsSet = lib.genAttrs schemaEntityKinds (_: true);
+
   # Determine target entity kind from a schema effect.
   resolveTargetKind =
     entityKind: schemaEffect:
@@ -25,7 +26,7 @@ let
     if schemaEffect.schema.__targetKind or null != null then
       schemaEffect.schema.__targetKind
     else
-      lib.findFirst (k: builtins.elem k schemaEntityKinds) (
+      lib.findFirst (k: schemaEntityKindsSet ? ${k}) (
         if keys != [ ] then builtins.head keys else entityKind
       ) keys;
 
@@ -37,6 +38,24 @@ let
       classes = if entity != null then entity.classes or null else null;
     in
     if classes != null && classes != [ ] then builtins.head classes else null;
+
+  # Decompose a schema effect into its target kind, bindings, scoped ctx, and class.
+  decomposeSchemaEffect =
+    entityKind: enrichedCtx: schemaEffect:
+    let
+      targetKind = resolveTargetKind entityKind schemaEffect;
+      resolveBindings = schemaEffect.schema.value;
+      scopedCtx = enrichedCtx // resolveBindings;
+      entityClass = resolveEntityClass targetKind resolveBindings;
+    in
+    {
+      inherit
+        targetKind
+        resolveBindings
+        scopedCtx
+        entityClass
+        ;
+    };
 
   # Process a single schema resolve effect within the fold.
   processSingleResolve =
@@ -185,11 +204,5 @@ let
       );
 in
 {
-  inherit
-    resolveTargetKind
-    resolveEntityClass
-    processSingleResolve
-    lateDispatchPass
-    processSchemaResolves
-    ;
+  inherit processSchemaResolves;
 }

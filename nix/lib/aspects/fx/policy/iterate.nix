@@ -19,14 +19,12 @@ let
   };
 
   # Merge new dispatch results into the accumulator.
-  mergeEffects = accEffects: dispatched: {
-    schemaEffects = accEffects.schemaEffects ++ dispatched.schemaEffects;
-    includeEffects = accEffects.includeEffects ++ dispatched.includeEffects;
-    excludeEffects = accEffects.excludeEffects ++ dispatched.excludeEffects;
-    routeEffects = accEffects.routeEffects ++ dispatched.routeEffects;
-    instantiateEffects = accEffects.instantiateEffects ++ dispatched.instantiateEffects;
-    provideEffects = accEffects.provideEffects ++ dispatched.provideEffects;
-  };
+  mergeEffects =
+    accEffects: dispatched:
+    lib.zipAttrsWith (_: builtins.concatLists) [
+      accEffects
+      dispatched
+    ];
 
   # Fixed-point iteration.
   iterate =

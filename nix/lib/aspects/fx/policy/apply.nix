@@ -5,6 +5,11 @@
   identity,
 }:
 let
+  # Sequentially send an effect for each item in a list.
+  sendEach =
+    effect: transform: effects:
+    builtins.foldl' (acc: e: fx.bind acc (_: fx.send effect (transform e))) (fx.pure null) effects;
+
   # Emit policy include effects via existing handlers.
   policyEmitIncludes =
     effects:
@@ -28,44 +33,25 @@ let
     ) (fx.pure [ ]) effects;
 
   # Emit policy exclude effects.
-  policyEmitExcludes =
-    effects:
-    builtins.foldl' (
-      acc: e:
-      fx.bind acc (
-        _:
-        fx.send "register-constraint" {
-          type = "exclude";
-          scope = "subtree";
-          identity = identity.key e.value;
-          owner = "policy";
-        }
-      )
-    ) (fx.pure null) effects;
+  policyEmitExcludes = sendEach "register-constraint" (e: {
+    type = "exclude";
+    scope = "subtree";
+    identity = identity.key e.value;
+    owner = "policy";
+  });
 
   # Emit policy route, instantiate, and provide effects.
   policyEmitEffects =
     routeEffects: instantiateEffects: provideEffects:
-    fx.bind
-      (builtins.foldl' (
-        acc: e: fx.bind acc (_: fx.send "register-route" e.value)
-      ) (fx.pure null) routeEffects)
-      (
+    fx.bind (sendEach "register-route" (e: e.value) routeEffects) (
+      _:
+      fx.bind (sendEach "register-instantiate" (e: e.value) instantiateEffects) (
         _:
-        fx.bind
-          (builtins.foldl' (
-            acc: e: fx.bind acc (_: fx.send "register-instantiate" e.value)
-          ) (fx.pure null) instantiateEffects)
-          (
-            _:
-            builtins.foldl' (
-              acc: e:
-              fx.bind acc (
-                _: fx.send "register-provide" (e.value // { __providePolicyName = e.__providePolicyName or null; })
-              )
-            ) (fx.pure null) provideEffects
-          )
-      );
+        sendEach "register-provide" (
+          e: e.value // { __providePolicyName = e.__providePolicyName or null; }
+        ) provideEffects
+      )
+    );
 
   # Emit excludes, route/instantiate/provide effects, then run a continuation.
   emitPolicyEffectsThen =

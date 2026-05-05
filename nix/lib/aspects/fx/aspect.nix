@@ -30,11 +30,6 @@ let
       fx.bind (fx.send "scope-widened" { ctx = ctxFromHandlers handlers; }) (_: computation)
     );
 
-  # --- Dead code removed: installPolicies, isContextDep, emitClassEntry,
-  # emitClassKey, emitClasses, chainWrap, emitNestedAspect,
-  # resolveChildSequence, resolveChildren, compileStatic —
-  # now live in effect handlers. ---
-
   # --- Parametric resolution ---
 
   # Build the base attrset for a parametric resolution result.

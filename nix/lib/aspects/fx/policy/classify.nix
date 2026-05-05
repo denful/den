@@ -5,12 +5,14 @@
   schemaEntityKinds,
 }:
 let
+  schemaEntityKindsSet = lib.genAttrs schemaEntityKinds (_: true);
+
   # Classify a resolve effect into schema vs enrichment (single-pass partition).
   classifyResolve =
     e:
     let
       keys = builtins.attrNames e.value;
-      partitioned = lib.partition (k: builtins.elem k schemaEntityKinds) keys;
+      partitioned = lib.partition (k: schemaEntityKindsSet ? ${k}) keys;
       schemaKeys = partitioned.right;
       enrichKeys = partitioned.wrong;
       hasTarget = e.__targetKind or null != null;
@@ -131,7 +133,6 @@ let
 in
 {
   inherit
-    classifyResolve
     classifyPolicyResult
     hasEffects
     extractTaggedEffects

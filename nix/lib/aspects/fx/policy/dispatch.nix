@@ -33,6 +33,8 @@ let
     );
 
   # Dispatch aspect policies against a context.
+  # Note: caller passes the same aspectPolicies each iteration; Nix memoizes
+  # attrsToList per attrset identity, so repeated calls are cheap.
   dispatchAspect =
     aspectPolicies: firedPolicies: resolveCtx:
     let
@@ -70,5 +72,5 @@ let
     };
 in
 {
-  inherit dispatchDirect dispatchAspect mkDispatch;
+  inherit dispatchAspect mkDispatch;
 }
