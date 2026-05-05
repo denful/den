@@ -93,7 +93,9 @@ let
         dispatchKey = "${entityKind}@${scope}";
         alreadyDispatched = ((state.dispatchedPolicies or (_: { })) null) ? ${dispatchKey};
         allDirectPolicies = { };
-        aspectPolicies = state.flatAspectPolicies or { };
+        # Policies fire where they're registered — scope-local only.
+        # Cascade happens through effects (resolves/includes), not re-dispatch.
+        aspectPolicies = ((state.scopedAspectPolicies or (_: { })) null).${scope} or { };
         resolveCtx = currentCtx // {
           __entityKind = entityKind;
         };
@@ -101,26 +103,13 @@ let
       if alreadyDispatched then
         fx.pure [ ]
       else
-        let
-          # Policies don't apply to their own outputs.  If this scope was
-          # created by a policy's resolve effect, that policy is pre-fired
-          # so installPolicies won't dispatch it here.
-          sourcePolicy = ((state.scopeSourcePolicy or (_: { })) null).${scope} or null;
-          initialFired = if sourcePolicy != null then { ${sourcePolicy} = true; } else { };
-        in
-        fx.bind
-          (fx.effects.state.modify (
-            st:
-            st
-            // {
-              dispatchedPolicies = _: ((st.dispatchedPolicies or (_: { })) null) // { ${dispatchKey} = true; };
-            }
-          ))
-          (
-            _:
-            iterate allDirectPolicies aspectPolicies entityKind currentCtx 0 { } emptyAcc initialFired
-              resolveCtx
-          )
+        fx.bind (fx.effects.state.modify (
+          st:
+          st
+          // {
+            dispatchedPolicies = _: ((st.dispatchedPolicies or (_: { })) null) // { ${dispatchKey} = true; };
+          }
+        )) (_: iterate allDirectPolicies aspectPolicies entityKind currentCtx 0 { } emptyAcc { } resolveCtx)
     );
 in
 {

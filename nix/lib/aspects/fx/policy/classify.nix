@@ -100,23 +100,10 @@ let
           __sourcePolicyName = r.policyName;
         }
         // lib.optionalAttrs r.isCrossProvider {
-          __policyIncludes = lib.imap0 (
-            i: e:
-            let
-              v = e.value;
-              tag = "<policy:${r.policyName}:${toString i}>";
-            in
-            if builtins.isFunction v then
-              {
-                name = tag;
-                __fn = v;
-                __args = builtins.functionArgs v;
-              }
-            else if builtins.isAttrs v && !(v ? name) then
-              v // { name = tag; }
-            else
-              v
-          ) r.includeEffects;
+          # Cross-provider includes are entity-scoped (attached to specific
+          # schema resolve targets).  No <policy:*> tagging — they use normal
+          # scope-prefixed dedup within their target entity's resolution.
+          __policyIncludes = map (e: e.value) r.includeEffects;
         }
       ) r.schemaEffects
     ) paired;

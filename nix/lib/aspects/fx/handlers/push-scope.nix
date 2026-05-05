@@ -23,11 +23,6 @@ let
         );
         allDeferred = (state.scopedDeferredIncludes or (_: { })) null;
         parentItems = allDeferred.${parentScope} or [ ];
-        parentPolicies =
-          let
-            all = state.scopedAspectPolicies null;
-          in
-          all.${parentScope} or { };
       in
       {
         resume = {
@@ -41,12 +36,14 @@ let
             scopeContexts = _: (state.scopeContexts null) // { ${newScopeId} = scopedCtx; };
             scopeParent =
               _: (state.scopeParent null) // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
+            # No parent inheritance — policies fire where registered, not at
+            # child scopes.  Cascade is through effects, not re-dispatch.
             scopedAspectPolicies =
               _:
               let
                 all = state.scopedAspectPolicies null;
               in
-              all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
+              all // { ${newScopeId} = all.${newScopeId} or { }; };
             # Record source policy name — installPolicies reads this to
             # exclude the source policy from dispatch at this scope.
             # Invariant: policies don't apply to their own outputs.
