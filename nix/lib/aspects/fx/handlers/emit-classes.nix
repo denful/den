@@ -1,0 +1,95 @@
+# Effect handler: emit-classes
+# Iterates class keys and sends emit-class per module element.
+{
+  lib,
+  den,
+  ...
+}:
+let
+  inherit (den.lib) fx;
+  inherit (den.lib.aspects.fx) identity;
+  inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList;
+
+  ctxFromHandlers =
+    handlers:
+    lib.mapAttrs (
+      _: handler:
+      (handler {
+        param = null;
+        state = { };
+      }).resume
+    ) handlers;
+
+  isContextDep =
+    aspect: ctx:
+    let
+      resolvedArgs = aspect.__parametricResolvedArgs or [ ];
+    in
+    (resolvedArgs != [ ] && builtins.any (ak: ctx ? ${ak}) resolvedArgs)
+    || (aspect.meta.contextDependent or false);
+
+  emitClassEntry =
+    {
+      class,
+      identity,
+      module,
+      ctx,
+      aspectPolicy,
+      globalPolicy,
+      isContextDependent,
+    }:
+    fx.send "emit-class" {
+      inherit
+        class
+        identity
+        module
+        ctx
+        aspectPolicy
+        globalPolicy
+        isContextDependent
+        ;
+      __rawEntry = true;
+    };
+
+  emitClassKey =
+    aspect: ctx: aspectPolicy: globalPolicy: contextDep: nodeIdentity: k:
+    let
+      modules = unwrapContentValuesList aspect.${k};
+      isMulti = builtins.length modules > 1;
+      mkEntry =
+        idx: module:
+        emitClassEntry {
+          class = k;
+          identity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
+          inherit
+            module
+            ctx
+            aspectPolicy
+            globalPolicy
+            ;
+          isContextDependent = contextDep;
+        };
+    in
+    fx.seq (lib.imap0 mkEntry modules);
+in
+{
+  emitClassesHandler = {
+    "emit-classes" =
+      { param, state }:
+      let
+        aspect = param.aspect;
+        classKeys = param.classKeys;
+        nodeIdentity = param.identity;
+        ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
+        aspectPolicy = aspect.meta.collisionPolicy or null;
+        globalPolicy = den.config.classModuleCollisionPolicy or "error";
+        contextDep = isContextDep aspect ctx;
+      in
+      {
+        resume = fx.seq (
+          map (emitClassKey aspect ctx aspectPolicy globalPolicy contextDep nodeIdentity) classKeys
+        );
+        inherit state;
+      };
+  };
+}
