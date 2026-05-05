@@ -7,7 +7,7 @@
   ...
 }:
 let
-  # Run aspectToEffect through the pipeline with an emit-class capture overlay.
+  # Run fx.send "resolve" through the pipeline with an emit-class capture overlay.
   resolveWithCapture =
     den: aspect:
     let

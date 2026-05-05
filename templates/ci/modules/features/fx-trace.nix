@@ -385,7 +385,11 @@
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.composeHandlers (den.lib.aspects.fx.pipeline.defaultHandlers
             {
@@ -414,7 +418,11 @@
           meta = { };
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect root;
+        comp = fx.send "resolve" {
+          aspect = root;
+          identity = den.lib.aspects.fx.identity.key root;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.composeHandlers (den.lib.aspects.fx.pipeline.defaultHandlers
             {

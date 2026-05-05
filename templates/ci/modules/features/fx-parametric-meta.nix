@@ -28,7 +28,11 @@
             user = false;
           };
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
+        comp = fx.send "resolve" {
+          inherit aspect;
+          identity = den.lib.aspects.fx.identity.key aspect;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -42,9 +46,9 @@
       in
       {
         expr = {
-          hostName = result.value.nixos.hostName;
-          userName = result.value.nixos.userName;
-          name = result.value.name;
+          hostName = (builtins.head result.value).nixos.hostName;
+          userName = (builtins.head result.value).nixos.userName;
+          name = (builtins.head result.value).name;
         };
         expected = {
           hostName = "h";
@@ -65,7 +69,11 @@
           nixos = { };
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
+        comp = fx.send "resolve" {
+          inherit aspect;
+          identity = den.lib.aspects.fx.identity.key aspect;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -75,7 +83,7 @@
         } comp;
       in
       {
-        expr = result.value.meta ? isParametric;
+        expr = (builtins.head result.value).meta ? isParametric;
         expected = false;
       }
     );
@@ -100,7 +108,11 @@
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers =
             den.lib.aspects.fx.pipeline.composeHandlers

@@ -81,7 +81,11 @@ in
           nixos.services.nginx.enable = true;
           includes = [ ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
+        comp = fx.send "resolve" {
+          inherit aspect;
+          identity = den.lib.aspects.fx.identity.key aspect;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkHandlers { inherit den; };
           state = defaultState;
@@ -90,7 +94,7 @@ in
       in
       {
         expr = {
-          resolvedName = result.value.name;
+          resolvedName = (builtins.head result.value).name;
           classCount = builtins.length emittedClasses;
           className = (builtins.head emittedClasses).class;
         };
@@ -119,7 +123,11 @@ in
           meta = { };
           includes = [ guarded ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkHandlers { inherit den; };
           state = defaultState;
@@ -127,7 +135,7 @@ in
       in
       {
         expr = {
-          resolvedChildName = (builtins.head result.value.includes).name;
+          resolvedChildName = (builtins.head (builtins.head result.value).includes).name;
           classCount = builtins.length (result.state.classes or [ ]);
         };
         expected = {
@@ -154,12 +162,16 @@ in
           meta = { };
           includes = [ guarded ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkHandlers { inherit den; };
           state = defaultState;
         } comp;
-        tombstone = builtins.head result.value.includes;
+        tombstone = builtins.head (builtins.head result.value).includes;
       in
       {
         expr = {
@@ -272,7 +284,11 @@ in
           meta = { };
           includes = [ parametricChild ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkHandlers {
             inherit den;
@@ -287,7 +303,7 @@ in
           };
           state = defaultState;
         } comp;
-        resolvedChild = builtins.head result.value.includes;
+        resolvedChild = builtins.head (builtins.head result.value).includes;
       in
       {
         expr = {

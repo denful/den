@@ -182,7 +182,11 @@
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -237,7 +241,11 @@
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -593,7 +601,11 @@
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -643,7 +655,11 @@
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers =
             den.lib.aspects.fx.pipeline.composeHandlers
@@ -711,7 +727,11 @@
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers =
             den.lib.aspects.fx.pipeline.composeHandlers

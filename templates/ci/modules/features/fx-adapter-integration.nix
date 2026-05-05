@@ -15,7 +15,11 @@ let
     aspect:
     let
       fx = den.lib.fx;
-      comp = den.lib.aspects.fx.aspect.aspectToEffect aspect;
+      comp = fx.send "resolve" {
+        inherit aspect;
+        identity = den.lib.aspects.fx.identity.key aspect;
+        ctx = { };
+      };
     in
     fx.handle {
       handlers = den.lib.aspects.fx.pipeline.defaultHandlers { inherit ctx class; };
@@ -163,7 +167,7 @@ in
           ];
         };
         result = runPipeline den { } root;
-        tree = result.value;
+        tree = builtins.head result.value;
         children = tree.includes or [ ];
         names = map (c: c.name or "?") children;
       in

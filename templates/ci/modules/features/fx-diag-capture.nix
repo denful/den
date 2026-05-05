@@ -1,5 +1,5 @@
 # Tests for the diag library's capture path.
-# Verifies captureWithPaths produces correct trace entries via aspectToEffect.
+# Verifies captureWithPaths produces correct trace entries via fx.send "resolve".
 {
   denTest,
   lib,

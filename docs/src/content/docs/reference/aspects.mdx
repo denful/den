@@ -134,7 +134,7 @@ Resolution is handled internally by the fx pipeline. `den.lib.aspects.resolve` s
 When the pipeline resolves aspects for an entity, it:
 
 1. Collects all aspects referenced by the entity
-2. Compiles each aspect into an effectful computation (`aspectToEffect`)
+2. Compiles each aspect into an effectful computation (`fx.send "resolve"`)
 3. Evaluates static includes and defers parametric includes until context widens
 4. Walks the policy graph to fan out into derived stages
 5. Extracts the class-specific config (e.g., `nixos` for NixOS hosts)

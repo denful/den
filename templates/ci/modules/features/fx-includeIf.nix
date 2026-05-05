@@ -27,7 +27,11 @@
           meta = { };
           includes = [ guarded ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -37,7 +41,7 @@
         } comp;
       in
       {
-        expr = (builtins.head result.value.includes).name;
+        expr = (builtins.head (builtins.head result.value).includes).name;
         expected = "feature";
       }
     );
@@ -59,7 +63,11 @@
           meta = { };
           includes = [ guarded ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -69,7 +77,7 @@
         } comp;
       in
       {
-        expr = (builtins.head result.value.includes).meta.excluded;
+        expr = (builtins.head (builtins.head result.value).includes).meta.excluded;
         expected = true;
       }
     );
@@ -104,7 +112,11 @@
             guarded
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -112,7 +124,7 @@
           };
           state = den.lib.aspects.fx.pipeline.defaultState;
         } comp;
-        names = map (c: c.name) result.value.includes;
+        names = map (c: c.name) (builtins.head result.value).includes;
       in
       {
         expr = builtins.elem "sops-conf" names;
@@ -145,7 +157,11 @@
           meta = { };
           includes = [ guarded ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -155,7 +171,7 @@
         } comp;
       in
       {
-        expr = (builtins.head result.value.includes).meta.excluded;
+        expr = (builtins.head (builtins.head result.value).includes).meta.excluded;
         expected = true;
       }
     );
@@ -196,7 +212,11 @@
             (den.lib.aspects.fx.includes.includeIf (ctx: !ctx.hasAspect sops) [ ageConf ])
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = den.lib.aspects.fx.pipeline.defaultHandlers {
             class = "nixos";
@@ -204,7 +224,7 @@
           };
           state = den.lib.aspects.fx.pipeline.defaultState;
         } comp;
-        children = result.value.includes;
+        children = (builtins.head result.value).includes;
         names = map (c: c.name) children;
       in
       {

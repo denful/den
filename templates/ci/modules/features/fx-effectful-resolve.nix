@@ -1,4 +1,4 @@
-# Tests for the unified emit-include handler with aspectToEffect.
+# Tests for the unified emit-include handler with fx.send "resolve".
 {
   denTest,
   inputs,
@@ -6,7 +6,7 @@
   ...
 }:
 let
-  # Minimal handler set for testing aspectToEffect + includeHandler.
+  # Minimal handler set for testing fx.send "resolve" + includeHandler.
   mkTestHandlers =
     {
       den,
@@ -88,7 +88,7 @@ in
 {
   flake.tests.fx-effectful-resolve = {
 
-    # Basic: parent with child, both resolved via aspectToEffect.
+    # Basic: parent with child, both resolved via fx.send "resolve".
     test-basic-aspectToEffect = denTest (
       { den, ... }:
       let
@@ -110,7 +110,11 @@ in
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkTestHandlers { inherit den; };
           state = defaultState;
@@ -118,8 +122,8 @@ in
       in
       {
         expr = {
-          parentName = result.value.name;
-          childName = (builtins.head result.value.includes).name;
+          parentName = (builtins.head result.value).name;
+          childName = (builtins.head (builtins.head result.value).includes).name;
           classCount = builtins.length result.state.classes;
           resolvedNames = result.state.names;
         };
@@ -170,12 +174,16 @@ in
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkTestHandlers { inherit den; } // den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = defaultState;
         } comp;
-        children = result.value.includes;
+        children = (builtins.head result.value).includes;
       in
       {
         expr = {
@@ -215,7 +223,11 @@ in
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         hostHandler = {
           host =
             { param, state }:
@@ -231,7 +243,7 @@ in
           };
           state = defaultState;
         } comp;
-        child = builtins.head result.value.includes;
+        child = builtins.head (builtins.head result.value).includes;
       in
       {
         expr = child.nixos.hostName;
@@ -260,7 +272,11 @@ in
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkTestHandlers { inherit den; };
           state = defaultState;
@@ -325,7 +341,11 @@ in
             }
           ];
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkTestHandlers { inherit den; } // den.lib.aspects.fx.handlers.constraintRegistryHandler;
           state = defaultState;
@@ -366,7 +386,11 @@ in
               inherit state;
             };
         };
-        comp = den.lib.aspects.fx.aspect.aspectToEffect parent;
+        comp = fx.send "resolve" {
+          aspect = parent;
+          identity = den.lib.aspects.fx.identity.key parent;
+          ctx = { };
+        };
         result = fx.handle {
           handlers = mkTestHandlers {
             inherit den;
@@ -374,7 +398,7 @@ in
           };
           state = defaultState;
         } comp;
-        child = builtins.head result.value.includes;
+        child = builtins.head (builtins.head result.value).includes;
       in
       {
         expr = child.nixos.hostName;

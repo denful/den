@@ -247,7 +247,13 @@
           type = "ThrownError";
           msg = "parametric resolution exceeded";
         };
-        expr = fx.handle { inherit handlers state; } (den.lib.aspects.fx.aspect.aspectToEffect divergent);
+        expr = fx.handle { inherit handlers state; } (
+          fx.send "resolve" {
+            aspect = divergent;
+            identity = den.lib.aspects.fx.identity.key divergent;
+            ctx = { };
+          }
+        );
       }
     );
 
