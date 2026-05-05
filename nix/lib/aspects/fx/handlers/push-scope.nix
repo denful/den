@@ -15,6 +15,7 @@ let
       { param, state }:
       let
         inherit (param) scopedCtx entityClass parentScope;
+        sourcePolicyName = param.sourcePolicyName or null;
         newScopeId = mkScopeId scopedCtx;
         isSameScope = newScopeId == parentScope;
         scopeHandlers = constantHandler (
@@ -22,6 +23,11 @@ let
         );
         allDeferred = (state.scopedDeferredIncludes or (_: { })) null;
         parentItems = allDeferred.${parentScope} or [ ];
+        parentPolicies =
+          let
+            all = state.scopedAspectPolicies null;
+          in
+          all.${parentScope} or { };
       in
       {
         resume = {
@@ -39,9 +45,17 @@ let
               _:
               let
                 all = state.scopedAspectPolicies null;
-                parentPolicies = all.${parentScope} or { };
               in
               all // { ${newScopeId} = (all.${newScopeId} or { }) // parentPolicies; };
+            # Record source policy name — installPolicies reads this to
+            # exclude the source policy from dispatch at this scope.
+            # Invariant: policies don't apply to their own outputs.
+            scopeSourcePolicy =
+              _:
+              ((state.scopeSourcePolicy or (_: { })) null)
+              // lib.optionalAttrs (sourcePolicyName != null) {
+                ${newScopeId} = sourcePolicyName;
+              };
           }
           // lib.optionalAttrs (parentItems != [ ]) {
             scopedDeferredIncludes =

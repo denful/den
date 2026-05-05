@@ -100,6 +100,7 @@ let
             (fx.send "push-scope" {
               inherit (param) scopedCtx entityClass;
               inherit parentScope;
+              sourcePolicyName = param.sourcePolicyName or null;
             })
             (
               pushResult:

@@ -48,7 +48,14 @@
     test-shared-fanout-merges-state = denTest (
       { den, funnyNames, ... }:
       {
+        den.policies.src-to-tgt =
+          {
+            v,
+            ...
+          }:
+          [ (den.lib.policy.resolve.shared.to "tgt" { v = "${v}!"; }) ];
         den.schema.src.includes = [
+          den.policies.src-to-tgt
           (
             { v }:
             {
@@ -64,12 +71,6 @@
             }
           )
         ];
-        den.schema.src.policies.src-to-tgt =
-          {
-            v,
-            ...
-          }:
-          [ (den.lib.policy.resolve.shared.to "tgt" { v = "${v}!"; }) ];
         expr = funnyNames (den.lib.resolveEntity "src" { v = "x"; });
         expected = [
           "src-x"
@@ -83,7 +84,14 @@
     test-isolated-fanout-still-works = denTest (
       { den, funnyNames, ... }:
       {
+        den.policies.src2-to-tgt2 =
+          {
+            v,
+            ...
+          }:
+          [ (den.lib.policy.resolve.to "tgt2" { v = "${v}!"; }) ];
         den.schema.src2.includes = [
+          den.policies.src2-to-tgt2
           (
             { v }:
             {
@@ -99,12 +107,6 @@
             }
           )
         ];
-        den.schema.src2.policies.src2-to-tgt2 =
-          {
-            v,
-            ...
-          }:
-          [ (den.lib.policy.resolve.to "tgt2" { v = "${v}!"; }) ];
         expr = funnyNames (den.lib.resolveEntity "src2" { v = "x"; });
         expected = [
           "src2-x"

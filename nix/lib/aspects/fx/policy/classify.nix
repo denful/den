@@ -88,15 +88,21 @@ let
     || r.instantiateEffects != [ ]
     || r.provideEffects != [ ];
 
-  # Collect all schema effects, attaching cross-provider includes.
+  # Collect all schema effects, attaching cross-provider includes and source policy name.
   collectSchemaEffects =
     paired:
     builtins.concatMap (
       r:
-      if r.isCrossProvider then
-        map (se: se // { __policyIncludes = map (e: e.value) r.includeEffects; }) r.schemaEffects
-      else
-        r.schemaEffects
+      map (
+        se:
+        se
+        // {
+          __sourcePolicyName = r.policyName;
+        }
+        // lib.optionalAttrs r.isCrossProvider {
+          __policyIncludes = map (e: e.value) r.includeEffects;
+        }
+      ) r.schemaEffects
     ) paired;
 
   # Collect non-cross-provider include effects, tagged with source policy name.

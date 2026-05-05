@@ -96,6 +96,9 @@ let
               ctxNames
               prevResults
               ;
+            # Tag child scope with source policy — prevents the policy from
+            # re-dispatching at entities it created (no self-referential cycles).
+            sourcePolicyName = schemaEffect.__sourcePolicyName or null;
           }
         else if newAspectValues != [ ] then
           mkSupplementalResolution scopeHandlersForCtx ctxNames prevResults newAspectValues
