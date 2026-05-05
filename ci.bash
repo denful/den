@@ -49,10 +49,17 @@ fi
 
 results=$(mktemp -t den-test-XXXXX.json)
 
+# Cap workers and per-worker memory to prevent OOM from infinite recursion.
+# nproc can be very high (32+); limit workers so worst-case memory is bounded.
+max_workers=8
+mem_per_worker=2048  # MiB
+workers=$(( $(nproc) < max_workers ? $(nproc) : max_workers ))
+
 nix-eval-jobs \
   --flake ./templates/ci#tests${preSuite} \
   --override-input den . \
-  --workers $(nproc) \
+  --workers "$workers" \
+  --max-memory-size "$mem_per_worker" \
   --force-recurse \
   --select 'tests: let
     system="'"${system}"'";
