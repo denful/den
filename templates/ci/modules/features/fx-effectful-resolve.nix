@@ -17,9 +17,6 @@ let
     in
     den.lib.aspects.fx.handlers.includeHandler
     // den.lib.aspects.fx.handlers.checkDedupHandler
-    // den.lib.aspects.fx.handlers.resolveConditionalHandler
-    // den.lib.aspects.fx.handlers.resolveParametricHandler
-    // den.lib.aspects.fx.handlers.resolveAspectHandler
     // den.lib.aspects.fx.handlers.constraintRegistryHandler
     // den.lib.aspects.fx.handlers.resolveHandler
     // den.lib.aspects.fx.handlers.compileHandler

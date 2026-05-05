@@ -66,17 +66,22 @@ let
                     in
                     fx.bind (fx.send "resolve-complete" tombstone) (
                       _:
-                      # Coexistence: will become fx.send "resolve" in Task 12
-                      fx.bind (den.lib.aspects.fx.aspect.aspectToEffect decision.replacement) (
-                        resolved:
-                        fx.pure {
-                          blocked = true;
-                          result = [
-                            tombstone
-                            resolved
-                          ];
-                        }
-                      )
+                      fx.bind
+                        (fx.send "resolve" {
+                          aspect = decision.replacement;
+                          identity = identity.key decision.replacement;
+                          ctx = param.ctx or { };
+                        })
+                        (
+                          resolved:
+                          let
+                            replacementResult = if builtins.isList resolved then resolved else [ resolved ];
+                          in
+                          fx.pure {
+                            blocked = true;
+                            result = [ tombstone ] ++ replacementResult;
+                          }
+                        )
                     )
                   else
                     # pass-through

@@ -179,6 +179,19 @@
             // handlers.constraintRegistryHandler
             // handlers.includeHandler
             // handlers.chainHandler
+            // handlers.resolveHandler
+            // handlers.compileHandler
+            // handlers.compileStaticHandler
+            // handlers.compileParametricHandler
+            // handlers.compileConditionalHandler
+            // handlers.compileForwardHandler
+            // handlers.bindHandler
+            // handlers.deferHandler
+            // handlers.drainHandler
+            // handlers.classifyHandler
+            // handlers.emitClassesHandler
+            // handlers.resolveChildrenHandler
+            // den.lib.aspects.fx.identity.pathSetHandler
             // den.lib.aspects.fx.identity.collectPathsHandler;
           state = pipeline.defaultState;
         } comp;

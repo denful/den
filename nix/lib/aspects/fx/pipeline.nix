@@ -7,8 +7,6 @@ let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) handlers identity;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
-  route = import ./route { inherit lib den; };
-
   # Compose two handler sets: b's resume wins, a's state wins.
   # Used for tracing: tracingHandler (b) controls resume,
   # defaultHandlers (a) accumulates paths/imports.
@@ -48,20 +46,14 @@ let
     // handlers.chainHandler
     // handlers.includeHandler
     // handlers.checkDedupHandler
-    // handlers.resolveConditionalHandler
-    // handlers.resolveParametricHandler
-    // handlers.resolveAspectHandler
     // handlers.ctxSeenHandler
     // identity.pathSetHandler
     // identity.collectPathsHandler
     // handlers.registerAspectPolicyHandler
-    // handlers.deferredIncludeHandler
-    // handlers.drainDeferredHandler
     // handlers.registerRouteHandler
     // handlers.registerInstantiateHandler
     // handlers.provideHandler
     // resolveEntityHandler
-    // handlers.forwardHandler
     // handlers.resolveSchemaEntityHandler
     // handlers.gateHandler
     // handlers.resolveHandler

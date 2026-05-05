@@ -15,9 +15,6 @@ let
     in
     handlers.includeHandler
     // handlers.checkDedupHandler
-    // handlers.resolveConditionalHandler
-    // handlers.resolveParametricHandler
-    // handlers.resolveAspectHandler
     // handlers.constraintRegistryHandler
     // handlers.chainHandler
     // den.lib.aspects.fx.identity.pathSetHandler

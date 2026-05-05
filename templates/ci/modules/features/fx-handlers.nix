@@ -355,7 +355,7 @@
         handlers = den.lib.aspects.fx.handlers;
         comp =
           fx.bind
-            (fx.send "defer-include" {
+            (fx.send "defer" {
               child = {
                 name = "a";
                 __fn = _: { };
@@ -368,7 +368,7 @@
             })
             (
               _:
-              fx.send "defer-include" {
+              fx.send "defer" {
                 child = {
                   name = "b";
                   __fn = _: { };
@@ -381,7 +381,14 @@
               }
             );
         result = fx.handle {
-          handlers = handlers.deferredIncludeHandler;
+          handlers = handlers.deferHandler // {
+            "resolve-complete" =
+              { param, state }:
+              {
+                resume = param;
+                inherit state;
+              };
+          };
           state = {
             currentScope = "__test";
             scopedDeferredIncludes = _: { };
@@ -412,9 +419,9 @@
           };
           requiredArgs = [ "user" ];
         };
-        comp = fx.send "drain-deferred" { host = { }; };
+        comp = fx.send "drain" { host = { }; };
         result = fx.handle {
-          handlers = handlers.drainDeferredHandler;
+          handlers = handlers.drainHandler;
           state = {
             currentScope = "__test";
             scopedDeferredIncludes = _: {
@@ -456,9 +463,9 @@
           };
           requiredArgs = [ "host" ];
         };
-        comp = fx.send "drain-deferred" { };
+        comp = fx.send "drain" { };
         result = fx.handle {
-          handlers = handlers.drainDeferredHandler;
+          handlers = handlers.drainHandler;
           state = {
             currentScope = "__test";
             scopedDeferredIncludes = _: {

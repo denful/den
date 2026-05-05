@@ -3,8 +3,6 @@
   ...
 }:
 let
-  inherit (import ./state-util.nix) scopedAppend;
-
   mkDirectAspect =
     {
       intoClass,
@@ -194,55 +192,7 @@ let
     in
     base // body;
 
-  # Register forward spec as a route in pipeline state.
-  # All forwards — simple and complex — go into scopedRoutes.
-  # Post-processing in route.nix handles both kinds uniformly.
-  forwardHandler = {
-    "emit-forward" =
-      { param, state }:
-      let
-        spec = param;
-        scope = state.currentScope;
-
-        # Tier 1 classification: simple forwards with source modules already
-        # in the current pipeline's scopedClassImports can become routes.
-        # Requirements:
-        # - No adapter, no guard, static path, no evalConfig
-        # - Source aspect has no own context (__scopeHandlers — external
-        #   entities like resolveEntity carry these)
-        # - Source class already collected in current scope (excludes
-        #   synthetic source aspects whose modules aren't in the pipeline)
-        isSimpleSpec = spec.canDirectImport && !spec.needsAdapter && !(spec.evalConfig or false);
-        sourceScopeHandlers = spec.sourceAspect.__scopeHandlers or { };
-        sourceIsLocal = sourceScopeHandlers == { };
-        scopeClasses = (state.scopedClassImports null).${scope} or { };
-        sourceAlreadyCollected = scopeClasses ? ${spec.fromClass};
-        isTier1 = isSimpleSpec && sourceIsLocal && sourceAlreadyCollected;
-
-        # Tier 1: simple route shape (backward compatible).
-        simpleRoute = {
-          inherit (spec) fromClass intoClass;
-          path = spec.staticIntoPath;
-          guard = null;
-          adaptArgs = null;
-          sourceScopeId = scope;
-        };
-
-        # Complex: full forward spec as route with __complexForward marker.
-        complexRoute = spec // {
-          sourceScopeId = scope;
-          __complexForward = true;
-        };
-
-        route = if isTier1 then simpleRoute else complexRoute;
-      in
-      {
-        resume = null;
-        state = scopedAppend state "scopedRoutes" scope route;
-      };
-  };
-
 in
 {
-  inherit forwardHandler buildForwardAspect;
+  inherit buildForwardAspect;
 }
