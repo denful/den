@@ -26,6 +26,7 @@ in
                 aspect = deferred.child;
                 identity = identity.key deferred.child;
                 inherit ctx;
+                gated = true;
               }
             )
           ) (fx.pure null) satisfiable

@@ -9,6 +9,7 @@
 let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx.handlers) constantHandler;
+  inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.aspects.fx.aspect) aspectToEffect;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
 
@@ -88,14 +89,22 @@ let
 
   # Walk deferred aspects after entity resolution, collecting results.
   walkDeferred =
-    scopeHandlersForCtx: prevResults: childResult: satisfiable:
+    scopeHandlersForCtx: scopedCtx: prevResults: childResult: satisfiable:
     builtins.foldl' (
       acc': deferred:
       fx.bind acc' (
         prev:
-        fx.bind (aspectToEffect (deferred.child // { __scopeHandlers = scopeHandlersForCtx; })) (
-          resolved: fx.pure (prev ++ [ resolved ])
-        )
+        let
+          child = deferred.child // {
+            __scopeHandlers = scopeHandlersForCtx;
+          };
+        in
+        fx.bind (fx.send "resolve" {
+          aspect = child;
+          identity = identity.key child;
+          ctx = scopedCtx;
+          gated = true;
+        }) (resolved: fx.pure (prev ++ [ resolved ]))
       )
     ) (fx.pure (prevResults ++ [ childResult ])) satisfiable;
 
@@ -143,9 +152,9 @@ let
         in
         fx.bind (aspectToEffect entity) (
           childResult:
-          fx.bind (fx.send "drain-deferred" scopedCtx) (
+          fx.bind (fx.send "drain" scopedCtx) (
             satisfiable:
-            fx.bind (walkDeferred scopeHandlersForCtx prevResults childResult satisfiable) (
+            fx.bind (walkDeferred scopeHandlersForCtx scopedCtx prevResults childResult satisfiable) (
               allResults: propagateRootRoutes newScopeId restoreScope allResults
             )
           )

@@ -2,6 +2,7 @@
 {
   lib,
   fx,
+  identity,
   constantHandler,
   aspectToEffect,
   mkDispatch,
@@ -53,11 +54,24 @@ let
     let
       scopeHandlers = constantHandler enrichedCtx;
     in
-    fx.bind (fx.send "drain-deferred" enrichedCtx) (
+    fx.bind (fx.send "drain" enrichedCtx) (
       satisfiable:
       builtins.foldl' (
         acc: deferred:
-        fx.bind acc (_: aspectToEffect (deferred.child // { __scopeHandlers = scopeHandlers; }))
+        fx.bind acc (
+          _:
+          let
+            child = deferred.child // {
+              __scopeHandlers = scopeHandlers;
+            };
+          in
+          fx.send "resolve" {
+            aspect = child;
+            identity = identity.key child;
+            ctx = enrichedCtx;
+            gated = true;
+          }
+        )
       ) (fx.pure null) satisfiable
     );
 

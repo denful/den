@@ -82,6 +82,7 @@ let
     inherit
       lib
       fx
+      identity
       constantHandler
       aspectToEffect
       mkDispatch
