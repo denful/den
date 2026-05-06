@@ -134,7 +134,7 @@ let
       excludeList = map (ref: {
         type = "exclude";
         scope = "subtree";
-        identity = identity.key ref;
+        identity = if builtins.isAttrs ref && ref.__isPolicy or false then ref.name else identity.key ref;
       }) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";

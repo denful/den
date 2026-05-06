@@ -51,7 +51,7 @@
         };
 
         result = fx.handle {
-          handlers = dispatchHandler;
+          handlers = dispatchHandler // handlers.constraintRegistryHandler;
           state = { };
         } comp;
       in
@@ -110,7 +110,7 @@
         };
 
         result = fx.handle {
-          handlers = dispatchHandler;
+          handlers = dispatchHandler // handlers.constraintRegistryHandler;
           state = initialState;
         } comp;
       in
@@ -169,7 +169,7 @@
         };
 
         result = fx.handle {
-          handlers = dispatchHandler;
+          handlers = dispatchHandler // handlers.constraintRegistryHandler;
           state = { };
         } comp;
       in

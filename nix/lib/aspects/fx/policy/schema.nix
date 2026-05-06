@@ -113,33 +113,41 @@ let
       dispatchKey = "${sib.targetKind}@${sib.scopeId}";
       alreadyFired = firedPerScope.${dispatchKey} or { };
       latePolicies = lib.filterAttrs (name: _: !(alreadyFired ? ${name})) allAspectPolicies;
-      resolveCtx = sib.scopedCtx // {
-        __entityKind = sib.targetKind;
-      };
-      lateResults = dispatchAspect latePolicies alreadyFired resolveCtx;
-      late = extractTaggedEffects (map classifyPolicyResult lateResults);
-      hasLateEffects =
-        late.includeEffects != [ ]
-        || late.routeEffects != [ ]
-        || late.instantiateEffects != [ ]
-        || late.provideEffects != [ ]
-        || late.excludeEffects != [ ];
     in
-    if latePolicies == { } || !hasLateEffects then
-      fx.pure null
-    else
-      fx.bind
-        (fx.send "push-scope" {
-          scopedCtx = sib.scopedCtx;
-          entityClass = sib.entityClass;
-          inherit parentScope;
-        })
-        (
-          { scopeHandlers, ... }:
-          fx.bind (fx.effects.scope.provide scopeHandlers (
-            emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
-          )) (_: fx.send "restore-scope" { inherit parentScope; })
-        );
+    fx.bind fx.effects.state.get (
+      state:
+      let
+        constraintRegistry = state.flatConstraintRegistry or { };
+        isExcluded = name: builtins.any (e: e.type == "exclude") (constraintRegistry.${name} or [ ]);
+        filteredPolicies = lib.filterAttrs (name: _: !isExcluded name) latePolicies;
+        resolveCtx = sib.scopedCtx // {
+          __entityKind = sib.targetKind;
+        };
+        lateResults = dispatchAspect filteredPolicies alreadyFired resolveCtx;
+        late = extractTaggedEffects (map classifyPolicyResult lateResults);
+        hasLateEffects =
+          late.includeEffects != [ ]
+          || late.routeEffects != [ ]
+          || late.instantiateEffects != [ ]
+          || late.provideEffects != [ ]
+          || late.excludeEffects != [ ];
+      in
+      if filteredPolicies == { } || !hasLateEffects then
+        fx.pure null
+      else
+        fx.bind
+          (fx.send "push-scope" {
+            scopedCtx = sib.scopedCtx;
+            entityClass = sib.entityClass;
+            inherit parentScope;
+          })
+          (
+            { scopeHandlers, ... }:
+            fx.bind (fx.effects.scope.provide scopeHandlers (
+              emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
+            )) (_: fx.send "restore-scope" { inherit parentScope; })
+          )
+    );
 
   # Post-resolve pass: re-dispatch aspect policies registered by later siblings.
   # inLateDispatch is set true and intentionally never reset — this ensures
