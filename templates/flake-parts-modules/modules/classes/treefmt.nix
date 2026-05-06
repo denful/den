@@ -5,7 +5,7 @@ in
 {
   imports = [ inputs.treefmt-nix.flakeModule ];
   den.classes.treefmt = { };
-  den.schema.flake-parts.policies.to-flake-parts-system-treefmt = _: [
+  den.policies.to-flake-parts-system-treefmt = _: [
     (route {
       fromClass = "treefmt";
       intoClass = "flake-parts";
@@ -13,4 +13,5 @@ in
       adaptArgs = { config, ... }: config.allModuleArgs;
     })
   ];
+  den.schema.flake-parts.includes = [ den.policies.to-flake-parts-system-treefmt ];
 }

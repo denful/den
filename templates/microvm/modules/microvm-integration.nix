@@ -51,7 +51,7 @@ in
   # in guest aspects and collects them in scopedClassImports.
   den.classes.microvm.description = "MicroVM guest configuration (microvm.nix options)";
 
-  den.schema.host.policies.host-to-microvm-host =
+  den.policies.host-to-microvm-host =
     {
       host,
       ...
@@ -66,7 +66,7 @@ in
       ))
     ];
 
-  den.schema.microvm-host.policies.microvm-host-to-microvm-guest =
+  den.policies.microvm-host-to-microvm-guest =
     {
       host,
       ...
@@ -83,7 +83,7 @@ in
   # deliver its modules to the server via policy.provide at the correct paths.
   # External resolution prevents VM modules from merging into the server's
   # top-level output — only the routed content reaches the server.
-  den.schema.microvm-guest.policies.microvm-guest-resolve-vm =
+  den.policies.microvm-guest-resolve-vm =
     {
       host,
       vm,
@@ -147,7 +147,8 @@ in
     ]
     ++ sharedNixStore;
 
-  den.schema.microvm-host.includes = [ ];
-  den.schema.microvm-guest.includes = [ ];
+  den.schema.host.includes = [ den.policies.host-to-microvm-host ];
+  den.schema.microvm-host.includes = [ den.policies.microvm-host-to-microvm-guest ];
+  den.schema.microvm-guest.includes = [ den.policies.microvm-guest-resolve-vm ];
   den.schema.host.imports = [ extendHostSchema ];
 }

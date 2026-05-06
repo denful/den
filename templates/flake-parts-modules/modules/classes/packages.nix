@@ -10,7 +10,7 @@ in
   # A class for flake-parts' perSystem.packages
   # NOTE: this is different from Den's flake-packages class.
   den.classes.packages = { };
-  den.schema.flake-parts.policies.to-flake-parts-system-packages = _: [
+  den.policies.to-flake-parts-system-packages = _: [
     (route {
       fromClass = "packages";
       intoClass = "flake-parts";
@@ -18,4 +18,5 @@ in
       adaptArgs = { config, ... }: config.allModuleArgs;
     })
   ];
+  den.schema.flake-parts.includes = [ den.policies.to-flake-parts-system-packages ];
 }

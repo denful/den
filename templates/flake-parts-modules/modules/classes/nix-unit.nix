@@ -17,7 +17,7 @@ in
     inputs = inputs;
   };
 
-  den.schema.flake-parts.policies.to-flake-parts-system-tests = _: [
+  den.policies.to-flake-parts-system-tests = _: [
     (route {
       fromClass = "tests";
       intoClass = "flake-parts";
@@ -28,4 +28,5 @@ in
       adaptArgs = { config, ... }: config.allModuleArgs;
     })
   ];
+  den.schema.flake-parts.includes = [ den.policies.to-flake-parts-system-tests ];
 }
