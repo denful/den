@@ -65,13 +65,18 @@ let
       )
     );
 
-  # Emit excludes, route/instantiate/provide effects, then run a continuation.
+  # Emit pipe effects via register-pipe-effect handler.
+  policyEmitPipeEffects = sendEach "register-pipe-effect" (
+    e: e.value // { __pipePolicyName = e.__pipePolicyName or null; }
+  );
+
+  # Emit excludes, route/instantiate/provide/pipe effects, then run a continuation.
   emitPolicyEffectsThen =
     effects: cont:
     fx.bind (policyEmitExcludes effects.excludeEffects) (
       _:
       fx.bind (policyEmitEffects effects.routeEffects effects.instantiateEffects effects.provideEffects) (
-        _: cont
+        _: fx.bind (policyEmitPipeEffects (effects.pipeEffects or [ ])) (_: cont)
       )
     );
 
@@ -96,6 +101,7 @@ in
     policyEmitIncludes
     policyEmitExcludes
     policyEmitEffects
+    policyEmitPipeEffects
     emitPolicyEffectsThen
     mkSupplementalResolution
     ;

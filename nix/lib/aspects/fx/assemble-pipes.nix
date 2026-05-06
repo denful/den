@@ -26,6 +26,71 @@ let
       if builtins.isList val then val else [ val ]
     ) entries;
 
+  # Apply a single transform stage to a value list.
+  applyStage =
+    values: stage:
+    let
+      t = stage.__pipeStage or "";
+    in
+    if t == "filter" then
+      builtins.filter stage.fn values
+    else if t == "transform" then
+      map stage.fn values
+    else if t == "fold" then
+      [ (builtins.foldl' stage.fn stage.init values) ]
+    else if t == "append" then
+      values ++ [ stage.value ]
+    else if t == "for" then
+      stage.fn values
+    else
+      values;
+
+  # Apply all transform stages from a pipe effect.
+  applyTransformStages =
+    values: stages:
+    let
+      transformStages = builtins.filter (
+        s:
+        builtins.elem (s.__pipeStage or "") [
+          "filter"
+          "transform"
+          "fold"
+          "append"
+          "for"
+        ]
+      ) stages;
+    in
+    builtins.foldl' applyStage values transformStages;
+
+  # Apply pipe effects from policies to a pipe's base values.
+  applyPipeEffects =
+    pipeName: scopeId: baseValues: effects:
+    let
+      # Check pipe.for singularity — at most one per pipe per scope.
+      forEffects = builtins.filter (
+        e: builtins.any (s: (s.__pipeStage or "") == "for") (e.stages or [ ])
+      ) effects;
+      forCount = builtins.length forEffects;
+      _ =
+        assert
+          forCount <= 1
+          || throw "den: multiple pipe.for on '${pipeName}' in scope '${scopeId}' from policies: ${
+            lib.concatMapStringsSep ", " (e: e.__pipePolicyName or "<anon>") forEffects
+          }";
+        null;
+    in
+    builtins.seq _ (
+      if forCount == 1 then
+        # pipe.for replaces the list — use the for-containing effect's stages.
+        let
+          forEffect = builtins.head forEffects;
+        in
+        applyTransformStages baseValues (forEffect.stages or [ ])
+      else
+        # Each effect runs independently on the base pool, results concatenated.
+        lib.concatLists (map (e: applyTransformStages baseValues (e.stages or [ ])) effects)
+    );
+
   assemblePipes =
     {
       scopeContexts,
@@ -39,12 +104,18 @@ let
         scopeId: scopeCtx:
         let
           scopeImports = scopedClassImports.${scopeId} or { };
+          scopeEffects = scopedPipeEffects.${scopeId} or [ ];
           pipeData = lib.genAttrs pipeNames (
             pipeName:
             let
               rawEntries = scopeImports.${pipeName} or [ ];
+              baseValues = flattenAndExtract rawEntries;
+              relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
             in
-            flattenAndExtract rawEntries
+            if relevantEffects == [ ] then
+              baseValues
+            else
+              applyPipeEffects pipeName scopeId baseValues relevantEffects
           );
         in
         scopeCtx // pipeData

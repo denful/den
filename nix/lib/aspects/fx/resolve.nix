@@ -205,6 +205,7 @@ let
       augmentedScopeContexts = assemblePipes {
         inherit scopeContexts;
         scopedClassImports = scopedClassImportsRaw;
+        scopedPipeEffects = result.state.scopedPipeEffects null;
       };
 
       phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw;

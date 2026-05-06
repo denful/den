@@ -14,6 +14,7 @@ let
     route = true;
     instantiate = true;
     provide = true;
+    pipe = true;
   };
 
   # Validate that each effect returned by a policy has a valid __policyEffect tag.
@@ -24,7 +25,7 @@ let
       if !(builtins.isAttrs eff) then
         throw "den: policy '${policyName}' returned invalid effect at index ${toString i}: expected attrset, got ${builtins.typeOf eff}"
       else if !(eff ? __policyEffect) then
-        throw "den: policy '${policyName}' returned invalid effect at index ${toString i}: missing __policyEffect — use den.lib.policy.resolve/include/exclude/route/instantiate/provide"
+        throw "den: policy '${policyName}' returned invalid effect at index ${toString i}: missing __policyEffect — use den.lib.policy.resolve/include/exclude/route/instantiate/provide/pipe"
       else if !(validEffectTypes ? ${eff.__policyEffect}) then
         throw "den: policy '${policyName}' returned unknown effect type '${eff.__policyEffect}' at index ${toString i}"
       else

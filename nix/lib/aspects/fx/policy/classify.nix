@@ -64,6 +64,7 @@ let
       routeEffects = filterEffect "route" r.effects;
       instantiateEffects = filterEffect "instantiate" r.effects;
       provideEffects = filterEffect "provide" r.effects;
+      pipeEffects = filterEffect "pipe" r.effects;
     };
 
   # Tag cross-provider schema effects with their paired includes.
@@ -86,7 +87,8 @@ let
     || r.excludeEffects != [ ]
     || r.routeEffects != [ ]
     || r.instantiateEffects != [ ]
-    || r.provideEffects != [ ];
+    || r.provideEffects != [ ]
+    || r.pipeEffects != [ ];
 
   # Collect all schema effects, attaching cross-provider includes and source policy name.
   collectSchemaEffects =
@@ -137,6 +139,9 @@ let
       ) classified;
       provideEffects = builtins.concatMap (
         r: map (pe: pe // { __providePolicyName = r.policyName; }) r.provideEffects
+      ) classified;
+      pipeEffects = builtins.concatMap (
+        r: map (pe: pe // { __pipePolicyName = r.policyName; }) r.pipeEffects
       ) classified;
     };
 in

@@ -88,6 +88,51 @@
     value = spec;
   };
 
+  # Pipe transform builder — policies use pipe.from to attach transform
+  # stages (filter, transform, fold, append, for) to a named pipe.
+  pipe = {
+    from = pipeName: stages: {
+      __policyEffect = "pipe";
+      value = {
+        inherit pipeName stages;
+      };
+    };
+    filter = pred: {
+      __pipeStage = "filter";
+      fn = pred;
+    };
+    transform = fn: {
+      __pipeStage = "transform";
+      inherit fn;
+    };
+    fold = fn: init: {
+      __pipeStage = "fold";
+      inherit fn init;
+    };
+    append = value: {
+      __pipeStage = "append";
+      inherit value;
+    };
+    for = fn: {
+      __pipeStage = "for";
+      inherit fn;
+    };
+    withProvenance = {
+      __pipeStage = "withProvenance";
+    };
+    to = aspects: {
+      __pipeStage = "to";
+      inherit aspects;
+    };
+    expose = {
+      __pipeStage = "expose";
+    };
+    collect = pred: {
+      __pipeStage = "collect";
+      fn = pred;
+    };
+  };
+
   # Tag a value with collisionPolicy = "class-wins".
   # When the value reaches a class module that also receives the same arg
   # from the module system (e.g., NixOS provides `lib`), the class value

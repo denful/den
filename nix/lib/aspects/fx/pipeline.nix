@@ -52,6 +52,7 @@ let
     // handlers.registerRouteHandler
     // handlers.registerInstantiateHandler
     // handlers.provideHandler
+    // handlers.registerPipeEffectHandler
     // resolveEntityHandler
     // handlers.pushScopeHandler
     // handlers.restoreScopeHandler
@@ -160,6 +161,7 @@ let
     scopedRoutes = _: { };
     scopedInstantiates = _: { };
     scopedProvides = _: { };
+    scopedPipeEffects = _: { };
     scopedEmittedLocs = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
