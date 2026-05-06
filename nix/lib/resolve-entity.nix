@@ -51,7 +51,7 @@ let
           [ ];
     in
     {
-      inherit name collisionPolicy;
+      inherit name;
       meta = {
         handleWith = null;
         excludes = [ ];

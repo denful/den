@@ -118,9 +118,15 @@ let
         inherit ctx;
         inherit (entry) module aspectPolicy globalPolicy;
       };
+      # Don't strip den arg keys that the wrapper intentionally advertises
+      # for collision detection — NixOS needs to see them to pass _module.args.
+      wrapperAdvertised = result.advertisedArgs or { };
+      effectiveEnrichmentKeys = builtins.filter (k: !(wrapperAdvertised ? ${k})) (
+        builtins.attrNames enrichmentKeys
+      );
       finalModule = stripEnrichmentArgs {
         inherit (result) module wrapped;
-        enrichmentOnlyKeys = builtins.attrNames enrichmentKeys;
+        enrichmentOnlyKeys = effectiveEnrichmentKeys;
         inherit ctx;
       };
       isContextDependent = result.wrapped || (entry.isContextDependent or false);

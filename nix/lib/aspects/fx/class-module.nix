@@ -160,7 +160,7 @@ let
         in
         {
           module = lib.setFunctionArgs wrapper advertisedArgs;
-          inherit validator validatorAdvertisedArgs;
+          inherit validator validatorAdvertisedArgs advertisedArgs;
           wrapped = true;
         };
 
