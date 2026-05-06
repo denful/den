@@ -7,6 +7,7 @@
 }:
 let
   inherit (import ./wrap-classes.nix { inherit lib den; }) wrapCollectedClasses;
+  inherit (import ./assemble-pipes.nix { inherit lib den; }) assemblePipes;
   route = import ./route { inherit lib den; };
   handlers = den.lib.aspects.fx.handlers;
 
@@ -199,10 +200,17 @@ let
       result = mkPipeline { inherit class; } { inherit self ctx; };
       scopeContexts = result.state.scopeContexts null;
 
-      phase1 = wrapPerScope ctx scopeContexts (result.state.scopedClassImports null);
-      phase2 = applyProvides ctx scopeContexts (result.state.scopedProvides null) phase1;
+      # Assemble pipe data into scope contexts before wrapping.
+      scopedClassImportsRaw = result.state.scopedClassImports null;
+      augmentedScopeContexts = assemblePipes {
+        inherit scopeContexts;
+        scopedClassImports = scopedClassImportsRaw;
+      };
+
+      phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw;
+      phase2 = applyProvides ctx augmentedScopeContexts (result.state.scopedProvides null) phase1;
       phase3 =
-        applyRoutes (fxResolve mkPipeline) ctx scopeContexts result.state.rootScopeId
+        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
           (result.state.scopedRoutes null)
           phase2;
       phase4 = applyInstantiates (result.state.scopedInstantiates null) phase3.classImports;
