@@ -257,7 +257,7 @@ let
       # Assemble pipe data into scope contexts before wrapping.
       scopedClassImportsRaw = result.state.scopedClassImports null;
       augmentedScopeContexts = assemblePipes {
-        inherit scopeContexts globalPipePool;
+        inherit scopeContexts;
         scopedClassImports = scopedClassImportsRaw;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         scopeParent = result.state.scopeParent null;

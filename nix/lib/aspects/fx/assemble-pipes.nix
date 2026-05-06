@@ -62,36 +62,45 @@ let
     in
     builtins.foldl' applyStage values transformStages;
 
-  # Collect quirks from peer scopes matching a predicate.
-  # Uses the global pipe pool (all hosts' raw data) for cross-host harvesting.
-  # Returns flat list of harvested values from matching peers.
+  # Collect quirks from sibling scopes matching a predicate.
+  # Siblings = scopes sharing the same parent in scopeParent.
+  # Entity kind filtering: reject scopes whose entity kinds don't match the predicate.
   collectFromPeers =
     {
-      globalPipePool,
+      scopeContexts,
+      scopeParent,
+      scopedClassImports,
       currentScopeId,
       pipeName,
     }:
     predicate:
     let
-      allScopes = builtins.attrNames globalPipePool.scopeContexts;
-      # Check if the scope context satisfies the predicate's required args.
-      # Entity kind filtering is implicit in the destructuring — if the
-      # predicate requires { host, ... } but the scope has no host, skip it.
+      entityKinds = den.lib.schemaUtil.schemaEntityKinds;
+      parent = scopeParent.${currentScopeId} or null;
+      allScopeIds = builtins.attrNames scopeContexts;
+      # Siblings: same parent, excluding self.
+      siblings = builtins.filter (
+        sid: sid != currentScopeId && (scopeParent.${sid} or null) == parent
+      ) allScopeIds;
+      # Entity kind depth filter: reject scopes with entity kinds the predicate didn't request.
       predArgs = builtins.functionArgs predicate;
       requiredArgs = builtins.filter (k: !predArgs.${k}) (builtins.attrNames predArgs);
+      predEntityArgs = builtins.filter (k: builtins.elem k entityKinds) requiredArgs;
       predicateMatches =
         sid:
         let
-          ctx = globalPipePool.scopeContexts.${sid};
+          ctx = scopeContexts.${sid};
           hasRequired = builtins.all (k: ctx ? ${k}) requiredArgs;
+          scopeEntityArgs = builtins.filter (k: ctx ? ${k}) entityKinds;
+          extraEntityKinds = builtins.filter (k: !builtins.elem k predEntityArgs) scopeEntityArgs;
         in
-        hasRequired && predicate ctx;
-      matchingScopes = builtins.filter (sid: sid != currentScopeId && predicateMatches sid) allScopes;
+        hasRequired && extraEntityKinds == [ ] && predicate ctx;
+      matchingScopes = builtins.filter predicateMatches siblings;
     in
     lib.concatMap (
       sid:
       let
-        entries = (globalPipePool.scopedClassImports.${sid} or { }).${pipeName} or [ ];
+        entries = (scopedClassImports.${sid} or { }).${pipeName} or [ ];
       in
       flattenAndExtract entries
     ) matchingScopes;
@@ -100,7 +109,9 @@ let
   # This replaces applyTransformStages for effects that contain collect stages.
   processStagesWithCollect =
     {
-      globalPipePool,
+      scopeContexts,
+      scopeParent,
+      scopedClassImports,
       currentScopeId,
       pipeName,
     }:
@@ -127,7 +138,9 @@ let
         values
         ++ collectFromPeers {
           inherit
-            globalPipePool
+            scopeContexts
+            scopeParent
+            scopedClassImports
             currentScopeId
             pipeName
             ;
@@ -152,7 +165,9 @@ let
   # Uses processStagesWithCollect when collect stages are present, otherwise applyTransformStages.
   applyEffectStages =
     {
-      globalPipePool,
+      scopeContexts,
+      scopeParent,
+      scopedClassImports,
       currentScopeId,
       pipeName,
     }:
@@ -160,7 +175,9 @@ let
     if builtins.any (s: (s.__pipeStage or "") == "collect") stages then
       processStagesWithCollect {
         inherit
-          globalPipePool
+          scopeContexts
+          scopeParent
+          scopedClassImports
           currentScopeId
           pipeName
           ;
@@ -172,7 +189,9 @@ let
   # Returns only the untargeted (scope-wide) result.
   applyPipeEffects =
     {
-      globalPipePool,
+      scopeContexts,
+      scopeParent,
+      scopedClassImports,
     }:
     pipeName: scopeId: baseValues: effects:
     let
@@ -189,7 +208,11 @@ let
         else
           null;
       applyStages = applyEffectStages {
-        inherit globalPipePool;
+        inherit
+          scopeContexts
+          scopeParent
+          scopedClassImports
+          ;
         currentScopeId = scopeId;
         inherit pipeName;
       };
@@ -206,7 +229,9 @@ let
   # Returns: { aspectName → transformedValues }
   buildTargetedData =
     {
-      globalPipePool,
+      scopeContexts,
+      scopeParent,
+      scopedClassImports,
       currentScopeId,
     }:
     baseValues: effects:
@@ -218,7 +243,9 @@ let
           targets = getToTargets effect;
           transformed = applyEffectStages {
             inherit
-              globalPipePool
+              scopeContexts
+              scopeParent
+              scopedClassImports
               currentScopeId
               ;
             pipeName = effect.pipeName;
@@ -339,10 +366,6 @@ let
       scopedClassImports,
       scopedPipeEffects ? { },
       scopeParent ? { },
-      globalPipePool ? {
-        scopeContexts = { };
-        scopedClassImports = { };
-      },
     }:
     if pipeNames == [ ] then
       scopeContexts
@@ -386,7 +409,7 @@ let
               combinedBase
             else
               applyPipeEffects {
-                inherit globalPipePool;
+                inherit scopeContexts scopeParent scopedClassImports;
               } pipeName scopeId combinedBase untargetedEffects
           );
 
@@ -407,7 +430,7 @@ let
                   { }
                 else
                   buildTargetedData {
-                    inherit globalPipePool;
+                    inherit scopeContexts scopeParent scopedClassImports;
                     currentScopeId = scopeId;
                   } combinedBase targetedEffects
               );
