@@ -108,25 +108,21 @@ let
     in
     lib.setDefaultModuleLocation validatorLoc validatorModule;
 
-  # Extract the leaf aspect name from an entry identity.
-  # "postgres" → "postgres", "provider/postgres" → "postgres"
-  aspectNameFromIdentity =
-    id:
-    let
-      # Strip any context suffix like "/{ctxId}" first.
-      base = lib.head (lib.splitString "/{" id);
-      parts = lib.splitString "/" base;
-    in
-    lib.last parts;
+  # Extract the base identity key from an entry identity.
+  # Strips context suffix (/{ctxId}) but preserves full provider path.
+  # "postgres" → "postgres", "provider/postgres" → "provider/postgres"
+  # "postgres/{host=igloo}" → "postgres"
+  baseIdentityFromEntry = id: den.lib.aspects.fx.identity.stripCtxSuffix id;
 
   # Apply per-aspect pipe overrides from __pipeTargeted.
+  # Matches on full identity pathkey, not just leaf name.
   applyPipeTargeting =
     ctx: entry:
     let
       pipeTargeted = ctx.__pipeTargeted or { };
       entryId = entry.identity or "<anon>";
-      aspectName = aspectNameFromIdentity entryId;
-      overrides = pipeTargeted.${aspectName} or { };
+      baseId = baseIdentityFromEntry entryId;
+      overrides = pipeTargeted.${baseId} or { };
     in
     if pipeTargeted == { } || overrides == { } then ctx else ctx // overrides;
 

@@ -65,13 +65,14 @@ let
   # Check whether a pipe effect has a pipe.to routing stage.
   hasToStage = e: builtins.any (s: (s.__pipeStage or "") == "to") (e.stages or [ ]);
 
-  # Extract target aspect names from a pipe.to stage.
+  # Extract target aspect identity keys from a pipe.to stage.
+  # Uses full identity pathkey (e.g., "provider/postgres") not just leaf name.
   getToTargets =
     effect:
     let
       toStage = lib.findFirst (s: (s.__pipeStage or "") == "to") null (effect.stages or [ ]);
     in
-    map (a: a.name or "<anon>") toStage.aspects;
+    map (a: den.lib.aspects.fx.identity.key a) toStage.aspects;
 
   # Apply pipe effects from policies to a pipe's base values.
   # Returns only the untargeted (scope-wide) result.
