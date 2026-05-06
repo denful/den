@@ -153,7 +153,7 @@ let
 
   # Phase 4: Apply entity instantiation.
   applyInstantiates =
-    scopedInstantiates: classImports:
+    scopedInstantiates: perScope: classImports:
     let
       allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
       instantiateModules = lib.concatMap (
@@ -165,18 +165,26 @@ let
           [ ]
         else
           let
+            # If the host was walked in this pipeline, use pre-walked modules.
+            # Otherwise fall back to mainModule (triggers fxResolve — legacy path).
+            sid = spec.sourceScopeId or null;
+            hostClass = spec.class or "nixos";
+            preWalkedModules = if sid != null then perScope.${sid}.${hostClass} or null else null;
+            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
             instantiateArgs =
               if spec ? pkgs then
                 {
                   inherit (spec) pkgs;
-                  modules = [ spec.mainModule ];
+                  inherit modules;
                 }
               else
                 {
-                  modules = [
-                    spec.mainModule
-                  ]
-                  ++ lib.optional (spec ? system) { nixpkgs.hostPlatform = lib.mkDefault spec.system; };
+                  inherit modules;
+                }
+                // lib.optionalAttrs (spec ? system) {
+                  modules = modules ++ [
+                    { nixpkgs.hostPlatform = lib.mkDefault spec.system; }
+                  ];
                 };
             evaluated = spec.instantiate instantiateArgs;
           in
@@ -261,7 +269,9 @@ let
         applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
           (result.state.scopedRoutes null)
           phase2;
-      phase4 = applyInstantiates (result.state.scopedInstantiates null) phase3.classImports;
+      phase4 =
+        applyInstantiates (result.state.scopedInstantiates null) phase3.perScope
+          phase3.classImports;
     in
     {
       imports = phase4.${class} or [ ];

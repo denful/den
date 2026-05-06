@@ -56,18 +56,26 @@ in
     let
       hosts = den.hosts.${system} or { };
     in
-    lib.concatMap (host: lib.optional (host.intoAttr != [ ]) (den.lib.policy.instantiate host)) (
-      builtins.attrValues hosts
-    );
+    lib.concatMap (
+      host:
+      lib.optionals (host.intoAttr != [ ]) [
+        (resolve.to "host" { inherit host; })
+        (den.lib.policy.instantiate host)
+      ]
+    ) (builtins.attrValues hosts);
 
   den.policies.to-hm-outputs =
     { system, ... }:
     let
       homes = den.homes.${system} or { };
     in
-    lib.concatMap (home: lib.optional (home.intoAttr != [ ]) (den.lib.policy.instantiate home)) (
-      builtins.attrValues homes
-    );
+    lib.concatMap (
+      home:
+      lib.optionals (home.intoAttr != [ ]) [
+        (resolve.to "home" { inherit home; })
+        (den.lib.policy.instantiate home)
+      ]
+    ) (builtins.attrValues homes);
 
   # Per-output route policies
   den.policies.to-packages = mkOutputPolicy "packages";
