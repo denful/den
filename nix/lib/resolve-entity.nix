@@ -17,7 +17,21 @@ let
   resolveEntity =
     name: ctx:
     let
-      scopeHandlers = constantHandler ctx;
+      schemaEntry = (den.schema or { }).${name} or { };
+      schemaIncludes = schemaEntry.includes or [ ];
+      # Capture schema-level collisionPolicy eagerly — avoids circular eval
+      # when read during post-pipeline wrapping (wrapClassModule).
+      collisionPolicy = schemaEntry.collisionPolicy or null;
+      # Store collisionPolicy as a separate __collisionPolicies entry in ctx
+      # so wrapClassModule can read it without accessing the live entity config.
+      augmentedCtx =
+        ctx
+        // lib.optionalAttrs (collisionPolicy != null) {
+          __collisionPolicies = (ctx.__collisionPolicies or { }) // {
+            ${name} = collisionPolicy;
+          };
+        };
+      scopeHandlers = constantHandler augmentedCtx;
       selfProvide =
         if name == "default" && den ? default then
           [ den.default ]
@@ -35,10 +49,9 @@ let
           ]
         else
           [ ];
-      schemaIncludes = ((den.schema or { }).${name} or { }).includes or [ ];
     in
     {
-      inherit name;
+      inherit name collisionPolicy;
       meta = {
         handleWith = null;
         excludes = [ ];

@@ -13,24 +13,36 @@ let
   # Emit policy include effects via existing handlers.
   policyEmitIncludes =
     effects:
-    builtins.foldl' (
-      acc: e:
-      fx.bind acc (
-        prev:
-        let
-          policyName = e.__sourcePolicyName or null;
-          child =
-            if policyName != null && builtins.isAttrs e.value && !(e.value ? name) then
-              e.value // { name = "<policy:${policyName}>"; }
-            else
-              e.value;
-        in
-        fx.bind (fx.send "emit-include" {
-          inherit child;
-          idx = null;
-        }) (r: fx.pure (prev ++ r))
-      )
-    ) (fx.pure [ ]) effects;
+    let
+      len = builtins.length effects;
+      go =
+        idx: acc:
+        if idx >= len then
+          acc
+        else
+          let
+            e = builtins.elemAt effects idx;
+            policyName = e.__sourcePolicyName or null;
+            # Append index when multiple includes share a policy name to prevent
+            # dedup collisions in the class collector.
+            suffix = if len > 1 then "[${toString idx}]" else "";
+            child =
+              if policyName != null && builtins.isAttrs e.value && !(e.value ? name) then
+                e.value // { name = "<policy:${policyName}>${suffix}"; }
+              else
+                e.value;
+          in
+          go (idx + 1) (
+            fx.bind acc (
+              prev:
+              fx.bind (fx.send "emit-include" {
+                inherit child;
+                idx = null;
+              }) (r: fx.pure (prev ++ r))
+            )
+          );
+    in
+    go 0 (fx.pure [ ]);
 
   # Emit policy exclude effects.
   policyEmitExcludes = sendEach "register-constraint" (e: {

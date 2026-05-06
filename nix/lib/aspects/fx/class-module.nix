@@ -55,7 +55,12 @@ let
     then
       ctx.${name}.collisionPolicy
     else
-      globalPolicy;
+      # Check __collisionPolicies — pre-computed from schema entries during
+      # resolveEntity to avoid circular eval through module system configs.
+      let
+        policies = ctx.__collisionPolicies or { };
+      in
+      if policies ? ${name} then policies.${name} else globalPolicy;
 
   # Class modules (after aspectContentType unwrapping or from deferred
   # imports) may be { imports = [...]; } attrsets. The original function
