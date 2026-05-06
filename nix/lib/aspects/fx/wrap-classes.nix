@@ -157,7 +157,13 @@ let
     lib.mapAttrs (
       class: entries:
       lib.concatMap (
-        entry: if !(entry.__rawEntry or false) then [ entry ] else processEntry enrichedCtx class entry
+        entry:
+        if entry.__isPipeEntry or false then
+          [ entry ]
+        else if !(entry.__rawEntry or false) then
+          [ entry ]
+        else
+          processEntry enrichedCtx class entry
       ) entries
     ) classImports;
 in

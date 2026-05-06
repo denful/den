@@ -16,6 +16,29 @@
       }
     );
 
+    # Pipe key reaches scopedClassImports, not emitted as class module.
+    # If firewall quirk became a NixOS module, NixOS would error on { ports = [...]; }.
+    test-pipe-key-not-class = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.pipes.firewall = {
+          description = "Firewall port declarations";
+        };
+        den.aspects.igloo = {
+          nixos.networking.hostName = "pipe-classify";
+          firewall = {
+            ports = [
+              80
+              443
+            ];
+          };
+        };
+        expr = igloo.networking.hostName;
+        expected = "pipe-classify";
+      }
+    );
+
     test-pipe-class-collision = denTest (
       { den, ... }:
       {

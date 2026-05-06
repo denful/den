@@ -63,6 +63,26 @@ let
         };
     in
     fx.seq (lib.imap0 mkEntry modules);
+
+  emitPipeKey =
+    aspect: ctx: contextDep: nodeIdentity: k:
+    let
+      modules = unwrapContentValuesList aspect.${k};
+      isMulti = builtins.length modules > 1;
+      mkEntry =
+        idx: module:
+        fx.send "emit-class" {
+          class = k;
+          identity = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
+          inherit module ctx;
+          aspectPolicy = null;
+          globalPolicy = null;
+          isContextDependent = contextDep;
+          __rawEntry = true;
+          __isPipeEntry = true;
+        };
+    in
+    fx.seq (lib.imap0 mkEntry modules);
 in
 {
   emitClassesHandler = {
@@ -71,6 +91,7 @@ in
       let
         aspect = param.aspect;
         classKeys = param.classKeys;
+        pipeKeys = param.pipeKeys or [ ];
         nodeIdentity = param.identity;
         ctx = ctxFromHandlers (aspect.__scopeHandlers or { });
         aspectPolicy = aspect.meta.collisionPolicy or null;
@@ -79,7 +100,8 @@ in
       in
       {
         resume = fx.seq (
-          map (emitClassKey aspect ctx aspectPolicy globalPolicy contextDep nodeIdentity) classKeys
+          (map (emitClassKey aspect ctx aspectPolicy globalPolicy contextDep nodeIdentity) classKeys)
+          ++ (map (emitPipeKey aspect ctx contextDep nodeIdentity) pipeKeys)
         );
         inherit state;
       };

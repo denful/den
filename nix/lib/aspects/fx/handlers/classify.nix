@@ -17,7 +17,7 @@ in
       {
         resume = {
           classKeys = classified.classKeys ++ classified.unregisteredClassKeys;
-          inherit (classified) nestedKeys;
+          inherit (classified) nestedKeys pipeKeys;
         };
         inherit state;
       };

@@ -79,6 +79,7 @@ in
                           (fx.send "emit-classes" {
                             aspect = tagged;
                             classKeys = classified.classKeys;
+                            pipeKeys = classified.pipeKeys or [ ];
                             identity = nodeIdentity;
                           })
                           (registerConstraints tagged)

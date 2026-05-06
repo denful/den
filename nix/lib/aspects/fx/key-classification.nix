@@ -32,6 +32,10 @@ let
   # the evaluation cycle that existed when it lived inside den.schema.
   classRegistry = den.classes or { };
 
+  # Pipe registry — pipe keys flow through emit-class but are not
+  # wrapped as class modules by wrapCollectedClasses.
+  pipeRegistry = den.pipes or { };
+
   hasRecognizedSubKeys =
     depth: val:
     builtins.isAttrs val
@@ -50,25 +54,29 @@ let
     let
       allKeys = builtins.filter (k: !(structuralKeysSet ? ${k})) (builtins.attrNames aspect);
     in
-    if classRegistry == { } then
+    if classRegistry == { } && pipeRegistry == { } then
       {
         classKeys = allKeys;
         nestedKeys = [ ];
         unregisteredClassKeys = [ ];
+        pipeKeys = [ ];
       }
     else
       let
+        isPipeKey = k: pipeRegistry ? ${k};
         isClassKey = k: classRegistry ? ${k} || (targetClass != null && k == targetClass);
-        classKeys = builtins.filter isClassKey allKeys;
-        nonClassKeys = builtins.filter (k: !isClassKey k) allKeys;
+        pipeKeys = builtins.filter isPipeKey allKeys;
+        nonPipeKeys = builtins.filter (k: !isPipeKey k) allKeys;
+        classKeys = builtins.filter isClassKey nonPipeKeys;
+        nonClassKeys = builtins.filter (k: !isClassKey k) nonPipeKeys;
         classified = lib.partition (isNestedKey aspect) nonClassKeys;
       in
       {
-        inherit classKeys;
+        inherit classKeys pipeKeys;
         nestedKeys = classified.right;
         unregisteredClassKeys = classified.wrong;
       };
 in
 {
-  inherit structuralKeysSet classifyKeys;
+  inherit structuralKeysSet classifyKeys pipeRegistry;
 }
