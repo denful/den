@@ -530,18 +530,21 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.default.homeManager.home.stateVersion = "25.11";
-        den.default.includes = [ myProvide ];
-        # Enrichment policy — mimics slashfiles host-guards which adds
-        # isDarwin/isNixos context. This triggers context widening and
-        # re-dispatch at each entity scope, causing the provide's sub-includes
-        # to be walked a second time with different __ctxId.
-        den.default.policies.enrichment =
+        den.policies.enrichment =
           { host, ... }:
           [
             (den.lib.policy.resolve {
               isNixos = host.class == "nixos";
             })
           ];
+        den.default.includes = [
+          myProvide
+          # Enrichment policy — mimics slashfiles host-guards which adds
+          # isDarwin/isNixos context. This triggers context widening and
+          # re-dispatch at each entity scope, causing the provide's sub-includes
+          # to be walked a second time with different __ctxId.
+          den.policies.enrichment
+        ];
 
         expr = {
           nixos = igloo.environment.variables.FROM_PROVIDE or "missing";
