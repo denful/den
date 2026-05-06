@@ -188,26 +188,54 @@ let
       flake = (classImports.flake or [ ]) ++ instantiateModules;
     };
 
+  # Compute global raw pipeline data for all hosts, lazily.
+  # Each host's raw scopedClassImports and scopeContexts are merged
+  # into a single pool so pipe.collect can harvest from peer hosts.
+  # Uses den.lib.resolveEntity to construct the correct root aspect
+  # with entity bindings (host = hostConfig, etc.) in scope handlers.
+  mkGlobalPipePool =
+    mkPipeline:
+    let
+      inherit (den.lib.aspects) normalizeRoot;
+      ctxFromHandlers = den.lib.aspects.fx.aspect.ctxFromHandlers;
+      allHosts = den.hosts or { };
+      perHost = lib.concatMap (
+        system:
+        map (
+          hostName:
+          let
+            hostConfig = allHosts.${system}.${hostName};
+            resolved = den.lib.resolveEntity "host" { host = hostConfig; };
+            wrapped = normalizeRoot resolved;
+            ctx = ctxFromHandlers (resolved.__scopeHandlers or { });
+            result = mkPipeline { class = hostConfig.class; } {
+              self = wrapped;
+              inherit ctx;
+            };
+          in
+          {
+            scopeContexts = result.state.scopeContexts null;
+            scopedClassImports = result.state.scopedClassImports null;
+          }
+        ) (builtins.attrNames (allHosts.${system} or { }))
+      ) (builtins.attrNames allHosts);
+    in
+    builtins.foldl'
+      (acc: hostData: {
+        scopeContexts = acc.scopeContexts // hostData.scopeContexts;
+        scopedClassImports = acc.scopedClassImports // hostData.scopedClassImports;
+      })
+      {
+        scopeContexts = { };
+        scopedClassImports = { };
+      }
+      perHost;
+
   # Full resolution: run pipeline, then assemble output through all phases.
   fxResolve =
     mkPipeline:
     let
-      # Lazy fleet pipeline walk — provides cross-host pipe pool for pipe.collect.
-      # Only forces when pipe.collect is actually used.
-      fleetPipelineState =
-        let
-          inherit (den.lib.aspects) normalizeRoot;
-          fleetEntity = den.lib.resolveEntity "fleet" { };
-          wrapped = normalizeRoot fleetEntity;
-          result = mkPipeline { class = "__fleet"; } {
-            self = wrapped;
-            ctx = { };
-          };
-        in
-        {
-          scopeContexts = result.state.scopeContexts null;
-          scopedClassImports = result.state.scopedClassImports null;
-        };
+      globalPipePool = mkGlobalPipePool mkPipeline;
     in
     {
       class,
@@ -221,8 +249,7 @@ let
       # Assemble pipe data into scope contexts before wrapping.
       scopedClassImportsRaw = result.state.scopedClassImports null;
       augmentedScopeContexts = assemblePipes {
-        inherit scopeContexts;
-        globalPipePool = fleetPipelineState;
+        inherit scopeContexts globalPipePool;
         scopedClassImports = scopedClassImportsRaw;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         scopeParent = result.state.scopeParent null;

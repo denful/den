@@ -235,7 +235,6 @@ in
   };
   config.den.schema = {
     conf = { };
-    fleet = { };
     host.imports = [ den.schema.conf ];
     user.imports = [ den.schema.conf ];
     home.imports = [ den.schema.conf ];
