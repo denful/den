@@ -72,20 +72,20 @@ let
       ) effects;
       forCount = builtins.length forEffects;
       _ =
-        assert
-          forCount <= 1
-          || throw "den: multiple pipe.for on '${pipeName}' in scope '${scopeId}' from policies: ${
+        if forCount > 1 then
+          throw "den: multiple pipe.for on '${pipeName}' in scope '${scopeId}' from policies: ${
             lib.concatMapStringsSep ", " (e: e.__pipePolicyName or "<anon>") forEffects
-          }";
-        null;
+          }"
+        else
+          null;
     in
     builtins.seq _ (
       if forCount == 1 then
-        # pipe.for replaces the list — use the for-containing effect's stages.
-        let
-          forEffect = builtins.head forEffects;
-        in
-        applyTransformStages baseValues (forEffect.stages or [ ])
+        # pipe.for takes ownership — other effects for this pipe in this scope
+        # are silently dropped. pipe.for semantically replaces the entire pool
+        # with an arbitrary value, so filtering/appending from other effects
+        # would be incoherent. Use a single policy with pipe.for per pipe.
+        applyTransformStages baseValues ((builtins.head forEffects).stages or [ ])
       else
         # Each effect runs independently on the base pool, results concatenated.
         lib.concatLists (map (e: applyTransformStages baseValues (e.stages or [ ])) effects)

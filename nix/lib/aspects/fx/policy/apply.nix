@@ -101,7 +101,6 @@ in
     policyEmitIncludes
     policyEmitExcludes
     policyEmitEffects
-    policyEmitPipeEffects
     emitPolicyEffectsThen
     mkSupplementalResolution
     ;
