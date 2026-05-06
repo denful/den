@@ -30,6 +30,7 @@ let
     {
       scopeContexts,
       scopedClassImports,
+      scopedPipeEffects ? { },
     }:
     if pipeNames == [ ] then
       scopeContexts
