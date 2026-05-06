@@ -35,6 +35,8 @@
         # den included batteries that provide common configs.
         <den/primary-user> # alice is admin always.
         (<den/user-shell> "fish") # default user shell
+        # explicit policy activation
+        den.aspects.alice.policies.to-igloo
       ];
 
     # Alice configures NixOS hosts it lives on.
@@ -61,6 +63,7 @@
           module.programs.nh.enable = true;
         }
       );
+
   };
 
   # This is a context-aware aspect, that emits configurations

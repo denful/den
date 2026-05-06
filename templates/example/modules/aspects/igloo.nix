@@ -19,5 +19,7 @@
           homeManager.programs.tmux.enable = user.name == "alice";
         }
       );
+
+    includes = [ den.aspects.igloo.policies.to-alice ];
   };
 }
