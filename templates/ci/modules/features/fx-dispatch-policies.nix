@@ -15,7 +15,7 @@
 
         # Mock mkDispatch: just return a tagged result so we can verify
         # the handler passes args correctly and resumes the return value.
-        mockMkDispatch = directPolicies: aspectPolicies: firedPolicies: resolveCtx: {
+        mockMkDispatch = aspectPolicies: firedPolicies: resolveCtx: {
           schemaEffects = [ ];
           includeEffects = [ ];
           excludeEffects = [ ];
@@ -25,18 +25,25 @@
           enrichment = { };
           firedNames = [ ];
           # Echo inputs for verification.
-          __directCount = builtins.length (builtins.attrNames directPolicies);
+          __aspectCount = builtins.length (builtins.attrNames aspectPolicies);
           __resolveKind = resolveCtx.__entityKind or "none";
         };
 
         dispatchHandler = handlers.mkDispatchPoliciesHandler mockMkDispatch;
 
         comp = fx.send "dispatch-policies" {
-          directPolicies = {
-            pol-a = _: [ ];
-            pol-b = _: [ ];
+          aspectPolicies = {
+            pol-a = {
+              __isPolicy = true;
+              name = "pol-a";
+              fn = _: [ ];
+            };
+            pol-b = {
+              __isPolicy = true;
+              name = "pol-b";
+              fn = _: [ ];
+            };
           };
-          aspectPolicies = { };
           firedPolicies = { };
           resolveCtx = {
             __entityKind = "hosts";
@@ -59,7 +66,7 @@
             provideEffects
             enrichment
             firedNames
-            __directCount
+            __aspectCount
             __resolveKind
             ;
         };
@@ -72,7 +79,7 @@
           provideEffects = [ ];
           enrichment = { };
           firedNames = [ ];
-          __directCount = 2;
+          __aspectCount = 2;
           __resolveKind = "hosts";
         };
       }
@@ -85,14 +92,13 @@
         fx = den.lib.fx;
         handlers = den.lib.aspects.fx.handlers;
 
-        mockMkDispatch = _: _: _: _: {
+        mockMkDispatch = _: _: _: {
           firedNames = [ ];
         };
 
         dispatchHandler = handlers.mkDispatchPoliciesHandler mockMkDispatch;
 
         comp = fx.send "dispatch-policies" {
-          directPolicies = { };
           aspectPolicies = { };
           firedPolicies = { };
           resolveCtx = { };
@@ -139,20 +145,23 @@
         dispatchHandler = handlers.mkDispatchPoliciesHandler mkDispatch;
 
         # A policy that emits an include effect.
-        testPolicy =
-          { __entityKind, ... }:
-          [
-            {
-              __policyEffect = "include";
-              value = "some-module";
-            }
-          ];
+        testPolicy = {
+          __isPolicy = true;
+          name = "test-pol";
+          fn =
+            { __entityKind, ... }:
+            [
+              {
+                __policyEffect = "include";
+                value = "some-module";
+              }
+            ];
+        };
 
         comp = fx.send "dispatch-policies" {
-          directPolicies = {
+          aspectPolicies = {
             test-pol = testPolicy;
           };
-          aspectPolicies = { };
           firedPolicies = { };
           resolveCtx = {
             __entityKind = "hosts";

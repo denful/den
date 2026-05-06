@@ -28,13 +28,12 @@ let
 
   # Fixed-point iteration.
   iterate =
-    allDirectPolicies: aspectPolicies: entityKind: currentCtx:
+    aspectPolicies: entityKind: currentCtx:
     let
       go =
         iteration: accEnrichment: accEffects: firedPolicies: currentResolveCtx:
         fx.bind
           (fx.send "dispatch-policies" {
-            directPolicies = allDirectPolicies;
             inherit aspectPolicies firedPolicies;
             resolveCtx = currentResolveCtx;
           })

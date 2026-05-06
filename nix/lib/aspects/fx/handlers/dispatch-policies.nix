@@ -8,7 +8,7 @@ _: {
     "dispatch-policies" =
       { param, state }:
       {
-        resume = mkDispatch param.directPolicies param.aspectPolicies param.firedPolicies param.resolveCtx;
+        resume = mkDispatch param.aspectPolicies param.firedPolicies param.resolveCtx;
         inherit state;
       };
   };

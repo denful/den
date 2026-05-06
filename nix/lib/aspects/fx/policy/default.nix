@@ -92,7 +92,6 @@ let
         currentCtx = scopeCtx // ctx;
         dispatchKey = "${entityKind}@${scope}";
         alreadyDispatched = ((state.dispatchedPolicies or (_: { })) null) ? ${dispatchKey};
-        allDirectPolicies = { };
         # Policies fire where they're registered — scope-local only.
         # Cascade happens through effects (resolves/includes), not re-dispatch.
         aspectPolicies = ((state.scopedAspectPolicies or (_: { })) null).${scope} or { };
@@ -109,7 +108,7 @@ let
           // {
             dispatchedPolicies = _: ((st.dispatchedPolicies or (_: { })) null) // { ${dispatchKey} = true; };
           }
-        )) (_: iterate allDirectPolicies aspectPolicies entityKind currentCtx 0 { } emptyAcc { } resolveCtx)
+        )) (_: iterate aspectPolicies entityKind currentCtx 0 { } emptyAcc { } resolveCtx)
     );
 in
 {

@@ -31,34 +31,6 @@ let
         eff
     ) rawEffects;
 
-  # Dispatch global + schema policies against a context.
-  dispatchDirect =
-    allDirectPolicies: firedPolicies: resolveCtx:
-    lib.concatLists (
-      lib.mapAttrsToList (
-        name: policy:
-        let
-          policyFn = if builtins.isAttrs policy && policy.__isPolicy or false then policy.fn else policy;
-        in
-        if !resolveArgsSatisfied policyFn resolveCtx || firedPolicies ? ${name} then
-          [ ]
-        else
-          let
-            result = policyFn resolveCtx;
-            rawEffects = if builtins.isList result then result else [ result ];
-          in
-          if rawEffects == [ ] then
-            [ ]
-          else
-            [
-              {
-                policyName = name;
-                effects = validateEffects name rawEffects;
-              }
-            ]
-      ) allDirectPolicies
-    );
-
   # Dispatch aspect policies against a context.
   # Note: caller passes the same aspectPolicies each iteration; Nix memoizes
   # attrsToList per attrset identity, so repeated calls are cheap.
@@ -84,11 +56,9 @@ let
 
   # Combined dispatch returning classified + tagged results.
   mkDispatch =
-    allDirectPolicies: aspectPolicies: firedPolicies: resolveCtx:
+    aspectPolicies: firedPolicies: resolveCtx:
     let
-      allResults =
-        dispatchDirect allDirectPolicies firedPolicies resolveCtx
-        ++ dispatchAspect aspectPolicies firedPolicies resolveCtx;
+      allResults = dispatchAspect aspectPolicies firedPolicies resolveCtx;
       classified = map classifyPolicyResult allResults;
       tagged = extractTaggedEffects classified;
     in
