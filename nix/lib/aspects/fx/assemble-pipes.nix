@@ -62,6 +62,80 @@ let
     in
     builtins.foldl' applyStage values transformStages;
 
+  # Collect quirks from peer scopes matching a predicate.
+  # Uses the global pipe pool (all hosts' raw data) for cross-host harvesting.
+  # Returns flat list of harvested values from matching peers.
+  collectFromPeers =
+    {
+      globalPipePool,
+      currentScopeId,
+      pipeName,
+    }:
+    predicate:
+    let
+      allScopes = builtins.attrNames globalPipePool.scopeContexts;
+      # Check if the scope context satisfies the predicate's required args.
+      # Entity kind filtering is implicit in the destructuring — if the
+      # predicate requires { host, ... } but the scope has no host, skip it.
+      predArgs = builtins.functionArgs predicate;
+      requiredArgs = builtins.filter (k: !predArgs.${k}) (builtins.attrNames predArgs);
+      predicateMatches =
+        sid:
+        let
+          ctx = globalPipePool.scopeContexts.${sid};
+          hasRequired = builtins.all (k: ctx ? ${k}) requiredArgs;
+        in
+        hasRequired && predicate ctx;
+      matchingScopes = builtins.filter (sid: sid != currentScopeId && predicateMatches sid) allScopes;
+    in
+    lib.concatMap (
+      sid:
+      let
+        entries = (globalPipePool.scopedClassImports.${sid} or { }).${pipeName} or [ ];
+      in
+      flattenAndExtract entries
+    ) matchingScopes;
+
+  # Process stages sequentially, including collect stages that harvest from peers.
+  # This replaces applyTransformStages for effects that contain collect stages.
+  processStagesWithCollect =
+    {
+      globalPipePool,
+      currentScopeId,
+      pipeName,
+    }:
+    initialValues: stages:
+    let
+      relevantStages = builtins.filter (
+        s:
+        builtins.elem (s.__pipeStage or "") [
+          "filter"
+          "transform"
+          "fold"
+          "append"
+          "for"
+          "collect"
+        ]
+      ) stages;
+    in
+    builtins.foldl' (
+      values: stage:
+      let
+        t = stage.__pipeStage or "";
+      in
+      if t == "collect" then
+        values
+        ++ collectFromPeers {
+          inherit
+            globalPipePool
+            currentScopeId
+            pipeName
+            ;
+        } stage.fn
+      else
+        applyStage values stage
+    ) initialValues relevantStages;
+
   # Check whether a pipe effect has a pipe.to routing stage.
   hasToStage = e: builtins.any (s: (s.__pipeStage or "") == "to") (e.stages or [ ]);
 
@@ -74,9 +148,32 @@ let
     in
     map (a: den.lib.aspects.fx.identity.key a) toStage.aspects;
 
+  # Choose the right stage processor for an effect's stages.
+  # Uses processStagesWithCollect when collect stages are present, otherwise applyTransformStages.
+  applyEffectStages =
+    {
+      globalPipePool,
+      currentScopeId,
+      pipeName,
+    }:
+    baseValues: stages:
+    if builtins.any (s: (s.__pipeStage or "") == "collect") stages then
+      processStagesWithCollect {
+        inherit
+          globalPipePool
+          currentScopeId
+          pipeName
+          ;
+      } baseValues stages
+    else
+      applyTransformStages baseValues stages;
+
   # Apply pipe effects from policies to a pipe's base values.
   # Returns only the untargeted (scope-wide) result.
   applyPipeEffects =
+    {
+      globalPipePool,
+    }:
     pipeName: scopeId: baseValues: effects:
     let
       # Check pipe.for singularity — at most one per pipe per scope.
@@ -91,22 +188,27 @@ let
           }"
         else
           null;
+      applyStages = applyEffectStages {
+        inherit globalPipePool;
+        currentScopeId = scopeId;
+        inherit pipeName;
+      };
     in
     builtins.seq _ (
       if forCount == 1 then
-        # pipe.for takes ownership — other effects for this pipe in this scope
-        # are silently dropped. pipe.for semantically replaces the entire pool
-        # with an arbitrary value, so filtering/appending from other effects
-        # would be incoherent. Use a single policy with pipe.for per pipe.
-        applyTransformStages baseValues ((builtins.head forEffects).stages or [ ])
+        applyStages baseValues ((builtins.head forEffects).stages or [ ])
       else
         # Each effect runs independently on the base pool, results concatenated.
-        lib.concatLists (map (e: applyTransformStages baseValues (e.stages or [ ])) effects)
+        lib.concatLists (map (e: applyStages baseValues (e.stages or [ ])) effects)
     );
 
   # Build per-aspect targeted pipe data from targeted effects.
   # Returns: { aspectName → transformedValues }
   buildTargetedData =
+    {
+      globalPipePool,
+      currentScopeId,
+    }:
     baseValues: effects:
     let
       # Collect (aspectName, values) pairs from all targeted effects.
@@ -114,7 +216,13 @@ let
         effect:
         let
           targets = getToTargets effect;
-          transformed = applyTransformStages baseValues (effect.stages or [ ]);
+          transformed = applyEffectStages {
+            inherit
+              globalPipePool
+              currentScopeId
+              ;
+            pipeName = effect.pipeName;
+          } baseValues (effect.stages or [ ]);
         in
         map (name: {
           inherit name;
@@ -231,6 +339,10 @@ let
       scopedClassImports,
       scopedPipeEffects ? { },
       scopeParent ? { },
+      globalPipePool ? {
+        scopeContexts = { };
+        scopedClassImports = { };
+      },
     }:
     if pipeNames == [ ] then
       scopeContexts
@@ -273,7 +385,9 @@ let
               # All effects are targeted/expose — scope-wide data is combined base values.
               combinedBase
             else
-              applyPipeEffects pipeName scopeId combinedBase untargetedEffects
+              applyPipeEffects {
+                inherit globalPipePool;
+              } pipeName scopeId combinedBase untargetedEffects
           );
 
           # Build __pipeTargeted: { aspectName → { pipeName → values } }
@@ -289,7 +403,13 @@ let
                   relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
                   targetedEffects = builtins.filter hasToStage relevantEffects;
                 in
-                if targetedEffects == [ ] then { } else buildTargetedData combinedBase targetedEffects
+                if targetedEffects == [ ] then
+                  { }
+                else
+                  buildTargetedData {
+                    inherit globalPipePool;
+                    currentScopeId = scopeId;
+                  } combinedBase targetedEffects
               );
               # Invert: { pipeName → { aspectName → vals } } → { aspectName → { pipeName → vals } }
               allAspectNames = lib.unique (
