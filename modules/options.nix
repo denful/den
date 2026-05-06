@@ -54,7 +54,6 @@ let
               // {
                 value = builtins.removeAttrs d.value [
                   "includes"
-                  "policies"
                 ];
               }
             else
@@ -147,7 +146,6 @@ let
                 if builtins.isAttrs v then
                   builtins.removeAttrs v [
                     "includes"
-                    "policies"
                   ]
                 else
                   v;

@@ -137,7 +137,7 @@
               [ ];
         };
     in
-    if builtins.isList policiesOrSingle then map wrap policies else wrap (builtins.head policies);
+    if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
 
   # Wrap a policy (or list of policies) to only fire when predicate is true.
   when =
@@ -163,5 +163,5 @@
           fn = ctx: if predicate ctx then inner.fn ctx else [ ];
         };
     in
-    if builtins.isList policiesOrSingle then map wrap policies else wrap (builtins.head policies);
+    if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
 }

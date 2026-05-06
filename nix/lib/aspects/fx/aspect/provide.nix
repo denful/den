@@ -133,14 +133,10 @@ let
       aspectName = aspect.name or "<anon>";
       nodeIdentity = identity.key aspect;
 
-      policyRegistrations = [ ];
-
       provides = aspect.provides or { };
       crossKeys = builtins.filter (k: k != aspectName) (builtins.attrNames provides);
       compatKeys = builtins.filter (k: !(schemaEntityKindsSet ? ${k})) crossKeys;
-      crossRegistrations = map (mkCrossPolicy aspectName nodeIdentity provides) compatKeys;
-
-      allRegistrations = policyRegistrations ++ crossRegistrations;
+      allRegistrations = map (mkCrossPolicy aspectName nodeIdentity provides) compatKeys;
 
       hasSelfProvide = provides ? ${aspectName};
       selfProvide = mkSelfProvideInclude aspect aspectName;
