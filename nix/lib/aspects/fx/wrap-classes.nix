@@ -108,11 +108,33 @@ let
     in
     lib.setDefaultModuleLocation validatorLoc validatorModule;
 
+  # Extract the leaf aspect name from an entry identity.
+  # "postgres" → "postgres", "provider/postgres" → "postgres"
+  aspectNameFromIdentity =
+    id:
+    let
+      # Strip any context suffix like "/{ctxId}" first.
+      base = lib.head (lib.splitString "/{" id);
+      parts = lib.splitString "/" base;
+    in
+    lib.last parts;
+
+  # Apply per-aspect pipe overrides from __pipeTargeted.
+  applyPipeTargeting =
+    ctx: entry:
+    let
+      pipeTargeted = ctx.__pipeTargeted or { };
+      entryId = entry.identity or "<anon>";
+      aspectName = aspectNameFromIdentity entryId;
+      overrides = pipeTargeted.${aspectName} or { };
+    in
+    if pipeTargeted == { } || overrides == { } then ctx else ctx // overrides;
+
   # Process a single raw class entry through the wrapping pipeline.
   processEntry =
     enrichedCtx: class: entry:
     let
-      enrichment = mergeEnrichment enrichedCtx entry.ctx;
+      enrichment = mergeEnrichment (applyPipeTargeting enrichedCtx entry) entry.ctx;
       inherit (enrichment) enrichmentKeys ctx;
       result = den.lib.aspects.fx.aspect.wrapClassModule {
         inherit ctx;

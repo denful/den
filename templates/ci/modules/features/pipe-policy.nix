@@ -486,5 +486,200 @@
         expected = "a-b";
       }
     );
+    # pipe.to delivers pipe data only to the targeted aspect.
+    test-pipe-to-aspect = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.pipes.secrets = {
+          description = "Secret paths";
+        };
+
+        den.aspects.igloo = {
+          includes = [
+            den.aspects.postgres
+            den.aspects.nginx-server
+          ];
+        };
+
+        den.aspects.postgres = {
+          nixos =
+            { secrets, ... }:
+            {
+              networking.hostName = builtins.head secrets;
+            };
+        };
+
+        den.aspects.nginx-server = {
+          nixos =
+            { secrets, ... }:
+            {
+              networking.domain = builtins.head secrets;
+            };
+        };
+
+        den.policies.app-secrets =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "secrets" [
+              (pipe.filter (_: false))
+              (pipe.append "pg-pass")
+              (pipe.to [ den.aspects.postgres ])
+            ])
+            (pipe.from "secrets" [
+              (pipe.filter (_: false))
+              (pipe.append "nginx-key")
+              (pipe.to [ den.aspects.nginx-server ])
+            ])
+          ];
+
+        den.default.includes = [ den.policies.app-secrets ];
+
+        expr = {
+          host = igloo.networking.hostName;
+          domain = igloo.networking.domain;
+        };
+        expected = {
+          host = "pg-pass";
+          domain = "nginx-key";
+        };
+      }
+    );
+
+    # Two policies targeting the same aspect on the same pipe concatenate.
+    test-pipe-to-same-aspect-concat = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.pipes.items = {
+          description = "Items";
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.consumer ];
+        };
+
+        den.aspects.consumer = {
+          nixos =
+            { items, ... }:
+            {
+              networking.hostName = lib.concatStringsSep "-" items;
+            };
+        };
+
+        den.policies.policy-a =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "items" [
+              (pipe.filter (_: false))
+              (pipe.append "x")
+              (pipe.to [ den.aspects.consumer ])
+            ])
+          ];
+
+        den.policies.policy-b =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "items" [
+              (pipe.filter (_: false))
+              (pipe.append "y")
+              (pipe.to [ den.aspects.consumer ])
+            ])
+          ];
+
+        den.default.includes = [
+          den.policies.policy-a
+          den.policies.policy-b
+        ];
+
+        # Both targeted effects concatenate for the same aspect.
+        expr = igloo.networking.hostName;
+        expected = "x-y";
+      }
+    );
+
+    # Untargeted and targeted coexist: targeted overrides for specific aspect.
+    test-pipe-to-with-untargeted = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.pipes.items = {
+          description = "Items";
+        };
+
+        den.aspects.igloo = {
+          includes = [
+            den.aspects.producer
+            den.aspects.special
+            den.aspects.normal
+          ];
+        };
+
+        den.aspects.producer = {
+          items = [
+            "a"
+            "b"
+          ];
+        };
+
+        # special is targeted — gets targeted data (overrides scope-wide)
+        den.aspects.special = {
+          nixos =
+            { items, ... }:
+            {
+              networking.hostName = lib.concatStringsSep "-" items;
+            };
+        };
+
+        # normal is NOT targeted — gets untargeted scope-wide data
+        den.aspects.normal = {
+          nixos =
+            { items, ... }:
+            {
+              networking.domain = lib.concatStringsSep "-" items;
+            };
+        };
+
+        den.policies.mixed-policy =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            # Untargeted: append "c" to all
+            (pipe.from "items" [
+              (pipe.append "c")
+            ])
+            # Targeted: special only gets filtered + appended result
+            (pipe.from "items" [
+              (pipe.filter (_: false))
+              (pipe.append "special-only")
+              (pipe.to [ den.aspects.special ])
+            ])
+          ];
+
+        den.default.includes = [ den.policies.mixed-policy ];
+
+        expr = {
+          # special sees targeted data (overrides scope-wide)
+          special = igloo.networking.hostName;
+          # normal sees untargeted data (scope-wide)
+          normal = igloo.networking.domain;
+        };
+        expected = {
+          special = "special-only";
+          normal = "a-b-c";
+        };
+      }
+    );
   };
 }

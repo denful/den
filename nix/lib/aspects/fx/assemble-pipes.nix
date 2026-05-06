@@ -62,7 +62,19 @@ let
     in
     builtins.foldl' applyStage values transformStages;
 
+  # Check whether a pipe effect has a pipe.to routing stage.
+  hasToStage = e: builtins.any (s: (s.__pipeStage or "") == "to") (e.stages or [ ]);
+
+  # Extract target aspect names from a pipe.to stage.
+  getToTargets =
+    effect:
+    let
+      toStage = lib.findFirst (s: (s.__pipeStage or "") == "to") null (effect.stages or [ ]);
+    in
+    map (a: a.name or "<anon>") toStage.aspects;
+
   # Apply pipe effects from policies to a pipe's base values.
+  # Returns only the untargeted (scope-wide) result.
   applyPipeEffects =
     pipeName: scopeId: baseValues: effects:
     let
@@ -91,6 +103,35 @@ let
         lib.concatLists (map (e: applyTransformStages baseValues (e.stages or [ ])) effects)
     );
 
+  # Build per-aspect targeted pipe data from targeted effects.
+  # Returns: { aspectName → transformedValues }
+  buildTargetedData =
+    baseValues: effects:
+    let
+      # Collect (aspectName, values) pairs from all targeted effects.
+      pairs = lib.concatMap (
+        effect:
+        let
+          targets = getToTargets effect;
+          transformed = applyTransformStages baseValues (effect.stages or [ ]);
+        in
+        map (name: {
+          inherit name;
+          values = transformed;
+        }) targets
+      ) effects;
+    in
+    # Group by aspect name, concatenating values for same aspect.
+    builtins.foldl' (
+      acc: entry:
+      acc
+      // {
+        ${entry.name} =
+          (acc.${entry.name} or [ ])
+          ++ (if builtins.isList entry.values then entry.values else [ entry.values ]);
+      }
+    ) { } pairs;
+
   assemblePipes =
     {
       scopeContexts,
@@ -105,20 +146,53 @@ let
         let
           scopeImports = scopedClassImports.${scopeId} or { };
           scopeEffects = scopedPipeEffects.${scopeId} or [ ];
+
+          # For each pipe, separate untargeted and targeted effects.
           pipeData = lib.genAttrs pipeNames (
             pipeName:
             let
               rawEntries = scopeImports.${pipeName} or [ ];
               baseValues = flattenAndExtract rawEntries;
               relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
+              untargetedEffects = builtins.filter (e: !hasToStage e) relevantEffects;
             in
-            if relevantEffects == [ ] then
+            if untargetedEffects == [ ] && relevantEffects == [ ] then
+              baseValues
+            else if untargetedEffects == [ ] then
+              # All effects are targeted — scope-wide data is just base values.
               baseValues
             else
-              applyPipeEffects pipeName scopeId baseValues relevantEffects
+              applyPipeEffects pipeName scopeId baseValues untargetedEffects
           );
+
+          # Build __pipeTargeted: { aspectName → { pipeName → values } }
+          pipeTargeted =
+            let
+              perPipe = lib.genAttrs pipeNames (
+                pipeName:
+                let
+                  rawEntries = scopeImports.${pipeName} or [ ];
+                  baseValues = flattenAndExtract rawEntries;
+                  relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
+                  targetedEffects = builtins.filter hasToStage relevantEffects;
+                in
+                if targetedEffects == [ ] then { } else buildTargetedData baseValues targetedEffects
+              );
+              # Invert: { pipeName → { aspectName → vals } } → { aspectName → { pipeName → vals } }
+              allAspectNames = lib.unique (
+                lib.concatMap (pipeName: builtins.attrNames (perPipe.${pipeName})) pipeNames
+              );
+            in
+            lib.genAttrs allAspectNames (
+              aspectName:
+              lib.genAttrs (builtins.filter (pn: perPipe.${pn} ? ${aspectName}) pipeNames) (
+                pipeName: perPipe.${pipeName}.${aspectName}
+              )
+            );
+
+          hasTargeted = pipeTargeted != { };
         in
-        scopeCtx // pipeData
+        scopeCtx // pipeData // lib.optionalAttrs hasTargeted { __pipeTargeted = pipeTargeted; }
       ) scopeContexts;
 in
 {
