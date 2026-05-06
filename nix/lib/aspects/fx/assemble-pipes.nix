@@ -132,20 +132,126 @@ let
       }
     ) { } pairs;
 
+  # Check whether a pipe effect has a pipe.expose routing stage.
+  hasExposeStage = e: builtins.any (s: (s.__pipeStage or "") == "expose") (e.stages or [ ]);
+
+  # Collect exposed data bottom-up from child scopes.
+  # Returns: { parentScopeId → { pipeName → [values] } }
+  collectAllExposed =
+    {
+      scopeContexts,
+      scopedClassImports,
+      scopedPipeEffects,
+      scopeParent,
+    }:
+    let
+      allScopeIds = builtins.attrNames scopeContexts;
+
+      # Find children of a given parent scope.
+      childrenOf =
+        parentId:
+        builtins.filter (sid: sid != parentId && (scopeParent.${sid} or null) == parentId) allScopeIds;
+
+      # Recursive bottom-up: process children first, accumulate exposed data.
+      processTree =
+        exposedPool: scopeId:
+        let
+          children = childrenOf scopeId;
+          # Process all children first.
+          afterChildren = builtins.foldl' processTree exposedPool children;
+          # Now compute what this scope exposes to its parent.
+          parentId = scopeParent.${scopeId} or null;
+          isRoot = parentId == null || parentId == scopeId;
+          scopeEffects = scopedPipeEffects.${scopeId} or [ ];
+          rawExposeEffects = builtins.filter hasExposeStage scopeEffects;
+          # Dedup expose effects by (pipeName, policyName) — policies may fire
+          # for multiple entity kinds in the same scope, producing duplicates.
+          exposeEffects =
+            let
+              go =
+                seen: effs:
+                if effs == [ ] then
+                  [ ]
+                else
+                  let
+                    e = builtins.head effs;
+                    rest = builtins.tail effs;
+                    key = "${e.pipeName}/${e.__pipePolicyName or "<anon>"}";
+                  in
+                  if seen ? ${key} then go seen rest else [ e ] ++ go (seen // { ${key} = true; }) rest;
+            in
+            go { } rawExposeEffects;
+        in
+        if isRoot || exposeEffects == [ ] then
+          afterChildren
+        else
+          let
+            scopeImports = scopedClassImports.${scopeId} or { };
+            # Also include data already exposed to this scope from its children.
+            exposedForScope = afterChildren.${scopeId} or { };
+            newExposed = lib.foldl' (
+              acc: effect:
+              let
+                inherit (effect) pipeName;
+                rawEntries = scopeImports.${pipeName} or [ ];
+                baseValues = flattenAndExtract rawEntries;
+                # Include child-exposed data in the base for transform stages.
+                exposedValues = exposedForScope.${pipeName} or [ ];
+                combinedBase = baseValues ++ exposedValues;
+                transformed = applyTransformStages combinedBase (effect.stages or [ ]);
+              in
+              acc
+              // {
+                ${pipeName} = (acc.${pipeName} or [ ]) ++ transformed;
+              }
+            ) { } exposeEffects;
+          in
+          afterChildren
+          // {
+            ${parentId} =
+              (removeAttrs (afterChildren.${parentId} or { }) (builtins.attrNames newExposed))
+              // lib.mapAttrs (pipeName: vals: (afterChildren.${parentId}.${pipeName} or [ ]) ++ vals) newExposed;
+          };
+
+      # Find root scopes to start traversal.
+      rootScopes = builtins.filter (
+        sid:
+        let
+          parent = scopeParent.${sid} or null;
+        in
+        parent == null || parent == sid
+      ) allScopeIds;
+    in
+    builtins.foldl' processTree { } rootScopes;
+
   assemblePipes =
     {
       scopeContexts,
       scopedClassImports,
       scopedPipeEffects ? { },
+      scopeParent ? { },
     }:
     if pipeNames == [ ] then
       scopeContexts
     else
+      let
+        # Pass 1: Collect all exposed data bottom-up.
+        allExposed = collectAllExposed {
+          inherit
+            scopeContexts
+            scopedClassImports
+            scopedPipeEffects
+            scopeParent
+            ;
+        };
+      in
+      # Pass 2: Build final contexts with exposed data merged in.
       lib.mapAttrs (
         scopeId: scopeCtx:
         let
           scopeImports = scopedClassImports.${scopeId} or { };
           scopeEffects = scopedPipeEffects.${scopeId} or [ ];
+          exposedForScope = allExposed.${scopeId} or { };
 
           # For each pipe, separate untargeted and targeted effects.
           pipeData = lib.genAttrs pipeNames (
@@ -153,16 +259,20 @@ let
             let
               rawEntries = scopeImports.${pipeName} or [ ];
               baseValues = flattenAndExtract rawEntries;
+              # Merge exposed data from children.
+              exposedValues = exposedForScope.${pipeName} or [ ];
+              combinedBase = baseValues ++ exposedValues;
               relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
-              untargetedEffects = builtins.filter (e: !hasToStage e) relevantEffects;
+              # Exclude expose effects from untargeted processing — they route upward, not locally.
+              untargetedEffects = builtins.filter (e: !hasToStage e && !hasExposeStage e) relevantEffects;
             in
-            if untargetedEffects == [ ] && relevantEffects == [ ] then
+            if untargetedEffects == [ ] && relevantEffects == [ ] && exposedValues == [ ] then
               baseValues
             else if untargetedEffects == [ ] then
-              # All effects are targeted — scope-wide data is just base values.
-              baseValues
+              # All effects are targeted/expose — scope-wide data is combined base values.
+              combinedBase
             else
-              applyPipeEffects pipeName scopeId baseValues untargetedEffects
+              applyPipeEffects pipeName scopeId combinedBase untargetedEffects
           );
 
           # Build __pipeTargeted: { aspectName → { pipeName → values } }
@@ -173,10 +283,12 @@ let
                 let
                   rawEntries = scopeImports.${pipeName} or [ ];
                   baseValues = flattenAndExtract rawEntries;
+                  exposedValues = exposedForScope.${pipeName} or [ ];
+                  combinedBase = baseValues ++ exposedValues;
                   relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
                   targetedEffects = builtins.filter hasToStage relevantEffects;
                 in
-                if targetedEffects == [ ] then { } else buildTargetedData baseValues targetedEffects
+                if targetedEffects == [ ] then { } else buildTargetedData combinedBase targetedEffects
               );
               # Invert: { pipeName → { aspectName → vals } } → { aspectName → { pipeName → vals } }
               allAspectNames = lib.unique (

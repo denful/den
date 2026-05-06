@@ -206,6 +206,7 @@ let
         inherit scopeContexts;
         scopedClassImports = scopedClassImportsRaw;
         scopedPipeEffects = result.state.scopedPipeEffects null;
+        scopeParent = result.state.scopeParent null;
       };
 
       phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw;
