@@ -68,7 +68,9 @@ let
                   }
                 )
             else if iteration >= maxPolicyIterations then
-              throw "den: installPolicies enrichment iteration exceeded ${toString maxPolicyIterations} — likely a cycle (${entityKind})"
+              throw "den: enrichment cycle at ${entityKind} — fired: ${lib.concatStringsSep ", " (builtins.attrNames updatedFired)}, enrichment keys: ${
+                lib.concatStringsSep ", " (builtins.attrNames (accEnrichment // dispatched.enrichment))
+              }"
             else
               let
                 combinedEnrichment = accEnrichment // dispatched.enrichment;

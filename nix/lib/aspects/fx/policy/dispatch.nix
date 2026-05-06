@@ -7,6 +7,30 @@
   hasEffects,
 }:
 let
+  validEffectTypes = {
+    resolve = true;
+    include = true;
+    exclude = true;
+    route = true;
+    instantiate = true;
+    provide = true;
+  };
+
+  # Validate that each effect returned by a policy has a valid __policyEffect tag.
+  validateEffects =
+    policyName: rawEffects:
+    lib.imap0 (
+      i: eff:
+      if !(builtins.isAttrs eff) then
+        throw "den: policy '${policyName}' returned invalid effect at index ${toString i}: expected attrset, got ${builtins.typeOf eff}"
+      else if !(eff ? __policyEffect) then
+        throw "den: policy '${policyName}' returned invalid effect at index ${toString i}: missing __policyEffect — use den.lib.policy.resolve/include/exclude/route/instantiate/provide"
+      else if !(validEffectTypes ? ${eff.__policyEffect}) then
+        throw "den: policy '${policyName}' returned unknown effect type '${eff.__policyEffect}' at index ${toString i}"
+      else
+        eff
+    ) rawEffects;
+
   # Dispatch global + schema policies against a context.
   dispatchDirect =
     allDirectPolicies: firedPolicies: resolveCtx:
@@ -29,7 +53,7 @@ let
             [
               {
                 policyName = name;
-                effects = rawEffects;
+                effects = validateEffects name rawEffects;
               }
             ]
       ) allDirectPolicies
@@ -54,7 +78,7 @@ let
       in
       {
         policyName = entry.name;
-        effects = rawEffects;
+        effects = validateEffects entry.name rawEffects;
       }
     ) matching;
 
