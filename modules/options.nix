@@ -190,6 +190,16 @@ let
     }
   );
 
+  pipeSchemaType = lib.types.submodule (
+    { ... }:
+    {
+      options.description = lib.mkOption {
+        description = "Human-readable description of this pipe.";
+        type = lib.types.str;
+      };
+    }
+  );
+
   schemaOption = lib.mkOption {
     description = "freeform deferred modules per entity kind";
     defaultText = lib.literalExpression "{ }";
@@ -207,6 +217,21 @@ in
     description = "Class evaluation domains";
     type = lib.types.lazyAttrsOf classSchemaType;
     default = { };
+  };
+  options.den.pipes = lib.mkOption {
+    description = "Pipe declarations — named data routes for structured quirk flow";
+    type = lib.types.lazyAttrsOf pipeSchemaType;
+    default = { };
+    apply =
+      pipes:
+      let
+        classKeys = builtins.attrNames (den.classes or { });
+        overlap = builtins.filter (k: builtins.elem k classKeys) (builtins.attrNames pipes);
+      in
+      assert
+        overlap == [ ]
+        || throw "den.classes and den.pipes must not share keys, but found: ${builtins.concatStringsSep ", " overlap}";
+      pipes;
   };
   config.den.schema = {
     conf = { };

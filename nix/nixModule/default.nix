@@ -5,5 +5,6 @@
     ./lib.nix
     ./policies.nix
     ./aspects.nix
+    ./pipes.nix
   ];
 }
