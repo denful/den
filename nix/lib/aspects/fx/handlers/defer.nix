@@ -26,6 +26,7 @@ in
         resume = fx.bind (fx.send "resolve-complete" stub) (_: fx.pure [ ]);
         state = scopedAppend state "scopedDeferredIncludes" state.currentScope {
           inherit child requiredKeys requiredArgs;
+          hasPipeArgs = param.hasPipeArgs or false;
         };
       };
   };

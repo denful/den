@@ -467,7 +467,69 @@ let
         inherit scopeParent;
       };
 
-      phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw;
+      # Post-assembly drain: resolve pipe-arg deferred includes.
+      # Aspects deferred because they required pipe args (e.g., { firewall, ... })
+      # can now be compiled since assemblePipes made those args available.
+      drainedClassImportsRaw =
+        let
+          allDeferred = (result.state.scopedDeferredIncludes or (_: { })) null;
+          inherit (den.lib.aspects.fx.keyClassification) classifyKeys;
+          inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList;
+        in
+        lib.foldl' (
+          accImports: scopeId:
+          let
+            deferred = allDeferred.${scopeId} or [ ];
+            pipeDeferred = builtins.filter (d: d.hasPipeArgs or false) deferred;
+            scopeCtx = augmentedScopeContexts.${scopeId} or { };
+          in
+          if pipeDeferred == [ ] then
+            accImports
+          else
+            let
+              newEntries = lib.concatMap (
+                d:
+                let
+                  child = d.child;
+                  requiredArgs = d.requiredArgs;
+                  satisfied = builtins.all (k: scopeCtx ? ${k}) requiredArgs;
+                in
+                if !satisfied then
+                  [ ]
+                else
+                  let
+                    classified = classifyKeys null child;
+                  in
+                  lib.concatMap (
+                    k:
+                    let
+                      modules = unwrapContentValuesList child.${k};
+                    in
+                    map (module: {
+                      __rawEntry = true;
+                      class = k;
+                      inherit module;
+                      ctx = scopeCtx;
+                      identity = child.name or "<deferred>";
+                      aspectPolicy = child.meta.collisionPolicy or null;
+                      globalPolicy = den.config.classModuleCollisionPolicy or "error";
+                      isContextDependent = false;
+                    }) modules
+                  ) classified.classKeys
+              ) pipeDeferred;
+            in
+            builtins.foldl' (
+              acc: entry:
+              acc
+              // {
+                ${scopeId} = (acc.${scopeId} or { }) // {
+                  ${entry.class} = ((acc.${scopeId} or { }).${entry.class} or [ ]) ++ [ entry ];
+                };
+              }
+            ) accImports newEntries
+        ) scopedClassImportsRaw (builtins.attrNames allDeferred);
+
+      phase1 = wrapPerScope ctx augmentedScopeContexts drainedClassImportsRaw;
       phase2 = applyProvides ctx augmentedScopeContexts scopedProvides phase1;
       phase3 =
         applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId scopedRoutes

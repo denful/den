@@ -163,5 +163,64 @@
         expected = true;
       }
     );
+    # Discriminator deferred until pipe data available: aspect conditionally
+    # included based on pipe data.
+    test-pipe-discriminator = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.pipes.firewall = {
+          description = "Firewall port declarations";
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.firewall-aware ];
+          firewall = [
+            80
+            443
+          ];
+        };
+
+        # This aspect requires { firewall, ... } — deferred during pipeline walk,
+        # resolved post-assembly when pipe data is available.
+        den.aspects.firewall-aware = {
+          nixos =
+            { firewall, ... }:
+            {
+              networking.hostName = if builtins.length firewall > 1 then "multi-port" else "single-port";
+            };
+        };
+
+        expr = igloo.networking.hostName;
+        expected = "multi-port";
+      }
+    );
+
+    # Empty pipe discriminator: aspect sees empty list when no pipe data emitted.
+    test-pipe-discriminator-empty = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.pipes.firewall = {
+          description = "Firewall port declarations";
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.firewall-aware ];
+          # No firewall pipe data emitted.
+        };
+
+        den.aspects.firewall-aware = {
+          nixos =
+            { firewall, ... }:
+            {
+              networking.hostName = if firewall == [ ] then "no-ports" else "has-ports";
+            };
+        };
+
+        expr = igloo.networking.hostName;
+        expected = "no-ports";
+      }
+    );
   };
 }
