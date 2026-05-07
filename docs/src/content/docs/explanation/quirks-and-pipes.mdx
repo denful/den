@@ -11,12 +11,20 @@ import { Aside } from '@astrojs/starlight/components';
 [`nix/lib/policy-effects.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-effects.nix)
 </Aside>
 
-Quirks and pipes solve a fundamental problem: how do multiple aspects contribute
-structured data that a single consumer assembles? Firewall ports, backup paths,
-persistence directories, monitoring endpoints — these are all cases where many
-producers feed one consumer.
+## What is a quirk?
+
+A **quirk** is structured data emitted by an aspect on a named key
+registered in `den.quirks`. A **pipe** is a policy effect that routes,
+filters, transforms, or aggregates quirk data — within a scope or
+across hosts. Producers emit quirks without knowing who consumes them;
+policies wire producers to consumers.
 
 ## The problem
+
+Quirks and pipes solve a fundamental problem: how do multiple aspects
+contribute structured data that a single consumer assembles? Firewall
+ports, backup paths, persistence directories, monitoring endpoints —
+these are all cases where many producers feed one consumer.
 
 Without quirks, the only way to share data between aspects is through NixOS
 module options. This works but creates coupling: every producer must know the

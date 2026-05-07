@@ -12,10 +12,12 @@ import { Aside } from '@astrojs/starlight/components';
 [`options.nix`](https://github.com/denful/den/blob/main/modules/options.nix)
 </Aside>
 
-Den's **Data** concern is about declaring _what entities are_. An entity is a typed
-data record — a host, a user, or a standalone home — that carries metadata consumed
-by the resolution pipeline: [Policies](/explanation/policies/)
-and [Aspects](/explanation/aspects/).
+## What is an entity?
+
+An **entity** is a typed data record — a host, a user, or a standalone
+home. Entities declare *what exists* in your infrastructure. They carry
+metadata consumed by [policies](/explanation/policies/) (which define
+relationships) and [aspects](/explanation/aspects/) (which define behavior).
 
 ## Entity types
 

@@ -10,6 +10,22 @@ import { Aside } from '@astrojs/starlight/components';
 [`nix/lib.nix`](https://github.com/denful/den/blob/main/nix/lib.nix) --
 </Aside>
 
+## What is an aspect?
+
+An **aspect** is a composable unit of configuration that bundles modules
+for one or more Nix classes (`nixos`, `darwin`, `homeManager`, or custom)
+in a single attrset. Aspects declare *what behavior applies* — one
+concern, all platforms. They compose via `includes` (DAG edges) and
+`provides` (named sub-aspects).
+
+```nix
+den.aspects.gaming = { host, user }: {
+  nixos = { pkgs, ... }: { programs.steam.enable = true; };
+  homeManager = { pkgs, ... }: { programs.mangohud.enable = true; };
+  includes = [ den.aspects.performance ];
+};
+```
+
 ## The `__functor` Pattern
 
 Any Nix attrset with `__functor` can be called as a function:

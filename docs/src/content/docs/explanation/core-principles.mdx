@@ -1,16 +1,26 @@
 ---
 title: Core Principles
-description: The two design principles behind Den.
+description: The core concepts behind Den — entities, aspects, policies, and quirks.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-**Aspects**, **Policies**, and **Entities** are Den's core architectural principles.
+Den has four core concepts. Each has one job:
 
-It is how Den supports different platform configurations, packages/checks flake outputs, different home environments support,
-wsl support, third-party flake-parts perSystem modules, microvm guests, and pretty much everything.
+| Concept | What it is | Where it lives |
+|---------|-----------|----------------|
+| **[Entity](/explanation/entities/)** | A typed data record — a host, user, or home | `den.hosts`, `den.homes`, `den.schema` |
+| **[Aspect](/explanation/aspects/)** | A composable unit of configuration that spans Nix classes | `den.aspects` |
+| **[Policy](/explanation/policies/)** | A function that defines how entities relate and route data | `den.policies` |
+| **[Quirk](/explanation/quirks-and-pipes/)** | Structured data emitted by aspects, aggregated via pipes | `den.quirks` |
 
-It is also how more complex entities, like machine fleets, terraform or cloud infra can be configured with Den.
+Entities declare *what exists*. Aspects declare *what it does*. Policies
+declare *how things relate*. Quirks let aspects share structured data
+without coupling.
+
+These four concepts compose to support NixOS, nix-Darwin, home-manager,
+WSL, MicroVM, flake-parts perSystem modules, machine fleets, and anything
+else configurable through Nix modules.
 
 <Aside title="Aspect-Oriented">
 If you are familiar with Aspect-Oriented-Programming you will recognize how Den uses pointcuts to define where configurations get applied at each point in the pipeline.
@@ -203,13 +213,14 @@ den.aspects.workstation = {
 
 ## Separation of Concerns
 
-Den separates **what exists** (schema) from **what it does** (aspects):
+Den separates **what exists** from **what it does**:
 
 | Layer | Purpose | Example |
 |-------|---------|---------|
 | Schema | Declare entities | `den.hosts.x86_64-linux.laptop.users.alice = {}` |
 | Aspects | Configure behavior | `den.aspects.laptop.nixos.networking.hostName = "laptop"` |
-| Policies | Entity topology | `den.policies.host-to-users` fans out from hosts to users |
+| Policies | Entity topology and routing | `den.policies.host-to-users` fans out from hosts to users |
+| Quirks | Structured data flow | `den.quirks.firewall` + `pipe.collect` aggregates across hosts |
 | Batteries | Reusable patterns | `den.provides.primary-user`, `den.provides.user-shell` |
 
 This separation means you can reorganize files, rename aspects, or add platforms

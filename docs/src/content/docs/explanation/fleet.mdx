@@ -11,10 +11,12 @@ import { Aside } from '@astrojs/starlight/components';
 [`templates/ci/modules/features/pipe-scope.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipe-scope.nix)
 </Aside>
 
-When a Den flake declares multiple hosts, they all resolve in a single
-pipeline run. This is what makes cross-host data flow possible — hosts
-are sibling scopes in a shared scope tree, and `pipe.collect` can reach
-across them.
+## What is a fleet?
+
+A **fleet** is the set of hosts resolved together in a single pipeline
+run. All hosts declared in a Den flake form a fleet automatically —
+they become sibling scopes in a shared scope tree, and `pipe.collect`
+can reach across them for cross-host data flow.
 
 ## The scope tree
 
