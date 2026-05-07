@@ -37,7 +37,14 @@ let
       entity = resolveBindings.${targetKind} or null;
       classes = if entity != null then entity.classes or null else null;
     in
-    if classes != null && classes != [ ] then builtins.head classes else null;
+    if classes != null && classes != [ ] then
+      builtins.head classes
+    else
+    # Fallback to singular `class` (hosts use class, users use classes).
+    if entity != null then
+      entity.class or null
+    else
+      null;
 
   # Decompose a schema effect into its target kind, bindings, scoped ctx, and class.
   decomposeSchemaEffect =
@@ -143,17 +150,26 @@ let
           })
           (
             { scopeHandlers, ... }:
+            let
+              # Strip `class` from propagated scope handlers — class is an
+              # internal routing key and must not appear in __scopeKeys
+              # (which take.exactly uses for exact-match detection).
+              # class remains available via scope.provide for handler probing.
+              userFacingHandlers = builtins.removeAttrs scopeHandlers [ "class" ];
+            in
             fx.bind (fx.effects.scope.provide scopeHandlers (
-              emitPolicyEffectsThen late (policyEmitIncludes late.includeEffects)
+              emitPolicyEffectsThen late (
+                policyEmitIncludes late.includeEffects { parentScopeHandlers = userFacingHandlers; }
+              )
             )) (_: fx.send "restore-scope" { inherit parentScope; })
           )
     );
 
   # Post-resolve pass: re-dispatch aspect policies registered by later siblings.
-  # inLateDispatch is set true and intentionally never reset — this ensures
-  # only the FIRST fan-out resolution triggers late dispatch.  Subsequent
-  # fan-outs within the same pipeline run see the flag and skip, preventing
-  # O(N²) re-dispatch across multiple entity kinds.
+  # inLateDispatch is set true per-scope — push-scope resets it, restore-scope
+  # restores the parent value.  This gives each scope level exactly one
+  # late-dispatch opportunity while preventing O(N²) re-dispatch within the
+  # same scope level.
   lateDispatchPass =
     siblingMetas:
     fx.bind (fx.effects.state.modify (st: st // { inLateDispatch = true; })) (

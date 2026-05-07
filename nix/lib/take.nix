@@ -25,7 +25,9 @@ let
             # __scopeKeys is injected by the compile-parametric handler when meta.exactMatch is set.
             # It contains all scope handler keys so we can detect extra context beyond
             # the function's declared args.
-            scopeKeys = resolvedArgs.__scopeKeys or [ ];
+            # Filter out `class` — it's an internal routing key added by push-scope,
+            # not a user-facing context arg that should affect exact matching.
+            scopeKeys = builtins.filter (k: k != "class") (resolvedArgs.__scopeKeys or [ ]);
             cleanArgs = builtins.removeAttrs resolvedArgs [ "__scopeKeys" ];
             # Check 1: all required keys must be resolved
             hasMissing = builtins.any (k: !(cleanArgs ? ${k})) requiredKeys;

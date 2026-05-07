@@ -41,12 +41,12 @@ in
           if hasSchemaResolves then
             fx.bind (processSchemaResolves entityKind includeAspects effects.schemaEffects enrichedCtx) (
               schemaResults:
-              fx.bind (policyEmitIncludes independentIncludes) (
+              fx.bind (policyEmitIncludes independentIncludes { }) (
                 includeResults: fx.pure (schemaResults ++ includeResults)
               )
             )
           else
-            policyEmitIncludes effects.includeEffects
+            policyEmitIncludes effects.includeEffects { }
         );
         inherit state;
       };

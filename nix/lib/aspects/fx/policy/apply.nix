@@ -11,8 +11,13 @@ let
     builtins.foldl' (acc: e: fx.bind acc (_: fx.send effect (transform e))) (fx.pure null) effects;
 
   # Emit policy include effects via existing handlers.
+  # parentScopeHandlers: optional scope handlers to propagate through includes
+  # (needed for late dispatch where scope.provide doesn't survive handler boundaries).
   policyEmitIncludes =
     effects:
+    {
+      parentScopeHandlers ? null,
+    }:
     let
       len = builtins.length effects;
       go =
@@ -38,6 +43,7 @@ let
               fx.bind (fx.send "emit-include" {
                 inherit child;
                 idx = null;
+                __parentScopeHandlers = parentScopeHandlers;
               }) (r: fx.pure (prev ++ r))
             )
           );

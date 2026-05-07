@@ -33,7 +33,16 @@ let
           state
           // {
             currentScope = newScopeId;
-            scopeContexts = _: (state.scopeContexts null) // { ${newScopeId} = scopedCtx; };
+            # Save and reset inLateDispatch — each scope level gets its own
+            # late-dispatch opportunity.  restore-scope pops the saved value.
+            inLateDispatch = false;
+            inLateDispatchStack = (state.inLateDispatchStack or [ ]) ++ [ (state.inLateDispatch or false) ];
+            scopeContexts =
+              _:
+              (state.scopeContexts null)
+              // {
+                ${newScopeId} = scopedCtx;
+              };
             scopeParent =
               _: (state.scopeParent null) // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
             # No parent inheritance — policies fire where registered, not at

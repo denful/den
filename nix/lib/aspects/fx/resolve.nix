@@ -11,6 +11,17 @@ let
   route = import ./route { inherit lib den; };
   handlers = den.lib.aspects.fx.handlers;
 
+  # Check if `ancestor` is an ancestor of `descendant` in the scopeParent tree.
+  isAncestorOf =
+    scopeParent: ancestor: descendant:
+    let
+      parent = scopeParent.${descendant} or null;
+    in
+    if parent == null || parent == descendant then
+      false
+    else
+      parent == ancestor || isAncestorOf scopeParent ancestor parent;
+
   # Dedup provides by composite key (policyName/class/path).
   dedupProvides =
     raw:
@@ -260,7 +271,10 @@ let
             preWalkedModules =
               if hostScopeId != null then
                 let
-                  # Filter walk data to this host's subtree.
+                  # Filter walk data to this host's subtree + ancestors.
+                  # Subtree: host scope + all descendants (users, etc.)
+                  # Ancestors: parent scopes up to root (flake-system, flake)
+                  # Excludes sibling subtrees (other hosts) to prevent cross-contamination.
                   isInSubtree =
                     sid:
                     sid == hostScopeId
@@ -270,15 +284,31 @@ let
                       in
                       parent != null && parent != sid && isInSubtree parent
                     );
+                  isAncestor =
+                    sid:
+                    let
+                      parent = scopeParent.${hostScopeId} or null;
+                    in
+                    sid == parent || (parent != null && parent != hostScopeId && isAncestorOf scopeParent sid parent);
+                  isRelevant = sid: isInSubtree sid || isAncestor sid;
                   subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
+                  relevantScopeIds = builtins.filter isRelevant allScopeIds;
+                  # Class imports: subtree only (ancestor class imports belong to other outputs).
                   subtreeContexts = lib.genAttrs subtreeScopeIds (sid: augmentedScopeContexts.${sid});
                   subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
-                  subtreeProvides = lib.filterAttrs (sid: _: isInSubtree sid) scopedProvides;
-                  subtreeRoutes = lib.filterAttrs (sid: _: isInSubtree sid) scopedRoutes;
+                  # Routes and provides: include ancestors (policies at flake-system scope
+                  # produce routes/provides that must be visible during per-host assembly).
+                  subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
+                  subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
 
+                  # Contexts for route/provide resolution include ancestors
+                  # so routes registered at ancestor scopes can look up their contexts.
+                  relevantContexts = lib.genAttrs relevantScopeIds (sid: augmentedScopeContexts.${sid});
                   subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
-                  subtreePhase2 = applyProvides ctx subtreeContexts subtreeProvides subtreePhase1;
-                  subtreePhase3 = applyRoutes fxResolveFn ctx subtreeContexts hostScopeId subtreeRoutes subtreePhase2;
+                  subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
+                  subtreePhase3 =
+                    applyRoutes fxResolveFn ctx relevantContexts hostScopeId subtreeRoutes
+                      subtreePhase2;
                 in
                 extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
               else

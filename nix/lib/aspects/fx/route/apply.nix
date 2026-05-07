@@ -155,12 +155,7 @@ let
             adaptArgs = route.adaptArgs or null;
           };
     in
-    {
-      classImports = acc.classImports // {
-        ${route.intoClass} = (acc.classImports.${route.intoClass} or [ ]) ++ wrappedModules;
-      };
-      inherit (acc) perScope;
-    };
+    appendToClass acc route.intoClass route.sourceScopeId wrappedModules;
 
   isDenDefaultModule = mod: lib.hasSuffix "@default" (mod.key or mod._file or "");
 
