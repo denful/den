@@ -49,14 +49,14 @@ export default defineConfig({
 						{ label: 'Core Principles', slug: 'explanation/core-principles' },
 						{
 							label: 'Entities',
-							collapsed: true,
+							collapsed: false,
 							items: [
 								{ label: 'Entities & Schema', slug: 'explanation/entities' },
 							],
 						},
 						{
 							label: 'Aspects',
-							collapsed: true,
+							collapsed: false,
 							items: [
 								{ label: 'Aspects & Functors', slug: 'explanation/aspects' },
 								{ label: 'Class Modules', slug: 'explanation/class-modules' },
@@ -65,7 +65,7 @@ export default defineConfig({
 						},
 						{
 							label: 'Policies',
-							collapsed: true,
+							collapsed: false,
 							items: [
 								{ label: 'Policies', slug: 'explanation/policies' },
 								{ label: 'Policy Activation', slug: 'explanation/policy-activation' },
@@ -73,7 +73,7 @@ export default defineConfig({
 						},
 						{
 							label: 'Quirks & Pipes',
-							collapsed: true,
+							collapsed: false,
 							items: [
 								{ label: 'Quirks & Pipes', slug: 'explanation/quirks-and-pipes' },
 								{ label: 'Fleets & Multi-Host', slug: 'explanation/fleet' },
