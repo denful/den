@@ -30,14 +30,14 @@ let
   osAspect =
     { host }:
     {
-      name = "os";
+      name = "unfree-predicate/os";
       ${host.class}.imports = [ unfreeModule ];
     };
 
   userAspect =
     { host, user }:
     {
-      name = "user";
+      name = "unfree-predicate/user";
     }
     // lib.optionalAttrs (lib.elem "homeManager" user.classes) {
       homeManager.imports = [ unfreeModule ];
@@ -46,7 +46,7 @@ let
   homeAspect =
     { home }:
     {
-      name = "home";
+      name = "unfree-predicate/home";
       ${home.class}.imports = [ unfreeModule ];
     };
 

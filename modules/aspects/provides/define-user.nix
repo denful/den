@@ -48,7 +48,7 @@ let
       user.userName = home.userName;
     }
     // {
-      name = "home";
+      name = "define-user/home";
     };
 in
 {

@@ -13,7 +13,7 @@ let
   setHostname =
     { host, ... }:
     {
-      name = "os";
+      name = "hostname/os";
       ${host.class}.networking.hostName = host.hostName;
     };
 in

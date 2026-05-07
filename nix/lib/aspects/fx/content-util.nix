@@ -55,6 +55,12 @@ let
     value: ctx:
     if builtins.isAttrs value && value ? __fn then
       value.__fn ctx
+    # Aspect attrsets with includes are already structured — return as-is.
+    # Their __functor (from aspectType.merge) is a user convenience, not
+    # intended for provides resolution; calling it here would invoke
+    # resolveAspectWith outside the pipeline where class is unavailable.
+    else if builtins.isAttrs value && value ? includes then
+      value
     else if builtins.isAttrs value && value ? __functor then
       (value.__functor value) ctx
     else if lib.isFunction value then
