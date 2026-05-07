@@ -133,24 +133,33 @@
 
       den.default.funny.names = [ "default-owned" ];
       den.default.includes = [
-        { funny.names = [ "default-static" ]; }
-        (ctx: { funny.names = [ "default-anyctx ${keys ctx}" ]; })
+        {
+          name = "default-static-inc";
+          funny.names = [ "default-static" ];
+        }
+        (ctx: {
+          name = "default-anyctx-inc";
+          funny.names = [ "default-anyctx ${keys ctx}" ];
+        })
 
         (
           { host, ... }@ctx:
           {
+            name = "default-host-lax-inc";
             funny.names = [ "default-host-lax ${keys ctx}" ];
           }
         )
         (
           { user, ... }@ctx:
           {
+            name = "default-user-lax-inc";
             funny.names = [ "default-user-lax ${keys ctx}" ];
           }
         )
         (
           { host, user, ... }@ctx:
           {
+            name = "default-host+user-lax-inc";
             funny.names = [ "default-host+user-lax ${keys ctx}" ];
           }
         )

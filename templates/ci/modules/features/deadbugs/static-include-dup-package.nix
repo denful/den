@@ -121,6 +121,7 @@
 
         den.default.includes = [
           {
+            name = "plocate-locate";
             nixos =
               { pkgs, ... }:
               {
