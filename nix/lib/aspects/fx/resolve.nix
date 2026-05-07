@@ -50,7 +50,7 @@ let
   # both scopes.  The NixOS module system would eventually dedup by key,
   # but keeping duplicates wastes evaluation and can amplify lib.warn noise.
   wrapPerScope =
-    ctx: rootScopeId: scopeContexts: scopedClassImportsRaw:
+    ctx: scopeContexts: scopedClassImportsRaw:
     let
       wrappedPerScope = lib.mapAttrs (
         scopeId: scopeClasses: wrapCollectedClasses (scopeContexts.${scopeId} or ctx) scopeClasses
@@ -93,31 +93,10 @@ let
                 };
               }
             ) acc allClasses;
-          # Only fold scopes relevant to this pipeline's own output.
-          # When the root is a non-entity scope (flake pipeline), entity subtree
-          # scopes (hosts, homes, users) are handled lazily by applyInstantiates
-          # subtree extraction — don't force them here.
-          # When the root IS an entity scope (per-host fxResolve), fold all scopes.
-          entityKinds = den.lib.schemaUtil.schemaEntityKinds;
-          rootCtx = scopeContexts.${rootScopeId} or { };
-          rootIsEntity = builtins.any (k: rootCtx ? ${k}) entityKinds;
-          scopesToFold =
-            if rootIsEntity then
-              builtins.attrValues wrappedPerScope
-            else
-              map (sid: wrappedPerScope.${sid}) (
-                builtins.filter (
-                  sid:
-                  let
-                    scopeCtx = scopeContexts.${sid} or { };
-                  in
-                  !builtins.any (k: scopeCtx ? ${k}) entityKinds
-                ) (builtins.attrNames scopedClassImportsRaw)
-              );
           final = builtins.foldl' go {
             classes = { };
             keys = { };
-          } scopesToFold;
+          } (builtins.attrValues wrappedPerScope);
         in
         final.classes;
     in
@@ -333,7 +312,7 @@ let
                   subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
                   subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
                   relevantContexts = lib.genAttrs relevantScopeIds (sid: augmentedScopeContexts.${sid});
-                  subtreePhase1 = wrapPerScope ctx hostScopeId subtreeContexts subtreeClassImports;
+                  subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
                   subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
                   subtreePhase3 =
                     applyRoutes fxResolveFn ctx relevantContexts hostScopeId subtreeRoutes
@@ -452,7 +431,7 @@ let
             subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
             subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
             relevantContexts = lib.genAttrs relevantScopeIds (sid: scopeContexts.${sid});
-            subtreePhase1 = wrapPerScope ctx hostScopeId subtreeContexts subtreeClassImports;
+            subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
             subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
             subtreePhase3 =
               applyRoutes (fxResolve mkPipeline) ctx relevantContexts hostScopeId subtreeRoutes
@@ -551,30 +530,10 @@ let
             ) accImports newEntries
         ) scopedClassImportsRaw (builtins.attrNames allDeferred);
 
-      phase1 = wrapPerScope ctx result.state.rootScopeId augmentedScopeContexts drainedClassImportsRaw;
-      # Filter provides and routes for the flake level: skip entity subtree
-      # scopes to avoid forcing their wrapping. Subtree extraction in
-      # applyInstantiates re-runs provides/routes per host lazily.
-      entityKinds = den.lib.schemaUtil.schemaEntityKinds;
-      rootCtx = augmentedScopeContexts.${result.state.rootScopeId} or { };
-      rootIsEntity = builtins.any (k: rootCtx ? ${k}) entityKinds;
-      isNonEntityScope =
-        sid:
-        let
-          scopeCtx = augmentedScopeContexts.${sid} or { };
-        in
-        !builtins.any (k: scopeCtx ? ${k}) entityKinds;
-      filteredProvides =
-        if rootIsEntity then
-          scopedProvides
-        else
-          lib.filterAttrs (sid: _: isNonEntityScope sid) scopedProvides;
-      filteredRoutes =
-        if rootIsEntity then scopedRoutes else lib.filterAttrs (sid: _: isNonEntityScope sid) scopedRoutes;
-      phase2 = applyProvides ctx augmentedScopeContexts filteredProvides phase1;
+      phase1 = wrapPerScope ctx augmentedScopeContexts drainedClassImportsRaw;
+      phase2 = applyProvides ctx augmentedScopeContexts scopedProvides phase1;
       phase3 =
-        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
-          filteredRoutes
+        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId scopedRoutes
           phase2;
       phase4 = applyInstantiates {
         scopedInstantiates = result.state.scopedInstantiates null;
