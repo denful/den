@@ -270,7 +270,7 @@ let
     };
 
   # Generic content wrapper for aspect freeform keys.
-  # Wraps any value (class module, trait data, function) with provenance metadata.
+  # Wraps any value (class module, quirk data, function) with provenance metadata.
   # Multi-site definitions are preserved as a list with file attribution.
   # Already-wrapped values (from cross-submodule propagation) are flattened
   # to prevent double-wrapping.
@@ -278,7 +278,7 @@ let
     typeCfg:
     lib.types.mkOptionType {
       name = "aspectContent";
-      description = "class module, trait emission, or nested aspect";
+      description = "class module, quirk emission, or nested aspect";
       check = _: true;
       merge =
         loc: defs:
@@ -321,7 +321,7 @@ let
       merge = loc: defs: contentType.merge loc defs;
     };
 
-  # Aspect meta submodule type: handleWith, excludes, provider, collisionPolicy.
+  # Aspect meta submodule type: handleWith, provider, collisionPolicy.
   metaType =
     typeCfg: config:
     lib.types.submodule {
@@ -338,11 +338,6 @@ let
           }
         );
         default = null;
-      };
-      options.excludes = lib.mkOption {
-        description = "Aspects to exclude from this subtree (sugar for handleWith)";
-        type = lib.types.listOf lib.types.unspecified;
-        default = [ ];
       };
       options.provider = lib.mkOption {
         internal = true;
@@ -398,6 +393,11 @@ let
           includes = lib.mkOption {
             description = "Providers to ask aspects from";
             type = lib.types.listOf (providerType typeCfg);
+            default = [ ];
+          };
+          excludes = lib.mkOption {
+            description = "Aspects or policies to exclude from this subtree";
+            type = lib.types.listOf lib.types.unspecified;
             default = [ ];
           };
           provides = lib.mkOption {

@@ -19,6 +19,7 @@ let
     let
       schemaEntry = (den.schema or { }).${name} or { };
       schemaIncludes = schemaEntry.includes or [ ];
+      schemaExcludes = schemaEntry.excludes or [ ];
       # Capture schema-level collisionPolicy eagerly — avoids circular eval
       # when read during post-pipeline wrapping (wrapClassModule).
       collisionPolicy = schemaEntry.collisionPolicy or null;
@@ -66,9 +67,9 @@ let
       inherit name;
       meta = {
         handleWith = null;
-        excludes = [ ];
         provider = [ ];
       };
+      excludes = schemaExcludes;
       includes = selfProvide ++ schemaIncludes;
       __entityKind = name;
       __scopeHandlers = scopeHandlers;

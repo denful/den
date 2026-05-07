@@ -628,7 +628,7 @@
       }
     );
 
-    # meta.excludes sugar: exclude via list of refs
+    # excludes: exclude via list of refs
     test-excludes-sugar = denTest (
       { den, ... }:
       let
@@ -639,9 +639,8 @@
         };
         parent = {
           name = "root";
-          meta = {
-            excludes = [ target ];
-          };
+          meta = { };
+          excludes = [ target ];
           includes = [
             {
               name = "keep";

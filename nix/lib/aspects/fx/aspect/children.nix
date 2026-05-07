@@ -121,7 +121,7 @@ let
     aspect:
     let
       rawHandleWith = aspect.meta.handleWith or null;
-      rawExcludes = aspect.meta.excludes or [ ];
+      rawExcludes = aspect.excludes or [ ];
       handleWithList =
         if rawHandleWith == null then
           [ ]

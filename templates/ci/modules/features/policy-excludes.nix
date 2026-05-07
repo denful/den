@@ -14,7 +14,7 @@
         ];
         den.aspects.igloo = {
           includes = [ den.policies.add-marker ];
-          meta.excludes = [ den.policies.add-marker ];
+          excludes = [ den.policies.add-marker ];
         };
 
         expr = igloo.environment.variables.EXCLUDED_MARKER or "absent";
@@ -80,7 +80,7 @@
         ];
         den.aspects.igloo = {
           includes = [ childAspect ];
-          meta.excludes = [ den.policies.blocked-pol ];
+          excludes = [ den.policies.blocked-pol ];
         };
 
         expr = igloo.environment.variables.BLOCKED_MARKER or "absent";

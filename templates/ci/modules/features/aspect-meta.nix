@@ -80,7 +80,7 @@
             KEYS
             ;
         };
-        expected.KEYS = "collisionPolicy:excludes:file:handleWith:loc:name:provider:self";
+        expected.KEYS = "collisionPolicy:file:handleWith:loc:name:provider:self";
       }
     );
 
@@ -110,7 +110,7 @@
             KEYS
             ;
         };
-        expected.KEYS = "collisionPolicy:excludes:file:foo:handleWith:loc:name:provider:self";
+        expected.KEYS = "collisionPolicy:file:foo:handleWith:loc:name:provider:self";
       }
     );
 

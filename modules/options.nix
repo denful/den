@@ -39,11 +39,18 @@ let
         loc: defs:
         let
           kind = lib.last loc;
-          # Extract includes from defs that have them, strip before deferred merge
+          # Extract includes and excludes from defs, strip before deferred merge
           allIncludes = lib.concatMap (
             d:
             if builtins.isAttrs d.value && d.value ? includes && builtins.isList d.value.includes then
               d.value.includes
+            else
+              [ ]
+          ) defs;
+          allExcludes = lib.concatMap (
+            d:
+            if builtins.isAttrs d.value && d.value ? excludes && builtins.isList d.value.excludes then
+              d.value.excludes
             else
               [ ]
           ) defs;
@@ -54,6 +61,7 @@ let
               // {
                 value = builtins.removeAttrs d.value [
                   "includes"
+                  "excludes"
                 ];
               }
             else
@@ -133,10 +141,11 @@ let
                 default = null;
               };
             };
-          # Entity gating: kind gets pipeline wiring if it has includes or structural module content.
+          # Entity gating: kind gets pipeline wiring if it has includes, excludes, or structural module content.
           # `conf` is a shared base module, not an entity — always excluded.
-          hasEntityContent = kind != "conf" && (allIncludes != [ ] || hasStructuralContent);
-          # A schema entry is "structural" if it has module content beyond just includes.
+          hasEntityContent =
+            kind != "conf" && (allIncludes != [ ] || allExcludes != [ ] || hasStructuralContent);
+          # A schema entry is "structural" if it has module content beyond just includes/excludes.
           # Only structural entries should get self-provide aspect lookup.
           hasStructuralContent = builtins.any (
             d:
@@ -146,6 +155,7 @@ let
                 if builtins.isAttrs v then
                   builtins.removeAttrs v [
                     "includes"
+                    "excludes"
                   ]
                 else
                   v;
@@ -165,12 +175,14 @@ let
                 ];
               };
             includes = allIncludes;
+            excludes = allExcludes;
             isEntity = hasStructuralContent;
           }
         else
           {
             __functor = _: { ... }: merged;
             includes = [ ];
+            excludes = [ ];
             isEntity = false;
           };
     };
