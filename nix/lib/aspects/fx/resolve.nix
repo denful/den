@@ -246,8 +246,6 @@ let
             # If the host was walked in this pipeline, extract the entire subtree's
             # modules (host scope + user scopes + route-delivered content).
             # Otherwise fall back to mainModule (triggers fxResolve — legacy path).
-            # TODO: subtree extraction disabled pending identity fixes.
-            # Uses mainModule (per-host fxResolve) as fallback.
             modules = [ spec.mainModule ];
             instantiateArgs =
               if spec ? pkgs then
