@@ -6,7 +6,7 @@
   ...
 }:
 let
-  pipeRegistry = den.pipes or { };
+  pipeRegistry = den.quirks or { };
   pipeNames = builtins.attrNames pipeRegistry;
 
   # Extract raw quirk value from a pipe entry.
@@ -48,15 +48,24 @@ let
 
   # Resolve a config-dependent thunk against instantiated host configs.
   # Used for COLLECTED entries (cross-host) where the source host's config
-  # is needed. Returns a list (auto-flattens list-valued results).
+  # is needed. Provides scope context args (host, user, etc.) alongside config.
+  # Returns a list (auto-flattens list-valued results).
   resolveEntry =
-    hostConfigs: sourceScopeId: entry:
+    hostConfigs: scopeContexts: sourceScopeId: entry:
     if isConfigDependent entry then
       let
-        result = entry {
-          config = hostConfigs.${sourceScopeId} or { };
-          inherit lib;
-        };
+        thunkArgs = builtins.functionArgs entry;
+        scopeCtx = scopeContexts.${sourceScopeId} or { };
+        ctxArgs = lib.genAttrs (builtins.filter (k: scopeCtx ? ${k}) (builtins.attrNames thunkArgs)) (
+          k: scopeCtx.${k}
+        );
+        result = entry (
+          ctxArgs
+          // {
+            config = hostConfigs.${sourceScopeId} or { };
+            inherit lib;
+          }
+        );
       in
       if builtins.isList result then result else [ result ]
     else
@@ -65,11 +74,11 @@ let
   # Resolve all config-dependent thunks in a list of values.
   # Only used for collected entries (cross-host resolution).
   resolveThunks =
-    hostConfigs: scopeId: values:
+    hostConfigs: scopeContexts: scopeId: values:
     if hostConfigs == null then
       values
     else
-      builtins.concatMap (resolveEntry hostConfigs scopeId) values;
+      builtins.concatMap (resolveEntry hostConfigs scopeContexts scopeId) values;
 
   # Apply a single transform stage to a value list.
   # Config thunk markers (__configThunk) pass through filter/transform unchanged.
@@ -162,7 +171,7 @@ let
         entries = (scopedClassImports.${sid} or { }).${pipeName} or [ ];
         values = flattenAndExtract entries;
       in
-      resolveThunks hostConfigs sid values
+      resolveThunks hostConfigs scopeContexts sid values
     ) matchingScopes;
 
   # Process stages sequentially, including collect and withProvenance stages.
@@ -218,7 +227,7 @@ let
               let
                 entries = (scopedClassImports.${sid} or { }).${pipeName} or [ ];
                 rawValues = flattenAndExtract entries;
-                resolved = resolveThunks hostConfigs sid rawValues;
+                resolved = resolveThunks hostConfigs scopeContexts sid rawValues;
               in
               map (v: {
                 __pv = v;

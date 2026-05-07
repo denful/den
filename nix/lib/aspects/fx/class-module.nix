@@ -152,16 +152,20 @@ let
         effectiveRemainingArgs =
           if hasConfigThunks then remainingArgs // { config = true; } else remainingArgs;
 
-        # Resolve config thunk markers in a value list using the evalModules config.
+        # Resolve config thunk markers using both the scope context (for pipeline
+        # args like host/user) and the evalModules fixpoint config.
         resolveMarkers =
           config: values:
           builtins.concatMap (
             v:
             if v ? __configThunk then
               let
-                result = v.__fn {
-                  inherit config lib;
-                };
+                # Provide scope context args (host, user, etc.) plus config from fixpoint.
+                thunkArgs = builtins.functionArgs v.__fn;
+                ctxArgs = lib.genAttrs (builtins.filter (k: ctx ? ${k}) (builtins.attrNames thunkArgs)) (
+                  k: ctx.${k}
+                );
+                result = v.__fn (ctxArgs // { inherit config lib; });
               in
               if builtins.isList result then result else [ result ]
             else

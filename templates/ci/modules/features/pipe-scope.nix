@@ -8,7 +8,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.prefs = {
+        den.quirks.prefs = {
           description = "User preferences";
         };
 
@@ -55,7 +55,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -112,7 +112,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.ports = {
+        den.quirks.ports = {
           description = "Port declarations";
         };
 
@@ -165,7 +165,7 @@
           users.tux = { };
           users.pingu = { };
         };
-        den.pipes.shells = {
+        den.quirks.shells = {
           description = "Shell preferences";
         };
 
@@ -215,7 +215,7 @@
           users.tux = { };
           users.pingu = { };
         };
-        den.pipes.secrets = {
+        den.quirks.secrets = {
           description = "User secrets";
         };
 
@@ -285,7 +285,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.http-backends = {
+        den.quirks.http-backends = {
           description = "HTTP backends";
         };
 
@@ -338,7 +338,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.http-backends = {
+        den.quirks.http-backends = {
           description = "HTTP backends";
         };
 
@@ -397,7 +397,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -448,7 +448,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.http-backends = {
+        den.quirks.http-backends = {
           description = "HTTP backends";
         };
 
@@ -535,7 +535,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.http-backends = {
+        den.quirks.http-backends = {
           description = "HTTP backends";
         };
 
@@ -605,7 +605,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.tags = {
+        den.quirks.tags = {
           description = "Tags";
         };
 
@@ -672,7 +672,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.ssh-keys = {
+        den.quirks.ssh-keys = {
           description = "SSH host public keys";
         };
 
@@ -736,7 +736,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.pipes.ports = {
+        den.quirks.ports = {
           description = "Port declarations";
         };
 
@@ -791,7 +791,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.peer-names = {
+        den.quirks.peer-names = {
           description = "Peer host names";
         };
 
@@ -845,6 +845,96 @@
       }
     );
 
+    # Config thunk that takes both pipeline args AND config in the thunk itself.
+    # The pipe value function receives { host, config, ... } — host is a pipeline
+    # entity binding, config is the NixOS fixpoint. Both resolve in the same thunk.
+    test-pipe-config-thunk-both-paths = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.quirks.host-info = {
+          description = "Host info combining entity name and config";
+        };
+
+        den.aspects.set-hostname = {
+          nixos =
+            { host, ... }:
+            {
+              networking.hostName = host.name;
+            };
+        };
+
+        den.policies.collect-info =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "host-info" [
+              (pipe.collect ({ host, ... }: true))
+            ])
+          ];
+
+        den.schema.host.includes = [
+          den.aspects.set-hostname
+          den.policies.collect-info
+        ];
+
+        # The thunk itself takes { host, config, ... } — exercising both
+        # pipeline arg (host.name) and NixOS config (networking.hostName)
+        # in a single pipe value.
+        den.aspects.iceberg = {
+          host-info =
+            { host, config, ... }:
+            {
+              ${host.name} = config.networking.hostName;
+            };
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.info-reader ];
+          host-info =
+            { host, config, ... }:
+            {
+              ${host.name} = config.networking.hostName;
+            };
+        };
+
+        den.aspects.info-reader = {
+          nixos =
+            { host-info, lib, ... }:
+            {
+              # Each entry is { <entity-name> = <config-hostname>; }.
+              # Entity name comes from pipeline, config hostname from NixOS fixpoint.
+              networking.domain =
+                lib.concatMapStringsSep ","
+                  (
+                    entry:
+                    let
+                      k = builtins.head (builtins.attrNames entry);
+                    in
+                    "${k}=${entry.${k}}"
+                  )
+                  (
+                    lib.sort (
+                      a: b: builtins.head (builtins.attrNames a) < builtins.head (builtins.attrNames b)
+                    ) host-info
+                  );
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "iceberg=iceberg,igloo=igloo";
+      }
+    );
+
     # Entity kind filter: collect predicate { host, ... } rejects user scopes
     # even though user scopes also have `host` in context.
     test-pipe-collect-entity-kind-filter = denTest (
@@ -853,7 +943,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.alice = { };
 
-        den.pipes.host-tags = {
+        den.quirks.host-tags = {
           description = "Host tags";
         };
 
