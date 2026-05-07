@@ -11,5 +11,10 @@
       addr = "10.0.1.11";
       port = 80;
     };
+
+    host-addrs = {
+      hostname = "web-prod-2";
+      addr = "10.0.1.11";
+    };
   };
 }

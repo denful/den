@@ -17,19 +17,7 @@ in
     description = "Host address entries for /etc/hosts generation";
   };
 
-  # Every host emits its own address into host-addrs.
-  den.policies.emit-host-addr =
-    { host, ... }:
-    [
-      (pipe.from "host-addrs" [
-        (pipe.append {
-          hostname = host.name;
-          inherit (host) addr;
-        })
-      ])
-    ];
-
-  # Every host with an http-backends quirk collects from peers.
+  # Every host collects http-backends from peers.
   den.policies.collect-backends =
     { host, ... }:
     [
@@ -48,7 +36,6 @@ in
     ];
 
   den.schema.host.includes = [
-    den.policies.emit-host-addr
     den.policies.collect-backends
     den.policies.collect-host-addrs
   ];

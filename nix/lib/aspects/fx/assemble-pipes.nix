@@ -27,8 +27,13 @@ let
     ) entries;
 
   # Detect config-dependent thunks: functions that take `config` as an argument.
-  # These are resolved lazily against instantiated host configs.
+  # Config-dependent thunks require `config` in their args and are resolved
+  # lazily against instantiated host configs.
   isConfigDependent = val: builtins.isFunction val && (builtins.functionArgs val) ? config;
+
+  # Pipeline-parametric values require pipeline context args (host, user, etc.)
+  # but not config. These are resolved eagerly using scope context.
+  isPipelineParametric = val: builtins.isFunction val && !(builtins.functionArgs val) ? config;
 
   # Mark a config-dependent value for deferred resolution inside evalModules.
   # The marker is transparent to the module wrapper, which resolves it
@@ -66,6 +71,16 @@ let
             inherit lib;
           }
         );
+      in
+      if builtins.isList result then result else [ result ]
+    else if isPipelineParametric entry then
+      let
+        thunkArgs = builtins.functionArgs entry;
+        scopeCtx = scopeContexts.${sourceScopeId} or { };
+        ctxArgs = lib.genAttrs (builtins.filter (k: scopeCtx ? ${k}) (builtins.attrNames thunkArgs)) (
+          k: scopeCtx.${k}
+        );
+        result = entry (ctxArgs // { inherit lib; });
       in
       if builtins.isList result then result else [ result ]
     else

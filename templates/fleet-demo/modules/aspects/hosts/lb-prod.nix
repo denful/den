@@ -8,7 +8,10 @@
       den.aspects.haproxy
       den.aspects.hostfile
     ];
-    # lb doesn't serve HTTP itself — no http-backends quirk.
-    # host-addrs emitted by emit-host-addr policy (reads host.addr).
+
+    host-addrs = {
+      hostname = "lb-prod";
+      addr = "10.0.1.1";
+    };
   };
 }

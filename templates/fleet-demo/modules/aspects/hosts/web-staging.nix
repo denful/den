@@ -11,5 +11,10 @@
       addr = "10.0.2.10";
       port = 80;
     };
+
+    host-addrs = {
+      hostname = "web-staging";
+      addr = "10.0.2.10";
+    };
   };
 }
