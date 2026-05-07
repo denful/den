@@ -16,6 +16,7 @@ let
   userToHostContext =
     { user, host, ... }:
     {
+      name = "primary-user(${user.userName}@${host.name})";
       inherit description;
       darwin.system.primaryUser = user.userName;
       wsl.defaultUser = user.userName;

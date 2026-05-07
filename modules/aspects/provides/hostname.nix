@@ -19,6 +19,7 @@ let
 in
 {
   den.provides.hostname = {
+    name = "hostname";
     inherit description;
     includes = [ setHostname ];
   };

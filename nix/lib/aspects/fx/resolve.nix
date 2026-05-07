@@ -283,7 +283,7 @@ let
                 extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
               else
                 null;
-            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
+            modules = [ spec.mainModule ];
             instantiateArgs =
               if spec ? pkgs then
                 {

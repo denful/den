@@ -61,6 +61,7 @@ let
 in
 {
   den.provides.inputs' = {
+    name = "inputs'";
     inherit description;
     includes = [
       osAspect

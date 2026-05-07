@@ -60,6 +60,7 @@ let
 in
 {
   den.provides.self' = {
+    name = "self'";
     inherit description;
     includes = [
       osAspect

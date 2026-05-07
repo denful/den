@@ -53,6 +53,7 @@ let
 in
 {
   den.provides.define-user = {
+    name = "define-user";
     inherit description;
     includes = [
       userContext

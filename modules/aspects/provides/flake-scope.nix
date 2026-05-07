@@ -14,6 +14,7 @@ let
 in
 {
   den.provides.flake-scope = {
+    name = "flake-scope";
     description = "Expose lib, inputs, and den to aspect pipeline functions.";
     policies.den-flake-scope = _: [
       (resolve {

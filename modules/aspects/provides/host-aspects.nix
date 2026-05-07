@@ -34,6 +34,7 @@ let
 in
 {
   den.provides.host-aspects = {
+    name = "host-aspects";
     inherit description;
     includes = [ from-host ];
   };
