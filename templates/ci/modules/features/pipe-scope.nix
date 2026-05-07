@@ -523,6 +523,328 @@
       }
     );
 
+    # Provenance wrapping: pipe.withProvenance annotates entries with source context.
+    test-pipe-provenance = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.pipes.http-backends = {
+          description = "HTTP backends";
+        };
+
+        den.policies.fleet-backends =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "http-backends" [
+              (pipe.collect ({ host, ... }: true))
+              pipe.withProvenance
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.fleet-backends ];
+
+        den.aspects.iceberg = {
+          http-backends = {
+            addr = "10.0.0.2";
+            port = 80;
+          };
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.haproxy ];
+          http-backends = {
+            addr = "10.0.0.1";
+            port = 80;
+          };
+        };
+
+        den.aspects.haproxy = {
+          nixos =
+            { http-backends, ... }:
+            {
+              # With provenance, entries are { value, source }.
+              # Local entry has source = igloo's context.
+              # Collected entry has source = iceberg's context.
+              networking.hostName = toString (builtins.length http-backends);
+              networking.domain = lib.concatMapStringsSep "," (e: "${e.value.addr}:${e.source.host.name}") (
+                lib.sort (a: b: a.value.addr < b.value.addr) http-backends
+              );
+            };
+        };
+
+        expr = {
+          count = igloo.networking.hostName;
+          detail = igloo.networking.domain;
+        };
+        expected = {
+          count = "2";
+          detail = "10.0.0.1:igloo,10.0.0.2:iceberg";
+        };
+      }
+    );
+
+    # Provenance + transform composition: transform runs on tagged values.
+    test-pipe-provenance-with-transform = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.pipes.tags = {
+          description = "Tags";
+        };
+
+        den.policies.collect-tags =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "tags" [
+              (pipe.collect ({ host, ... }: true))
+              (pipe.filter (t: t != "skip"))
+              pipe.withProvenance
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.collect-tags ];
+
+        den.aspects.iceberg = {
+          tags = [
+            "web"
+            "skip"
+          ];
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.tag-reader ];
+          tags = [ "lb" ];
+        };
+
+        den.aspects.tag-reader = {
+          nixos =
+            { tags, ... }:
+            {
+              # "skip" filtered before provenance wrapping.
+              # Remaining: local "lb" + collected "web" = 2 entries with provenance.
+              networking.hostName = toString (builtins.length tags);
+              networking.domain = lib.concatMapStringsSep "," (e: "${e.value}@${e.source.host.name}") (
+                lib.sort (a: b: a.value < b.value) tags
+              );
+            };
+        };
+
+        expr = {
+          count = igloo.networking.hostName;
+          detail = igloo.networking.domain;
+        };
+        expected = {
+          count = "2";
+          detail = "lb@igloo,web@iceberg";
+        };
+      }
+    );
+
+    # Config-dependent thunk: pipe entry is a function that reads host config.
+    test-pipe-config-thunk = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.pipes.ssh-keys = {
+          description = "SSH host public keys";
+        };
+
+        den.policies.collect-keys =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "ssh-keys" [
+              (pipe.collect ({ host, ... }: true))
+            ])
+          ];
+
+        # Set hostname so config thunks can read it.
+        den.aspects.set-hostname = {
+          nixos =
+            { host, ... }:
+            {
+              networking.hostName = host.name;
+            };
+        };
+        den.schema.host.includes = [
+          den.policies.collect-keys
+          den.aspects.set-hostname
+        ];
+
+        # Config-dependent thunk: reads hostname from NixOS config.
+        # The thunk is resolved lazily against instantiated configs.
+        den.aspects.iceberg = {
+          ssh-keys = { config, ... }: [ "key-${config.networking.hostName}" ];
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.key-consumer ];
+          ssh-keys = { config, ... }: [ "key-${config.networking.hostName}" ];
+        };
+
+        den.aspects.key-consumer = {
+          nixos =
+            { ssh-keys, lib, ... }:
+            {
+              # igloo sees: local resolved thunk + collected from iceberg = 2 keys.
+              networking.domain = lib.concatStringsSep "," (lib.sort (a: b: a < b) ssh-keys);
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "key-iceberg,key-igloo";
+      }
+    );
+
+    # Config-dependent thunk with list-valued result (auto-flattened).
+    test-pipe-config-thunk-list = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.pipes.ports = {
+          description = "Port declarations";
+        };
+
+        den.aspects.set-hostname = {
+          nixos =
+            { host, ... }:
+            {
+              networking.hostName = host.name;
+            };
+        };
+        den.default.includes = [ den.aspects.set-hostname ];
+
+        # Thunk returns a list — should be auto-flattened.
+        den.aspects.igloo = {
+          includes = [ den.aspects.port-reader ];
+          ports =
+            { config, ... }:
+            if config.networking.hostName == "igloo" then
+              [
+                80
+                443
+              ]
+            else
+              [ 8080 ];
+        };
+
+        den.aspects.port-reader = {
+          nixos =
+            { ports, lib, ... }:
+            {
+              networking.firewall.allowedTCPPorts = lib.sort (a: b: a < b) ports;
+            };
+        };
+
+        expr = igloo.networking.firewall.allowedTCPPorts;
+        expected = [
+          80
+          443
+        ];
+      }
+    );
+
+    # Mutual config dependency: two hosts read each other's non-overlapping config.
+    test-pipe-config-thunk-mutual = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.pipes.peer-names = {
+          description = "Peer host names";
+        };
+
+        den.policies.collect-peer-names =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "peer-names" [
+              (pipe.collect ({ host, ... }: true))
+            ])
+          ];
+
+        den.aspects.set-hostname = {
+          nixos =
+            { host, ... }:
+            {
+              networking.hostName = host.name;
+            };
+        };
+        den.schema.host.includes = [
+          den.policies.collect-peer-names
+          den.aspects.set-hostname
+        ];
+
+        # Both hosts emit config-dependent thunks reading their own hostname.
+        # Each host's hostname is set statically (not pipe-dependent), so
+        # mutual lazy resolution works: igloo reads iceberg's config.networking.hostName
+        # and vice versa without circular dep.
+        den.aspects.iceberg = {
+          peer-names = { config, ... }: config.networking.hostName;
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.name-consumer ];
+          peer-names = { config, ... }: config.networking.hostName;
+        };
+
+        den.aspects.name-consumer = {
+          nixos =
+            { peer-names, lib, ... }:
+            {
+              # igloo sees: local "igloo" + collected "iceberg" = 2.
+              networking.domain = lib.concatStringsSep "," (lib.sort (a: b: a < b) peer-names);
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "iceberg,igloo";
+      }
+    );
+
     # Entity kind filter: collect predicate { host, ... } rejects user scopes
     # even though user scopes also have `host` in context.
     test-pipe-collect-entity-kind-filter = denTest (

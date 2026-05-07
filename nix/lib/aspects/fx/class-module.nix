@@ -139,8 +139,36 @@ let
       let
         denArgs = lib.genAttrs denArgNames (k: ctx.${k});
         remainingArgs = removeAttrs allArgs denArgNames;
+
+        # Detect pipe args containing config thunk markers (__configThunk).
+        # These are resolved inside the module wrapper using the evalModules
+        # fixpoint config, breaking the circular dependency with assemblePipes.
+        pipeThunks = ctx.__pipeConfigThunks or { };
+        denArgsWithThunks = builtins.filter (k: pipeThunks ? ${k}) denArgNames;
+        hasConfigThunks = denArgsWithThunks != [ ];
+
+        # If any den args have config thunks, we need `config` from the module
+        # system to resolve them — force wrapper path even if no other remaining args.
+        effectiveRemainingArgs =
+          if hasConfigThunks then remainingArgs // { config = true; } else remainingArgs;
+
+        # Resolve config thunk markers in a value list using the evalModules config.
+        resolveMarkers =
+          config: values:
+          builtins.concatMap (
+            v:
+            if v ? __configThunk then
+              let
+                result = v.__fn {
+                  inherit config lib;
+                };
+              in
+              if builtins.isList result then result else [ result ]
+            else
+              [ v ]
+          ) values;
       in
-      if remainingArgs == { } then
+      if effectiveRemainingArgs == { } then
         {
           module = warnedModule denArgs;
           wrapped = true;
@@ -151,12 +179,27 @@ let
           classWinsNames = builtins.filter (name: policy name == "class-wins") denArgNames;
           classWinsDen = lib.genAttrs classWinsNames (k: denArgs.${k});
           denWinsDen = removeAttrs denArgs classWinsNames;
-          wrapper = moduleArgs: warnedModule (classWinsDen // moduleArgs // denWinsDen);
-          validatorAdvertisedArgs = remainingArgs // {
+          wrapper =
+            moduleArgs:
+            let
+              resolvedDen =
+                if hasConfigThunks then
+                  lib.mapAttrs (
+                    k: v:
+                    if builtins.elem k denArgsWithThunks && builtins.isList v then
+                      resolveMarkers (moduleArgs.config or { }) v
+                    else
+                      v
+                  ) denWinsDen
+                else
+                  denWinsDen;
+            in
+            warnedModule (classWinsDen // moduleArgs // resolvedDen);
+          validatorAdvertisedArgs = effectiveRemainingArgs // {
             config = true;
           };
           validator = mkCollisionValidator policy denArgNames;
-          advertisedArgs = remainingArgs // lib.genAttrs denArgNames (_: true);
+          advertisedArgs = effectiveRemainingArgs // lib.genAttrs denArgNames (_: true);
         in
         {
           module = lib.setFunctionArgs wrapper advertisedArgs;

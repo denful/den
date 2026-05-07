@@ -294,11 +294,6 @@ let
                   isRelevant = sid: isInSubtree sid || isAncestor sid;
                   subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
                   relevantScopeIds = builtins.filter isRelevant allScopeIds;
-                  # Class imports: subtree only (ancestor class imports belong to other outputs).
-                  # Inject host class into the host scope context for wrapPerScope.
-                  # The pipeline keeps class in scope handlers only (not context) to
-                  # avoid affecting provides/enrichment, but subtree extraction needs
-                  # it for correct class module wrapping.
                   scopeEntityClassMap = scopeEntityClass null;
                   subtreeContexts = lib.genAttrs subtreeScopeIds (
                     sid:
@@ -314,13 +309,8 @@ let
                       base
                   );
                   subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
-                  # Routes and provides: include ancestors (policies at flake-system scope
-                  # produce routes/provides that must be visible during per-host assembly).
                   subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
                   subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
-
-                  # Contexts for route/provide resolution include ancestors
-                  # so routes registered at ancestor scopes can look up their contexts.
                   relevantContexts = lib.genAttrs relevantScopeIds (sid: augmentedScopeContexts.${sid});
                   subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
                   subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
@@ -369,18 +359,113 @@ let
       result = mkPipeline { inherit class; } { inherit self ctx; };
       scopeContexts = result.state.scopeContexts null;
 
-      # Assemble pipe data into scope contexts before wrapping.
       scopedClassImportsRaw = result.state.scopedClassImports null;
-      augmentedScopeContexts = assemblePipes {
-        inherit scopeContexts;
-        scopedClassImports = scopedClassImportsRaw;
-        scopedPipeEffects = result.state.scopedPipeEffects null;
-        scopeParent = result.state.scopeParent null;
-      };
-
       scopeParent = result.state.scopeParent null;
       scopedProvides = result.state.scopedProvides null;
       scopedRoutes = result.state.scopedRoutes null;
+
+      # Pipe-data-free host configs for cross-host config thunk resolution.
+      # Uses original (non-augmented) scope contexts so modules don't receive
+      # pipe data args, breaking the cycle: assemblePipes → hostConfigs → evalModules → pipe data.
+      # Local thunks are marked and resolved inside evalModules via the fixpoint config.
+      hostConfigs =
+        let
+          allInstantiates = lib.concatLists (lib.attrValues (result.state.scopedInstantiates null));
+          allScopeIds = builtins.attrNames scopeContexts;
+          specsByHost = builtins.listToAttrs (
+            lib.concatMap (
+              spec:
+              let
+                hasOutput = (spec.intoAttr or [ ]) != [ ];
+                hostScopeId = if hasOutput then findHostScopeId scopeParent allScopeIds spec else null;
+              in
+              if hostScopeId == null then
+                [ ]
+              else
+                [
+                  {
+                    name = hostScopeId;
+                    value = spec;
+                  }
+                ]
+            ) allInstantiates
+          );
+        in
+        lib.mapAttrs (
+          hostScopeId: spec:
+          let
+            hostClass = spec.class or "nixos";
+            isInSubtree =
+              sid:
+              sid == hostScopeId
+              || (
+                let
+                  parent = scopeParent.${sid} or null;
+                in
+                parent != null && parent != sid && isInSubtree parent
+              );
+            isAncestor =
+              sid:
+              let
+                parent = scopeParent.${hostScopeId} or null;
+              in
+              sid == parent || (parent != null && parent != hostScopeId && isAncestorOf scopeParent sid parent);
+            isRelevant = sid: isInSubtree sid || isAncestor sid;
+            subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
+            relevantScopeIds = builtins.filter isRelevant allScopeIds;
+            scopeEntityClassMap = (result.state.scopeEntityClass or (_: { })) null;
+            subtreeContexts = lib.genAttrs subtreeScopeIds (
+              sid:
+              let
+                base = scopeContexts.${sid};
+                entityCls = scopeEntityClassMap.${sid} or null;
+              in
+              if !(base ? class) && entityCls != null then
+                base // { class = entityCls; }
+              else if !(base ? class) then
+                base // { class = hostClass; }
+              else
+                base
+            );
+            subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
+            subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
+            subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
+            relevantContexts = lib.genAttrs relevantScopeIds (sid: scopeContexts.${sid});
+            subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
+            subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
+            subtreePhase3 =
+              applyRoutes (fxResolve mkPipeline) ctx relevantContexts hostScopeId subtreeRoutes
+                subtreePhase2;
+            preWalkedModules = extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass;
+            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
+            instantiateArgs =
+              if spec ? pkgs then
+                {
+                  inherit (spec) pkgs;
+                  inherit modules;
+                }
+              else
+                {
+                  inherit modules;
+                }
+                // lib.optionalAttrs (spec ? system) {
+                  modules = modules ++ [
+                    { nixpkgs.hostPlatform = lib.mkDefault spec.system; }
+                  ];
+                };
+          in
+          (spec.instantiate instantiateArgs).config
+        ) specsByHost;
+
+      # Assemble pipe data into scope contexts before wrapping.
+      # Local config thunks are marked for deferred resolution inside evalModules.
+      # Cross-host config thunks (from pipe.collect) are resolved using hostConfigs.
+      augmentedScopeContexts = assemblePipes {
+        inherit scopeContexts hostConfigs;
+        scopedClassImports = scopedClassImportsRaw;
+        scopedPipeEffects = result.state.scopedPipeEffects null;
+        inherit scopeParent;
+      };
 
       phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw;
       phase2 = applyProvides ctx augmentedScopeContexts scopedProvides phase1;

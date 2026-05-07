@@ -26,16 +26,62 @@ let
       if builtins.isList val then val else [ val ]
     ) entries;
 
+  # Detect config-dependent thunks: functions that take `config` as an argument.
+  # These are resolved lazily against instantiated host configs.
+  isConfigDependent = val: builtins.isFunction val && (builtins.functionArgs val) ? config;
+
+  # Mark a config-dependent value for deferred resolution inside evalModules.
+  # The marker is transparent to the module wrapper, which resolves it
+  # using the evalModules fixpoint config.
+  markConfigThunk =
+    v:
+    if isConfigDependent v then
+      {
+        __configThunk = true;
+        __fn = v;
+      }
+    else
+      v;
+
+  # Mark all config-dependent entries in a value list.
+  markConfigThunks = map markConfigThunk;
+
+  # Resolve a config-dependent thunk against instantiated host configs.
+  # Used for COLLECTED entries (cross-host) where the source host's config
+  # is needed. Returns a list (auto-flattens list-valued results).
+  resolveEntry =
+    hostConfigs: sourceScopeId: entry:
+    if isConfigDependent entry then
+      let
+        result = entry {
+          config = hostConfigs.${sourceScopeId} or { };
+          inherit lib;
+        };
+      in
+      if builtins.isList result then result else [ result ]
+    else
+      [ entry ];
+
+  # Resolve all config-dependent thunks in a list of values.
+  # Only used for collected entries (cross-host resolution).
+  resolveThunks =
+    hostConfigs: scopeId: values:
+    if hostConfigs == null then
+      values
+    else
+      builtins.concatMap (resolveEntry hostConfigs scopeId) values;
+
   # Apply a single transform stage to a value list.
+  # Config thunk markers (__configThunk) pass through filter/transform unchanged.
   applyStage =
     values: stage:
     let
       t = stage.__pipeStage or "";
     in
     if t == "filter" then
-      builtins.filter stage.fn values
+      builtins.filter (v: v ? __configThunk || stage.fn v) values
     else if t == "transform" then
-      map stage.fn values
+      map (v: if v ? __configThunk then v else stage.fn v) values
     else if t == "fold" then
       [ (builtins.foldl' stage.fn stage.init values) ]
     else if t == "append" then
@@ -62,27 +108,23 @@ let
     in
     builtins.foldl' applyStage values transformStages;
 
-  # Collect quirks from sibling scopes matching a predicate.
+  # Find sibling scopes matching a predicate.
   # Siblings = scopes sharing the same parent in scopeParent.
   # Entity kind filtering: reject scopes whose entity kinds don't match the predicate.
-  collectFromPeers =
+  findMatchingSiblings =
     {
       scopeContexts,
       scopeParent,
-      scopedClassImports,
       currentScopeId,
-      pipeName,
     }:
     predicate:
     let
       entityKinds = den.lib.schemaUtil.schemaEntityKinds;
       parent = scopeParent.${currentScopeId} or null;
       allScopeIds = builtins.attrNames scopeContexts;
-      # Siblings: same parent, excluding self.
       siblings = builtins.filter (
         sid: sid != currentScopeId && (scopeParent.${sid} or null) == parent
       ) allScopeIds;
-      # Entity kind depth filter: reject scopes with entity kinds the predicate didn't request.
       predArgs = builtins.functionArgs predicate;
       requiredArgs = builtins.filter (k: !predArgs.${k}) (builtins.attrNames predArgs);
       predEntityArgs = builtins.filter (k: builtins.elem k entityKinds) requiredArgs;
@@ -95,18 +137,38 @@ let
           extraEntityKinds = builtins.filter (k: !builtins.elem k predEntityArgs) scopeEntityArgs;
         in
         hasRequired && extraEntityKinds == [ ] && predicate ctx;
-      matchingScopes = builtins.filter predicateMatches siblings;
+    in
+    builtins.filter predicateMatches siblings;
+
+  # Collect quirks from sibling scopes matching a predicate.
+  collectFromPeers =
+    {
+      scopeContexts,
+      scopeParent,
+      scopedClassImports,
+      currentScopeId,
+      pipeName,
+      hostConfigs ? null,
+    }:
+    predicate:
+    let
+      matchingScopes = findMatchingSiblings {
+        inherit scopeContexts scopeParent currentScopeId;
+      } predicate;
     in
     lib.concatMap (
       sid:
       let
         entries = (scopedClassImports.${sid} or { }).${pipeName} or [ ];
+        values = flattenAndExtract entries;
       in
-      flattenAndExtract entries
+      resolveThunks hostConfigs sid values
     ) matchingScopes;
 
-  # Process stages sequentially, including collect stages that harvest from peers.
-  # This replaces applyTransformStages for effects that contain collect stages.
+  # Process stages sequentially, including collect and withProvenance stages.
+  # When withProvenance is present, values are internally tagged with source
+  # scope IDs: { __pv = value; __ps = scopeId; }. The withProvenance stage
+  # converts these to user-visible { value; source; } format.
   processStagesWithCollect =
     {
       scopeContexts,
@@ -114,9 +176,11 @@ let
       scopedClassImports,
       currentScopeId,
       pipeName,
+      hostConfigs ? null,
     }:
     initialValues: stages:
     let
+      hasProvenance = builtins.any (s: (s.__pipeStage or "") == "withProvenance") stages;
       relevantStages = builtins.filter (
         s:
         builtins.elem (s.__pipeStage or "") [
@@ -126,8 +190,17 @@ let
           "append"
           "for"
           "collect"
+          "withProvenance"
         ]
       ) stages;
+      taggedInitial =
+        if hasProvenance then
+          map (v: {
+            __pv = v;
+            __ps = currentScopeId;
+          }) initialValues
+        else
+          initialValues;
     in
     builtins.foldl' (
       values: stage:
@@ -135,19 +208,72 @@ let
         t = stage.__pipeStage or "";
       in
       if t == "collect" then
-        values
-        ++ collectFromPeers {
-          inherit
-            scopeContexts
-            scopeParent
-            scopedClassImports
-            currentScopeId
-            pipeName
-            ;
-        } stage.fn
+        if hasProvenance then
+          let
+            matchingScopes = findMatchingSiblings {
+              inherit scopeContexts scopeParent currentScopeId;
+            } stage.fn;
+            collected = lib.concatMap (
+              sid:
+              let
+                entries = (scopedClassImports.${sid} or { }).${pipeName} or [ ];
+                rawValues = flattenAndExtract entries;
+                resolved = resolveThunks hostConfigs sid rawValues;
+              in
+              map (v: {
+                __pv = v;
+                __ps = sid;
+              }) resolved
+            ) matchingScopes;
+          in
+          values ++ collected
+        else
+          values
+          ++ collectFromPeers {
+            inherit
+              scopeContexts
+              scopeParent
+              scopedClassImports
+              currentScopeId
+              pipeName
+              hostConfigs
+              ;
+          } stage.fn
+      else if t == "withProvenance" then
+        map (v: {
+          value = v.__pv;
+          source = scopeContexts.${v.__ps};
+        }) values
+      else if hasProvenance then
+        if t == "filter" then
+          builtins.filter (v: stage.fn v.__pv) values
+        else if t == "transform" then
+          map (v: v // { __pv = stage.fn v.__pv; }) values
+        else if t == "fold" then
+          [
+            {
+              __pv = builtins.foldl' (acc: v: stage.fn acc v.__pv) stage.init values;
+              __ps = currentScopeId;
+            }
+          ]
+        else if t == "append" then
+          values
+          ++ [
+            {
+              __pv = stage.value;
+              __ps = currentScopeId;
+            }
+          ]
+        else if t == "for" then
+          map (v: {
+            __pv = v;
+            __ps = currentScopeId;
+          }) (stage.fn (map (v: v.__pv) values))
+        else
+          values
       else
         applyStage values stage
-    ) initialValues relevantStages;
+    ) taggedInitial relevantStages;
 
   # Check whether a pipe effect has a pipe.to routing stage.
   hasToStage = e: builtins.any (s: (s.__pipeStage or "") == "to") (e.stages or [ ]);
@@ -162,7 +288,7 @@ let
     map (a: den.lib.aspects.fx.identity.key a) toStage.aspects;
 
   # Choose the right stage processor for an effect's stages.
-  # Uses processStagesWithCollect when collect stages are present, otherwise applyTransformStages.
+  # Uses processStagesWithCollect when collect or withProvenance stages are present.
   applyEffectStages =
     {
       scopeContexts,
@@ -170,9 +296,18 @@ let
       scopedClassImports,
       currentScopeId,
       pipeName,
+      hostConfigs ? null,
     }:
     baseValues: stages:
-    if builtins.any (s: (s.__pipeStage or "") == "collect") stages then
+    if
+      builtins.any (
+        s:
+        builtins.elem (s.__pipeStage or "") [
+          "collect"
+          "withProvenance"
+        ]
+      ) stages
+    then
       processStagesWithCollect {
         inherit
           scopeContexts
@@ -180,6 +315,7 @@ let
           scopedClassImports
           currentScopeId
           pipeName
+          hostConfigs
           ;
       } baseValues stages
     else
@@ -192,6 +328,7 @@ let
       scopeContexts,
       scopeParent,
       scopedClassImports,
+      hostConfigs ? null,
     }:
     pipeName: scopeId: baseValues: effects:
     let
@@ -212,6 +349,7 @@ let
           scopeContexts
           scopeParent
           scopedClassImports
+          hostConfigs
           ;
         currentScopeId = scopeId;
         inherit pipeName;
@@ -233,6 +371,7 @@ let
       scopeParent,
       scopedClassImports,
       currentScopeId,
+      hostConfigs ? null,
     }:
     baseValues: effects:
     let
@@ -247,6 +386,7 @@ let
               scopeParent
               scopedClassImports
               currentScopeId
+              hostConfigs
               ;
             pipeName = effect.pipeName;
           } baseValues (effect.stages or [ ]);
@@ -366,6 +506,7 @@ let
       scopedClassImports,
       scopedPipeEffects ? { },
       scopeParent ? { },
+      hostConfigs ? null,
     }:
     if pipeNames == [ ] then
       scopeContexts
@@ -395,21 +536,30 @@ let
             let
               rawEntries = scopeImports.${pipeName} or [ ];
               baseValues = flattenAndExtract rawEntries;
-              # Merge exposed data from children.
+              # Mark local config thunks for deferred resolution inside evalModules.
+              # Cross-host thunks are resolved eagerly in collectFromPeers.
+              markedBase = markConfigThunks baseValues;
+              # Merge exposed data from children (also mark any thunks).
               exposedValues = exposedForScope.${pipeName} or [ ];
-              combinedBase = baseValues ++ exposedValues;
+              markedExposed = markConfigThunks exposedValues;
+              combinedBase = markedBase ++ markedExposed;
               relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
               # Exclude expose effects from untargeted processing — they route upward, not locally.
               untargetedEffects = builtins.filter (e: !hasToStage e && !hasExposeStage e) relevantEffects;
             in
             if untargetedEffects == [ ] && relevantEffects == [ ] && exposedValues == [ ] then
-              baseValues
+              markedBase
             else if untargetedEffects == [ ] then
               # All effects are targeted/expose — scope-wide data is combined base values.
               combinedBase
             else
               applyPipeEffects {
-                inherit scopeContexts scopeParent scopedClassImports;
+                inherit
+                  scopeContexts
+                  scopeParent
+                  scopedClassImports
+                  hostConfigs
+                  ;
               } pipeName scopeId combinedBase untargetedEffects
           );
 
@@ -421,8 +571,10 @@ let
                 let
                   rawEntries = scopeImports.${pipeName} or [ ];
                   baseValues = flattenAndExtract rawEntries;
+                  markedBase = markConfigThunks baseValues;
                   exposedValues = exposedForScope.${pipeName} or [ ];
-                  combinedBase = baseValues ++ exposedValues;
+                  markedExposed = markConfigThunks exposedValues;
+                  combinedBase = markedBase ++ markedExposed;
                   relevantEffects = builtins.filter (e: e.pipeName == pipeName) scopeEffects;
                   targetedEffects = builtins.filter hasToStage relevantEffects;
                 in
@@ -430,7 +582,12 @@ let
                   { }
                 else
                   buildTargetedData {
-                    inherit scopeContexts scopeParent scopedClassImports;
+                    inherit
+                      scopeContexts
+                      scopeParent
+                      scopedClassImports
+                      hostConfigs
+                      ;
                     currentScopeId = scopeId;
                   } combinedBase targetedEffects
               );
@@ -447,8 +604,18 @@ let
             );
 
           hasTargeted = pipeTargeted != { };
+
+          # Flag pipes that contain config thunk markers for resolution
+          # inside evalModules (see class-module.nix wrapFunctionModule).
+          pipeConfigThunks = lib.genAttrs (builtins.filter (
+            pipeName: builtins.any (v: v ? __configThunk) (pipeData.${pipeName})
+          ) pipeNames) (_: true);
+          hasConfigThunks = pipeConfigThunks != { };
         in
-        scopeCtx // pipeData // lib.optionalAttrs hasTargeted { __pipeTargeted = pipeTargeted; }
+        scopeCtx
+        // pipeData
+        // lib.optionalAttrs hasTargeted { __pipeTargeted = pipeTargeted; }
+        // lib.optionalAttrs hasConfigThunks { __pipeConfigThunks = pipeConfigThunks; }
       ) scopeContexts;
 in
 {
