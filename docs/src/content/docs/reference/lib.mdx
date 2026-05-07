@@ -63,6 +63,79 @@ targets and routing type.
 See [den.policies reference](/reference/policies/#denlibpolicyinspectinspect)
 for full documentation.
 
+## `den.lib.nh`
+
+<Aside title="Source" icon="github">
+[`nix/lib/nh.nix`](https://github.com/denful/den/blob/main/nix/lib/nh.nix)
+</Aside>
+
+Generates [nh](https://github.com/viperML/nh) wrapper scripts for each
+host and home in your fleet. Each wrapper is a shell application that
+calls `nh os`, `nh darwin`, or `nh home` with the correct flake
+attribute, so you can build/switch with `nix run .#<hostname>`.
+
+### `den.lib.nh.denPackages args pkgs`
+
+Returns an attrset of all host and home wrapper packages, suitable for
+`perSystem.packages`:
+
+```nix
+perSystem = { pkgs, ... }: {
+  packages = den.lib.nh.denPackages { fromFlake = true; } pkgs;
+};
+```
+
+### `den.lib.nh.denShell args pkgs`
+
+Returns a `mkShell` with `nh` and all wrapper scripts on `PATH`:
+
+```nix
+# Non-flake usage
+options.den.sh = lib.mkOption {
+  default = den.lib.nh.denShell {
+    fromFlake = false;
+    outPrefix = [ "flake" ];
+  } pkgs;
+};
+```
+
+### `den.lib.nh.denApps args pkgs`
+
+Returns a list of all wrapper derivations (hosts + homes).
+
+### `den.lib.nh.hostApps args pkgs`
+
+Returns a list of host-only wrapper derivations.
+
+### `den.lib.nh.homeApps args pkgs`
+
+Returns a list of home-only wrapper derivations.
+
+### Args
+
+All functions take an `args` attrset:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `fromFlake` | `bool` | `true` | Use flake ref (`path#attr`) or file ref (`--file path attr`) |
+| `fromPath` | `str` | `"."` | Flake path or file path |
+| `outPrefix` | `list` | `[]` | Prefix prepended to the output attribute path |
+
+### Usage
+
+After adding `denPackages` to your `perSystem.packages`:
+
+```console
+# Build igloo via nh (defaults to "build" action)
+$ nix run .#igloo
+
+# Switch igloo via nh
+$ nix run .#igloo -- switch
+
+# Any nh flags work
+$ nix run .#igloo -- switch --dry
+```
+
 ## Deprecated functions
 
 Several `den.lib` functions are deprecated — the pipeline now handles
