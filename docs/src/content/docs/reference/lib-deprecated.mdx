@@ -1,0 +1,107 @@
+---
+title: "den.lib (deprecated)"
+description: Deprecated library functions — parametric dispatch, canTake, take, and context shortcuts.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="All functions on this page are deprecated">
+The pipeline now handles parametric dispatch and class module wrapping
+automatically. These functions still work but should not be used in new code.
+See [Class Modules](/explanation/class-modules/) and
+[Parametric Aspects](/explanation/parametric/).
+</Aside>
+
+## `den.lib.parametric`
+
+Wraps an aspect with a `__functor` that filters `includes` by argument
+compatibility. Default uses `atLeast` matching.
+
+```nix
+den.lib.parametric { nixos.x = 1; includes = [ ... ]; }
+```
+
+### `den.lib.parametric.atLeast`
+
+Same as `parametric`. Functions match if all required params are present.
+
+### `den.lib.parametric.exactly`
+
+Functions match only if required params exactly equal provided params.
+
+```nix
+den.lib.parametric.exactly { includes = [ ({ host }: ...) ]; }
+```
+
+### `den.lib.parametric.fixedTo`
+
+Calls the aspect with a fixed context, ignoring the actual context:
+
+```nix
+den.lib.parametric.fixedTo { host = myHost; } someAspect
+```
+
+### `den.lib.parametric.expands`
+
+Extends the received context with additional attributes before dispatch:
+
+```nix
+den.lib.parametric.expands { extra = true; } someAspect
+```
+
+## `den.lib.canTake`
+
+Function argument introspection.
+
+### `den.lib.canTake params fn`
+
+Returns `true` if `fn`'s required arguments are satisfied by `params` (atLeast).
+
+### `den.lib.canTake.atLeast params fn`
+
+Same as `canTake`.
+
+### `den.lib.canTake.exactly params fn`
+
+Returns `true` only if `fn`'s required arguments exactly match `params`.
+
+## `den.lib.take`
+
+Conditional function application.
+
+### `den.lib.take.atLeast fn ctx`
+
+Calls `fn ctx` if `canTake.atLeast ctx fn`, otherwise returns `{}`.
+
+### `den.lib.take.exactly fn ctx`
+
+Calls `fn ctx` if `canTake.exactly ctx fn`, otherwise returns `{}`.
+
+### `den.lib.take.unused`
+
+`_unused: used: used` — ignores first argument, returns second. Used for
+discarding `aspect-chain` in `import-tree`.
+
+## Context shortcuts
+
+Shortcuts built with `den.lib.take.exactly` and `den.lib.parametric.fixedTo`.
+
+### `den.lib.perHost aspect`
+
+Run `aspect` only in `{ host }` contexts.
+
+### `den.lib.perUser aspect`
+
+Run `aspect` only in `{ host, user }` contexts.
+
+### `den.lib.perHome aspect`
+
+Run `aspect` only in `{ home }` contexts.
+
+## `den.lib.resolveStage`
+
+### `den.lib.resolveStage name ctx`
+
+Resolves a stage by name with a given context attrset. Returns an aspect-like
+record. Used internally by the pipeline and by `den.lib.diag` convenience
+wrappers.
