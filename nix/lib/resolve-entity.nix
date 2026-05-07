@@ -22,10 +22,22 @@ let
       # Capture schema-level collisionPolicy eagerly — avoids circular eval
       # when read during post-pipeline wrapping (wrapClassModule).
       collisionPolicy = schemaEntry.collisionPolicy or null;
-      # Store collisionPolicy as a separate __collisionPolicies entry in ctx
-      # so wrapClassModule can read it without accessing the live entity config.
+      # For entity kinds that carry related entity bindings on their schema
+      # entry (e.g. home.host, home.user), include those bindings in the
+      # context.  This mirrors config.resolved in options.nix which reads
+      # _module.args for entity-kind keys.
+      entity = ctx.${name} or null;
+      entityDerivedBindings =
+        if entity == null || !builtins.isAttrs entity then
+          { }
+        else
+          lib.filterAttrs (
+            k: v:
+            k != name && builtins.elem k schemaEntityKinds && v != null && builtins.isAttrs v && !(ctx ? ${k})
+          ) (lib.intersectAttrs (lib.genAttrs schemaEntityKinds (_: null)) entity);
       augmentedCtx =
         ctx
+        // entityDerivedBindings
         // lib.optionalAttrs (collisionPolicy != null) {
           __collisionPolicies = (ctx.__collisionPolicies or { }) // {
             ${name} = collisionPolicy;
