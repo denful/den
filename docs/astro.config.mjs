@@ -47,7 +47,6 @@ export default defineConfig({
 					label: 'Understand',
 					items: [
 						{ label: 'Core Principles', slug: 'explanation/core-principles' },
-						{ label: 'Coming from...', slug: 'explanation/coming-from', badge: { text: 'new', variant: 'success' } },
 						{
 							label: 'Entities',
 							collapsed: true,
@@ -96,6 +95,7 @@ export default defineConfig({
 				{
 					label: 'Start',
 					items: [
+						{ label: 'Coming from...', slug: 'explanation/coming-from', badge: { text: 'new', variant: 'success' } },
 						{ label: 'From Zero to Den', slug: 'guides/from-zero-to-den' },
 						{ label: 'From Flake to Den', slug: 'guides/from-flake-to-den' },
 						{ label: 'Migrate to Den', slug: 'guides/migrate' },
