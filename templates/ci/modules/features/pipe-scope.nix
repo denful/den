@@ -300,7 +300,7 @@
             ])
           ];
 
-        den.default.includes = [ den.policies.fleet-backends ];
+        den.schema.host.includes = [ den.policies.fleet-backends ];
 
         den.aspects.iceberg = {
           http-backends = {
@@ -354,7 +354,7 @@
             ])
           ];
 
-        den.default.includes = [ den.policies.fleet-backends ];
+        den.schema.host.includes = [ den.policies.fleet-backends ];
 
         den.aspects.iceberg = {
           http-backends = [
@@ -412,7 +412,7 @@
             ])
           ];
 
-        den.default.includes = [ den.policies.collect-all ];
+        den.schema.host.includes = [ den.policies.collect-all ];
 
         den.aspects.igloo = {
           includes = [ den.aspects.consumer ];

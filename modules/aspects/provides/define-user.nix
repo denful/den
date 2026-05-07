@@ -25,6 +25,7 @@ let
   userContext =
     { host, user }:
     {
+      name = "user";
       nixos.users.users.${user.userName} = {
         name = user.userName;
         home = homeDir host user;
@@ -45,6 +46,9 @@ let
     userContext {
       host.system = home.system;
       user.userName = home.userName;
+    }
+    // {
+      name = "home";
     };
 in
 {

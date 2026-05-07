@@ -30,22 +30,28 @@ let
   osAspect =
     { host }:
     {
+      name = "os";
       ${host.class}.imports = [ insecureModule ];
     };
 
   userAspect =
     { host, user }:
-    lib.optionalAttrs (lib.elem "homeManager" user.classes) {
+    {
+      name = "user";
+    }
+    // lib.optionalAttrs (lib.elem "homeManager" user.classes) {
       homeManager.imports = [ insecureModule ];
     };
 
   homeAspect =
     { home }:
     {
+      name = "home";
       ${home.class}.imports = [ insecureModule ];
     };
 
   aspect = {
+    name = "insecure-predicate";
     inherit description;
     includes = [
       osAspect

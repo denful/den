@@ -25,7 +25,10 @@ let
         __scopeHandlers = scopeHandlers;
       };
     in
-    lib.genAttrs (user.classes or [ "homeManager" ]) (
+    {
+      name = "user";
+    }
+    // lib.genAttrs (user.classes or [ "homeManager" ]) (
       class: den.lib.aspects.resolve class aspectWithCtx
     );
 in

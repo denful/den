@@ -79,12 +79,6 @@ let
     // fx.effects.state.handler;
 
   # resolve-entity resolves an entity by kind using resolveEntity.
-  # Strips den.default from child entity includes to prevent
-  # cross-context duplicate resolution: den.default is resolved once
-  # at the root entity level; child entities must not re-resolve it
-  # in a different context (which would produce duplicate NixOS
-  # module definitions). Filter uses pointer identity.
-  denDefault = den.default or null;
   resolveEntityHandler = {
     "resolve-entity" =
       { param, state }:
@@ -93,16 +87,9 @@ let
         scope = state.currentScope;
         currentCtx = if scope == null then { } else (state.scopeContexts null).${scope} or { };
         entity = den.lib.resolveEntity kind currentCtx;
-        strippedIncludes =
-          if denDefault != null then
-            builtins.filter (inc: inc != denDefault) entity.includes
-          else
-            entity.includes;
       in
       {
-        resume = entity // {
-          includes = strippedIncludes;
-        };
+        resume = entity;
         inherit state;
       };
   };

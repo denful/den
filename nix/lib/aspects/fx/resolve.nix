@@ -152,10 +152,87 @@ let
     };
 
   # Phase 4: Apply entity instantiation.
+  # Find the host scope ID for an instantiate spec.
+  # register-instantiate records sourceScopeId = currentScope (the parent, e.g.
+  # flake-system), but the entity's scope was created by resolve.to as a child.
+  # Search child scopes of sourceScopeId matching the entity name.
+  findHostScopeId =
+    scopeParent: allScopeIds: spec:
+    let
+      sid = spec.sourceScopeId or null;
+    in
+    # Direct match: if sourceScopeId itself is in the scope tree.
+    if sid != null && builtins.elem sid allScopeIds then
+      sid
+    else
+      let
+        entityName = spec.name or null;
+        children = builtins.filter (
+          scopeId: scopeId != sid && (scopeParent.${scopeId} or null) == sid
+        ) allScopeIds;
+        matchByName =
+          if entityName != null then
+            builtins.filter (scopeId: lib.hasInfix "=${entityName}" scopeId) children
+          else
+            [ ];
+      in
+      if matchByName != [ ] then
+        builtins.head matchByName
+      else if builtins.length children == 1 then
+        builtins.head children
+      else
+        null;
+
+  # Extract merged modules for a scope subtree (the scope + all descendants).
+  # This produces the complete module set for a host: host-scope modules,
+  # user-scope modules, and route-delivered modules — all in one list.
+  extractSubtreeModules =
+    perScope: scopeParent: rootScopeId: targetClass:
+    let
+      allScopeIds = builtins.attrNames perScope;
+      # Collect all descendant scope IDs by walking scopeParent.
+      isInSubtree =
+        sid:
+        sid == rootScopeId
+        || (
+          let
+            parent = scopeParent.${sid} or null;
+          in
+          parent != null && parent != sid && isInSubtree parent
+        );
+      subtreeScopes = builtins.filter isInSubtree allScopeIds;
+      # Collect modules from all subtree scopes, deduplicating by key.
+      # Same aspect included at multiple scope levels (host default + user default)
+      # produces identical static modules; first occurrence wins.
+      # Named modules carry `key`; anon modules carry `_file` from setDefaultModuleLocation.
+      raw = lib.concatMap (sid: perScope.${sid}.${targetClass} or [ ]) subtreeScopes;
+      deduped =
+        let
+          go =
+            seen: mods:
+            if mods == [ ] then
+              [ ]
+            else
+              let
+                m = builtins.head mods;
+                rest = builtins.tail mods;
+                k = m.key or null;
+              in
+              if k != null && seen ? ${k} then
+                go seen rest
+              else
+                [ m ] ++ go (if k != null then seen // { ${k} = true; } else seen) rest;
+        in
+        go { } raw;
+    in
+    if deduped == [ ] then null else deduped;
+
+  # Phase 4: Apply entity instantiation.
   applyInstantiates =
-    scopedInstantiates: perScope: classImports:
+    scopedInstantiates: perScope: scopeParent: classImports:
     let
       allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
+      allScopeIds = builtins.attrNames perScope;
       instantiateModules = lib.concatMap (
         spec:
         let
@@ -165,12 +242,13 @@ let
           [ ]
         else
           let
-            # If the host was walked in this pipeline, use pre-walked modules.
-            # Otherwise fall back to mainModule (triggers fxResolve — legacy path).
-            sid = spec.sourceScopeId or null;
             hostClass = spec.class or "nixos";
-            preWalkedModules = if sid != null then perScope.${sid}.${hostClass} or null else null;
-            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
+            # If the host was walked in this pipeline, extract the entire subtree's
+            # modules (host scope + user scopes + route-delivered content).
+            # Otherwise fall back to mainModule (triggers fxResolve — legacy path).
+            # TODO: subtree extraction disabled pending identity fixes.
+            # Uses mainModule (per-host fxResolve) as fallback.
+            modules = [ spec.mainModule ];
             instantiateArgs =
               if spec ? pkgs then
                 {
@@ -196,55 +274,9 @@ let
       flake = (classImports.flake or [ ]) ++ instantiateModules;
     };
 
-  # Compute global raw pipeline data for all hosts, lazily.
-  # Each host's raw scopedClassImports and scopeContexts are merged
-  # into a single pool so pipe.collect can harvest from peer hosts.
-  # Uses den.lib.resolveEntity to construct the correct root aspect
-  # with entity bindings (host = hostConfig, etc.) in scope handlers.
-  mkGlobalPipePool =
-    mkPipeline:
-    let
-      inherit (den.lib.aspects) normalizeRoot;
-      ctxFromHandlers = den.lib.aspects.fx.aspect.ctxFromHandlers;
-      allHosts = den.hosts or { };
-      perHost = lib.concatMap (
-        system:
-        map (
-          hostName:
-          let
-            hostConfig = allHosts.${system}.${hostName};
-            resolved = den.lib.resolveEntity "host" { host = hostConfig; };
-            wrapped = normalizeRoot resolved;
-            ctx = ctxFromHandlers (resolved.__scopeHandlers or { });
-            result = mkPipeline { class = hostConfig.class; } {
-              self = wrapped;
-              inherit ctx;
-            };
-          in
-          {
-            scopeContexts = result.state.scopeContexts null;
-            scopedClassImports = result.state.scopedClassImports null;
-          }
-        ) (builtins.attrNames (allHosts.${system} or { }))
-      ) (builtins.attrNames allHosts);
-    in
-    builtins.foldl'
-      (acc: hostData: {
-        scopeContexts = acc.scopeContexts // hostData.scopeContexts;
-        scopedClassImports = acc.scopedClassImports // hostData.scopedClassImports;
-      })
-      {
-        scopeContexts = { };
-        scopedClassImports = { };
-      }
-      perHost;
-
   # Full resolution: run pipeline, then assemble output through all phases.
   fxResolve =
     mkPipeline:
-    let
-      globalPipePool = mkGlobalPipePool mkPipeline;
-    in
     {
       class,
       self,
@@ -269,8 +301,9 @@ let
         applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
           (result.state.scopedRoutes null)
           phase2;
+      scopeParent = result.state.scopeParent null;
       phase4 =
-        applyInstantiates (result.state.scopedInstantiates null) phase3.perScope
+        applyInstantiates (result.state.scopedInstantiates null) phase3.perScope scopeParent
           phase3.classImports;
     in
     {

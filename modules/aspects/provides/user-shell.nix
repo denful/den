@@ -33,8 +33,8 @@ in
   den.provides.user-shell = shell: {
     inherit description;
     includes = [
-      ({ host, user }: userShell shell user)
-      ({ home }: userShell shell home)
+      ({ host, user }: { name = "user"; } // userShell shell user)
+      ({ home }: { name = "home"; } // userShell shell home)
     ];
   };
 }

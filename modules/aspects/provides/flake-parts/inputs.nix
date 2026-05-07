@@ -34,7 +34,12 @@ let
       }
     );
 
-  osAspect = { host }: mkAspect host.class host.system;
+  osAspect =
+    { host }:
+    {
+      name = "os";
+    }
+    // mkAspect host.class host.system;
 
   userAspect =
     {
@@ -42,10 +47,16 @@ let
       host,
     }:
     {
+      name = "user";
       includes = map (c: mkAspect c host.system) user.classes;
     };
 
-  hmAspect = { home }: mkAspect home.class home.system;
+  hmAspect =
+    { home }:
+    {
+      name = "home";
+    }
+    // mkAspect home.class home.system;
 
 in
 {

@@ -30,18 +30,23 @@ let
   osAspect =
     { host }:
     {
+      name = "os";
       ${host.class}.imports = [ unfreeModule ];
     };
 
   userAspect =
     { host, user }:
-    lib.optionalAttrs (lib.elem "homeManager" user.classes) {
+    {
+      name = "user";
+    }
+    // lib.optionalAttrs (lib.elem "homeManager" user.classes) {
       homeManager.imports = [ unfreeModule ];
     };
 
   homeAspect =
     { home }:
     {
+      name = "home";
       ${home.class}.imports = [ unfreeModule ];
     };
 
