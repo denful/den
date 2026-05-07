@@ -49,8 +49,15 @@ export default defineConfig({
 						{ label: 'Core Principles', slug: 'explanation/core-principles' },
 						{ label: 'Coming from...', slug: 'explanation/coming-from', badge: { text: 'new', variant: 'success' } },
 						{
+							label: 'Entities',
+							collapsed: true,
+							items: [
+								{ label: 'Entities & Schema', slug: 'explanation/entities' },
+							],
+						},
+						{
 							label: 'Aspects',
-							collapsed: false,
+							collapsed: true,
 							items: [
 								{ label: 'Aspects & Functors', slug: 'explanation/aspects' },
 								{ label: 'Class Modules', slug: 'explanation/class-modules' },
@@ -58,27 +65,26 @@ export default defineConfig({
 							],
 						},
 						{
-							label: 'The Four Concerns',
-							collapsed: false,
+							label: 'Policies',
+							collapsed: true,
 							items: [
-								{ label: 'Entities & Schema', slug: 'explanation/entities', badge: { text: 'core', variant: 'tip' } },
-								{ label: 'Policies', slug: 'explanation/policies', badge: { text: 'core', variant: 'tip' } },
-								{ label: 'Quirks & Pipes', slug: 'explanation/quirks-and-pipes', badge: { text: 'core', variant: 'tip' } },
+								{ label: 'Policies', slug: 'explanation/policies' },
+								{ label: 'Policy Activation', slug: 'explanation/policy-activation' },
 							],
 						},
 						{
-							label: 'How It Fits Together',
-							collapsed: false,
+							label: 'Quirks & Pipes',
+							collapsed: true,
 							items: [
-								{ label: 'Resolution Pipeline', slug: 'explanation/context-pipeline' },
+								{ label: 'Quirks & Pipes', slug: 'explanation/quirks-and-pipes' },
 								{ label: 'Fleets & Multi-Host', slug: 'explanation/fleet' },
 							],
 						},
+						{ label: 'Resolution Pipeline', slug: 'explanation/context-pipeline' },
 						{
 							label: 'Deep Dives',
 							collapsed: true,
 							items: [
-								{ label: 'Policy Activation', slug: 'explanation/policy-activation', badge: { text: 'advanced', variant: 'caution' } },
 								{ label: 'Scope Partitioning', slug: 'explanation/scope-partitioning', badge: { text: 'advanced', variant: 'caution' } },
 								{ label: 'ABC on Den Effects', slug: 'explanation/effects', badge: { text: 'advanced', variant: 'caution' } },
 								{ label: 'Diagrams', slug: 'explanation/diagrams', badge: { text: 'advanced', variant: 'caution' } },
