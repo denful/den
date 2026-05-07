@@ -434,5 +434,149 @@
         expected = "1";
       }
     );
+    # Fleet-based cross-host collection via user-defined fleet entity.
+    # Fleet groups hosts under a shared parent scope so pipe.collect
+    # sees all fleet members as siblings.
+    test-pipe-collect-fleet = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.pipes.http-backends = {
+          description = "HTTP backends";
+        };
+
+        # Fleet entity: groups all hosts under a fleet parent scope.
+        den.policies.to-fleet = _: [
+          (den.lib.policy.resolve.to "fleet" {
+            fleet = {
+              name = "fleet";
+            };
+          })
+        ];
+
+        den.policies.fleet-to-hosts =
+          { fleet, ... }:
+          lib.concatMap (
+            system:
+            lib.concatMap (
+              hostName:
+              let
+                host = den.hosts.${system}.${hostName};
+              in
+              [
+                (den.lib.policy.resolve.to "host" { inherit host; })
+                (den.lib.policy.instantiate host)
+              ]
+            ) (builtins.attrNames (den.hosts.${system} or { }))
+          ) (builtins.attrNames (den.hosts or { }));
+
+        den.schema.flake.includes = [ den.policies.to-fleet ];
+        den.schema.fleet.includes = [ den.policies.fleet-to-hosts ];
+
+        # Collect policy: each host collects from fleet peers.
+        den.policies.fleet-backends =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "http-backends" [
+              (pipe.collect ({ host, ... }: true))
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.fleet-backends ];
+
+        den.aspects.iceberg = {
+          http-backends = {
+            addr = "10.0.0.2";
+            port = 80;
+          };
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.haproxy ];
+          http-backends = {
+            addr = "10.0.0.1";
+            port = 80;
+          };
+        };
+
+        den.aspects.haproxy = {
+          nixos =
+            { http-backends, ... }:
+            {
+              # igloo sees: local (10.0.0.1) + collected from iceberg (10.0.0.2) = 2
+              networking.hostName = toString (builtins.length http-backends);
+            };
+        };
+
+        expr = igloo.networking.hostName;
+        expected = "2";
+      }
+    );
+
+    # Entity kind filter: collect predicate { host, ... } rejects user scopes
+    # even though user scopes also have `host` in context.
+    test-pipe-collect-entity-kind-filter = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.pipes.host-tags = {
+          description = "Host tags";
+        };
+
+        den.policies.collect-host-tags =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "host-tags" [
+              (pipe.collect ({ host, ... }: true))
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.collect-host-tags ];
+
+        # Both host and user aspects emit host-tags.
+        # Only HOST scope entries should be collected — user scope entries
+        # should be rejected by the entity kind filter.
+        den.aspects.iceberg = {
+          host-tags = [ "webserver" ];
+        };
+
+        den.aspects.alice = {
+          host-tags = [ "user-tag-should-not-appear" ];
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.tag-consumer ];
+          host-tags = [ "loadbalancer" ];
+        };
+
+        den.aspects.tag-consumer = {
+          nixos =
+            { host-tags, ... }:
+            {
+              # igloo sees: local "loadbalancer" + iceberg's "webserver" = 2
+              # alice's "user-tag-should-not-appear" is rejected by entity kind filter.
+              networking.hostName = toString (builtins.length host-tags);
+            };
+        };
+
+        expr = igloo.networking.hostName;
+        expected = "2";
+      }
+    );
   };
 }
