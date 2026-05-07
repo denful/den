@@ -40,7 +40,7 @@ Then in REPL:
 nix-repl> :lf .
 nix-repl> den.aspects.igloo
 nix-repl> den.hosts.x86_64-linux.igloo
-nix-repl> den.stages
+nix-repl> den.policies
 ```
 
 ## Inspect Policies

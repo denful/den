@@ -130,7 +130,7 @@ flowchart BT
     Includes form a DAG. Provides create sub-aspects. One concern, all platforms.
   </Card>
   <Card title="Pure Effects Pipeline" icon="right-arrow">
-    Built on [algebraic effects](/explanation/effects/) via `nix-effects`. Aspects compile to computations, handlers own resolution strategy. [Policies](/explanation/policies/) drive entity topology. [Stages](/explanation/stages/) bind behavior. Everything is extensible.
+    Built on [algebraic effects](/explanation/effects/) via `nix-effects`. Aspects compile to computations, handlers own resolution strategy. [Policies](/explanation/policies/) drive entity topology and bind behavior. Everything is extensible.
   </Card>
   <Card title="No Lock-in" icon="open-book">
     Works with flake-parts, without flake-parts, or [without flakes at all](/tutorials/noflake/).
@@ -149,17 +149,17 @@ NixOS/nix-Darwin/homes configurations.
 
 ```mermaid
 flowchart LR
-  Schema["den.hosts / den.homes"] --> Ctx["den.stages pipeline"]
-  Aspects["den.aspects"] --> Ctx
-  Batteries["den.provides"] --> Ctx
-  Ctx --> Resolve["Resolution"]
+  Schema["den.hosts / den.homes"] --> Pipeline["den.policies pipeline"]
+  Aspects["den.aspects"] --> Pipeline
+  Batteries["den.provides"] --> Pipeline
+  Pipeline --> Resolve["Resolution"]
   Resolve --> Out["nixos / darwin / homeConfigurations"]
 ```
 
 <Steps>
 1. **Schema** -- `den.hosts` and `den.homes` declare machines, users, and their properties with `den.schema` modules and extensible freeform types.
 2. **Aspects** -- `den.aspects.*` bundles per-class configs (`nixos`, `darwin`, `homeManager`, or any custom class) with `.includes` and `.provides` forming a DAG.
-3. **Resolution pipeline** -- `den.policies` fan out from entity kinds (`{host}` → `{host, user}`, `{home}`), while `den.stages` bind behavior at each pipeline step. Batteries register derived entity kinds like `hm-host`, `hm-user`, `wsl-host`.
+3. **Resolution pipeline** -- `den.policies` fan out from entity kinds (`{host}` → `{host, user}`, `{home}`) and bind behavior. Batteries register derived entity kinds like `hm-host`, `hm-user`, `wsl-host`.
 4. **Resolution** -- Context-aware dispatch: functions receive entity data automatically based on their argument shape. [Class modules](/explanation/class-modules/) can access both Den context and NixOS module args in a single function.
 5. **Output** -- Each host/home is instantiated via `nixpkgs.lib.nixosSystem`, `darwin.lib.darwinSystem`, or `home-manager.lib.homeManagerConfiguration`.
 </Steps>

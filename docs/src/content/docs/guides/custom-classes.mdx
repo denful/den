@@ -91,7 +91,7 @@ let
       fromAspect = _: den.aspects.${user.aspect};
     };
 in {
-  den.stages.user.includes = [ fwd ];
+  den.schema.user.includes = [ fwd ];
 }
 ```
 
@@ -240,7 +240,7 @@ os-class = { class, aspect-chain }: den._.forward {
 };
 
 # Note: already enabled by Den
-# den.stages.host.includes = [ os-class ];
+# den.schema.host.includes = [ os-class ];
 
 den.aspects.my-laptop = {
   os.networking.hostName = "Yavanna"; # on both NixOS and MacOS
@@ -263,7 +263,7 @@ roleClass =
     fromAspect = _: lib.head aspect-chain;
   };
 
-den.stages.user.includes = [ roleClass ];
+den.schema.user.includes = [ roleClass ];
 
 den.hosts.x86_64-linux.igloo = {
   roles = [ "devops" "gaming" ];
@@ -323,7 +323,7 @@ nixClass =
   };
 
 # enable class for all users:
-den.stages.user.includes = [ nixClass ];
+den.schema.user.includes = [ nixClass ];
 
 # custom aspect that uses the `nix` class.
 nix-allowed = { user, ... }: { nix.allowed-users = [ user.userName ]; };

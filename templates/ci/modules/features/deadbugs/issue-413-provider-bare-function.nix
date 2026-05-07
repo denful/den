@@ -1,5 +1,5 @@
 # Provider sub-aspect as bare function with host context.
-# https://github.com/vic/den/pull/413
+# https://github.com/denful/den/pull/413
 { denTest, lib, ... }:
 {
   flake.tests.deadbugs-issue-413 = {

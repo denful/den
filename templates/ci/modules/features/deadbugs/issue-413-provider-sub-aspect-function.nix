@@ -1,5 +1,5 @@
 # Simplified variant of issue-413 provider sub-aspect bug.
-# https://github.com/vic/den/pull/413
+# https://github.com/denful/den/pull/413
 { denTest, ... }:
 {
   flake.tests.deadbugs-issue-413 = {

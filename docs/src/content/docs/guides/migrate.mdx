@@ -49,10 +49,10 @@ Migration to Den is incremental. You do not need to rewrite everything at once.
     ```nix
     # modules/legacy.nix
     { den, ... }: {
-      den.stages.host.includes = [
+      den.schema.host.includes = [
         (den.provides.import-tree._.host ./hosts)
       ];
-      den.stages.user.includes = [
+      den.schema.user.includes = [
         (den.provides.import-tree._.user ./users)
       ];
     }

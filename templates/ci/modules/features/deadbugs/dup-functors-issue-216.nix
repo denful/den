@@ -1,5 +1,5 @@
 # This test verifies that aspects do not use lib.functionTo merging semantics on aspect.__functor.
-# See: https://github.com/vic/den/issues/216 and https://github.com/vic/flake-aspects/pull/38
+# See: https://github.com/denful/den/issues/216 and https://github.com/vic/flake-aspects/pull/38
 {
   lib,
   inputs,

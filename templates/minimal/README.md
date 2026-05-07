@@ -2,7 +2,7 @@
 
 Steps you can follow after cloning this template:
 
-- Be sure to read the [den documentation](https://vic.github.io/den)
+- Be sure to read the [den documentation](https://den.oeiuwq.com)
 
 - Update den input.
 

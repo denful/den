@@ -1,4 +1,4 @@
-# See https://github.com/vic/den/issues/254
+# See https://github.com/denful/den/issues/254
 { denTest, ... }:
 {
   flake.tests.deadbugs-issue-254.hm-user-includes = {

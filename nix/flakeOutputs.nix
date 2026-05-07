@@ -1,4 +1,4 @@
-# See https://github.com/vic/den/discussions/317
+# See https://github.com/denful/den/discussions/317
 let
   message = ''
     If you see this message it likely means you have more than

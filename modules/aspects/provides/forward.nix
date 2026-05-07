@@ -30,7 +30,7 @@ let
     the new class to exist.
 
     See templates/ci/modules/guarded-forward.nix, templates/ci/modules/forward-from-custom-class.nix
-    See also: https://github.com/vic/den/issues/160
+    See also: https://github.com/denful/den/issues/160
   '';
 
 in

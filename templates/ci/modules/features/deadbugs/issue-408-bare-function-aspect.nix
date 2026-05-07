@@ -1,5 +1,5 @@
 # Bare function aspect merged with static config.
-# https://github.com/vic/den/pull/408
+# https://github.com/denful/den/pull/408
 { denTest, lib, ... }:
 {
   flake.tests.deadbugs-issue-408 = {

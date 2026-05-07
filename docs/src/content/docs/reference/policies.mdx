@@ -1,164 +1,225 @@
 ---
 title: den.policies
-description: Policy declarations, types, and built-in policies.
+description: Policy registry, effect types, combinators, and built-in policies.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`nix/nixModule/policies.nix`](https://github.com/denful/den/blob/main/nix/nixModule/policies.nix) --
-[`nix/lib/policy-types.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-types.nix) --
+[`nix/lib/aspects/policy-type.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/policy-type.nix) --
+[`nix/lib/policy-effects.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-effects.nix) --
 [`modules/policies/core.nix`](https://github.com/denful/den/blob/main/modules/policies/core.nix) --
 [`modules/policies/flake.nix`](https://github.com/denful/den/blob/main/modules/policies/flake.nix)
 </Aside>
 
-See [Policies](/explanation/policies/) for conceptual background on how policies
-drive the evaluation pipeline.
+See [Policies](/explanation/policies/) for conceptual background.
 
 ## `den.policies`
 
-Type: `lazyAttrsOf policyType`
+**Type:** `lazyAttrsOf policyFunction`
 
-A map of policy names to policy definitions. Each policy declares a directed
-edge between entity kinds, with a resolve function that performs fan-out from
-source contexts to target contexts.
+A registry of named policies. Each entry is a function from context to a
+list of policy effects. The module system wraps bare functions into
+`{ __isPolicy = true; name; fn; }` records automatically.
 
 ```nix
-den.policies.host-to-peers = {
-  from = "host";
-  to = "host";
-  as = "peer";
-  resolve = { host, ... }:
-    map (h: { host = h; }) (lib.attrValues den.hosts.${host.system});
+den.policies.my-policy = { host, ... }: [
+  (policy.resolve { enriched = true; })
+];
+```
+
+Declaring a policy here only **registers** it. Activation happens via
+`includes` — see [Activation](#activation).
+
+## Policy effects
+
+All constructors are accessed via `den.lib.policy`. Policies return lists
+of these effects.
+
+### `policy.resolve bindings`
+
+Create a new scope with `bindings` merged into the current context.
+
+```nix
+policy.resolve { myFlag = true; }
+```
+
+**Variants:**
+- `policy.resolve.shared bindings` — shared (non-isolated) fan-out
+- `policy.resolve.to kind bindings` — target a specific entity kind
+- `policy.resolve.withIncludes includes bindings` — attach includes to the new scope
+- `policy.resolve.to.withIncludes kind includes bindings` — both
+
+### `policy.include aspect`
+
+Inject an aspect into the current resolution:
+
+```nix
+policy.include { nixos.environment.variables.MARKER = "yes"; }
+```
+
+### `policy.exclude aspect`
+
+Remove an aspect via the constraint registry:
+
+```nix
+policy.exclude den.aspects.unwanted
+```
+
+### `policy.route spec`
+
+Route class or quirk content from one scope partition into a target class:
+
+```nix
+policy.route {
+  fromClass = "myClass";
+  intoClass = "nixos";
+  path = [ "services" "myService" ];
+}
+```
+
+### `policy.provide spec`
+
+Deliver a module directly to a target class, bypassing the aspect tree:
+
+```nix
+policy.provide { class = "nixos"; module = { pkgs, ... }: { ... }; }
+```
+
+### `policy.instantiate entity`
+
+Request post-pipeline instantiation of an entity:
+
+```nix
+policy.instantiate den.hosts.x86_64-linux.igloo
+```
+
+### `policy.pipe`
+
+See [den.quirks reference](/reference/quirks/) for the pipe builder API.
+
+### `policy.pipelineOnly value`
+
+Tag a value with `collisionPolicy = "class-wins"` — when the value
+collides with a module-system arg (e.g., NixOS provides `lib`), the
+class value wins silently.
+
+---
+
+## Activation
+
+Policies are activated by including them in `includes` lists. The pipeline
+distinguishes policies from aspects by the `__isPolicy` tag.
+
+```nix
+# For all entities of a kind
+den.schema.host.includes = [ den.policies.my-policy ];
+
+# For a specific aspect's subtree
+den.aspects.igloo.includes = [ den.policies.my-policy ];
+
+# For all entities globally
+den.default.includes = [ den.policies.my-policy ];
+```
+
+Policies and aspects mix freely in `includes`.
+
+## Deactivation
+
+Use `excludes` to prevent a policy from firing in a subtree:
+
+```nix
+den.aspects.igloo = {
+  excludes = [ den.policies.blocked ];
 };
 ```
 
-## Policy Type Options
+Excludes are **authoritative** — parent excludes cannot be overridden by
+child includes. The constraint registry uses the policy's identity for
+matching.
 
-### `from`
 
-Type: `str` (required)
+---
 
-Source entity kind. The policy fires when the pipeline processes a context
-matching this kind.
+## Combinators
 
-### `to`
+### `den.lib.policy.for entity policyOrList`
 
-Type: `str` (required)
-
-Target entity kind. Each entity kind has a corresponding stage where
-the resolved contexts are processed.
-
-### `as`
-
-Type: `str` (default: `""`)
-
-Context key used for the synthesized output entry. When empty, defaults to the
-`to` value. This is needed for sibling routing where `from` and `to` are the
-same kind -- without `as`, the target would collide with the source key.
+Wrap a policy to fire only when a specific entity is in context, matched
+by `id_hash`:
 
 ```nix
-# host-to-host routing: `as` avoids key collision
-{ from = "host"; to = "host"; as = "peer"; ... }
+den.lib.policy.for den.hosts.x86_64-linux.igloo den.policies.igloo-only
 ```
 
-### `resolve`
+Accepts a single policy or a list. Identity is preserved through the wrapper.
 
-Type: `raw` (required)
+### `den.lib.policy.when predicate policyOrList`
 
-Function that takes accumulated pipeline context and returns a list of target
-context attrsets. The argument is destructured against the current context --
-`synthesize-policies.nix` validates entity keys before calling resolve.
+Wrap a policy to fire only when a predicate over the current context
+returns true:
 
 ```nix
-resolve = { host, ... }:
-  map (user: { inherit host user; }) (lib.attrValues host.users);
+den.lib.policy.when ({ host, ... }: host.wsl.enable) den.policies.wsl-setup
 ```
 
-### `handlers`
+Accepts a single policy or a list. Identity is preserved.
 
-Type: `lazyAttrsOf raw` (default: `{ }`)
+### Composition
 
-Named effect handlers installed when this policy fires. Handlers are scoped
-to the transition this policy represents.
-
-## Policy Activation
-
-Core policies (those with `_core = true`) are always active. User-defined
-policies must be activated explicitly.
-
-Activation can be set at three levels:
-
-1. **Global default** -- `den.default.policies`
-2. **Per-kind schema** -- `den.schema.<kind>.policies`
-3. **Per-entity instance** -- `den.hosts.<system>.<name>.policies`
+Combinators compose:
 
 ```nix
-# Activate for all hosts
-den.schema.host.policies = [ "host-to-peers" ];
-
-# Activate for a single host
-den.hosts.x86_64-linux.igloo.policies = [ "host-to-peers" ];
+den.lib.policy.when (ctx: ctx.flag or false)
+  (den.lib.policy.for entity den.policies.my-policy)
 ```
 
-The `policies` option on every entity is a `listOf str` naming the policies
-to activate. Core policies do not need to appear in this list.
+---
 
-## Built-in Core Policies
-
-All built-in policies are marked `_core = true` and are always active.
+## Built-in policies
 
 ### Entity traversal (`core.nix`)
 
 | Policy | From | To | Behavior |
 |---|---|---|---|
 | `host-to-users` | `host` | `user` | One `{ host, user }` per `host.users` entry |
-| `host-to-default` | `host` | `default` | Identity (singleton) |
-| `user-to-default` | `user` | `default` | Identity (singleton) |
-| `home-to-default` | `home` | `default` | Identity (singleton) |
 
 ### Flake output traversal (`flake.nix`)
 
 | Policy | From | To | Behavior |
 |---|---|---|---|
-| `flake-to-flake-system` | `flake` | `flake-system` | One `{ system }` per `den.systems` entry |
-| `flake-system-to-flake-os` | `flake-system` | `flake-os` | One `{ host }` per host in that system |
-| `flake-system-to-flake-hm` | `flake-system` | `flake-hm` | One `{ home }` per home in that system |
-| `flake-system-to-flake-packages` | `flake-system` | `flake-packages` | `{ system, output }` |
-| `flake-system-to-flake-apps` | `flake-system` | `flake-apps` | `{ system, output }` |
-| `flake-system-to-flake-checks` | `flake-system` | `flake-checks` | `{ system, output }` |
-| `flake-system-to-flake-devShells` | `flake-system` | `flake-devShells` | `{ system, output }` |
-| `flake-system-to-flake-legacyPackages` | `flake-system` | `flake-legacyPackages` | `{ system, output }` |
+| `to-systems` | `flake` | `flake-system` | One `{ system }` per `den.systems` entry |
+| `to-os-outputs` | `flake-system` | `host` | One `{ host }` per host + instantiate |
+| `to-hm-outputs` | `flake-system` | `home` | One `{ home }` per home + instantiate |
+| `to-packages` | `flake-system` | — | Route `packages` class to flake output |
+| `to-apps` | `flake-system` | — | Route `apps` class to flake output |
+| `to-checks` | `flake-system` | — | Route `checks` class to flake output |
+| `to-devShells` | `flake-system` | — | Route `devShells` class to flake output |
+| `to-legacyPackages` | `flake-system` | — | Route `legacyPackages` class to flake output |
+
+---
 
 ## `den.lib.policyInspect.inspect`
 
-<Aside title="Source" icon="github">
-[`nix/lib/policy-inspect.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-inspect.nix)
-</Aside>
-
-Lightweight inspection utility that calls resolve functions directly without
-running the full pipeline. Useful for debugging which targets a given entity
-resolves to.
+Lightweight inspection utility that calls resolve functions directly
+without running the full pipeline:
 
 ```nix
 den.lib.policyInspect.inspect {
   kind = "host";
   context = { host = den.hosts.x86_64-linux.igloo; };
 }
-# => { host-to-users = { targetKey = "user"; targets = [ ... ]; from = "host"; to = "user"; as = ""; routing = "child"; }; }
 ```
 
 **Parameters:**
-- `kind` -- entity kind string (e.g., `"host"`)
-- `context` -- attrset representing the current pipeline context
+- `kind` — entity kind string
+- `context` — attrset representing the current pipeline context
 
-**Returns** an attrset keyed by policy name, where each value contains:
+**Returns** an attrset keyed by policy name with resolved targets,
+routing type, and other metadata.
 
-| Field | Description |
-|---|---|
-| `targetKey` | Effective context key (`as` if set, otherwise `to`) |
-| `targets` | List of resolved target context attrsets |
-| `from` | Source entity kind |
-| `to` | Target entity kind |
-| `as` | The `as` override (empty string if unset) |
-| `routing` | `"sibling"` when `from == to`, otherwise `"child"` |
+## See also
+
+- [Policies explanation](/explanation/policies/) — conceptual overview
+- [Policy Activation Deep Dive](/explanation/policy-activation/) — registry/activation model, dispatch internals
+- [den.quirks](/reference/quirks/) — pipe builder API (a policy effect type)

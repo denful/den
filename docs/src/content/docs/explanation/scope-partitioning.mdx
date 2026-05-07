@@ -1,0 +1,195 @@
+---
+title: Scope Partitioning
+description: How the pipeline isolates per-entity state via scope-partitioned fields, scope identity, and the scope tree.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside type="caution" title="Contributor Deep Dive">
+This page describes internal pipeline architecture. Users configuring
+hosts and aspects don't need this — see [Fleets & Multi-Host](/explanation/fleet/)
+and [Quirks & Pipes](/explanation/quirks-and-pipes/) for user-facing patterns.
+</Aside>
+
+<Aside title="Source" icon="github">
+[`nix/lib/aspects/fx/pipeline.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/pipeline.nix) --
+[`nix/lib/aspects/fx/resolve.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/resolve.nix) --
+[`nix/lib/aspects/fx/handlers/push-scope.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/handlers/push-scope.nix)
+</Aside>
+
+Every entity in the pipeline gets its own scope. Scopes partition
+pipeline state so that emissions from one entity don't contaminate
+another. This is what makes multi-host resolution work in a single
+pipeline run.
+
+## Scope identity: `mkScopeId`
+
+Each scope has a deterministic string ID computed from its context attrset.
+The format is comma-separated `key=value` pairs, sorted lexicographically:
+
+```
+{ host = { name = "igloo"; }; user = { name = "tux"; }; }
+  → "host=igloo,user=tux"
+```
+
+**Value extraction:**
+- Attrsets with `name`: use `v.name`
+- Strings: use directly
+- Anything else: `<type:key>` (e.g., `<int:priority>`)
+
+**Injectivity:** separator characters (`=`, `,`, `<`, `>`) cannot appear in
+Nix identifiers, so distinct contexts always produce distinct scope IDs.
+
+**Edge cases:**
+- Empty context `{}` → `""` (root scope)
+- Single key → `"host=igloo"` (no commas)
+
+## The scope tree
+
+Scopes form a tree tracked by two flat maps:
+
+**`scopeParent`** — child-to-parent mapping:
+```nix
+{
+  "host=igloo" = "";                     # parent is root
+  "host=igloo,user=tux" = "host=igloo";  # parent is host
+  "host=igloo,user=pingu" = "host=igloo";
+}
+```
+
+**`scopeContexts`** — scope-to-context mapping:
+```nix
+{
+  "" = {};
+  "host=igloo" = { host = { name = "igloo"; ... }; };
+  "host=igloo,user=tux" = { host = ...; user = { name = "tux"; ... }; };
+}
+```
+
+Both grow as the pipeline creates new scopes. The tree shape comes from
+policy-driven context expansion — `host-to-users` creates child scopes
+under each host scope.
+
+```
+""                                     ← root (flake)
+├── "system=x86_64-linux"              ← flake-system
+│   ├── "host=igloo"                   ← host
+│   │   ├── "host=igloo,user=tux"      ← user
+│   │   └── "host=igloo,user=pingu"    ← user
+│   └── "host=server"                  ← host
+│       └── "host=server,user=admin"   ← user
+```
+
+## Scope-partitioned state
+
+Pipeline state fields fall into three categories:
+
+### Scoped fields
+
+Per-scope partitions keyed by scope ID. Emission handlers write to
+`scopedX.${state.currentScope}`:
+
+| Field | Contents |
+|---|---|
+| `scopedClassImports` | Class modules emitted per scope, keyed by class name |
+| `scopedAspectPolicies` | Policies discovered during tree walk |
+| `scopedDeferredIncludes` | Includes deferred until context widens |
+| `scopedConstraintRegistry` | Constraint predicates per scope |
+| `scopedConstraintFilters` | Constraint filter functions per scope |
+| `scopedIncludesChain` | Include nesting depth tracking |
+| `scopedRoutes` | `policy.route` specs per scope |
+| `scopedInstantiates` | `policy.instantiate` specs per scope |
+
+### Prefixed fields
+
+Shared maps with scope-prefixed keys for dedup:
+
+| Field | Key format | Purpose |
+|---|---|---|
+| `seen` | `${scopeId}/${ctxKey}` | Context-aware emission dedup |
+| `includeSeen` | `${scopeId}/${identity}` | Include dedup per scope |
+| `pathSet` | `${scopeId}/${path}` | Per-scope aspect tracking |
+
+### Global fields
+
+Pipeline-wide values:
+
+| Field | Purpose |
+|---|---|
+| `currentScope` | Active scope ID — controls which partition receives emissions |
+| `class` | Target class name (immutable after init) |
+| `scopeParent` | Child-to-parent scope map |
+| `scopeContexts` | Scope-to-context map |
+
+## Scope transitions
+
+When a `policy.resolve` effect fires, the pipeline creates a new scope
+via `resolve-schema-entity`:
+
+1. **Enrich context** — merge the resolve effect's bindings into current context
+2. **Compute scope ID** — `childScopeId = mkScopeId enrichedCtx`
+3. **Dedup check** — skip if `childScopeId` already exists in `scopeContexts`
+4. **Record tree** — set `scopeParent`, `scopeContexts`, and `currentScope`
+5. **Install handlers** — `scope.provide` installs entity context handlers
+   for the child scope
+6. **Walk entity** — resolve the entity's aspect tree; all emissions write
+   to `scopedX.${childScopeId}`
+7. **Dispatch policies** — `installPolicies` fires any policies whose args
+   are now satisfied, potentially creating recursive child scopes
+8. **Restore** — `scope.provide` returns, reverting handlers;
+   `currentScope` restores to parent
+
+### The sync invariant
+
+Two mechanisms must stay synchronized during scope transitions:
+
+- **`scope.provide`** — controls which context handlers are visible to
+  parametric aspect resolution
+- **`state.currentScope`** — controls which partition emissions write to
+
+If these diverge, emissions land in the wrong scope or aspects resolve
+against the wrong context. Both are set in the same `fx.bind` chain,
+and `scope.provide`'s lexical scoping guarantees automatic handler
+cleanup.
+
+**Sequential sibling processing:** within a scope, siblings (e.g.,
+multiple users of a host) are processed sequentially in the bind chain.
+Nix's strict evaluation prevents interleaving. Scope set/restore for
+sibling A completes before sibling B begins.
+
+## Post-pipeline composition
+
+After the walk completes, `fxResolve` composes the final output from
+scope-partitioned state:
+
+1. **Per-scope wrapping** — each scope's class imports are wrapped with
+   that scope's entity context via `wrapClassModule`. This pre-applies
+   den args (`host`, `user`) so the module system only sees its own args.
+
+2. **Pipe assembly** — `assemblePipes` processes quirk data:
+   bottom-up expose collection, per-scope pipe effect application,
+   context enrichment with assembled pipe data.
+
+3. **Route application** — `policy.route` specs read source content from
+   scope partitions and inject into target classes.
+
+4. **Per-host extraction** — `applyInstantiates` filters shared state to
+   each host's subtree (host + descendants + ancestors), re-runs wrapping
+   and routing with the host as root scope.
+
+5. **Instantiation** — each extracted subtree is passed to
+   `lib.nixosSystem` / `darwinSystem` / `homeManagerConfiguration`.
+
+### Why ancestors are included
+
+During per-host extraction, ancestor scopes (up to root) are included
+because routes and provides registered at `flake-system` level must
+remain visible to host-level resolution. Without ancestors, routes from
+system-level batteries would be lost.
+
+## See also
+
+- [Fleets & Multi-Host](/explanation/fleet/) — user-facing multi-host patterns
+- [Resolution Pipeline](/explanation/context-pipeline/) — pipeline overview
+- [Policy Activation](/explanation/policy-activation/) — how dispatch and enrichment work
+- [ABC on Den Effects](/explanation/effects/) — the algebraic effects foundation

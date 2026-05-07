@@ -65,7 +65,7 @@
     value = aspect;
   };
 
-  # Route class or trait content from one scope partition into a target class.
+  # Route class or quirk content from one scope partition into a target class.
   # Tier 1 delivery — replaces den.provides.forward for the common case.
   route = spec: {
     __policyEffect = "route";

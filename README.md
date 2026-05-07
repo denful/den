@@ -1,10 +1,10 @@
 <p align="right">
   <a href="https://dendritic.oeiuwq.com/sponsor"><img src="https://img.shields.io/badge/sponsor-vic-white?logo=githubsponsors&logoColor=white&labelColor=%23FF0000" alt="Sponsor Vic"/></a>
-  <a href="https://deepwiki.com/vic/den"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
-  <a href="https://github.com/vic/den/releases"><img src="https://img.shields.io/github/v/release/vic/den?style=plastic&logo=github&color=purple"/></a>
+  <a href="https://deepwiki.com/denful/den"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
+  <a href="https://github.com/denful/den/releases"><img src="https://img.shields.io/github/v/release/denful/den?style=plastic&logo=github&color=purple"/></a>
   <a href="https://dendritic.oeiuwq.com"><img src="https://img.shields.io/badge/Dendritic-Nix-informational?logo=nixos&logoColor=white" alt="Dendritic Nix"/></a>
-  <a href="LICENSE"><img src="https://img.shields.io/github/license/vic/den" alt="License"/></a>
-  <a href="https://github.com/vic/den/actions"><img src="https://github.com/vic/den/actions/workflows/test.yml/badge.svg" alt="CI Status"/></a>
+  <a href="LICENSE"><img src="https://img.shields.io/github/license/denful/den" alt="License"/></a>
+  <a href="https://github.com/denful/den/actions"><img src="https://github.com/denful/den/actions/workflows/test.yml/badge.svg" alt="CI Status"/></a>
 </p>
 
 > den and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [dendritic libs](https://dendritic.oeiuwq.com) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://dendritic.oeiuwq.com/sponsor)
@@ -47,16 +47,15 @@ den.aspects.gaming = { host, user }: {
 # Other Nix configuration domains outside NixOS/nix-Darwin
 # can use the same pattern. demo: templates/nvf-standalone
 
-# A context transformation pipeline takes initially {host}
-# and traverses its topology (host->[users]->[homes]) aggregating deps
-aspect = den.ctx.host { host = den.hosts.x86_64-linux.my-laptop; };
+# Den resolves entities declared in den.hosts automatically.
+# Policies drive topology (host->[users]->[homes]).
+# The pipeline collects all aspects and produces per-class modules.
 
-# obtain the final module for nixos class
-nixosModule = den.lib.aspects.resolve "nixos" aspect;
-
-# Use NixOS API to instantiate or mix-in with other custom modules
-nixosConfigurations.my-laptop = lib.nixosConfiguration {
-  modules = [ nixosModule ];
+# For manual resolution outside the pipeline:
+aspect = den.lib.aspects.resolve "nixos"
+  (den.aspects.my-aspect { host = den.hosts.x86_64-linux.my-laptop; });
+nixosConfigurations.my-laptop = lib.nixosSystem {
+  modules = [ aspect ];
 };
 ```
 
@@ -70,7 +69,7 @@ On top of `den.lib`, Den also provides a [framework](https://den.oeiuwq.com/expl
 
 Den embraces your Nix choices and does not impose itself. All parts of Den are optional and replaceable. Works with your current setup, with/without flakes, flake-parts or any other Nix module system.
 
-> [Den is a declarative data transformation pipeline](https://github.com/vic/den/discussions/355). Infra entities are traversed via `den.ctx` transformations and configurations for them are generated when `den.aspects` are applied at each context stage.
+> [Den is a declarative data transformation pipeline](https://github.com/denful/den/discussions/355). Infra entities are traversed via `den.policies` and configurations for them are generated when `den.aspects` are applied at each entity resolution.
 
 <table>
 <tr>
@@ -155,17 +154,17 @@ Growing community adoption: [Usage Search](https://github.com/search?q=den.aspec
 
 ```console
 # Run virtio MicroVM from templates/microvm
-nix run github:vic/den?dir=templates/microvm#runnable-microvm
+nix run github:denful/den?dir=templates/microvm#runnable-microvm
 ```
 
 ```console
 # Run NVF-Standalone neovim from templates/nvf-standalone
-nix run github:vic/den?dir=templates/nvf-standalone#my-neovim
+nix run github:denful/den?dir=templates/nvf-standalone#my-neovim
 ```
 
 ```console
 # Run qemu VM from templates/example
-nix run github:vic/den
+nix run github:denful/den
 ```
 
 </td>
@@ -334,7 +333,7 @@ roleClass =
     fromAspect = _: lib.head aspect-chain;
   };
 
-den.ctx.user.includes = [ roleClass ];
+den.schema.user.includes = [ roleClass ];
 
 den.hosts.x86_64-linux.igloo = {
   roles = [ "devops" "gaming" ];
@@ -422,7 +421,7 @@ persys = { host }: den._.forward {
 };
 
 # enable on all hosts
-den.ctx.host.includes = [ persys ];
+den.schema.host.includes = [ persys ];
 
 # aspects just attach config to custom class
 den.aspects.my-laptop.persys.hideMounts = true;
@@ -431,7 +430,7 @@ den.aspects.my-laptop.persys.hideMounts = true;
 ### User-defined Extensions to Den context pipeline.
 
 See example [`template/microvm`](https://den.oeiuwq.com/tutorials/microvm) for an example
-of custom `den.ctx` and `den.schema` extensions for supporting
+of custom `den.schema` and `den.policies` extensions for supporting
 Declarative [MicroVM](https://microvm-nix.github.io/microvm.nix/declarative.html) guests with automatic host-shared `/nix/store`.
 
 ```nix

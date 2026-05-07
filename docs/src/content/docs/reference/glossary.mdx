@@ -81,9 +81,9 @@ See: [Policies](/explanation/policies/)
 
 ### provides
 
-Overloaded term with two distinct meanings. On an aspect, `provides` defines named sub-aspects that dependents can include. On a stage, `provides` defines aspect-lookup hooks that connect entities to their aspects.
+Overloaded term with two distinct meanings. On an aspect, `provides` defines named sub-aspects that dependents can include. As a battery namespace (`den.provides`), these are reusable aspect providers shipped with Den.
 
-See: [Aspects](/explanation/aspects/), [Context reference](/reference/ctx/)
+See: [Aspects](/explanation/aspects/), [Batteries](/reference/batteries/)
 
 ### provider
 
@@ -97,8 +97,8 @@ The process of walking an entity's aspect graph, applying parametric dispatch, c
 
 See: [Context pipeline](/explanation/context-pipeline/)
 
-### stage
+### entity kind
 
-A named scope in `den.stages` that binds behavior to a point in the resolution pipeline. Stages are the "where" -- they define what happens at each pipeline step. Stages are not policies and not aspects, though they use aspect-like structure.
+A named scope in `den.schema` that defines a type of entity in the resolution pipeline. Entity kinds are the "where" — they define what happens at each pipeline step. Built-in kinds: `host`, `user`, `home`. Custom kinds are registered by adding keys to `den.schema`.
 
-See: [Stages](/explanation/stages/)
+See: [Entities](/explanation/entities/)

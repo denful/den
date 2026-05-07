@@ -11,12 +11,12 @@ import { Aside } from '@astrojs/starlight/components';
 
 Den ships reusable aspect providers under `den.provides` (aliased `den._`).
 Each battery contributes NixOS/Darwin/home-manager modules to hosts and
-users that include them via `den.stages`.
+users that include them.
 
 Batteries fall into two categories:
 
-- **Opt-in** -- you include them explicitly in `den.default.includes`, `den.aspects.<name>.includes`, or `den.stages.<stage>.includes`.
-- **Auto-activated** -- Den activates them for you via `den.stages`. They define new classes or integration layers that work without explicit inclusion.
+- **Opt-in** -- you include them explicitly in `den.default.includes`, `den.aspects.<name>.includes`, or `den.schema.<kind>.includes`.
+- **Auto-activated** -- Den activates them via built-in policies. They define new classes or integration layers that work without explicit inclusion.
 
 ---
 
@@ -54,7 +54,7 @@ den.default.includes = [ den.provides.hostname ];
 
 Provides an `os` convenience class that forwards its contents into both `nixos` and `darwin` classes. This lets you write platform-agnostic host configuration without duplicating it across classes.
 
-**Auto-activated** at both host and user stages.
+**Auto-activated** for both host and user entity kinds.
 
 ```nix
 den.aspects.my-host = {
@@ -70,7 +70,7 @@ den.aspects.my-host = {
 
 Provides a `user` class that forwards settings into the host's `users.users.<userName>` at OS level. Instead of writing the full `nixos.users.users.alice` path, you write directly into the `user` class.
 
-**Auto-activated** at the user stage.
+**Auto-activated** for the user entity kind.
 
 ```nix
 den.aspects.alice.user = { pkgs, ... }: {
@@ -117,10 +117,10 @@ den.aspects.alice.includes = [
 
 Allows hosts and users to contribute configuration to each other through the `provides` attribute. Users can provide to specific hosts or to all hosts they belong to, and vice versa.
 
-**Opt-in.** Typically included at the user stage.
+**Opt-in.** Typically included for the user entity kind.
 
 ```nix
-den.stages.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den._.mutual-provider ];
 ```
 
 Then in aspects:
@@ -171,7 +171,7 @@ den.aspects.laptop.includes = [
 
 ### `den._.wsl`
 
-Enables WSL support on NixOS using the NixOS-WSL project. Adds a `wsl-host` stage and forwards the `wsl` class into the host's NixOS configuration.
+Enables WSL support on NixOS using the NixOS-WSL project. Adds a `wsl-host` entity kind and forwards the `wsl` class into the host's NixOS configuration.
 
 **Auto-activated** when `host.wsl.enable = true`. Requires `inputs.nixos-wsl`.
 
@@ -211,12 +211,12 @@ Recursively imports non-dendritic `.nix` files, auto-detecting class from direct
 
 ```nix
 # Import per host
-den.stages.host.includes = [
+den.schema.host.includes = [
   (den.provides.import-tree._.host ./hosts)
 ];
 
 # Import per user
-den.stages.user.includes = [
+den.schema.user.includes = [
   (den.provides.import-tree._.user ./users)
 ];
 
@@ -236,7 +236,7 @@ den.aspects.laptop.includes = [
 
 ### `den._.home-manager`
 
-Integrates [home-manager](https://github.com/nix-community/home-manager) as a user environment class. Defines the `hm-host` stage, imports the appropriate home-manager NixOS or Darwin module, and merges `home-manager.users.<name>` from each user's `homeManager` class.
+Integrates [home-manager](https://github.com/nix-community/home-manager) as a user environment class. Defines the `hm-host` entity kind, imports the appropriate home-manager NixOS or Darwin module, and merges `home-manager.users.<name>` from each user's `homeManager` class.
 
 **Auto-activated** when users have `homeManager` classes. Requires `inputs.home-manager`.
 
@@ -380,12 +380,12 @@ den.aspects.alice.includes = [
 ];
 ```
 
-### Per-stage inclusion
+### Per-entity-kind inclusion
 
-Apply batteries at a pipeline stage:
+Apply batteries to all entities of a kind:
 
 ```nix
-den.stages.user.includes = [
+den.schema.user.includes = [
   den._.mutual-provider
 ];
 ```

@@ -5,7 +5,7 @@ description: The two design principles behind Den.
 
 import { Aside } from '@astrojs/starlight/components';
 
-**Aspects** and **Contexts** are Den core architectural principles.
+**Aspects**, **Policies**, and **Entities** are Den's core architectural principles.
 
 It is how Den supports different platform configurations, packages/checks flake outputs, different home environments support,
 wsl support, third-party flake-parts perSystem modules, microvm guests, and pretty much everything.
@@ -13,7 +13,7 @@ wsl support, third-party flake-parts perSystem modules, microvm guests, and pret
 It is also how more complex entities, like machine fleets, terraform or cloud infra can be configured with Den.
 
 <Aside title="Aspect-Oriented">
-If you are familiar with Aspect-Oriented-Programming you will recognize how Den uses pointcuts to define where configurations get applied at each context stage.
+If you are familiar with Aspect-Oriented-Programming you will recognize how Den uses pointcuts to define where configurations get applied at each point in the pipeline.
 
 > Pointcuts in **Aspect-Oriented-Programming** determine where additional behavior (advice) should be applied in your code, typically at method execution points.
 </Aside>
@@ -34,15 +34,13 @@ From our README header example:
 # Other Nix configuration domains outside NixOS/nix-Darwin
 # can use the same pattern. demo: templates/nvf-standalone
 
-# A context transformation pipeline takes initially {host}
-# and traverses its topology (host->[users]->[homes]) aggregating deps
-aspect = den.stages.host { host = den.hosts.x86_64-linux.my-laptop; };
+# Den resolves entities declared in den.hosts automatically.
+# Policies drive topology (host->[users]->[homes]).
+# The pipeline collects all aspects and produces per-class modules.
 
-# obtain the final module for nixos class
-nixosModule = den.lib.aspects.resolve "nixos" aspect;
-
-# Use NixOS API to instantiate or mix-in with other custom modules
-nixosConfigurations.my-laptop = lib.nixosSystem { modules = [ nixosModule ]; };
+# For manual resolution outside the pipeline:
+aspect = den.lib.aspects.resolve "nixos" (den.aspects.my-aspect { host = den.hosts.x86_64-linux.my-laptop; });
+nixosConfigurations.my-laptop = lib.nixosSystem { modules = [ aspect ]; };
 ```
 
 Anything that you can describe via a data structure that can be traversed, can be configured like we do for NixOS. 
@@ -75,50 +73,52 @@ Den context is evaluated _before_ module evaluation, which is why it cannot caus
 
 ### Den is Context-driven
 
-Den uses `den.stages.<name>.provides.<name>` as **Aspect Pointcuts** where configuration is applied to data at that point in the pipeline.
+Den uses **policies** and **schema includes** as **Aspect Pointcuts** — where
+configuration is applied to data at a given point in the pipeline.
 Say you have an entity kind `foo` with data shape `{ x }`:
 
 ```nix
 # This policy fans out from entity kind `foo` to entity kind `bar`
-den.policies.foo-to-bar = { x }: [ { y = x; } ]
+den.policies.foo-to-bar = { x, ... }:
+  [ (policy.resolve.to "bar" { y = x; }) ];
 ```
 
-The following `den.stages.bar.provides.bar` is the actual pointcut that **locates** the aspect responsible for configuring
-using data `{ y }` available when resolving `bar` entities.
+Aspects activated on `bar` entities receive `{ y }` in their context:
 
 ```nix
-# inlined aspect for this example, but can locate the aspect by any means
-den.stages.bar.provides.bar = { y }: { nixos.something = y; }
+# Aspect that configures using data available when resolving `bar` entities
+den.aspects.bar-config = { y }: { nixos.something = y; };
+
+# Activate it for all `bar` entities
+den.schema.bar.includes = [ den.aspects.bar-config den.aspects.other ];
 ```
 
-and since `den.stages.bar` **is** itself an aspect, it can be used to include
-additional configurations at that particular stage:
+### Host resolution pipeline
+
+This is how everything works in Den. Policies drive entity topology,
+and schema includes activate aspects at each entity kind:
 
 ```nix
-den.stages.bar.nixos.something-else = true;
-den.stages.bar.includes = [ den.aspects.other ];
-```
+# Activate the host's own aspect for all hosts
+den.schema.host.includes = [ ({ host }: den.aspects.${host.aspect}) ];
 
-### `den.stages.host` pipeline
+# host -> users: fan-out policy
+den.policies.host-to-users = { host, ... }:
+  map (user: policy.resolve.to "user" { inherit host user; })
+    (lib.attrValues host.users);
 
-This is how everything works in Den, the following is the stage transitions
-that happen when applying `den.stages.host { host }`
+# Activate user aspects
+den.schema.user.includes = [ ({ host, user }: den.aspects.${user.aspect}) ];
 
-```nix
-# host configuration: THIS is where your host-aspect is hooked into the pipeline
-den.stages.host.provides.host = { host }: den.aspects.${host.aspect};
+# conditional: only if HM is enabled for user and host
+den.policies.user-to-hm-user = { host, user, ... }:
+  lib.optional (host.hm.enable && lib.elem "homeManager" user.classes)
+    (policy.resolve.to "hm-user" { inherit host user; });
 
-# host -> users stage transition (the `host-to-users` policy)
-den.policies.host-to-users = { host }: map (user: { inherit host user; }) (lib.attrValues host.users); # transition into many { host, user }
-
-# user configuration: Lookup user aspect.
-den.stages.user.provides.user = { host, user }: den.aspects.${user.aspect}; # Hook for the user-aspect.
-
-# conditional transition ONLY if hm is enabled for user and host.
-den.policies.user-to-hm-user = { host, user }: lib.optional (host.hm.enable && lib.elem "homeManager" user.classes) { inherit host user; }
-
-# host -> wsl-host: Same data shape, different stage.
-den.policies.host-to-wsl-host = { host }: lib.optional host.wsl.enable { inherit host; }
+# host -> wsl-host: same data shape, different entity kind
+den.policies.host-to-wsl-host = { host, ... }:
+  lib.optional host.wsl.enable
+    (policy.resolve.to "wsl-host" { inherit host; });
 ```
 
 **people can define their own extensions to Den's NixOS pipeline, or define other pipelines entirely**.

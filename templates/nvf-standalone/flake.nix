@@ -9,7 +9,7 @@
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
     import-tree.url = "github:vic/import-tree";
-    den.url = "github:vic/den";
+    den.url = "github:denful/den";
     nvf.url = "github:notashelf/nvf";
     nvf.inputs.nixpkgs.follows = "nixpkgs";
   };

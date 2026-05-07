@@ -62,8 +62,9 @@ export default defineConfig({
 							collapsed: false,
 							items: [
 								{ label: 'Entities & Schema', slug: 'explanation/entities', badge: { text: 'core', variant: 'tip' } },
-								{ label: 'Stages', slug: 'explanation/stages', badge: { text: 'core', variant: 'tip' } },
 								{ label: 'Policies', slug: 'explanation/policies', badge: { text: 'core', variant: 'tip' } },
+								{ label: 'Quirks & Pipes', slug: 'explanation/quirks-and-pipes', badge: { text: 'core', variant: 'tip' } },
+								{ label: 'Fleets & Multi-Host', slug: 'explanation/fleet', badge: { text: 'core', variant: 'tip' } },
 								{ label: 'Resolution Pipeline', slug: 'explanation/context-pipeline', badge: { text: 'core', variant: 'tip' } },
 							],
 						},
@@ -71,6 +72,8 @@ export default defineConfig({
 							label: 'Deep Dives',
 							collapsed: true,
 							items: [
+								{ label: 'Policy Activation', slug: 'explanation/policy-activation', badge: { text: 'advanced', variant: 'caution' } },
+								{ label: 'Scope Partitioning', slug: 'explanation/scope-partitioning', badge: { text: 'advanced', variant: 'caution' } },
 								{ label: 'ABC on Den Effects', slug: 'explanation/effects', badge: { text: 'advanced', variant: 'caution' } },
 								{ label: 'Diagrams', slug: 'explanation/diagrams', badge: { text: 'advanced', variant: 'caution' } },
 								{ label: 'Library vs Framework', slug: 'explanation/library-vs-framework', badge: { text: 'advanced', variant: 'caution' } },
@@ -136,6 +139,7 @@ export default defineConfig({
 						},
 						{ label: 'Host↔User Mutual Config', slug: 'guides/mutual' },
 						{ label: 'Share with Namespaces', slug: 'guides/namespaces' },
+						{ label: 'Quirks & Pipes', slug: 'guides/quirks' },
 						{ label: 'Custom Nix Classes', slug: 'guides/custom-classes' },
 						{ label: 'Angle Brackets Syntax', slug: 'guides/angle-brackets' },
 						{
@@ -154,7 +158,8 @@ export default defineConfig({
 						{ label: 'den.schema', slug: 'reference/schema' },
 						{ label: 'den.aspects', slug: 'reference/aspects' },
 						{ label: 'den.provides', slug: 'reference/batteries' },
-						{ label: 'den.stages', slug: 'reference/ctx' },
+						{ label: 'den.ctx (compat)', slug: 'explanation/context-system', badge: { text: 'legacy', variant: 'note' } },
+						{ label: 'den.quirks', slug: 'reference/quirks' },
 						{ label: 'den.policies', slug: 'reference/policies' },
 						{ label: 'den.lib', slug: 'reference/lib' },
 						{ label: 'den.lib.diag', slug: 'reference/diag' },

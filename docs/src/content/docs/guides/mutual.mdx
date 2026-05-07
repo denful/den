@@ -6,8 +6,6 @@ description: How to configure mutual configs in Den.
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`context/user.nix`](https://github.com/denful/den/blob/main/modules/context/user.nix) ·
-[`context/host.nix`](https://github.com/denful/den/blob/main/modules/context/host.nix) ·
 [`mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix)
 </Aside>
 
@@ -20,23 +18,23 @@ configurations to a User.
 
 ## Default, *unidirectional* OS configuration
 
-Den framework is built around **context pipeline** transformations.
-In order to create a full OS configuration, everything starts with a host definition:
+Den's resolution pipeline starts with a host definition:
 
 ```nix "igloo" "tux"
 den.hosts.x86_64-linux.igloo.users.tux = {}
 ```
 
 We need to build the `nixos` Nix module that will later be used by `lib.nixosSystem`.
-To do so, Den invokes the `den.stages.host` pipeline like this:
+Policies drive entity topology — the built-in `host-to-users` policy fans out
+from each host to its users:
 
 > `Tip: Zoom diagrams using your mouse wheel or drag to move.`
 
 ```mermaid
 sequenceDiagram
    participant Den
-   participant host as den.stages.host
-   participant user as den.stages.user
+   participant host as host resolution
+   participant user as user resolution
    participant igloo as den.aspects.igloo
    participant tux as den.aspects.tux
 
@@ -46,7 +44,7 @@ sequenceDiagram
    igloo -->> igloo : each .includes takes { host }
    igloo -->> host : { nixos = ... } owned and parametric results
 
-   host ->> user : fan-outs for each user: { host, user }
+   host ->> user : policy fans out for each user: { host, user }
 
    user ->> tux : request nixos class
    tux -->> tux : home classes forwarded as nixos class
@@ -59,17 +57,17 @@ sequenceDiagram
 
 ```
 
-This is the normal `den.stages.host` pipeline. All OS contributions come from the host itself and from each of its user.
+This is the normal host resolution pipeline. All OS contributions come from the host itself and from each of its users.
 
 
 ## `den.provides.mutual-provider`
 
-The [`den.provides.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix) battery allows you to define mutual configurations by letting you to define named aspects under `.provides.` to create explicit policy between users and hosts.
+The [`den.provides.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix) battery allows you to define mutual configurations by letting you define named aspects under `.provides.` to create explicit relationships between users and hosts.
 
 ```nix
-# mutual-provider is activated at a `{host,user}` context
+# mutual-provider is activated at a {host,user} context
 # either per-user or for all of them.
-den.stages.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den._.mutual-provider ];
 
 # user aspect provides to specific host or to all where it lives
 den.aspects.tux = {
@@ -93,8 +91,8 @@ den.aspects.igloo = {
 ```mermaid
 sequenceDiagram
    participant Den
-   participant host as den.stages.host
-   participant user as den.stages.user
+   participant host as host resolution
+   participant user as user resolution
    participant igloo as den.aspects.igloo
    participant igloo-users as den.aspects.igloo.provides.to-users
    participant igloo-tux as den.aspects.igloo.provides.tux
@@ -108,7 +106,7 @@ sequenceDiagram
    igloo -->> igloo : each .includes takes { host }
    igloo -->> host : { nixos = ... } owned and parametric results
 
-   host ->> user : fan-outs for each user: { host, user }
+   host ->> user : policy fans out for each user: { host, user }
 
    user ->> tux : request nixos class
    tux -->> tux : home classes forwarded as nixos class
@@ -145,10 +143,10 @@ sequenceDiagram
 ### User Peers Configuration
 
 A user `alice` can provide configurations for other users in the same system,
-either by name or for all of them (exluding alice itself).
+either by name or for all of them (excluding alice itself).
 
 ```nix
-den.stages.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den._.mutual-provider ];
 
 den.aspects.alice = {
   provides.bob = { homeManager.programs.vim.enable = true; };
@@ -164,7 +162,7 @@ If you have two standalone homes sharing same user aspect, you can provide host 
 configuration even if the Host is not a NixOS system managed by you.
 
 ```nix
-den.stages.home.includes = [ den._.mutual-provider ];
+den.schema.home.includes = [ den._.mutual-provider ];
 
 den.homes.x86_64-linux."tux@igloo" = {};
 den.homes.x86_64-linux."tux@iceberg" = {};

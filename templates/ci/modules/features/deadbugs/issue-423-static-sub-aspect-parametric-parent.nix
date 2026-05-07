@@ -2,7 +2,7 @@
 # parametric parent aspect. Regression from the applyDeep fix in #419:
 # re-applying takeFn to the sub invoked its default functor in a non-static
 # context, which dropped owned class configs.
-# https://github.com/vic/den/pull/423
+# https://github.com/denful/den/pull/423
 { denTest, ... }:
 {
   flake.tests.deadbugs-issue-423 = {

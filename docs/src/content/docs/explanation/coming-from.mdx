@@ -45,7 +45,7 @@ a home, it extracts the `homeManager` attrs. You write the concern once.
 
 | flake-parts concept | Den equivalent |
 |---|---|
-| `perSystem` | `den.stages.flake-system` -- flake-level [policies](/explanation/policies/) fan out per system |
+| `perSystem` | `den.schema.flake-system` -- flake-level [policies](/explanation/policies/) fan out per system |
 | `flake.nixosConfigurations` | `den.hosts` -- Den generates flake outputs from entity declarations |
 | `mkFlake` | `inputs.den.flakeModule` or `inputs.den.denModule` -- Den is a flake-parts module |
 | `flakeModules` for sharing | `den.ful` namespaces -- shareable aspect libraries |
@@ -84,7 +84,7 @@ real data.
 </Aside>
 
 Den also uses context shape for dispatch. A function that takes `{ host, user }`
-is silently skipped in stages where only `{ host }` exists. No `mkIf`, no
+is silently skipped in scopes where only `{ host }` exists. No `mkIf`, no
 `enable` flags -- the function signature declares when it applies. See
 [Parametric dispatch](/explanation/parametric/) for details.
 

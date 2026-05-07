@@ -1,0 +1,352 @@
+---
+title: Quirks & Pipes
+description: Hands-on guide to structured data flow between aspects using quirks and pipe policies.
+---
+
+import { Aside, Steps } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+[`templates/ci/modules/features/pipes.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipes.nix) --
+[`templates/ci/modules/features/pipe-policy.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipe-policy.nix) --
+[`templates/ci/modules/features/pipe-scope.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipe-scope.nix)
+</Aside>
+
+## Quick start: firewall ports
+
+The classic example — multiple aspects declare firewall ports, one aspect
+opens them.
+
+<Steps>
+
+1. **Declare the quirk**
+
+    ```nix
+    den.quirks.firewall = {
+      description = "Firewall port declarations";
+    };
+    ```
+
+2. **Produce data**
+
+    Any aspect can emit data on the `firewall` key. Producers don't need
+    to know who consumes it:
+
+    ```nix
+    den.aspects.nginx = {
+      nixos.services.nginx.enable = true;
+      firewall = { ports = [ 80 443 ]; };
+    };
+
+    den.aspects.postgres = {
+      nixos.services.postgresql.enable = true;
+      firewall = { ports = [ 5432 ]; };
+    };
+    ```
+
+3. **Consume data**
+
+    A class module receives all firewall entries as a list by naming the
+    quirk in its function arguments:
+
+    ```nix
+    den.aspects.networking = {
+      nixos = { firewall, lib, ... }: {
+        networking.firewall.allowedTCPPorts =
+          lib.concatMap (f: f.ports or []) firewall;
+      };
+    };
+    ```
+
+4. **Include everything**
+
+    ```nix
+    den.aspects.igloo = {
+      includes = [
+        den.aspects.nginx
+        den.aspects.postgres
+        den.aspects.networking
+      ];
+    };
+    ```
+
+    Result: `networking.firewall.allowedTCPPorts = [ 80 443 5432 ]`.
+
+</Steps>
+
+No pipe policy needed — same-scope aggregation works out of the box.
+If no producers emit data, the consumer receives `[]`.
+
+## Pipe policies: filter, transform, fold
+
+When you need to process data before consumers see it, use pipe policies.
+All pipe stages are accessed via `den.lib.policy.pipe`.
+
+### Filtering
+
+Remove entries that don't match a predicate:
+
+```nix
+den.policies.tcp-only = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "firewall" [
+      (pipe.filter (e: e.proto == "tcp"))
+    ])
+  ];
+
+den.default.includes = [ den.policies.tcp-only ];
+```
+
+Given producers emitting `[{ port = 80; proto = "tcp"; } { port = 53; proto = "udp"; }]`,
+consumers see only `[{ port = 80; proto = "tcp"; }]`.
+
+### Transforming
+
+Map each entry to a new shape:
+
+```nix
+den.policies.label-items = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "items" [
+      (pipe.transform (i: { label = "x-${i.name}"; }))
+    ])
+  ];
+```
+
+### Folding
+
+Reduce all entries to a single value:
+
+```nix
+den.policies.sum-nums = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "nums" [
+      (pipe.fold (acc: n: acc + n) 0)
+    ])
+  ];
+```
+
+The consumer receives a single-element list: `[ 60 ]` for inputs `[ 10 20 30 ]`.
+
+### Appending
+
+Add a synthetic entry to the pool:
+
+```nix
+den.policies.add-default = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "items" [
+      (pipe.append { name = "default"; })
+    ])
+  ];
+```
+
+### Replacing with `pipe.for`
+
+Replace the entire list. At most one `pipe.for` per pipe per scope:
+
+```nix
+den.policies.reverse-items = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "items" [
+      (pipe.for (vals: lib.reverseList vals))
+    ])
+  ];
+```
+
+### Chaining stages
+
+Stages compose left-to-right:
+
+```nix
+pipe.from "items" [
+  (pipe.filter (i: i.keep))
+  (pipe.transform (i: { label = "x-${i.name}"; }))
+]
+```
+
+## Cross-scope flow
+
+### Upward: `pipe.expose`
+
+Push child-scope data to the parent. A user's preferences reach the host:
+
+```nix
+den.quirks.prefs = { description = "User preferences"; };
+
+den.aspects.tux = {
+  prefs = [{ editor = "vim"; }];
+};
+
+den.aspects.igloo = {
+  includes = [ den.aspects.host-consumer ];
+};
+
+den.aspects.host-consumer = {
+  nixos = { prefs, ... }: {
+    networking.hostName =
+      lib.concatMapStringsSep "-" (p: p.editor) prefs;
+  };
+};
+
+den.policies.expose-prefs = { host, user, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "prefs" [ pipe.expose ]) ];
+
+den.default.includes = [ den.policies.expose-prefs ];
+```
+
+Result: host consumer sees `[{ editor = "vim"; }]`.
+
+Exposed data merges with host-local data. If the host aspect also emits
+`prefs`, consumers see both host-local and exposed user entries.
+
+Transform stages run before expose:
+
+```nix
+pipe.from "items" [
+  (pipe.filter (i: i.keep))
+  (pipe.transform (i: { label = "x-${i.name}"; }))
+  pipe.expose
+]
+```
+
+### Lateral: `pipe.collect`
+
+Harvest data from sibling scopes. Siblings are scopes sharing the same
+parent in the scope tree. This is how you do cross-host aggregation:
+
+```nix
+den.hosts.x86_64-linux.igloo.users.tux = {};
+den.hosts.x86_64-linux.iceberg.users.alice = {};
+
+den.quirks.http-backends = {
+  description = "HTTP backends";
+};
+
+den.aspects.iceberg = {
+  http-backends = { addr = "10.0.0.2"; port = 80; };
+};
+
+den.aspects.igloo = {
+  includes = [ den.aspects.lb-consumer ];
+  http-backends = { addr = "10.0.0.1"; port = 8080; };
+};
+
+den.aspects.lb-consumer = {
+  nixos = { http-backends, lib, ... }: {
+    networking.hostName =
+      lib.concatMapStringsSep "," (b: "${b.addr}:${toString b.port}")
+        http-backends;
+  };
+};
+
+den.policies.fleet-backends = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "http-backends" [
+      (pipe.collect ({ host, ... }: true))
+    ])
+  ];
+
+den.schema.host.includes = [ den.policies.fleet-backends ];
+```
+
+The predicate in `pipe.collect` filters which sibling scopes to harvest from.
+Entity kind matching ensures only scopes of the right kind are included.
+
+### Collect with provenance
+
+Track where collected data came from:
+
+```nix
+pipe.from "http-backends" [
+  (pipe.collect ({ host, ... }: true))
+  pipe.withProvenance
+]
+```
+
+Consumers receive `[{ value = <data>; source = <context>; }]` where `source`
+is the full context attrset (`{ host = ...; }`) of the source scope.
+
+### Collect with filtering
+
+Stages after `pipe.collect` operate on the combined pool:
+
+```nix
+pipe.from "http-backends" [
+  (pipe.collect ({ host, ... }: true))
+  (pipe.filter (b: b.port != 8080))
+]
+```
+
+## Targeted delivery with `pipe.to`
+
+Route pipe data to specific aspects by identity:
+
+```nix
+den.policies.route-firewall = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "firewall" [
+      (pipe.to [ den.aspects.networking ])
+    ])
+  ];
+```
+
+Only the named aspects receive the data. Other consumers of the same
+pipe see the unmodified pool.
+
+### Recipe: per-aspect secrets delivery
+
+Combine `pipe.filter`, `pipe.append`, `pipe.for`, and `pipe.to` to
+deliver a custom attrset to a specific aspect:
+
+```nix
+den.quirks.secrets = { description = "Secret paths"; };
+
+den.policies.postgres-secrets = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "secrets" [
+      (pipe.filter (_: false))          # discard the pool
+      (pipe.append { db-password = "/run/secrets/pg-pass"; })
+      (pipe.for lib.mergeAttrsList)     # merge into a single attrset
+      (pipe.to [ den.aspects.postgres ])
+    ])
+  ];
+
+den.schema.host.includes = [ den.policies.postgres-secrets ];
+```
+
+The consumer receives a single merged attrset instead of a list:
+
+```nix
+den.aspects.postgres = {
+  nixos = { secrets, ... }: {
+    services.postgresql.settings.password_file = secrets.db-password;
+  };
+};
+```
+
+This pattern works because `pipe.for` replaces the list with the fold
+result, and `pipe.to` delivers only to the named aspect.
+
+## Config-dependent thunks
+
+Quirk values can depend on a host's NixOS `config`. Declare a function
+taking `{ config, ... }` as the quirk value:
+
+```nix
+den.aspects.my-service = {
+  nixos.services.my-service.enable = true;
+  firewall = { config, ... }: {
+    ports = [ config.services.my-service.port ];
+  };
+};
+```
+
+Local thunks are resolved lazily inside `evalModules`. Cross-host thunks
+(via `pipe.collect`) are resolved eagerly against the source host's config.
+
+## See also
+
+- [Quirks & Pipes explanation](/explanation/quirks-and-pipes/) — conceptual overview
+- [den.quirks reference](/reference/quirks/) — option types and pipe builder API
+- [Tests as examples](https://github.com/denful/den/tree/main/templates/ci/modules/features) — `pipes.nix`, `pipe-policy.nix`, `pipe-scope.nix`

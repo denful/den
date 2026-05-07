@@ -21,7 +21,7 @@ If you have found a bug, please share a reproduction repository with us.
 First step is to clone the `bogus` template and edit `modules/bug.nix`.
 
 ```console
-nix flake init -t github:vic/den#bogus
+nix flake init -t github:denful/den#bogus
 nix flake update den
 vim modules/bug.nix
 nix flake check
@@ -35,4 +35,4 @@ If you found a bug regression please edit the CI workflow to include main and an
 
 Provide a very small description of the intended and the actual behaviour.
 
-Share a link to a [discussion](https://github.com/vic/den/discussions) to keep track of it.
+Share a link to a [discussion](https://github.com/denful/den/discussions) to keep track of it.

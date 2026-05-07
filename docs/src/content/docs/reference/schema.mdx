@@ -74,7 +74,7 @@ den.schema.host = { ... }: {
 
 ### Entity Kinds
 
-Entity kinds (`host`, `user`, `home`) are derived from the keys of `den.schema`. The pipeline uses the kind name to select the corresponding stage (`den.stages.host`, `den.stages.user`, `den.stages.home`) and to dispatch policies. Adding a key to `den.schema` registers a new entity kind.
+Entity kinds (`host`, `user`, `home`) are derived from the keys of `den.schema`. The pipeline uses the kind name to dispatch policies and resolve entities. Adding a key to `den.schema` registers a new entity kind.
 
 ## `den.hosts`
 

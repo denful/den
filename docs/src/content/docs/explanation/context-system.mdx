@@ -1,107 +1,75 @@
 ---
-title: Context System
-description: How den.ctx types define data flow between entities.
+title: "den.ctx (Compatibility Shim)"
+description: Legacy den.ctx option — forwards to den.aspects and den.schema with deprecation warnings.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside type="caution" title="Legacy API">
-This page describes `den.ctx`, which is deprecated. The concepts have been split into three dedicated pages:
-- [Entities & Schema](/explanation/entities/) — typed data declarations
-- [Stages](/explanation/stages/) — scoped behavior bindings
-- [Policies](/explanation/policies/) — entity relationships and topology
+<Aside type="caution" title="Legacy API — Scheduled for Removal">
+`den.ctx` is a compatibility shim. It forwards entries to `den.aspects` and
+`den.schema.<kind>.includes` with deprecation warnings at evaluation time.
+It will be removed after the first stable release.
 
-`den.ctx` still works via a compatibility shim with deprecation warnings.
-See [Migrating from den.ctx](/guides/migrate-ctx/) for upgrade steps.
+**Migrate to:**
+- `den.aspects` for aspect definitions
+- `den.schema.<kind>.includes` for entity inclusion
+- `den.policies` for entity topology and routing
+
+See [Migrating from den.ctx](/guides/migrate-ctx/) for step-by-step instructions.
 </Aside>
 
-<Aside title="Source" icon="github">
-[`modules/context/types.nix`](https://github.com/denful/den/blob/main/modules/context/types.nix) --
-[`modules/context/os.nix`](https://github.com/denful/den/blob/main/modules/context/os.nix)
-</Aside>
+## What it does
 
-## What is a Context
+`den.ctx` was the original API for declaring aspects and binding them to entity
+resolution stages. It combined aspect definitions, cross-entity providers, and
+pipeline transitions in a single namespace.
 
-A **context** is a named stage in Den's evaluation pipeline. Each context type is declared
-under `den.ctx.<name>` and carries:
+The compatibility shim in `modules/compat/ctx-shim.nix` accepts `den.ctx.*`
+entries and forwards them:
 
-- **Aspect definitions** (`provides.<name>`) -- what this context contributes to the resolved aspect.
-- **Transformations** (`into.<other>`) -- functions that produce new contexts from the current one.
-- **Provides** (`provides.<other>`) -- cross-context providers injected by other context definitions.
-
-## Built-in Context Types
-
-```mermaid
-flowchart TD
-  host["{host}"] -->|"into.user (per user)"| user["{host, user}"]
-  host -->|"into.hm-host (if HM enabled)"| hmhost["{host} hm-host"]
-  hmhost -->|"into.hm-user (per HM user)"| hmuser["{host, user} hm-user"]
-  host -->|"into.wsl-host (if WSL enabled)"| wslhost["{host} wsl-host"]
-  host -->|"into.hjem-host (if hjem enabled)"| hjemhost["{host} hjem-host"]
-  hjemhost -->|"into.hjem-user"| hjemuser["{host, user}"]
-  host -->|"into.maid-host (if maid enabled)"| maidhost["{host} maid-host"]
-  maidhost -->|"into.maid-user"| maiduser["{host, user}"]
+```
+den.ctx.<name> = { ... }
+  ↓
+den.schema.<name>.includes = [ <value with deprecation warning> ]
 ```
 
-The framework defines these contexts in `modules/context/os.nix` and the various battery modules.
-Each battery (Home Manager, hjem, nix-maid, WSL) registers its own `into.*` transitions on the `host` context.
+Each forwarded value emits a `lib.warn` at evaluation time telling you exactly
+what to change.
 
-## Context Type Anatomy
+## What replaced it
 
-A context type at `den.ctx.host`:
+The `den.ctx` namespace was split into three independent concerns:
 
+| Old (`den.ctx`)  | New | Purpose |
+|---|---|---|
+| `den.ctx.<name> = { ... }` | `den.aspects.<name> = { ... }` | Aspect definitions |
+| `den.ctx.<name>.into.<other>` | `den.policies.<name>` | Entity topology (fan-out, routing) |
+| `den.ctx.<name>.provides.<other>` | `den.schema.<kind>.includes` | Cross-entity inclusion |
+| Implicit activation | `den.schema.<kind>.includes = [ ... ]` | Explicit activation via includes |
+
+## Example migration
+
+Before:
 ```nix
 den.ctx.host = {
-  description = "OS";
-
-  # The main aspect activated by this context
   provides.host = { host }: den.aspects.${host.aspect};
-
-  # How this context contributes an aspect to other derived contexts
-  provides.user = { host, user }: den.aspects.other-aspect;
-
-  # How to derive other contexts from this one
-  into.user = { host }: 
+  into.user = { host }:
     map (user: { inherit host user; }) (lib.attrValues host.users);
 };
 ```
 
-The `_` (or `provides`) attrset maps context names to functions that take the current
-context data and return aspect fragments. The `into` attrset maps to functions that
-produce lists of new context values.
-
-## Context Resolution
-
-When Den processes a host, it calls `den.ctx.host { host = ...; }`. This triggers:
-
-1. `collectPairs` walks the context type's `into.*` transitions recursively,
-   building a list of `{ ctx, ctxDef, source }` pairs.
-2. `dedupIncludes` processes these pairs, applying `parametric.fixedTo` for the
-   first occurrence of each context type and `parametric.atLeast` for subsequent
-   ones, preventing duplicate owned configs.
-3. The result is a flat list of aspect fragments merged into one `deferredModule`.
-
-## Custom Contexts
-
-You can define your own alternative context piplelines outside of `den.ctx.host` or 
-create custom context types for domain-specific needs like cloud infrastructure:
-
+After:
 ```nix
-den.ctx.my-service = {
-  description = "Custom service context";
-  provides.my-service = den.aspects.my-service;
+# Aspect definition
+den.aspects.my-aspect = { host }: {
+  nixos.services.foo.enable = true;
 };
 
-den.ctx.host.into.my-service = { host }:
-  lib.optional host.my-service.enable { inherit host; };
+# Entity topology via policy
+den.policies.host-to-users = { host, ... }:
+  map (user: policy.resolve.to "user" { inherit host user; })
+    (lib.attrValues host.users);
 
-den.aspects.my-service = { host }: {
-  nixos.services.my-service.hostName = host.hostName;
-};
-
-
-
+# Activation
+den.schema.host.includes = [ den.aspects.my-aspect ];
 ```
-
-This creates a new stage in the pipeline that only activates for hosts
-with `my-service.enable = true`, and contributes NixOS config.

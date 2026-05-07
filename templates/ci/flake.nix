@@ -7,7 +7,7 @@
     }).config.flake;
 
   inputs = {
-    den.url = "github:vic/den";
+    den.url = "github:denful/den";
     import-tree.url = "github:vic/import-tree";
 
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";

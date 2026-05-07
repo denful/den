@@ -1,0 +1,281 @@
+---
+title: den.quirks
+description: Reference for quirk declarations and the pipe builder API.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+[`modules/options.nix`](https://github.com/denful/den/blob/main/modules/options.nix) --
+[`nix/lib/policy-effects.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-effects.nix) --
+[`nix/lib/aspects/fx/assemble-pipes.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/assemble-pipes.nix)
+</Aside>
+
+## `den.quirks`
+
+**Type:** `lazyAttrsOf pipeSchemaType`
+
+**Default:** `{}`
+
+Registry of named data routes. Each key declares a quirk name that the
+pipeline classifies as pipe data rather than class modules. Quirk names
+must not collide with class names (`den.classes`) — the pipeline asserts
+this at evaluation time.
+
+Each entry receives a `name` field matching its attribute name automatically.
+
+```nix
+den.quirks.firewall = {
+  description = "Firewall port declarations";
+};
+```
+
+### `pipeSchemaType` fields
+
+| Field | Type | Required | Description |
+|---|---|---|---|
+| `description` | `str` | yes | Human-readable description of the quirk |
+
+## Key classification
+
+When the pipeline encounters a key on an aspect, `classifyKeys` dispatches
+to one of three branches:
+
+| Key matches | Category | What happens |
+|---|---|---|
+| `den.classes` | Class key | Emitted as class module |
+| `den.quirks` | Pipe key | Collected as pipe data |
+| Neither | Unregistered class key | Falls through to class (backwards compat) |
+
+Pipe keys flow through the same `emit-class` → `scopedClassImports`
+infrastructure as class keys, but `assemblePipes` consumes them
+post-pipeline instead of `wrapClassModule`.
+
+## Producing quirk data
+
+Any aspect can emit data on a quirk key:
+
+```nix
+den.aspects.nginx = {
+  firewall = { ports = [ 80 443 ]; };
+};
+```
+
+Values can be attrsets, lists, or any Nix value. List values are
+auto-flattened: if a producer emits `[a, b]`, each element is a separate
+entry in the pool.
+
+## Consuming quirk data
+
+Class modules receive quirk data by naming the quirk in their function
+arguments, alongside regular module args:
+
+```nix
+nixos = { firewall, lib, config, ... }: {
+  networking.firewall.allowedTCPPorts =
+    lib.concatMap (f: f.ports or []) firewall;
+};
+```
+
+The quirk arg receives a list of all values collected in the current scope.
+If no producers emitted data, it's `[]`. Delivery uses the same
+`wrapClassModule` mechanism as entity context args.
+
+---
+
+## Pipe builder API
+
+All pipe constructors are accessed via `den.lib.policy.pipe` inside policy
+functions. Pipe effects are returned from policies alongside other policy
+effects (`resolve`, `include`, `route`, etc.).
+
+```nix
+den.policies.my-pipe = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "firewall" [ ... ]) ];
+```
+
+### `pipe.from pipeName stages`
+
+Create a pipe effect targeting the named quirk. `pipeName` can be a string
+or a quirk ref (`den.quirks.firewall`). `stages` is a list of pipe stages
+applied sequentially.
+
+```nix
+pipe.from "firewall" [
+  (pipe.filter (e: e.proto == "tcp"))
+  (pipe.transform (e: { port = e.port; }))
+]
+```
+
+---
+
+## Transform stages
+
+Transform stages modify the pipe data pool. They can be chained left-to-right.
+
+### `pipe.filter predicate`
+
+Remove entries that don't match the predicate. Config thunk markers pass
+through unchanged.
+
+```nix
+pipe.filter (e: e.proto == "tcp")
+```
+
+**Input:** `[a, b, c]` → **Output:** entries where `predicate` returns `true`
+
+### `pipe.transform fn`
+
+Map each entry to a new value. Config thunk markers pass through unchanged.
+
+```nix
+pipe.transform (e: { label = "x-${e.name}"; })
+```
+
+**Input:** `[a, b]` → **Output:** `[fn(a), fn(b)]`
+
+### `pipe.fold fn init`
+
+Reduce all entries to a single value. The consumer receives a single-element list.
+
+```nix
+pipe.fold (acc: n: acc + n) 0
+```
+
+**Input:** `[10, 20, 30]` → **Output:** `[60]`
+
+### `pipe.append value`
+
+Add a synthetic entry to the pool.
+
+```nix
+pipe.append { name = "default"; }
+```
+
+**Input:** `[a, b]` → **Output:** `[a, b, { name = "default"; }]`
+
+### `pipe.for fn`
+
+Replace the entire list. The function receives the full list and returns a
+new list. **At most one `pipe.for` per pipe per scope** — multiple `pipe.for`
+on the same pipe throws an error.
+
+```nix
+pipe.for (vals: lib.reverseList vals)
+```
+
+**Input:** `[a, b, c]` → **Output:** `[c, b, a]`
+
+---
+
+## Routing stages
+
+Routing stages control where data flows. They are terminal — no transform
+stages should follow them.
+
+### `pipe.expose`
+
+Push pipe data from child scope to parent scope. Used to flow user data
+up to the host level. Transform stages before `pipe.expose` are applied
+first.
+
+```nix
+pipe.from "prefs" [
+  (pipe.filter (p: p.enabled))
+  pipe.expose
+]
+```
+
+Exposed data merges with the parent scope's own local pipe data. Multiple
+children expose into the same parent, and their data is concatenated.
+
+### `pipe.collect predicate`
+
+Harvest pipe data from sibling scopes matching the predicate. Siblings
+share the same parent in the scope tree. The predicate receives the
+sibling's context attrset.
+
+```nix
+pipe.collect ({ host, ... }: true)
+```
+
+Entity kind filtering is automatic: the predicate's required args are
+checked against schema entity kinds. Only scopes whose entity kind
+args match are considered.
+
+`pipe.collect` is non-terminal — transform stages can follow it:
+
+```nix
+pipe.from "http-backends" [
+  (pipe.collect ({ host, ... }: true))
+  (pipe.filter (b: b.port != 8080))
+]
+```
+
+### `pipe.to aspects`
+
+Route transformed data to specific aspects by identity. Only the named
+aspects receive the data; other consumers see the unmodified pool.
+
+```nix
+pipe.to [ den.aspects.networking ]
+```
+
+### `pipe.withProvenance`
+
+Tag each entry with its source scope context. Consumers receive
+`{ value; source; }` records where `source` is the full context attrset
+of the originating scope. Works with both local quirks and collected
+data — local entries get the current scope as their source.
+
+```nix
+pipe.from "http-backends" [
+  (pipe.collect ({ host, ... }: true))
+  pipe.withProvenance
+]
+```
+
+---
+
+## Config-dependent thunks
+
+Quirk values that are functions taking `{ config, ... }` are detected as
+config-dependent thunks.
+
+- **Local scope**: Marked for deferred resolution inside `evalModules`.
+  The thunk is resolved against the entity's own config fixpoint.
+- **Cross-host** (via `pipe.collect`): Resolved eagerly against the source
+  host's instantiated config, with scope context args (`host`, `user`, etc.)
+  available alongside `config` and `lib`.
+
+```nix
+den.aspects.my-service = {
+  firewall = { config, ... }: {
+    ports = [ config.services.my-service.port ];
+  };
+};
+```
+
+---
+
+## Assembly
+
+Pipe assembly runs post-pipeline in `assemblePipes`, before class module
+wrapping. The sequence:
+
+1. **Expose pass** — bottom-up tree walk collects all `pipe.expose` data
+2. **Per-scope assembly** — for each scope:
+   - Extract raw pipe entries from `scopedClassImports`
+   - Merge exposed data from children
+   - Mark local config thunks
+   - Apply untargeted pipe effects
+   - Build targeted data (`pipe.to`)
+3. **Inject into scope contexts** — pipe data becomes available as
+   function args in `wrapClassModule`
+
+## See also
+
+- [Quirks & Pipes explanation](/explanation/quirks-and-pipes/) — conceptual overview
+- [Quirks guide](/guides/quirks/) — hands-on examples
+- [Policies](/explanation/policies/) — how pipe effects compose with other policy effects

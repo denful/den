@@ -5,7 +5,7 @@
   outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; } (inputs.import-tree ./modules);
 
   inputs = {
-    den.url = "github:vic/den";
+    den.url = "github:denful/den";
     flake-file.url = "github:vic/flake-file";
     flake-parts = {
       inputs.nixpkgs-lib.follows = "nixpkgs-lib";

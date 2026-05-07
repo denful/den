@@ -157,6 +157,33 @@ den.schema.host.collisionPolicy = "den-wins";
 den.config.classModuleCollisionPolicy = "den-wins";
 ```
 
+## Unsatisfied args
+
+When a class module requires an entity arg that isn't in the current
+context (e.g., `{ user, config, ... }` at a host scope where no `user`
+exists), the module is **silently skipped**. A trace message is emitted
+but no error is raised.
+
+This is by design — it lets you write a single aspect with class modules
+that target different scopes:
+
+```nix
+den.aspects.my-aspect = {
+  # Applied at host scope (host is always present)
+  nixos = { host, config, ... }: {
+    networking.hostName = host.name;
+  };
+
+  # Applied only at user scope (skipped at host scope)
+  homeManager = { user, config, ... }: {
+    home.username = user.userName;
+  };
+};
+```
+
+If your class module isn't taking effect, check whether all its entity
+args are in context at the scope where it's being resolved.
+
 ## See Also
 
 - [Aspects & Functors](/explanation/aspects) -- how aspects work and the `__functor` pattern

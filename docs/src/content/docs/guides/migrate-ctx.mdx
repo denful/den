@@ -1,66 +1,78 @@
 ---
 title: Migrating from den.ctx
-description: Upgrade from den.ctx to den.stages and den.policies.
+description: Upgrade from the deprecated den.ctx API to den.aspects, den.schema, and den.policies.
 ---
 
 import { Aside, Steps } from '@astrojs/starlight/components';
 
 `den.ctx` is deprecated. A compatibility shim forwards `den.ctx` definitions to
-`den.stages` with deprecation warnings, so existing configs still evaluate -- but
-you should migrate to remove the warnings and gain access to the full stage tree
-and policy system.
+`den.schema.<kind>.includes` with deprecation warnings, so existing configs still
+evaluate — but you should migrate to remove the warnings and use the current API.
 
 ## What changed
 
 | Old (`den.ctx`)                     | New                                      | Notes                                         |
 | ----------------------------------- | ---------------------------------------- | --------------------------------------------- |
-| `den.ctx.<name>`                    | `den.stages.<name>`                      | Direct rename. Same submodule shape.          |
-| `den.ctx.<name>.includes`           | `den.stages.<name>.includes`             | Unchanged semantics.                          |
-| `den.ctx.<name>.provides.<p>`       | `den.stages.<name>.provides.<p>`         | Unchanged semantics.                          |
-| `den.ctx.<name>.into`               | `den.policies`                           | Now a first-class policy declaration.         |
-| `den.ctx.<name>.meta.adapter`       | *(removed)*                              | Pipeline handles filtering automatically.     |
-| `den.lib.ctxApply`                  | *(manual)*                               | No shim -- see step 4 below.                 |
+| `den.ctx.<name> = { ... }`          | `den.aspects.<name> = { ... }`           | Aspect definitions live here now.             |
+| `den.ctx.<name>.includes`           | `den.schema.<kind>.includes`             | Explicit activation on entity kinds.          |
+| `den.ctx.<name>.provides.<p>`       | `den.schema.<kind>.includes` or policy   | Cross-entity inclusion via schema or policy.  |
+| `den.ctx.<name>.into`               | `den.policies`                           | Entity topology via first-class policies.     |
+| `den.ctx.<name>.meta.adapter`       | *(removed)*                              | Pipeline handles class routing automatically. |
+| `den.lib.ctxApply`                  | *(removed)*                              | No shim — see step 5 below.                  |
 
 <Aside type="tip">
-The shim covers 27 of 28 known usage patterns automatically. Only direct
-`ctxApply` calls require manual intervention.
+The shim handles the common case automatically: `den.ctx.<name>` entries are
+forwarded as `den.schema.<name>.includes`. Only `into` transitions and direct
+`ctxApply` calls require manual migration.
 </Aside>
 
 ## Compatibility shim
 
-The shim (`modules/compat/ctx-shim.nix`) is always imported. It performs two
-forwarding operations at evaluation time:
+The shim (`modules/compat/ctx-shim.nix`) is always imported. At evaluation time
+it forwards `den.ctx.<name>` values into `den.schema.<name>.includes` with
+`lib.warn` deprecation messages. The shim handles flat entries only — `den.ctx`
+never supported nested namespaces.
 
-- `den.ctx.<name>` values (minus `into`) are merged into `den.stages.<name>`.
-- `den.ctx.<name>.into` is forwarded to `den.stages.<name>.meta.into`.
-
-Both emit `lib.warn` deprecation messages. The shim handles flat stages only
--- `den.ctx` never supported nested namespaces, so no tree mapping is needed.
-
-The shim will be removed in a future release.
+The shim will be removed after the first stable release.
 
 ## Migration steps
 
 <Steps>
 
-1. **Rename `den.ctx` to `den.stages`**
+1. **Move aspect definitions to `den.aspects`**
 
-    A simple find-and-replace in your configuration files:
+    Aspect content that was defined inline in `den.ctx` moves to the aspects
+    registry:
+
+    ```nix
+    # Before
+    den.ctx.host = {
+      provides.host = { host }: den.aspects.${host.aspect};
+    };
+
+    # After
+    den.aspects.my-aspect = { host }: {
+      nixos.services.foo.enable = true;
+    };
+    ```
+
+2. **Activate aspects via `den.schema.*.includes`**
+
+    Instead of `den.ctx.<name>.includes`, add aspects to the relevant entity
+    kind's includes list:
 
     ```nix
     # Before
     den.ctx.host.includes = [ den.provides.hostname ];
-    den.ctx.user.provides.user = { host, user }: user.aspect;
 
     # After
-    den.stages.host.includes = [ den.provides.hostname ];
-    den.stages.user.provides.user = { host, user }: user.aspect;
+    den.schema.host.includes = [ den.provides.hostname ];
     ```
 
-2. **Move `into` to `den.policies`**
+3. **Move `into` transitions to `den.policies`**
 
-    If you used `den.ctx.<name>.into` to declare transitions between entity
-    kinds, replace them with explicit policy declarations:
+    If you used `den.ctx.<name>.into` to fan out from one entity kind to
+    another, declare an explicit policy:
 
     ```nix
     # Before
@@ -68,36 +80,25 @@ The shim will be removed in a future release.
       map (user: { inherit host user; }) (lib.attrValues host.users);
 
     # After
-    den.policies.host-to-users = {
-      from = "host";
-      to = "user";
-      resolve = { host, ... }:
-        map (user: { inherit host user; }) (lib.attrValues host.users);
-    };
+    den.policies.host-to-users = { host, ... }:
+      map (user: policy.resolve.to "user" { inherit host user; })
+        (lib.attrValues host.users);
     ```
 
     See [Policies](/explanation/policies/) for the full policy model.
 
-3. **Remove `meta.adapter`**
+4. **Remove `meta.adapter`**
 
-    The `meta.adapter` option no longer exists. The pipeline now determines
-    which class keys apply to each output automatically. Simply delete any
-    `meta.adapter` assignments:
+    The `meta.adapter` option no longer exists. The pipeline determines
+    which class keys apply to each output automatically. Delete any
+    `meta.adapter` assignments.
 
-    ```nix
-    # Before
-    den.ctx.host.meta.adapter = "nixos";
-
-    # After -- nothing needed, delete the line
-    ```
-
-4. **Replace `ctxApply` calls**
+5. **Replace `ctxApply` calls**
 
     `den.lib.ctxApply` has no compatibility shim. If you called it directly,
-    replace it with the equivalent stage resolution. Consult
-    [den.stages](/reference/ctx/) for the current resolution API.
+    replace it with aspect definitions activated via `den.schema.*.includes`.
 
-5. **Verify**
+6. **Verify**
 
     Rebuild your system and confirm no deprecation warnings remain:
 
@@ -109,6 +110,6 @@ The shim will be removed in a future release.
 
 ## Further reading
 
-- [Stages](/explanation/stages/) -- how the stage tree works
-- [Policies](/explanation/policies/) -- declaring how entity kinds relate
-- [den.stages reference](/reference/ctx/) -- full option documentation
+- [Policies](/explanation/policies/) — declaring how entity kinds relate
+- [Entities & Schema](/explanation/entities/) — entity declarations and schema
+- [den.ctx compat shim](/explanation/context-system/) — what the shim does

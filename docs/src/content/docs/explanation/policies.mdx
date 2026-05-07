@@ -1,154 +1,201 @@
 ---
 title: Policies
-description: How den.policies declare directed edges between entity kinds.
+description: How den.policies declare entity topology, enrichment, and data routing.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`nix/lib/policy-types.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-types.nix) --
+[`nix/lib/policy-effects.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-effects.nix) --
 [`modules/policies/core.nix`](https://github.com/denful/den/blob/main/modules/policies/core.nix) --
-[`nix/lib/policy-inspect.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-inspect.nix)
+[`modules/policies/flake.nix`](https://github.com/denful/den/blob/main/modules/policies/flake.nix)
 </Aside>
 
-Policies are one of Den's three concerns.
+Policies are one of Den's core concerns.
 Where [entities](/explanation/entities/) declare *what things are* and
 [aspects](/explanation/aspects/) declare *what behavior applies*,
-**policies** declare *how entities relate* -- the directed edges
-that connect one entity kind to another.
+**policies** declare *how entities relate* — the directed edges
+that connect entity kinds, enrich context, route content, and drive
+structured data flow.
 
-## Why "policy"?
+## What is a policy?
 
-The word was chosen deliberately. A policy is an authority's rule for reaching a destination.
-In the simple case that rule is trivial: "the policy for reaching users is: enumerate `host.users`."
-In a complex case it might query an external registry, compute group membership, or apply
-access-control logic. The term captures active computation, external authority, and
-discrimination in a way that "edge" or "transition" do not.
+A policy is a function from context to a list of effects. The pipeline
+calls it when all required context args are present:
+
+```nix
+den.policies.host-to-users = { host, ... }:
+  map (user: policy.resolve.to "user" { inherit host user; })
+    (lib.attrValues host.users);
+```
+
+Policies are **first-class values** — they live in `den.policies` as a
+registry, and are **activated** by including them in `includes` lists.
 
 ## The policy graph
 
 ```mermaid
 flowchart TD
-  host["host"] -->|host-to-users| user["user"]
-  host -->|host-to-default| default["default"]
-  user -->|user-to-default| default
-  home["home"] -->|home-to-default| default
-  flake["flake"] -->|flake-to-flake-system| system["flake-system"]
-  system -->|"flake-system-to-flake-*"| outputs["flake-packages, flake-apps, ..."]
-  system -->|flake-system-to-flake-os| flakeOs["flake-os"]
-  system -->|flake-system-to-flake-hm| flakeHm["flake-hm"]
+  flake["flake"] -->|to-systems| system["flake-system"]
+  system -->|to-os-outputs| host["host"]
+  system -->|to-hm-outputs| home["home"]
+  host -->|host-to-users| user["user"]
+  host -->|host-to-hm-host| hmhost["hm-host"]
+  hmhost -->|hm-host-to-hm-user| hmuser["hm-user"]
 ```
 
-Each arrow is a policy. The pipeline walks this graph at evaluation time: starting from
-a root entity kind, it fires every active policy whose `from` matches, calls its `resolve`
-function, and recurses into the targets.
+Each arrow is a policy. The pipeline walks this graph at evaluation time:
+starting from the root, it fires every active policy whose required args
+match the current context, dispatches the returned effects, and recurses
+into resolved targets.
 
-## Policy anatomy
+## Writing a policy
 
-A policy is declared under `den.policies.<name>` as a submodule with five fields:
-
-| Field | Type | Purpose |
-|-------|------|---------|
-| `from` | string | Source entity kind (e.g. `"host"`) |
-| `to` | string | Target entity kind |
-| `as` | string | Context key for the output (defaults to `to`). Useful for sibling routing where `from == to`. |
-| `resolve` | function | Takes pipeline context, returns a list of target context attrsets |
-| `handlers` | attrs | Named effect handlers installed when this policy fires |
-
-The core policy `host-to-users` in `modules/policies/core.nix` illustrates the pattern:
+A policy is a bare function that destructures the current context and
+returns a list of [policy effects](/reference/policies/):
 
 ```nix
-host-to-users = {
-  _core = true;
-  from = "host";
-  to = "user";
-  resolve = { host, ... }:
-    map (user: { inherit host user; })
-        (lib.attrValues host.users);
-};
+den.policies.my-enrichment = { host, ... }:
+  let inherit (den.lib.policy) resolve; in
+  [ (resolve { myFlag = true; }) ];
 ```
 
-The `resolve` function destructures its context argument directly -- `{ host, ... }:` rather
-than a monolithic `ctx:` argument. This works because the synthesis layer validates that
-the required entity keys are present before calling `resolve`.
+Policy effect constructors live under `den.lib.policy` — use
+`let inherit (den.lib.policy) resolve; in` or access them directly as
+`den.lib.policy.resolve`, `den.lib.policy.include`, etc.
 
-## Activation model
+The `{ host, ... }:` pattern means this policy fires only when `host` is
+in context. Den introspects the function args and checks satisfaction
+automatically.
 
-Not every policy fires for every entity. Den uses a three-tier activation model:
+### Common effect types
 
-**Core policies** (`_core = true`) are always active. These are the fundamental
-traversals defined in `modules/policies/core.nix` -- `host-to-users`, `host-to-default`,
-and so on. You never need to opt into them.
+| Effect | What it does |
+|---|---|
+| `policy.resolve bindings` | Enrich current scope or create a child entity (see below) |
+| `policy.resolve.to kind bindings` | Create a child scope for a specific entity kind |
+| `policy.include aspect` | Inject an aspect into current resolution (walks the tree) |
+| `policy.exclude aspect` | Remove an aspect via constraint registry |
+| `policy.route spec` | Route class content between scopes |
+| `policy.provide spec` | Deliver a module directly to a class (bypasses tree walk) |
+| `policy.instantiate entity` | Request post-pipeline instantiation |
+| `pipe.from name stages` | Quirk data routing (see [Quirks](/explanation/quirks-and-pipes/)) |
 
-**Entity-kind activation** uses `den.schema.<kind>.policies` to enable a policy for
-every entity of that kind:
+### Enrichment vs entity resolution
+
+`policy.resolve` behaves differently depending on what's in the bindings:
+
+- **Entity keys** (keys matching `den.schema` kinds like `host`, `user`):
+  creates a **child scope** and resolves a new entity. This is how
+  `host-to-users` fans out — each user becomes a separate scope.
+- **Non-entity keys**: **enriches** the current scope by merging new
+  bindings into the context. No new scope is created. Deferred aspects
+  that needed the new bindings are drained.
 
 ```nix
-den.schema.host.policies = [ "host-to-peers" ];
+# Enrichment — adds myFlag to current context, no new scope
+policy.resolve { myFlag = true; }
+
+# Entity resolution — creates a child "user" scope
+policy.resolve.to "user" { inherit host user; }
 ```
 
-**Entity-instance activation** uses `den.hosts.<system>.<name>.policies` (or the
-equivalent for other entity kinds) to enable a policy for a single entity:
+This distinction matters: enrichment widens what aspects can resolve
+in the current scope, while entity resolution creates an isolated
+child scope with its own emissions.
+
+### `policy.include` vs `policy.provide`
+
+Both inject configuration, but through different paths:
+
+| | `policy.include` | `policy.provide` |
+|---|---|---|
+| **Path** | Walks through the aspect tree | Bypasses the tree entirely |
+| **Dedup** | Subject to include dedup | Deduped by policy/class/path |
+| **Use when** | Injecting aspects that should participate in the full resolution (constraints, nested includes, parametric dispatch) | Delivering raw modules directly to a class when you don't need tree processing |
 
 ```nix
-den.hosts.x86_64-linux.igloo.policies = [ "host-to-peers" ];
+# include: the aspect is resolved through the tree
+policy.include den.aspects.monitoring
+
+# provide: the module goes straight to the class
+policy.provide { class = "nixos"; module = { services.foo.enable = true; }; }
 ```
 
-The pipeline merges all three tiers: core policies are always included, then kind-level
-and instance-level lists are unioned. A policy only fires when its `from` matches the
-current entity kind *and* the policy appears in the merged active set.
+## Activating policies
 
-## Writing a custom policy
-
-Suppose you want hosts to discover their peers for mesh networking:
+Declaring a policy in `den.policies` only **registers** it. To activate,
+include it in an `includes` list:
 
 ```nix
-den.policies.host-to-peers = {
-  from = "host";
-  to = "host";
-  as = "peer";  # avoids collision since from == to
-  resolve = { host, ... }:
-    map (h: { peer = h; inherit host; })
-      (lib.filter (h: h.hostName != host.hostName)
-        (lib.attrValues den.hosts.${host.system}));
-};
-
 # Activate for all hosts
-den.schema.host.policies = [ "host-to-peers" ];
+den.schema.host.includes = [ den.policies.my-enrichment ];
+
+# Activate for a specific aspect
+den.aspects.igloo.includes = [ den.policies.my-enrichment ];
+
+# Activate globally
+den.default.includes = [ den.policies.my-enrichment ];
 ```
 
-The `as = "peer"` field is critical here: without it the target context key would
-collide with the source `host` key. With it, downstream stages receive `{ host, peer }`.
+Policies and aspects mix freely in `includes` — the pipeline distinguishes
+them by the `__isPolicy` tag.
 
-## Inspecting policies
+<Aside>
+Built-in core policies are always active — they're activated via
+`den.schema.*.includes` in `modules/policies/core.nix` and
+`modules/policies/flake.nix`.
+</Aside>
 
-The `den.lib.policyInspect.inspect` function lets you probe the policy graph without
-running the full pipeline:
+## Deactivating policies
+
+Use `excludes` on an aspect to prevent a policy from firing in its subtree:
 
 ```nix
-den.lib.policyInspect.inspect {
-  kind = "host";
-  context = { host = den.hosts.x86_64-linux.myhost; };
-}
-# => { host-to-users = { from = "host"; to = "user"; targets = [ ... ]; ... }; }
+den.aspects.igloo = {
+  includes = [ den.policies.add-marker ];
+  excludes = [ den.policies.add-marker ];
+};
 ```
 
-Each entry in the result tells you the `from`, `to`, `as`, resolved `targets` list,
-and whether the routing is `"sibling"` or `"child"`. This is invaluable for debugging
-"why did host X get module Y?" questions.
+Excludes are **authoritative** — a parent scope's exclude cannot be
+overridden by a child `includes`. This prevents downstream aspects from
+re-enabling policies that a parent explicitly blocked.
 
-<Aside type="tip">
-  The inspect utility calls resolve functions directly. It is cheap and does not
-  trigger a full pipeline evaluation.
-</Aside>
+## Conditional policies
+
+### `policy.for entity policy`
+
+Fire only when a specific entity is in context (matched by `id_hash`):
+
+```nix
+den.schema.host.includes = [
+  (den.lib.policy.for den.hosts.x86_64-linux.igloo
+    den.policies.igloo-specific)
+];
+```
+
+### `policy.when predicate policy`
+
+Fire only when a predicate over context returns true:
+
+```nix
+den.schema.host.includes = [
+  (den.lib.policy.when ({ host, ... }: host.wsl.enable)
+    den.policies.wsl-support)
+];
+```
+
+Both wrappers preserve the inner policy's identity — `excludes`
+still works against the wrapped policy.
+
+Both accept a single policy or a list of policies.
 
 ## Relation to other concerns
 
-Policies sit between data and behavior in the four-concern model:
-
 1. **Data** ([Entities](/explanation/entities/)) defines what an entity *is*.
-2. **Policies** (this page) define how entities *relate* -- the graph edges.
-3. **Stages** ([Stages](/explanation/stages/)) define *where* behavior binds in the pipeline.
-4. **Behavior** ([Aspects](/explanation/aspects/)) defines *how* entities resolve into configuration.
+2. **Policies** (this page) define how entities *relate*, enrich context, and route data.
+3. **Behavior** ([Aspects](/explanation/aspects/)) defines *how* entities resolve into configuration.
 
-For the full option reference, see [den.policies](/reference/policies/).
+For the full API reference, see [den.policies reference](/reference/policies/).
+For the complete activation/deactivation model, see [Policy Activation Deep Dive](/explanation/policy-activation/).

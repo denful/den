@@ -115,7 +115,7 @@ The following example are for `packages` but same applies for `checks`, `devShel
      # ANY Host or User aspect can produce outputs:
      # The flake-system-to-flake-os policy handles host fan-out.
      # To include aspects in flake outputs:
-     den.stages.flake-packages.includes = [ den.aspects.foo ];
+     den.schema.flake-packages.includes = [ den.aspects.foo ];
      ```
 
 3. Use the `packages` class on your aspects:

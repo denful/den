@@ -1,6 +1,6 @@
 ---
 title: Resolution Pipeline
-description: How host/user/home declarations resolve into NixOS/Darwin/HM configurations through policies and stages.
+description: How host/user/home declarations resolve into NixOS/Darwin/HM configurations through policies and entities.
 ---
 
 import { Steps, Aside } from '@astrojs/starlight/components';
@@ -15,27 +15,27 @@ import { Steps, Aside } from '@astrojs/starlight/components';
 ## Pipeline overview
 
 When Den evaluates a host, it runs a **resolution pipeline** driven by
-[policies](/explanation/policies/) and [stages](/explanation/stages/).
-Policies are directed edges that fan context out to downstream stages;
-stages bind behavior for each resolved context.
+[policies](/explanation/policies/) and [entities](/explanation/entities/).
+Policies are directed edges that fan context out to downstream entity kinds;
+each entity kind binds behavior for its resolved context.
 
 ```mermaid
 flowchart TD
-  start["den.hosts.x86_64-linux.laptop"] --> host["stage: host {host}"]
-  host -->|"host-to-users"| user["stage: user {host, user} (per user)"]
-  host -->|"host-to-default"| hdef["stage: default {host}"]
-  user -->|"user-to-default"| udef["stage: default {host, user}"]
-  host -->|"host-to-hm-host"| hmhost["stage: hm-host {host}"]
-  hmhost -->|"hm-host-to-hm-user"| hmuser["stage: hm-user {host, user}"]
+  start["den.hosts.x86_64-linux.laptop"] --> host["host {host}"]
+  host -->|"host-to-users"| user["user {host, user} (per user)"]
+  host -->|"host-to-default"| hdef["default {host}"]
+  user -->|"user-to-default"| udef["default {host, user}"]
+  host -->|"host-to-hm-host"| hmhost["hm-host {host}"]
+  hmhost -->|"hm-host-to-hm-user"| hmuser["hm-user {host, user}"]
   hmuser --> fwd["forward into home-manager.users.alice"]
 ```
 
 <Steps>
-1. **Host stage**
+1. **Host resolution**
 
-   For each entry in `den.hosts.<system>.<name>`, the pipeline enters the
-   `host` stage. The stage's `provides.host` function receives `{ host }`
-   and returns the host's own aspect, binding owned configs for the host's class.
+   For each entry in `den.hosts.<system>.<name>`, the pipeline creates a
+   `host` scope. The host's own aspect is resolved via `den.schema.host.includes`,
+   binding owned configs for the host's class.
 
 2. **Core policies fan out**
 
@@ -52,11 +52,11 @@ flowchart TD
    list of downstream contexts. `host-to-users` fans out: one `{ host, user }`
    pair per user declared on the host.
 
-3. **Battery policies create derived stages**
+3. **Battery policies create derived entity kinds**
 
-   Batteries register additional policies that create derived stages when their
-   conditions are met. Each battery uses `makeHomeEnv` to produce a pair of
-   policies and matching stages:
+   Batteries register additional policies that create derived entity kinds when
+   their conditions are met. Each battery uses `makeHomeEnv` to produce policies
+   for the new entity kinds:
 
    | Policy | Condition | Target entity kind |
    |---|---|---|
@@ -68,21 +68,21 @@ flowchart TD
    | `maid-host-to-maid-user` | Per `maid`-class user | `maid-user` |
    | `host-to-wsl-host` | NixOS host with `wsl.enable` | `wsl-host` |
 
-   The `-host` stage imports the battery's OS module (e.g., `home-manager.nixosModules.home-manager`).
-   The `-user` stage forwards the resolved user aspect into the appropriate
+   The `-host` entity kind imports the battery's OS module (e.g., `home-manager.nixosModules.home-manager`).
+   The `-user` entity kind forwards the resolved user aspect into the appropriate
    namespace (e.g., `home-manager.users.<name>`).
 
 4. **Deduplication**
 
-   The transition handler tracks a `seen` set keyed by context identity.
-   When a stage is entered for the first time with a given context, the full
+   The pipeline tracks a `seen` set keyed by context identity.
+   When a scope is entered for the first time with a given context, the full
    aspect (owned configs + statics + parametric matches) is included.
    Subsequent visits with the same context key skip already-applied includes,
    preventing `den.default` configs from being applied twice when the same
-   aspect appears at multiple stages.
+   aspect appears at multiple entity kinds.
 
-   Each policy transition runs its own sub-pipeline with independent dedup
-   state, so stages reached through different policies are isolated.
+   Each policy transition creates an independent scope with its own dedup
+   state, so entity kinds reached through different policies are isolated.
 
 5. **Home configurations**
 
@@ -91,20 +91,20 @@ flowchart TD
 
    ```mermaid
    flowchart TD
-     home["den.homes.x86_64-linux.alice"] --> homestage["stage: home {home}"]
-     homestage -->|"home-to-default"| hdef["stage: default {home}"]
+     home["den.homes.x86_64-linux.alice"] --> homestage["home {home}"]
+     homestage -->|"home-to-default"| hdef["default {home}"]
      homestage --> hmc["homeConfigurations.alice"]
    ```
 
-   Home stages have no `host` in context, so policies and provides requiring
+   Home scopes have no `host` in context, so policies and provides requiring
    `{ host }` are not activated. The `home-to-default` policy still applies
    shared defaults.
 
 6. **Output**
 
    Flake-level policies (`modules/policies/flake.nix`) drive the final
-   assembly. `flake-system-to-flake-os` iterates all hosts for a system;
-   `flake-system-to-flake-hm` iterates all homes. Each resolved entity
+   assembly. `to-os-outputs` resolves all hosts for a system;
+   `to-hm-outputs` resolves all homes. Each resolved entity
    is instantiated (`lib.nixosSystem`, `darwinSystem`, or
    `homeManagerConfiguration` depending on class) and placed into
    `flake.nixosConfigurations`, `flake.darwinConfigurations`, or
@@ -114,7 +114,8 @@ flowchart TD
 
 ## See also
 
-- [Entities and Schema](/explanation/entities/) -- what entities are
+- [Entities and Schema](/explanation/entities/) -- what entities are and how they feed the pipeline
 - [Policies](/explanation/policies/) -- how entities relate
-- [Stages](/explanation/stages/) -- where behavior binds
+- [Quirks & Pipes](/explanation/quirks-and-pipes/) -- structured data flow between aspects
+- [Fleets & Multi-Host](/explanation/fleet/) -- cross-host resolution and data flow
 - [Aspects](/explanation/aspects/) -- how entities resolve

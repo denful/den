@@ -4,7 +4,7 @@
 # { includes = [fn]; __functor = defaultFunctor; }. mapIncludes was skipping
 # includes that have __functor, so the inner parametric fn never received
 # user/host context and its config was silently dropped.
-# https://github.com/vic/den/issues/442
+# https://github.com/denful/den/issues/442
 { denTest, ... }:
 {
   flake.tests.deadbugs-issue-442 = {

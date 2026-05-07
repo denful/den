@@ -10,7 +10,7 @@ import { Aside } from '@astrojs/starlight/components';
 [`templates/microvm`](https://github.com/denful/den/tree/main/templates/microvm)
 </Aside>
 
-[templates/microvm](https://github.com/denful/den/tree/main/templates/microvm) demonstrates Den's extensibility: custom `den.stages` and `den.schema` extensions for integrating other Nix libraries like [MicroVM.nix](https://github.com/microvm-nix/microvm.nix).
+[templates/microvm](https://github.com/denful/den/tree/main/templates/microvm) demonstrates Den's extensibility: custom `den.schema` and `den.policies` extensions for integrating other Nix libraries like [MicroVM.nix](https://github.com/microvm-nix/microvm.nix).
 
 This template shows two patterns for building MicroVMs with Den.
 
@@ -128,17 +128,18 @@ Two-stage pipeline for MicroVM host and guests:
 den.policies.host-to-microvm-host = { host }:
   lib.optional (host.microvm.guests != []) { inherit host; };
 
-# microvm-host provides Host configuration
-den.stages.microvm-host.provides.microvm-host = { host }: {
+# microvm-host aspect provides Host configuration
+den.aspects.microvm-host-config = { host }: {
   ${host.class}.imports = [ host.microvm.hostModule ];
 };
+den.schema.microvm-host.includes = [ den.aspects.microvm-host-config ];
 
-# Stage 2: microvm-host → microvm-guest
-den.policies.microvm-host-to-microvm-guest = { host }:
-  map (vm: { inherit host vm; }) host.microvm.guests;
+# microvm-host → microvm-guest policy
+den.policies.microvm-host-to-microvm-guest = { host, ... }:
+  map (vm: policy.resolve.to "microvm-guest" { inherit host vm; }) host.microvm.guests;
 
 # Guest configuration forwarded to host
-den.stages.microvm-host.provides.microvm-guest = { host, vm }: {
+den.aspects.microvm-guest-config = { host, vm }: {
   includes = [
     # Auto-share nix store if enabled
     sharedNixStore

@@ -1,0 +1,225 @@
+---
+title: Policy Activation Deep Dive
+description: How the policy registry, includes-based activation, excludes, and dispatch work together.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+[`nix/lib/aspects/policy-type.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/policy-type.nix) --
+[`nix/lib/policy-effects.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-effects.nix) --
+[`nix/lib/aspects/fx/aspect/children.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/aspect/children.nix) --
+[`templates/ci/modules/features/policy-excludes.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/policy-excludes.nix) --
+[`templates/ci/modules/features/policy-combinators.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/policy-combinators.nix)
+</Aside>
+
+## Registry vs activation
+
+`den.policies` is a **registry** — a named collection of policy values.
+Registering a policy does not activate it:
+
+```nix
+# This only registers. The policy will never fire.
+den.policies.my-policy = { host, ... }: [
+  (policy.resolve { flag = true; })
+];
+```
+
+Activation happens when a policy value appears in an `includes` list:
+
+```nix
+# Now it fires for all hosts
+den.schema.host.includes = [ den.policies.my-policy ];
+```
+
+This separation is the core design principle: policies are reusable
+values that can be activated, deactivated, and filtered independently
+of where they're defined.
+
+## How policies become values
+
+The module system wraps bare functions into tagged records:
+
+```
+den.policies.foo = { host, ... }: [ ... ]
+  ↓ (module system merge)
+{ __isPolicy = true; name = "foo"; fn = { host, ... }: [ ... ]; }
+```
+
+The `__isPolicy` tag lets the pipeline distinguish policies from aspects
+in `includes` lists. Both are valid include entries — the pipeline
+checks the tag and routes accordingly.
+
+## Activation paths
+
+Policies can be activated at any level of the include hierarchy:
+
+| Level | Where | Scope |
+|---|---|---|
+| Global | `den.default.includes` | All entities |
+| Per entity kind | `den.schema.host.includes` | All hosts |
+| Per aspect | `den.aspects.igloo.includes` | The igloo subtree |
+| Inline | `{ includes = [ den.policies.foo ]; }` | The enclosing aspect |
+
+### Cascading
+
+When a policy is activated at a scope, it cascades to all descendant
+scopes. A policy in `den.schema.host.includes` fires at the host scope
+and is also available at user scopes resolved from that host.
+
+### Aspect-level policies
+
+Aspects can define policies inline using the `policies` attribute:
+
+```nix
+den.aspects.igloo = {
+  policies.to-users = { host, user, ... }:
+    lib.optional someCondition
+      (policy.include { nixos.some.option = true; });
+
+  includes = [ den.aspects.igloo.policies.to-users ];
+};
+```
+
+The policy is registered on the aspect and activated via `includes` in
+the same definition.
+
+## Deactivation with `excludes`
+
+`excludes` is a first-class top-level key on aspects, symmetric with
+`includes`. It prevents policies from firing in the aspect's subtree:
+
+```nix
+den.aspects.igloo = {
+  includes = [ den.policies.add-marker ];
+  excludes = [ den.policies.add-marker ];
+};
+```
+
+
+### Authoritative semantics
+
+Parent excludes are **authoritative** — child scopes cannot re-enable
+an excluded policy:
+
+```nix
+parentAspect = {
+  excludes = [ den.policies.blocked ];
+  includes = [ childAspect ];
+};
+
+childAspect = {
+  # This does NOT re-enable the policy. The parent's exclude wins.
+  includes = [ den.policies.blocked ];
+};
+```
+
+This prevents downstream aspects from bypassing security or correctness
+constraints established by parent scopes.
+
+### Identity through wrappers
+
+Excludes match on policy identity. When a policy is wrapped with
+`policy.for` or `policy.when`, the inner policy's identity is preserved:
+
+```nix
+wrapped = den.lib.policy.for entity den.policies.my-policy;
+
+# This exclude still works — it matches the inner policy identity
+excludes = [ den.policies.my-policy ];
+```
+
+## Conditional firing
+
+### `den.lib.policy.for entity policy`
+
+Wraps a policy to fire only when a specific entity is in context.
+Matching uses `id_hash` for robust identity comparison:
+
+```nix
+den.schema.host.includes = [
+  (den.lib.policy.for den.hosts.x86_64-linux.igloo
+    den.policies.igloo-specific)
+];
+```
+
+The wrapper checks whether any entity kind key in the current context
+has a matching `id_hash`. If not, the policy returns `[]`.
+
+Accepts a single policy value or a list:
+
+```nix
+den.lib.policy.for entity [
+  den.policies.policy-a
+  den.policies.policy-b
+]
+# Returns a list of two wrapped policies
+```
+
+### `den.lib.policy.when predicate policy`
+
+Wraps a policy to fire only when a predicate returns true:
+
+```nix
+den.schema.host.includes = [
+  (den.lib.policy.when ({ host, ... }: host.wsl.enable)
+    den.policies.wsl-support)
+];
+```
+
+The predicate receives the full context attrset. If it returns false,
+the policy returns `[]`.
+
+### Composing wrappers
+
+Wrappers compose — `when` wrapping `for` wrapping a raw policy:
+
+```nix
+den.lib.policy.when (ctx: ctx.flag or false)
+  (den.lib.policy.for entity den.policies.my-policy)
+```
+
+The outer wrapper runs first. If the predicate fails, the inner wrapper
+never executes.
+
+## Dispatch cycle
+
+When the pipeline reaches an entity scope, policy dispatch follows a
+fixed-point iteration:
+
+1. **Collect** — gather all active policies from the scope's include
+   chain (direct includes, schema includes, default includes).
+2. **Check satisfaction** — for each policy, introspect its function
+   args. A policy fires only when all required args (non-default) are
+   present in the current context.
+3. **Fire** — call satisfied policies, collect their effects.
+4. **Enrich** — if any effects add new context bindings
+   (`policy.resolve` with enrichment), merge them via `scope.provide`
+   and drain deferred includes.
+5. **Iterate** — check if new bindings satisfy previously-unsatisfied
+   policies. If so, fire them and repeat from step 4.
+6. **Converge** — when no new policies fire, emit all collected effects.
+
+This fixed-point iteration means policies can depend on context that
+other policies provide. The iteration is capped at 10 rounds to prevent
+infinite loops.
+
+### Self-exclusion invariant
+
+A policy does not apply to its own outputs. The source policy name is
+threaded through the resolve chain, seeding `firedPolicies` at child
+scopes. This prevents infinite recursion when a policy's effects would
+satisfy its own firing condition.
+
+## Policy include dedup
+
+Policy includes are deduplicated via identity tags. Each policy include
+gets a `<policy:name:idx>` identity key. Anonymous policy includes get
+global dedup keys. This prevents the same policy from being registered
+multiple times when included from multiple scopes.
+
+## See also
+
+- [Policies](/explanation/policies/) — conceptual overview
+- [den.policies reference](/reference/policies/) — effect types and built-in policies
+- [CI tests](https://github.com/denful/den/tree/main/templates/ci/modules/features) — `policy-excludes.nix`, `policy-combinators.nix`, `policy-include-routing.nix`

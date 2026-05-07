@@ -42,7 +42,7 @@ Allows hosts and users to contribute configuration **to each other** through `.p
 
 ```nix
 den.hosts.x86_64-linux.igloo.users.tux = { };
-den.stages.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den._.mutual-provider ];
 ```
 
 ```nix
@@ -108,10 +108,10 @@ directory names (`_nixos/`, `_darwin/`, `_homeManager/`):
 
 ```nix
 # Import per host
-den.stages.host.includes = [ (den.provides.import-tree._.host ./hosts) ];
+den.schema.host.includes = [ (den.provides.import-tree._.host ./hosts) ];
 
 # Import per user
-den.stages.user.includes = [ (den.provides.import-tree._.user ./users) ];
+den.schema.user.includes = [ (den.provides.import-tree._.user ./users) ];
 
 # Import for a specific aspect
 den.aspects.laptop.includes = [ (den.provides.import-tree ./disko) ];

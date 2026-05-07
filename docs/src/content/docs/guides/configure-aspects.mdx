@@ -163,6 +163,39 @@ den.aspects.alice.provides.work-vpn = { host, user, ... }:
   };
 ```
 
+### Cross-entity provides
+
+Three special `provides` keys route configuration across entity boundaries.
+They fire automatically during the tree walk — no manual policy wiring needed:
+
+```nix
+den.aspects.igloo = {
+  # Deliver to ALL users on this host
+  provides.to-users = { user, ... }: {
+    homeManager.programs.helix.enable = user.name == "alice";
+  };
+
+  # Deliver to a specific user by name
+  provides.alice.homeManager.programs.vim.enable = true;
+};
+
+den.aspects.tux = {
+  # Deliver to ALL hosts this user lives on
+  provides.to-hosts = { host, ... }: {
+    nixos.programs.nh.enable = host.name == "igloo";
+  };
+
+  # Deliver to a specific host by name
+  provides.igloo.nixos.programs.emacs.enable = true;
+};
+```
+
+<Aside>
+For new configurations, prefer `den.policies` with explicit `policy.include`
+for cross-entity delivery — it's more flexible and explicit. The `provides`
+patterns above are a permanent API for existing usage.
+</Aside>
+
 ## Global Defaults
 
 `den.default` is a special aspect applied to every host, user, and home:

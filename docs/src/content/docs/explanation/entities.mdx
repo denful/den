@@ -14,8 +14,8 @@ import { Aside } from '@astrojs/starlight/components';
 
 Den's **Data** concern is about declaring _what entities are_. An entity is a typed
 data record — a host, a user, or a standalone home — that carries metadata consumed
-by later stages of the pipeline: [Stages](/explanation/stages/),
-[Policies](/explanation/policies/), and [Aspects](/explanation/aspects/).
+by the resolution pipeline: [Policies](/explanation/policies/)
+and [Aspects](/explanation/aspects/).
 
 ## Entity types
 
@@ -97,24 +97,22 @@ Schema entries are `deferredModule` values — they can be plain attrsets with
 
 <Aside>
 `den.schema` uses a freeform type, so you can define custom kinds beyond the
-built-in three. Any kind that has a matching entry in `den.stages` automatically
-gains a `resolved` attribute and participates in the resolution pipeline.
-See [Stages](/explanation/stages/) for details.
+built-in three. Any kind with entity content automatically gains a `resolved`
+attribute and participates in the resolution pipeline.
 </Aside>
 
 ## Entity kinds and the resolution pipeline
 
 Each schema kind name (excluding `conf` and internal prefixes) is treated as a
-first-class **entity kind**. When a stage exists for a given kind
-(`den.stages.<kind>`), entities of that kind automatically receive:
+first-class **entity kind**. Entity kinds automatically receive:
 
 - A `resolved` attribute containing the fully resolved aspect output for that entity.
 - An `id_hash` for safe entity comparison (Nix's `==` is fragile across module
   boundaries).
 - Context arguments derived from the entity's module args, filtered to known kinds.
 
-This is how the Data concern feeds into [Stages](/explanation/stages/) — entities
-declare what they are, and stages determine where behavior binds.
+This is how the Data concern feeds into the resolution pipeline — entities
+declare what they are, and policies determine where behavior binds.
 
 ## Per-entity policy activation
 
