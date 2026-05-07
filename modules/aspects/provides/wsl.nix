@@ -37,6 +37,7 @@ let
   wsl-host-aspect =
     { host }:
     {
+      name = "wsl/${host.name}";
       inherit description;
       ${host.class} = {
         imports = [ host.wsl.module ];

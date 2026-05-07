@@ -26,7 +26,7 @@ let
       };
     in
     {
-      name = "user";
+      name = "host-aspects/${user.userName}@${host.name}";
     }
     // lib.genAttrs (user.classes or [ "homeManager" ]) (
       class: den.lib.aspects.resolve class aspectWithCtx
