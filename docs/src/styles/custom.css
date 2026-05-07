@@ -23,3 +23,13 @@ a, code, code * {
 .sponsor-card * {
   font-family: "DejaVu Sans";
 }
+
+/* Sidebar: top-level items use monospace, sub-items use sans */
+.top-level > li > details > summary .group-label,
+.top-level > li > a span {
+  font-family: var(--font-victor-mono);
+}
+
+.top-level > li > details > ul a span {
+  font-family: var(--font-jetbrains-mono);
+}
