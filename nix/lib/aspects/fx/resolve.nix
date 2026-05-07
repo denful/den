@@ -372,17 +372,24 @@ let
         let
           allInstantiates = lib.concatLists (lib.attrValues (result.state.scopedInstantiates null));
           allScopeIds = builtins.attrNames scopeContexts;
-          # First-wins dedup: when the same host is instantiated from multiple
-          # scopes (e.g. environment + each host scope via policy re-dispatch),
-          # keep the first occurrence (from the parent scope).
-          specsByHost = builtins.foldl' (
-            acc: spec:
-            let
-              hasOutput = (spec.intoAttr or [ ]) != [ ];
-              hostScopeId = if hasOutput then findHostScopeId scopeParent allScopeIds spec else null;
-            in
-            if hostScopeId == null || acc ? ${hostScopeId} then acc else acc // { ${hostScopeId} = spec; }
-          ) { } allInstantiates;
+          specsByHost = builtins.listToAttrs (
+            lib.concatMap (
+              spec:
+              let
+                hasOutput = (spec.intoAttr or [ ]) != [ ];
+                hostScopeId = if hasOutput then findHostScopeId scopeParent allScopeIds spec else null;
+              in
+              if hostScopeId == null then
+                [ ]
+              else
+                [
+                  {
+                    name = hostScopeId;
+                    value = spec;
+                  }
+                ]
+            ) allInstantiates
+          );
         in
         lib.mapAttrs (
           hostScopeId: spec:
@@ -542,7 +549,7 @@ let
       } phase3.classImports;
     in
     {
-      imports = (phase4.${class} or [ ]);
+      imports = phase4.${class} or [ ];
     };
 in
 {
