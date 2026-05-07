@@ -28,23 +28,30 @@ in
           if isChildScope then
             let
               ctxs = (state.scopeContexts or (_: { })) null;
+              entityCls = ((state.scopeEntityClass or (_: { })) null).${currentScope} or null;
             in
-            ctxs.${state.currentScope} or { }
+            (ctxs.${currentScope} or { }) // (if entityCls != null then { class = entityCls; } else { })
           else
             { };
         keysAfterStateFallback = builtins.filter (k: !(scopeCtx ? ${k})) keysToProbe;
-        # If state fallback satisfies all keys, merge scope handlers into aspect
-        # so compileFn receives them for parametric binding.
+        # Augment __scopeHandlers with ALL requested keys available in scope
+        # context (both required and optional).  This ensures scope.provide
+        # values (host, user, class) override pipeline-level defaults even
+        # for optional args.  Strip `class` from the final handlers to prevent
+        # it leaking into entry.ctx via ctxFromHandlers.
+        allRequestedKeys = builtins.attrNames childArgs;
+        scopeOverrideKeys = builtins.filter (
+          k: !(childScopeHandlers ? ${k}) && scopeCtx ? ${k}
+        ) allRequestedKeys;
         augmentedAspect =
-          if keysAfterStateFallback != keysToProbe then
+          if scopeOverrideKeys != [ ] then
             let
-              stateProvidedKeys = builtins.filter (k: scopeCtx ? ${k}) keysToProbe;
               stateHandlers = den.lib.aspects.fx.handlers.constantHandler (
                 builtins.listToAttrs (
                   map (k: {
                     name = k;
                     value = scopeCtx.${k};
-                  }) stateProvidedKeys
+                  }) scopeOverrideKeys
                 )
               );
             in

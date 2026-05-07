@@ -249,6 +249,7 @@ let
       scopedProvides,
       scopedRoutes,
       scopeParent,
+      scopeEntityClass ? (_: { }),
       fxResolveFn,
       ctx,
     }:
@@ -294,7 +295,24 @@ let
                   subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
                   relevantScopeIds = builtins.filter isRelevant allScopeIds;
                   # Class imports: subtree only (ancestor class imports belong to other outputs).
-                  subtreeContexts = lib.genAttrs subtreeScopeIds (sid: augmentedScopeContexts.${sid});
+                  # Inject host class into the host scope context for wrapPerScope.
+                  # The pipeline keeps class in scope handlers only (not context) to
+                  # avoid affecting provides/enrichment, but subtree extraction needs
+                  # it for correct class module wrapping.
+                  scopeEntityClassMap = scopeEntityClass null;
+                  subtreeContexts = lib.genAttrs subtreeScopeIds (
+                    sid:
+                    let
+                      base = augmentedScopeContexts.${sid};
+                      entityCls = scopeEntityClassMap.${sid} or null;
+                    in
+                    if !(base ? class) && entityCls != null then
+                      base // { class = entityCls; }
+                    else if !(base ? class) then
+                      base // { class = hostClass; }
+                    else
+                      base
+                  );
                   subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
                   # Routes and provides: include ancestors (policies at flake-system scope
                   # produce routes/provides that must be visible during per-host assembly).
@@ -313,7 +331,7 @@ let
                 extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
               else
                 null;
-            modules = [ spec.mainModule ];
+            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
             instantiateArgs =
               if spec ? pkgs then
                 {
@@ -371,6 +389,7 @@ let
           phase2;
       phase4 = applyInstantiates {
         scopedInstantiates = result.state.scopedInstantiates null;
+        scopeEntityClass = result.state.scopeEntityClass or (_: { });
         inherit
           augmentedScopeContexts
           scopedClassImportsRaw

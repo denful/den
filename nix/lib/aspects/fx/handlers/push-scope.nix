@@ -56,6 +56,15 @@ let
             # Record source policy name — installPolicies reads this to
             # exclude the source policy from dispatch at this scope.
             # Invariant: policies don't apply to their own outputs.
+            # Track entity class per scope — separate from scopeContexts to avoid
+            # affecting provides/enrichment.  Read by bind's state fallback and
+            # subtree extraction.
+            scopeEntityClass =
+              _:
+              ((state.scopeEntityClass or (_: { })) null)
+              // lib.optionalAttrs (entityClass != null) {
+                ${newScopeId} = entityClass;
+              };
             scopeSourcePolicy =
               _:
               ((state.scopeSourcePolicy or (_: { })) null)
