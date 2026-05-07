@@ -552,9 +552,29 @@ let
         ) scopedClassImportsRaw (builtins.attrNames allDeferred);
 
       phase1 = wrapPerScope ctx result.state.rootScopeId augmentedScopeContexts drainedClassImportsRaw;
-      phase2 = applyProvides ctx augmentedScopeContexts scopedProvides phase1;
+      # Filter provides and routes for the flake level: skip entity subtree
+      # scopes to avoid forcing their wrapping. Subtree extraction in
+      # applyInstantiates re-runs provides/routes per host lazily.
+      entityKinds = den.lib.schemaUtil.schemaEntityKinds;
+      rootCtx = augmentedScopeContexts.${result.state.rootScopeId} or { };
+      rootIsEntity = builtins.any (k: rootCtx ? ${k}) entityKinds;
+      isNonEntityScope =
+        sid:
+        let
+          scopeCtx = augmentedScopeContexts.${sid} or { };
+        in
+        !builtins.any (k: scopeCtx ? ${k}) entityKinds;
+      filteredProvides =
+        if rootIsEntity then
+          scopedProvides
+        else
+          lib.filterAttrs (sid: _: isNonEntityScope sid) scopedProvides;
+      filteredRoutes =
+        if rootIsEntity then scopedRoutes else lib.filterAttrs (sid: _: isNonEntityScope sid) scopedRoutes;
+      phase2 = applyProvides ctx augmentedScopeContexts filteredProvides phase1;
       phase3 =
-        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId scopedRoutes
+        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
+          filteredRoutes
           phase2;
       phase4 = applyInstantiates {
         scopedInstantiates = result.state.scopedInstantiates null;
