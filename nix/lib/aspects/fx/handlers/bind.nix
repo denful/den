@@ -37,8 +37,7 @@ in
         # Augment __scopeHandlers with ALL requested keys available in scope
         # context (both required and optional).  This ensures scope.provide
         # values (host, user, class) override pipeline-level defaults even
-        # for optional args.  Strip `class` from the final handlers to prevent
-        # it leaking into entry.ctx via ctxFromHandlers.
+        # for optional args.
         allRequestedKeys = builtins.attrNames childArgs;
         scopeOverrideKeys = builtins.filter (
           k: !(childScopeHandlers ? ${k}) && scopeCtx ? ${k}
