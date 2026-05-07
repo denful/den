@@ -460,8 +460,9 @@ let
       # Assemble pipe data into scope contexts before wrapping.
       # Local config thunks are marked for deferred resolution inside evalModules.
       # Cross-host config thunks (from pipe.collect) are resolved using hostConfigs.
+      scopeEntityKind = (result.state.scopeEntityKind or (_: { })) null;
       augmentedScopeContexts = assemblePipes {
-        inherit scopeContexts hostConfigs;
+        inherit scopeContexts hostConfigs scopeEntityKind;
         scopedClassImports = scopedClassImportsRaw;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         inherit scopeParent;

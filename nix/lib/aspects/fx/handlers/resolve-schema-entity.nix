@@ -101,6 +101,7 @@ let
               inherit (param) scopedCtx entityClass;
               inherit parentScope;
               sourcePolicyName = param.sourcePolicyName or null;
+              entityKind = param.targetKind or null;
             })
             (
               pushResult:

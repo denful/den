@@ -37,28 +37,20 @@ in
   # environment -> hosts: walk hosts whose environment matches.
   # Guard: only fire at environment scope (not at host scopes which inherit environment).
   den.policies.env-to-hosts =
-    {
-      environment,
-      host ? null,
-      ...
-    }:
-    # Guard: only fire at environment scope, not at host scopes.
-    if host != null then
-      [ ]
-    else
+    { environment, ... }:
+    lib.concatMap (
+      system:
       lib.concatMap (
-        system:
-        lib.concatMap (
-          hostName:
-          let
-            hostCfg = den.hosts.${system}.${hostName};
-          in
-          lib.optionals ((hostCfg.environment or "default") == environment.name && hostCfg.intoAttr != [ ]) [
-            (resolve.to "host" { host = hostCfg; })
-            (den.lib.policy.instantiate hostCfg)
-          ]
-        ) (builtins.attrNames (den.hosts.${system} or { }))
-      ) (builtins.attrNames (den.hosts or { }));
+        hostName:
+        let
+          hostCfg = den.hosts.${system}.${hostName};
+        in
+        lib.optionals ((hostCfg.environment or "default") == environment.name && hostCfg.intoAttr != [ ]) [
+          (resolve.to "host" { host = hostCfg; })
+          (den.lib.policy.instantiate hostCfg)
+        ]
+      ) (builtins.attrNames (den.hosts.${system} or { }))
+    ) (builtins.attrNames (den.hosts or { }));
 
   den.schema.flake.includes = [ den.policies.to-fleet ];
   den.schema.fleet.includes = [ den.policies.fleet-to-envs ];

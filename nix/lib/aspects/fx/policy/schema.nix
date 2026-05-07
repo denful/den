@@ -119,7 +119,25 @@ let
     let
       dispatchKey = "${sib.targetKind}@${sib.scopeId}";
       alreadyFired = firedPerScope.${dispatchKey} or { };
-      latePolicies = lib.filterAttrs (name: _: !(alreadyFired ? ${name})) allAspectPolicies;
+      # Filter policies to those not already fired AND whose entity-kind
+      # requirements don't exceed the target kind. A policy registered at
+      # an environment scope with { environment, ... }: should not re-fire
+      # at host scopes — it targets a different entity kind.
+      entityKinds = den.lib.schemaUtil.schemaEntityKinds;
+      latePolicies = lib.filterAttrs (
+        name: policy:
+        !(alreadyFired ? ${name})
+        && (
+          let
+            policyArgs = builtins.functionArgs (policy.fn or policy);
+            requiredEntityArgs = builtins.filter (
+              k: builtins.elem k entityKinds && !(policyArgs.${k} or false)
+            ) (builtins.attrNames policyArgs);
+          in
+          # Allow if the policy requires the target entity kind or has no entity-kind requirements.
+          requiredEntityArgs == [ ] || builtins.elem sib.targetKind requiredEntityArgs
+        )
+      ) allAspectPolicies;
     in
     fx.bind fx.effects.state.get (
       state:

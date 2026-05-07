@@ -14,7 +14,7 @@
 { lib, den, ... }:
 {
   den.schema.user.classes = lib.mkDefault [ "homeManager" ];
-  den.schema.environment = { };
+  den.schema.environment.isEntity = true;
 
   # Fleet handles host/home instantiation — exclude default walking policies.
   den.schema.flake-system.excludes = [

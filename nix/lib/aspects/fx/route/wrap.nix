@@ -27,7 +27,13 @@ let
       };
     in
     {
-      config = lib.setAttrByPath path (builtins.removeAttrs evaluated.config [ "_module" "warnings" "assertions" ]);
+      config = lib.setAttrByPath path (
+        builtins.removeAttrs evaluated.config [
+          "_module"
+          "warnings"
+          "assertions"
+        ]
+      );
     };
 
   # Nest a module at a path by resolving imports with full outer args.

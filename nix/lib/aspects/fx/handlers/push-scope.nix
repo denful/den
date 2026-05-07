@@ -16,6 +16,7 @@ let
       let
         inherit (param) scopedCtx entityClass parentScope;
         sourcePolicyName = param.sourcePolicyName or null;
+        entityKind = param.entityKind or null;
         newScopeId = mkScopeId scopedCtx;
         isSameScope = newScopeId == parentScope;
         scopeHandlers = constantHandler (
@@ -64,6 +65,15 @@ let
               ((state.scopeEntityClass or (_: { })) null)
               // lib.optionalAttrs (entityClass != null) {
                 ${newScopeId} = entityClass;
+              };
+            # Track which entity kind each scope was created for.
+            # Used by collectFromPeers to filter by the scope's own entity kind
+            # rather than all entity kinds inherited from parent context.
+            scopeEntityKind =
+              _:
+              ((state.scopeEntityKind or (_: { })) null)
+              // lib.optionalAttrs (entityKind != null) {
+                ${newScopeId} = entityKind;
               };
             scopeSourcePolicy =
               _:

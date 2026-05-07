@@ -139,6 +139,7 @@ let
     {
       scopeContexts,
       scopeParent,
+      scopeEntityKind ? { },
       currentScopeId,
     }:
     predicate:
@@ -157,8 +158,15 @@ let
         let
           ctx = scopeContexts.${sid};
           hasRequired = builtins.all (k: ctx ? ${k}) requiredArgs;
-          scopeEntityArgs = builtins.filter (k: ctx ? ${k}) entityKinds;
-          extraEntityKinds = builtins.filter (k: !builtins.elem k predEntityArgs) scopeEntityArgs;
+          # Use the scope's own entity kind (what it was created for), not all
+          # entity kinds inherited from parent context.  A host scope under an
+          # environment has { environment, host } in context but its own entity
+          # kind is just "host".  This prevents parent grouping entities from
+          # causing false rejections in the depth filter.
+          ownKind = scopeEntityKind.${sid} or null;
+          scopeOwnEntityKinds =
+            if ownKind != null then [ ownKind ] else builtins.filter (k: ctx ? ${k}) entityKinds;
+          extraEntityKinds = builtins.filter (k: !builtins.elem k predEntityArgs) scopeOwnEntityKinds;
         in
         hasRequired && extraEntityKinds == [ ] && predicate ctx;
     in
@@ -169,6 +177,7 @@ let
     {
       scopeContexts,
       scopeParent,
+      scopeEntityKind ? { },
       scopedClassImports,
       currentScopeId,
       pipeName,
@@ -177,7 +186,12 @@ let
     predicate:
     let
       matchingScopes = findMatchingSiblings {
-        inherit scopeContexts scopeParent currentScopeId;
+        inherit
+          scopeContexts
+          scopeParent
+          scopeEntityKind
+          currentScopeId
+          ;
       } predicate;
     in
     lib.concatMap (
@@ -197,6 +211,7 @@ let
     {
       scopeContexts,
       scopeParent,
+      scopeEntityKind ? { },
       scopedClassImports,
       currentScopeId,
       pipeName,
@@ -235,7 +250,12 @@ let
         if hasProvenance then
           let
             matchingScopes = findMatchingSiblings {
-              inherit scopeContexts scopeParent currentScopeId;
+              inherit
+                scopeContexts
+                scopeParent
+                scopeEntityKind
+                currentScopeId
+                ;
             } stage.fn;
             collected = lib.concatMap (
               sid:
@@ -257,6 +277,7 @@ let
             inherit
               scopeContexts
               scopeParent
+              scopeEntityKind
               scopedClassImports
               currentScopeId
               pipeName
@@ -317,6 +338,7 @@ let
     {
       scopeContexts,
       scopeParent,
+      scopeEntityKind ? { },
       scopedClassImports,
       currentScopeId,
       pipeName,
@@ -336,6 +358,7 @@ let
         inherit
           scopeContexts
           scopeParent
+          scopeEntityKind
           scopedClassImports
           currentScopeId
           pipeName
@@ -351,6 +374,7 @@ let
     {
       scopeContexts,
       scopeParent,
+      scopeEntityKind ? { },
       scopedClassImports,
       hostConfigs ? null,
     }:
@@ -372,6 +396,7 @@ let
         inherit
           scopeContexts
           scopeParent
+          scopeEntityKind
           scopedClassImports
           hostConfigs
           ;
@@ -393,6 +418,7 @@ let
     {
       scopeContexts,
       scopeParent,
+      scopeEntityKind ? { },
       scopedClassImports,
       currentScopeId,
       hostConfigs ? null,
@@ -530,6 +556,7 @@ let
       scopedClassImports,
       scopedPipeEffects ? { },
       scopeParent ? { },
+      scopeEntityKind ? { },
       hostConfigs ? null,
     }:
     if pipeNames == [ ] then
@@ -581,6 +608,7 @@ let
                 inherit
                   scopeContexts
                   scopeParent
+                  scopeEntityKind
                   scopedClassImports
                   hostConfigs
                   ;
@@ -609,6 +637,7 @@ let
                     inherit
                       scopeContexts
                       scopeParent
+                      scopeEntityKind
                       scopedClassImports
                       hostConfigs
                       ;

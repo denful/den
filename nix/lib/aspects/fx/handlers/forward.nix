@@ -22,7 +22,11 @@ let
       in
       {
         ${intoClass} = lib.setAttrByPath staticIntoPath (
-          builtins.removeAttrs evaluated.config [ "_module" "warnings" "assertions" ]
+          builtins.removeAttrs evaluated.config [
+            "_module"
+            "warnings"
+            "assertions"
+          ]
         );
       }
     else
