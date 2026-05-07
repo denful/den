@@ -174,7 +174,7 @@ export default defineConfig({
 						{ label: 'den.quirks', slug: 'reference/quirks' },
 						{ label: 'den.policies', slug: 'reference/policies' },
 						{ label: 'den.lib', slug: 'reference/lib' },
-						{ label: 'den.lib (deprecated)', slug: 'reference/lib-deprecated', badge: { text: 'legacy', variant: 'note' } },
+						{ label: 'den.lib', slug: 'reference/lib-deprecated', badge: { text: 'legacy', variant: 'note' } },
 						{ label: 'den.lib.diag', slug: 'reference/diag' },
 						{ label: 'flake.*', slug: 'reference/output' },
 						{ label: 'Glossary', slug: 'reference/glossary' },
