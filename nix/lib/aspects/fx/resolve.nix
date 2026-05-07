@@ -160,28 +160,25 @@ let
     scopeParent: allScopeIds: spec:
     let
       sid = spec.sourceScopeId or null;
+      entityName = spec.name or null;
+      # Find child scopes of sourceScopeId (where resolve.to created the entity scope).
+      children =
+        if sid != null then
+          builtins.filter (scopeId: scopeId != sid && (scopeParent.${scopeId} or null) == sid) allScopeIds
+        else
+          [ ];
+      matchByName =
+        if entityName != null then
+          builtins.filter (scopeId: lib.hasInfix "=${entityName}" scopeId) children
+        else
+          [ ];
     in
-    # Direct match: if sourceScopeId itself is in the scope tree.
-    if sid != null && builtins.elem sid allScopeIds then
-      sid
+    if matchByName != [ ] then
+      builtins.head matchByName
+    else if builtins.length children == 1 then
+      builtins.head children
     else
-      let
-        entityName = spec.name or null;
-        children = builtins.filter (
-          scopeId: scopeId != sid && (scopeParent.${scopeId} or null) == sid
-        ) allScopeIds;
-        matchByName =
-          if entityName != null then
-            builtins.filter (scopeId: lib.hasInfix "=${entityName}" scopeId) children
-          else
-            [ ];
-      in
-      if matchByName != [ ] then
-        builtins.head matchByName
-      else if builtins.length children == 1 then
-        builtins.head children
-      else
-        null;
+      null;
 
   # Extract merged modules for a scope subtree (the scope + all descendants).
   # This produces the complete module set for a host: host-scope modules,
@@ -228,11 +225,26 @@ let
     if deduped == [ ] then null else deduped;
 
   # Phase 4: Apply entity instantiation.
+  # When hosts were walked in the flake pipeline (via resolve.to "host"),
+  # re-run assembly phases per host subtree with the host as rootScopeId.
+  # This produces correct routing (identical to per-host fxResolve) while
+  # reusing the walk's scope data — including sibling visibility for pipe.collect.
   applyInstantiates =
-    scopedInstantiates: perScope: scopeParent: classImports:
+    {
+      scopedInstantiates,
+      # Raw walk data for per-host-subtree assembly.
+      augmentedScopeContexts,
+      scopedClassImportsRaw,
+      scopedProvides,
+      scopedRoutes,
+      scopeParent,
+      fxResolveFn,
+      ctx,
+    }:
+    classImports:
     let
       allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
-      allScopeIds = builtins.attrNames perScope;
+      allScopeIds = builtins.attrNames augmentedScopeContexts;
       instantiateModules = lib.concatMap (
         spec:
         let
@@ -243,10 +255,35 @@ let
         else
           let
             hostClass = spec.class or "nixos";
-            # If the host was walked in this pipeline, extract the entire subtree's
-            # modules (host scope + user scopes + route-delivered content).
-            # Otherwise fall back to mainModule (triggers fxResolve — legacy path).
-            modules = [ spec.mainModule ];
+            hostScopeId = findHostScopeId scopeParent allScopeIds spec;
+            # Re-run assembly phases for the host subtree with correct rootScopeId.
+            preWalkedModules =
+              if hostScopeId != null then
+                let
+                  # Filter walk data to this host's subtree.
+                  isInSubtree =
+                    sid:
+                    sid == hostScopeId
+                    || (
+                      let
+                        parent = scopeParent.${sid} or null;
+                      in
+                      parent != null && parent != sid && isInSubtree parent
+                    );
+                  subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
+                  subtreeContexts = lib.genAttrs subtreeScopeIds (sid: augmentedScopeContexts.${sid});
+                  subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
+                  subtreeProvides = lib.filterAttrs (sid: _: isInSubtree sid) scopedProvides;
+                  subtreeRoutes = lib.filterAttrs (sid: _: isInSubtree sid) scopedRoutes;
+
+                  subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
+                  subtreePhase2 = applyProvides ctx subtreeContexts subtreeProvides subtreePhase1;
+                  subtreePhase3 = applyRoutes fxResolveFn ctx subtreeContexts hostScopeId subtreeRoutes subtreePhase2;
+                in
+                extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
+              else
+                null;
+            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
             instantiateArgs =
               if spec ? pkgs then
                 {
@@ -293,16 +330,27 @@ let
         scopeParent = result.state.scopeParent null;
       };
 
-      phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw;
-      phase2 = applyProvides ctx augmentedScopeContexts (result.state.scopedProvides null) phase1;
-      phase3 =
-        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
-          (result.state.scopedRoutes null)
-          phase2;
       scopeParent = result.state.scopeParent null;
-      phase4 =
-        applyInstantiates (result.state.scopedInstantiates null) phase3.perScope scopeParent
-          phase3.classImports;
+      scopedProvides = result.state.scopedProvides null;
+      scopedRoutes = result.state.scopedRoutes null;
+
+      phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw;
+      phase2 = applyProvides ctx augmentedScopeContexts scopedProvides phase1;
+      phase3 =
+        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId scopedRoutes
+          phase2;
+      phase4 = applyInstantiates {
+        scopedInstantiates = result.state.scopedInstantiates null;
+        inherit
+          augmentedScopeContexts
+          scopedClassImportsRaw
+          scopedProvides
+          scopedRoutes
+          scopeParent
+          ctx
+          ;
+        fxResolveFn = fxResolve mkPipeline;
+      } phase3.classImports;
     in
     {
       imports = phase4.${class} or [ ];
