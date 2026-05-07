@@ -19,31 +19,28 @@ Den is an aspect-oriented Nix framework: you write features, not host files. A p
     [Coming from...](/explanation/coming-from/)
   </Card>
   <Card title="I want to understand the architecture" icon="open-book">
-    Start with principles, then work through aspects and the four concerns.\
-    [Core Principles](/explanation/core-principles/) | [Aspects](/explanation/aspects/) | [Four Concerns](#the-four-concerns)
+    Start with principles, then work through the four concerns.\
+    [Core Principles](/explanation/core-principles/) | [Four Concerns](#the-four-concerns)
+  </Card>
+  <Card title="I learn by example" icon="laptop">
+    Runnable templates covering common setups.\
+    [Templates Overview](/tutorials/overview/) | [CI Tests as Examples](/tutorials/ci/)
   </Card>
 </CardGrid>
 
 ## Understand
 
-<Card title="Core Principles" icon="open-book">
-Den's [design philosophy](/explanation/core-principles/): features over hosts, aspects over modules, composition over duplication.
-</Card>
-
-<Card title="Aspects" icon="puzzle">
-The primary concept in Den. Aspects bundle per-class config into composable, reusable units.\
-[Aspects & Functors](/explanation/aspects/) | [Class Modules](/explanation/class-modules/) | [Context-Aware Aspects](/explanation/parametric/)
-</Card>
-
 <Card title="The Four Concerns" icon="list-format">
 Den separates configuration into four orthogonal concerns.\
-[Entities & Schema](/explanation/entities/) | [Aspects](/explanation/aspects/) | [Policies](/explanation/policies/) | [Quirks & Pipes](/explanation/quirks-and-pipes/)
+[Entities](/explanation/entities/) | [Aspects](/explanation/aspects/) | [Policies](/explanation/policies/) | [Quirks & Pipes](/explanation/quirks-and-pipes/)
 </Card>
 
-<Card title="Deep Dives" icon="setting">
-Under the hood.\
-[Algebraic Effects](/explanation/effects/) | [Diagrams](/explanation/diagrams/) | [Library vs Framework](/explanation/library-vs-framework/)
-</Card>
+<CardGrid>
+  <LinkCard title="Core Principles" href="/explanation/core-principles/" description="Features over hosts, aspects over modules, composition over duplication." />
+  <LinkCard title="Resolution Pipeline" href="/explanation/context-pipeline/" description="How entities resolve into NixOS/Darwin/HM configurations." />
+  <LinkCard title="Fleets & Multi-Host" href="/explanation/fleet/" description="Cross-host data flow and fleet topology." />
+  <LinkCard title="Deep Dives" href="/explanation/effects/" description="Algebraic effects, diagrams, scope partitioning." />
+</CardGrid>
 
 ## Build
 
@@ -73,8 +70,9 @@ Option namespaces and library functions.
   <LinkCard title="den.schema" href="/reference/schema/" description="Host, user, and home schema options." />
   <LinkCard title="den.aspects" href="/reference/aspects/" description="Aspect type, resolution, class configs." />
   <LinkCard title="den.provides" href="/reference/batteries/" description="Built-in batteries reference." />
+  <LinkCard title="den.quirks" href="/reference/quirks/" description="Quirk declarations and pipe builder API." />
+  <LinkCard title="den.policies" href="/reference/policies/" description="Policy effects, combinators, and built-in policies." />
   <LinkCard title="den.ctx (compat)" href="/explanation/context-system/" description="Legacy compatibility shim." />
-  <LinkCard title="den.policies" href="/reference/policies/" description="Policy option types and built-in policies." />
   <LinkCard title="den.lib" href="/reference/lib/" description="Core library: parametric dispatch, __findFile." />
   <LinkCard title="den.lib.diag" href="/reference/diag/" description="Diagram generation and graph introspection." />
   <LinkCard title="flake.*" href="/reference/output/" description="Output generation and instantiation." />
