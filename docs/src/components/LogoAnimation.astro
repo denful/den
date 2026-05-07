@@ -1,0 +1,501 @@
+---
+---
+
+<div class="logo-animation">
+  <canvas width="400" height="400"></canvas>
+</div>
+
+<style>
+  .logo-animation {
+    width: min(70%, 20rem);
+    height: auto;
+    margin-inline: auto;
+  }
+
+  .logo-animation canvas {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  @media (min-width: 50rem) {
+    .logo-animation {
+      order: 2;
+      width: min(100%, 25rem);
+    }
+  }
+</style>
+
+<script>
+  const canvas = document.querySelector('.logo-animation canvas') as HTMLCanvasElement;
+  if (canvas) {
+    const ctx = canvas.getContext('2d')!;
+
+    const tiers = [15, 95, 175, 255, 335];
+    const gridOffset = 45;
+    const originX = canvas.width / 2;
+
+    let colors = { blue: '#8aadf4', purple: '#c6a0f6', white: '#ffffff' };
+
+    function readColors() {
+      const style = getComputedStyle(document.documentElement);
+      colors = {
+        blue: style.getPropertyValue('--sl-color-blue').trim() || '#8aadf4',
+        purple: style.getPropertyValue('--sl-color-purple').trim() || '#c6a0f6',
+        white: style.getPropertyValue('--sl-color-white').trim() || '#ffffff',
+      };
+    }
+
+    readColors();
+
+    interface TopologyLine {
+      sx: number; sy: number; ex: number; ey: number;
+      points: { x: number; y: number; dist: number }[];
+      totalLen: number; depth: number; progress: number;
+      speed: number; isPrime: boolean;
+      splitDepth: number; // how many splits occurred above this line
+    }
+
+    interface Photon {
+      line: TopologyLine;
+      progress: number;
+      speed: number;
+    }
+
+    interface SpawnRing {
+      x: number;
+      y: number;
+      progress: number; // 0→1, ring expands and fades
+      speed: number;
+    }
+
+    const themeObserver = new MutationObserver((mutations) => {
+      for (const m of mutations) {
+        if (m.attributeName === 'data-theme') {
+          readColors();
+          break;
+        }
+      }
+    });
+    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+    const STATE_DRAW_TOPOLOGY = 1;
+    const STATE_PHOTON_WALK = 2;
+    const STATE_PRE_REWIND_WAIT = 3;
+    const STATE_REWIND = 4;
+    const STATE_POST_REWIND_WAIT = 5;
+
+    let activeLines: TopologyLine[] = [];
+    let establishedTopologyLines: TopologyLine[] = [];
+    let lineRegistry = new Set<string>();
+    let activePhotons: Photon[] = [];
+    let spawnRings: SpawnRing[] = [];
+
+    let animationId = 0;
+    let currentAnimationState = STATE_DRAW_TOPOLOGY;
+    let canSpawnPhotons = false;
+    let photonShutdownTimeoutId: ReturnType<typeof setTimeout>;
+    let rewindWaitTimeoutId: ReturnType<typeof setTimeout>;
+    let postRewindWaitTimeoutId: ReturnType<typeof setTimeout>;
+    let isVisible = true;
+
+    const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
+
+    function shuffleArray<T>(array: T[]): T[] {
+      for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+      }
+      return array;
+    }
+
+    function getGlobalGradient() {
+      const grad = ctx.createLinearGradient(0, tiers[0], 0, tiers[tiers.length - 1]);
+      grad.addColorStop(0, colors.blue);
+      grad.addColorStop(1, colors.purple);
+      return grad;
+    }
+
+    function getBezierXY(t: number, sx: number, sy: number, cp1x: number, cp1y: number, cp2x: number, cp2y: number, ex: number, ey: number) {
+      const u = 1 - t;
+      return {
+        x: u * u * u * sx + 3 * u * u * t * cp1x + 3 * u * t * t * cp2x + t * t * t * ex,
+        y: u * u * u * sy + 3 * u * u * t * cp1y + 3 * u * t * t * cp2y + t * t * t * ey,
+      };
+    }
+
+    function generatePathPoints(sx: number, sy: number, ex: number, ey: number) {
+      const pts: { x: number; y: number; dist: number }[] = [];
+      const cp1x = sx, cp1y = sy + (ey - sy) * 0.45;
+      const cp2x = ex, cp2y = ey - (ey - sy) * 0.45;
+      const steps = 30;
+      let totalLen = 0;
+      pts.push({ x: sx, y: sy, dist: 0 });
+      for (let i = 1; i <= steps; i++) {
+        const t = i / steps;
+        const p = getBezierXY(t, sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey);
+        const prev = pts[i - 1];
+        totalLen += Math.hypot(p.x - prev.x, p.y - prev.y);
+        pts.push({ x: p.x, y: p.y, dist: totalLen });
+      }
+      return { points: pts, totalLength: totalLen };
+    }
+
+    function drawNode(x: number, y: number, depth: number) {
+      const pulse = Math.sin(Date.now() / 350) * 0.8;
+      ctx.beginPath();
+      ctx.arc(x, y, Math.max(2, 3.5 - depth * 0.3) + pulse, 0, Math.PI * 2);
+      ctx.fillStyle = colors.white;
+      ctx.shadowBlur = 6;
+      ctx.shadowColor = depth % 2 ? colors.purple : colors.blue;
+      ctx.fill();
+      ctx.shadowBlur = 0;
+    }
+
+    function drawCurveTrace(points: { x: number; y: number; dist: number }[], totalLen: number, progress: number, depth: number, isLineTrace: boolean, splitDepth = 0) {
+      const targetDist = Math.max(0, easeOutCubic(progress) * totalLen);
+      let currentPt = points[0];
+      ctx.beginPath();
+      ctx.moveTo(points[0].x, points[0].y);
+
+      for (let i = 1; i < points.length; i++) {
+        if (points[i].dist <= targetDist) {
+          ctx.lineTo(points[i].x, points[i].y);
+          currentPt = points[i];
+        } else {
+          const p1 = points[i - 1], p2 = points[i];
+          const ratio = (targetDist - p1.dist) / (p2.dist - p1.dist);
+          currentPt = { x: p1.x + (p2.x - p1.x) * ratio, y: p1.y + (p2.y - p1.y) * ratio };
+          ctx.lineTo(currentPt.x, currentPt.y);
+          break;
+        }
+      }
+
+      if (isLineTrace) {
+        ctx.strokeStyle = getGlobalGradient();
+        ctx.lineWidth = Math.max(1.5, 5 - splitDepth * 1.2);
+        ctx.lineCap = 'round';
+        ctx.stroke();
+      }
+      return currentPt;
+    }
+
+    // Track placed nodes per tier for convergence targeting
+    const tierNodes: Map<number, number[]> = new Map();
+
+    function registerNode(tierIdx: number, x: number) {
+      if (!tierNodes.has(tierIdx)) tierNodes.set(tierIdx, []);
+      const nodes = tierNodes.get(tierIdx)!;
+      if (!nodes.includes(x)) nodes.push(x);
+    }
+
+    function findNearbyNode(tierIdx: number, x: number, maxDist: number): number | null {
+      const nodes = tierNodes.get(tierIdx);
+      if (!nodes || nodes.length === 0) return null;
+      let closest: number | null = null;
+      let closestDist = Infinity;
+      for (const nx of nodes) {
+        const d = Math.abs(nx - x);
+        if (d > 0 && d <= maxDist && d < closestDist) {
+          closest = nx;
+          closestDist = d;
+        }
+      }
+      return closest;
+    }
+
+    function branch(x: number, y: number, depth: number, isPrime = false, parentSplitDepth = 0) {
+      if (depth >= tiers.length - 1) return;
+      const nextY = tiers[depth + 1];
+      const nextTierIdx = depth + 1;
+
+      registerNode(depth, x);
+
+      let availableOffsets = [-gridOffset, 0, gridOffset];
+      const currentOffset = x - originX;
+
+      const maxLimit = 180;
+      if (currentOffset <= -maxLimit) {
+        availableOffsets = [0, gridOffset];
+      } else if (currentOffset >= maxLimit) {
+        availableOffsets = [-gridOffset, 0];
+      }
+
+      // Bias toward center at shallow depths to keep multi-root subtrees coherent
+      let offsets: number[];
+      if (depth <= 1 && Math.abs(currentOffset) > gridOffset) {
+        const inward = currentOffset > 0 ? -gridOffset : gridOffset;
+        offsets = shuffleArray([inward, 0, ...availableOffsets.filter(o => o !== inward && o !== 0)]);
+      } else {
+        offsets = shuffleArray([...availableOffsets]);
+      }
+
+      let numChildren = 1;
+
+      if (depth === 0) {
+        numChildren = Math.random() > 0.5 ? 2 : (Math.random() > 0.3 ? 3 : 1);
+      } else if (depth === tiers.length - 2) {
+        numChildren = Math.random() > 0.4 ? 2 : 1;
+      } else {
+        const r = Math.random();
+        if (!isPrime && r < 0.15) {
+          numChildren = 0;
+        } else if (r > 0.40) {
+          numChildren = 2;
+        } else {
+          numChildren = 1;
+        }
+      }
+
+      if (numChildren === 0) return;
+
+      const selected = offsets.slice(0, Math.min(numChildren, offsets.length));
+      const isSplit = selected.length > 1;
+      const childSplitDepth = parentSplitDepth + (isSplit ? 1 : 0);
+      let primeAssigned = false;
+
+      selected.forEach((off) => {
+        let ex = x + off;
+
+        // Convergence: chance to target an existing node at the next tier
+        if (depth >= 1 && Math.random() < 0.35) {
+          const nearby = findNearbyNode(nextTierIdx, ex, gridOffset * 1.5);
+          if (nearby !== null) {
+            ex = nearby; // converge to existing node
+          }
+        }
+
+        const regKey = `${x},${y}->${ex},${nextY}`;
+
+        let assignPrime = false;
+        if (isPrime && !primeAssigned) {
+          assignPrime = true;
+          primeAssigned = true;
+        }
+
+        if (!lineRegistry.has(regKey)) {
+          registerNode(nextTierIdx, ex);
+          const pathData = generatePathPoints(x, y, ex, nextY);
+          activeLines.push({
+            sx: x, sy: y, ex: ex, ey: nextY,
+            points: pathData.points, totalLen: pathData.totalLength,
+            depth: depth, progress: 0,
+            speed: 0.012 - depth * 0.001,
+            isPrime: assignPrime,
+            splitDepth: childSplitDepth,
+          });
+          lineRegistry.add(regKey);
+        }
+      });
+    }
+
+    function renderLoop() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      const nodesToDraw = new Map<string, { x: number; y: number; d: number }>();
+
+      switch (currentAnimationState) {
+        case STATE_DRAW_TOPOLOGY:
+          for (let i = activeLines.length - 1; i >= 0; i--) {
+            const a = activeLines[i];
+            a.progress += a.speed;
+            if (a.progress >= 1) {
+              a.progress = 1;
+              establishedTopologyLines.push(a);
+              branch(a.ex, a.ey, a.depth + 1, a.isPrime, a.splitDepth);
+
+              // Context expansion: find unvisited grid positions at this
+              // depth and spawn a new independent root from one
+              if (a.depth >= 1 && a.depth <= tiers.length - 3) {
+                const spawnY = tiers[a.depth + 1];
+                const visited = new Set([
+                  ...establishedTopologyLines.filter(e => e.ey === spawnY).map(e => e.ex),
+                  ...activeLines.filter(e => e.ey === spawnY).map(e => e.ex),
+                ]);
+                const unvisited: number[] = [];
+                for (let gx = originX - 180; gx <= originX + 180; gx += gridOffset) {
+                  if (!visited.has(gx)) unvisited.push(gx);
+                }
+                if (unvisited.length > 0 && Math.random() < 0.15) {
+                  const spawnX = unvisited[Math.floor(Math.random() * unvisited.length)];
+                  registerNode(a.depth + 1, spawnX);
+                  branch(spawnX, spawnY, a.depth + 1, false);
+                  spawnRings.push({ x: spawnX, y: spawnY, progress: 0, speed: 0.03 });
+                }
+              }
+
+              activeLines.splice(i, 1);
+            }
+          }
+          if (activeLines.length === 0) {
+            currentAnimationState = STATE_PHOTON_WALK;
+            canSpawnPhotons = true;
+            photonShutdownTimeoutId = setTimeout(() => { canSpawnPhotons = false; }, 6000);
+          }
+          break;
+
+        case STATE_PHOTON_WALK:
+          if (canSpawnPhotons && Math.random() < 0.08) {
+            const leafLines = establishedTopologyLines.filter((l: TopologyLine) =>
+              !establishedTopologyLines.some((c: TopologyLine) => c.sx === l.ex && c.sy === l.ey)
+            );
+
+            if (leafLines.length > 0) {
+              activePhotons.push({
+                line: leafLines[Math.floor(Math.random() * leafLines.length)],
+                progress: 1, speed: 0.02 + Math.random() * 0.02,
+              });
+            }
+          }
+          for (let i = activePhotons.length - 1; i >= 0; i--) {
+            const p = activePhotons[i];
+            p.progress -= p.speed;
+            if (p.progress <= 0) {
+              const parents = establishedTopologyLines.filter((l: TopologyLine) => l.ex === p.line.sx && l.ey === p.line.sy);
+              if (parents.length > 0) {
+                p.line = parents[Math.floor(Math.random() * parents.length)];
+                p.progress = 1;
+              } else {
+                activePhotons.splice(i, 1);
+              }
+            } else {
+              const pos = drawCurveTrace(p.line.points, p.line.totalLen, p.progress, p.line.depth, false);
+              ctx.beginPath();
+              ctx.arc(pos.x, pos.y, 3 - p.line.depth * 0.3, 0, Math.PI * 2);
+              ctx.fillStyle = colors.white;
+              ctx.shadowBlur = 15;
+              ctx.shadowColor = p.line.depth % 2 ? colors.purple : colors.blue;
+              ctx.fill();
+              ctx.shadowBlur = 0;
+            }
+          }
+          if (!canSpawnPhotons && activePhotons.length === 0) {
+            currentAnimationState = STATE_PRE_REWIND_WAIT;
+            rewindWaitTimeoutId = setTimeout(() => { currentAnimationState = STATE_REWIND; }, 1000);
+          }
+          break;
+
+        case STATE_REWIND: {
+          let stillMoving = false;
+          for (let i = establishedTopologyLines.length - 1; i >= 0; i--) {
+            const l = establishedTopologyLines[i];
+            const hasChildren = establishedTopologyLines.some((c: TopologyLine) => c.sx === l.ex && c.sy === l.ey && c.progress > 0);
+
+            if (!hasChildren) {
+              l.progress -= 0.025;
+              stillMoving = true;
+              if (l.progress <= 0) {
+                establishedTopologyLines.splice(i, 1);
+              }
+            } else {
+              stillMoving = true;
+            }
+          }
+          if (!stillMoving) {
+            currentAnimationState = STATE_POST_REWIND_WAIT;
+            postRewindWaitTimeoutId = setTimeout(generate, 800);
+          }
+          break;
+        }
+      }
+
+      // Draw root nodes for all starting positions
+      if (establishedTopologyLines.length > 0 || activeLines.length > 0) {
+        const roots = tierNodes.get(0);
+        if (roots) {
+          roots.forEach(rx => nodesToDraw.set(`${rx}_${tiers[0]}`, { x: rx, y: tiers[0], d: 0 }));
+        }
+      }
+
+      [...establishedTopologyLines, ...activeLines].forEach((l) => {
+        drawCurveTrace(l.points, l.totalLen, l.progress, l.depth, true, l.splitDepth);
+        nodesToDraw.set(`${l.sx}_${l.sy}`, { x: l.sx, y: l.sy, d: l.depth });
+
+        if (l.progress >= 1) {
+          nodesToDraw.set(`${l.ex}_${l.ey}`, { x: l.ex, y: l.ey, d: l.depth + 1 });
+        }
+      });
+
+      nodesToDraw.forEach((n) => drawNode(n.x, n.y, n.d));
+
+      for (let i = spawnRings.length - 1; i >= 0; i--) {
+        const ring = spawnRings[i];
+        ring.progress += ring.speed;
+        if (ring.progress >= 1) {
+          spawnRings.splice(i, 1);
+          continue;
+        }
+        const radius = 4 + ring.progress * 20;
+        const alpha = 1 - ring.progress;
+        ctx.beginPath();
+        ctx.arc(ring.x, ring.y, radius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
+        ctx.lineWidth = 1.5 * (1 - ring.progress);
+        ctx.shadowBlur = 10 * alpha;
+        ctx.shadowColor = colors.purple;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+
+      animationId = requestAnimationFrame(renderLoop);
+    }
+
+    function generate() {
+      cancelAnimationFrame(animationId);
+      clearTimeout(photonShutdownTimeoutId);
+      clearTimeout(rewindWaitTimeoutId);
+      clearTimeout(postRewindWaitTimeoutId);
+
+      activeLines = [];
+      establishedTopologyLines = [];
+      lineRegistry.clear();
+      tierNodes.clear();
+      activePhotons = [];
+      spawnRings = [];
+      currentAnimationState = STATE_DRAW_TOPOLOGY;
+
+      const rr = Math.random();
+      const numRoots = rr < 0.4 ? 1 : rr < 0.8 ? 2 : 3;
+      const rootSpread = gridOffset * 2;
+      const rootPositions: number[] = [];
+      if (numRoots === 1) {
+        rootPositions.push(originX);
+      } else if (numRoots === 2) {
+        rootPositions.push(originX - rootSpread / 2, originX + rootSpread / 2);
+      } else {
+        rootPositions.push(originX - rootSpread, originX, originX + rootSpread);
+      }
+      rootPositions.forEach((rx, i) => {
+        registerNode(0, rx);
+        branch(rx, tiers[0], 0, i === 0);
+      });
+
+      animationId = requestAnimationFrame(renderLoop);
+    }
+
+    const visibilityObserver = new IntersectionObserver(
+      (entries) => {
+        const nowVisible = entries[0].isIntersecting;
+        if (nowVisible && !isVisible) {
+          isVisible = true;
+          animationId = requestAnimationFrame(renderLoop);
+        } else if (!nowVisible && isVisible) {
+          isVisible = false;
+          cancelAnimationFrame(animationId);
+        }
+      },
+      { threshold: 0 }
+    );
+    visibilityObserver.observe(canvas);
+
+    document.addEventListener('astro:before-swap', () => {
+      cancelAnimationFrame(animationId);
+      clearTimeout(photonShutdownTimeoutId);
+      clearTimeout(rewindWaitTimeoutId);
+      clearTimeout(postRewindWaitTimeoutId);
+      themeObserver.disconnect();
+      visibilityObserver.disconnect();
+    }, { once: true });
+
+    generate();
+  }
+</script>
