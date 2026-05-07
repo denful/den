@@ -36,7 +36,7 @@ in
         keysAfterStateFallback = builtins.filter (k: !(scopeCtx ? ${k})) keysToProbe;
         # Detect pipe arg references: if any required keys are pipe names,
         # unconditionally defer — pipe data is assembled post-pipeline.
-        pipeRegistry = den.pipes or { };
+        pipeRegistry = den.quirks or { };
         hasPipeArgs = builtins.any (k: pipeRegistry ? ${k}) requiredKeys;
         # Augment __scopeHandlers with ALL requested keys available in scope
         # context (both required and optional).  This ensures scope.provide

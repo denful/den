@@ -8,7 +8,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.firewall = {
+        den.quirks.firewall = {
           description = "Firewall port declarations";
         };
 
@@ -68,7 +68,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -119,7 +119,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -167,7 +167,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.nums = {
+        den.quirks.nums = {
           description = "Numbers";
         };
 
@@ -218,7 +218,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -267,7 +267,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -329,10 +329,10 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.alpha = {
+        den.quirks.alpha = {
           description = "Alpha";
         };
-        den.pipes.beta = {
+        den.quirks.beta = {
           description = "Beta";
         };
 
@@ -391,7 +391,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -455,7 +455,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -491,7 +491,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.secrets = {
+        den.quirks.secrets = {
           description = "Secret paths";
         };
 
@@ -554,7 +554,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -612,7 +612,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "Items";
         };
 
@@ -679,6 +679,56 @@
           special = "special-only";
           normal = "a-b-c";
         };
+      }
+    );
+    # pipe.from accepts a quirk ref (den.quirks.firewall) instead of a string.
+    # The ref has a `name` field injected by the apply function.
+    test-pipe-from-ref = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.quirks.firewall = {
+          description = "Firewall port declarations";
+        };
+
+        den.aspects.igloo = {
+          includes = [
+            den.aspects.producer
+            den.aspects.consumer
+          ];
+        };
+
+        den.aspects.producer = {
+          firewall = [
+            80
+            443
+          ];
+        };
+
+        den.aspects.consumer = {
+          nixos =
+            { firewall, lib, ... }:
+            {
+              networking.hostName = lib.concatMapStringsSep "-" toString firewall;
+            };
+        };
+
+        # Use ref syntax: den.quirks.firewall instead of string "firewall".
+        den.policies.filter-high =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from den.quirks.firewall [
+              (pipe.filter (p: p > 100))
+            ])
+          ];
+
+        den.default.includes = [ den.policies.filter-high ];
+
+        expr = igloo.networking.hostName;
+        expected = "443";
       }
     );
   };

@@ -218,20 +218,20 @@ in
     type = lib.types.lazyAttrsOf classSchemaType;
     default = { };
   };
-  options.den.pipes = lib.mkOption {
-    description = "Pipe declarations — named data routes for structured quirk flow";
+  options.den.quirks = lib.mkOption {
+    description = "Quirk declarations — named data routes for structured quirk flow";
     type = lib.types.lazyAttrsOf pipeSchemaType;
     default = { };
     apply =
-      pipes:
+      quirks:
       let
         classKeys = builtins.attrNames (den.classes or { });
-        overlap = builtins.filter (k: builtins.elem k classKeys) (builtins.attrNames pipes);
+        overlap = builtins.filter (k: builtins.elem k classKeys) (builtins.attrNames quirks);
       in
       assert
         overlap == [ ]
-        || throw "den.classes and den.pipes must not share keys, but found: ${builtins.concatStringsSep ", " overlap}";
-      pipes;
+        || throw "den.classes and den.quirks must not share keys, but found: ${builtins.concatStringsSep ", " overlap}";
+      lib.mapAttrs (name: v: v // { inherit name; }) quirks;
   };
   config.den.schema = {
     conf = { };

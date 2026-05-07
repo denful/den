@@ -34,7 +34,7 @@ let
 
   # Pipe registry — pipe keys flow through emit-class but are not
   # wrapped as class modules by wrapCollectedClasses.
-  pipeRegistry = den.pipes or { };
+  pipeRegistry = den.quirks or { };
 
   hasRecognizedSubKeys =
     depth: val:

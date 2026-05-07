@@ -91,10 +91,11 @@
   # Pipe transform builder — policies use pipe.from to attach transform
   # stages (filter, transform, fold, append, for) to a named pipe.
   pipe = {
-    from = pipeName: stages: {
+    from = pipeNameOrRef: stages: {
       __policyEffect = "pipe";
       value = {
-        inherit pipeName stages;
+        pipeName = if builtins.isAttrs pipeNameOrRef then pipeNameOrRef.name else pipeNameOrRef;
+        inherit stages;
       };
     };
     filter = pred: {

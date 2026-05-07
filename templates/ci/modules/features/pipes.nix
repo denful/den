@@ -5,7 +5,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.firewall = {
+        den.quirks.firewall = {
           description = "Firewall port declarations";
         };
         den.aspects.igloo = {
@@ -22,7 +22,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.firewall = {
+        den.quirks.firewall = {
           description = "Firewall port declarations";
         };
         den.aspects.igloo = {
@@ -44,7 +44,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.firewall = {
+        den.quirks.firewall = {
           description = "Firewall port declarations";
         };
 
@@ -94,7 +94,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.firewall = {
+        den.quirks.firewall = {
           description = "Firewall port declarations";
         };
 
@@ -120,7 +120,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.items = {
+        den.quirks.items = {
           description = "List items";
         };
 
@@ -155,11 +155,11 @@
       { den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.nixos = {
+        den.quirks.nixos = {
           description = "should collide with den.classes.nixos";
         };
-        # Accessing den.pipes should trigger the collision assertion.
-        expr = !(builtins.tryEval (builtins.deepSeq den.pipes null)).success;
+        # Accessing den.quirks should trigger the collision assertion.
+        expr = !(builtins.tryEval (builtins.deepSeq den.quirks null)).success;
         expected = true;
       }
     );
@@ -169,7 +169,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.firewall = {
+        den.quirks.firewall = {
           description = "Firewall port declarations";
         };
 
@@ -201,7 +201,7 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.pipes.firewall = {
+        den.quirks.firewall = {
           description = "Firewall port declarations";
         };
 
