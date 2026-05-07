@@ -64,8 +64,14 @@ export default defineConfig({
 								{ label: 'Entities & Schema', slug: 'explanation/entities', badge: { text: 'core', variant: 'tip' } },
 								{ label: 'Policies', slug: 'explanation/policies', badge: { text: 'core', variant: 'tip' } },
 								{ label: 'Quirks & Pipes', slug: 'explanation/quirks-and-pipes', badge: { text: 'core', variant: 'tip' } },
-								{ label: 'Fleets & Multi-Host', slug: 'explanation/fleet', badge: { text: 'core', variant: 'tip' } },
-								{ label: 'Resolution Pipeline', slug: 'explanation/context-pipeline', badge: { text: 'core', variant: 'tip' } },
+							],
+						},
+						{
+							label: 'How It Fits Together',
+							collapsed: false,
+							items: [
+								{ label: 'Resolution Pipeline', slug: 'explanation/context-pipeline' },
+								{ label: 'Fleets & Multi-Host', slug: 'explanation/fleet' },
 							],
 						},
 						{
@@ -174,6 +180,7 @@ export default defineConfig({
 				Footer: './src/components/Footer.astro',
 				SocialIcons: './src/components/SocialIcons.astro',
 				PageSidebar: './src/components/PageSidebar.astro',
+				Hero: './src/components/Hero.astro',
 			},
 			plugins: [
 				catppuccin({
