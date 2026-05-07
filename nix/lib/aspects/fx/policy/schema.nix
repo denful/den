@@ -177,12 +177,21 @@ let
       fx.bind fx.effects.state.get (
         state:
         let
-          allAspectPolicies = state.flatAspectPolicies or { };
+          scopedAspectPolicies = (state.scopedAspectPolicies or (_: { })) null;
           firedPerScope = (state.firedPolicyNames or (_: { })) null;
           parentScope = state.currentScope;
+          # Only collect policies from the parent scope and sibling scopes —
+          # not the global flat set.  Using flatAspectPolicies caused cross-host
+          # contamination: unguarded policies (to-users, to-hosts) from sibling
+          # host scopes would fire in unrelated host contexts.
+          siblingScopes = map (s: s.scopeId) siblingMetas;
+          relevantScopes = [ parentScope ] ++ siblingScopes;
+          subtreePolicies = builtins.foldl' (
+            acc: sid: acc // (scopedAspectPolicies.${sid} or { })
+          ) { } relevantScopes;
         in
         builtins.foldl' (
-          acc: sib: fx.bind acc (_: emitLateForSibling parentScope allAspectPolicies firedPerScope sib)
+          acc: sib: fx.bind acc (_: emitLateForSibling parentScope subtreePolicies firedPerScope sib)
         ) (fx.pure null) siblingMetas
       )
     );
