@@ -16,18 +16,11 @@
   den.schema.user.classes = lib.mkDefault [ "homeManager" ];
   den.schema.environment = { };
 
-  # Suppress default host/home walking — fleet policies handle this.
-  # Keep output route policies (packages, checks, etc.) by only removing
-  # to-os-outputs and to-hm-outputs.
-  den.schema.flake-system.includes = lib.mkForce (
-    map (output: den.policies."to-${output}") [
-      "packages"
-      "apps"
-      "checks"
-      "devShells"
-      "legacyPackages"
-    ]
-  );
+  # Fleet handles host/home instantiation — exclude default walking policies.
+  den.schema.flake-system.excludes = [
+    den.policies.to-os-outputs
+    den.policies.to-hm-outputs
+  ];
 
   den.hosts.x86_64-linux = {
     lb-prod = {
