@@ -1,0 +1,66 @@
+# Fleet topology: two environments, four hosts, haproxy + web backends.
+#
+# Scope tree:
+#   flake
+#   +-- flake-system (x86_64-linux)
+#   |   +-- [packages, checks, devShells — kept]
+#   +-- fleet
+#       +-- environment:prod
+#       |   +-- host:lb-prod
+#       |   +-- host:web-prod-1
+#       |   +-- host:web-prod-2
+#       +-- environment:staging
+#           +-- host:web-staging
+{ lib, den, ... }:
+{
+  den.schema.user.classes = lib.mkDefault [ "homeManager" ];
+  den.schema.environment = { };
+
+  # Suppress default host/home walking — fleet policies handle this.
+  # Keep output route policies (packages, checks, etc.) by only removing
+  # to-os-outputs and to-hm-outputs.
+  den.schema.flake-system.includes = lib.mkForce (
+    map (output: den.policies."to-${output}") [
+      "packages"
+      "apps"
+      "checks"
+      "devShells"
+      "legacyPackages"
+    ]
+  );
+
+  den.hosts.x86_64-linux = {
+    lb-prod = {
+      environment = "prod";
+      addr = "10.0.1.1";
+      users.deploy = { };
+    };
+    web-prod-1 = {
+      environment = "prod";
+      addr = "10.0.1.10";
+      users.deploy = { };
+    };
+    web-prod-2 = {
+      environment = "prod";
+      addr = "10.0.1.11";
+      users.deploy = { };
+    };
+    web-staging = {
+      environment = "staging";
+      addr = "10.0.2.10";
+      users.deploy = { };
+    };
+  };
+
+  den.default = {
+    nixos.system.stateVersion = "25.05";
+    homeManager.home.stateVersion = "25.05";
+  };
+
+  den.default.includes = [
+    den.provides.define-user
+    den.provides.hostname
+  ];
+
+  den.systems = [ "x86_64-linux" ];
+}
