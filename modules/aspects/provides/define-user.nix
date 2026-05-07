@@ -25,7 +25,7 @@ let
   userContext =
     { host, user }:
     {
-      name = "user";
+      name = "define-user/${user.userName}@${host.name}";
       nixos.users.users.${user.userName} = {
         name = user.userName;
         home = homeDir host user;
