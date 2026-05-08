@@ -123,13 +123,49 @@ let
       # merge ONLY the entries where `hasClass = true`. Otherwise every
       # aspect would look like it belongs to every class just because
       # the traversal visited it.
+      # Coerce null entityInstance to empty string for safe interpolation.
+      instOf = e: if e.entityInstance or null == null then "" else e.entityInstance;
+
+      # Scope-qualified key: dedup by (fullName, entityInstance) so the
+      # same aspect in different entity scopes gets separate nodes. Within
+      # one scope, class traces are still merged (nixos + homeManager
+      # entries for the same aspect in the same instance combine).
+      scopeKey =
+        e:
+        let
+          inst = instOf e;
+        in
+        "${fullName e}|${inst}";
+
       groupedByName = lib.foldl' (
         acc: e:
         let
-          k = fullName e;
+          k = scopeKey e;
         in
         acc // { ${k} = (acc.${k} or [ ]) ++ [ e ]; }
       ) { } entries;
+
+      # Detect fullNames appearing in multiple entity instances — these
+      # need scope-qualified IDs so nodes don't collide.
+      instancesPerFullName = lib.foldl' (
+        acc: e:
+        let
+          fn = fullName e;
+          inst = instOf e;
+        in
+        acc // { ${fn} = lib.unique ((acc.${fn} or [ ]) ++ [ inst ]); }
+      ) { } entries;
+      isMultiInstance = fn: builtins.length (instancesPerFullName.${fn} or [ ]) > 1;
+
+      # Scope-qualified entry ID: append entity instance suffix when the
+      # same fullName exists in multiple scopes.
+      seid =
+        entry:
+        let
+          fn = fullName entry;
+          inst = instOf entry;
+        in
+        if isMultiInstance fn && inst != "" then sanitize "${fn}@${inst}" else sanitize fn;
 
       # The classes this aspect actually contributes to (where
       # hasClass = true). Drives `node.class` and `node.classes`.
@@ -188,27 +224,41 @@ let
         ) { } es
       ) groupedByName;
 
-      nodes = dedupBy fullName entries;
+      nodes = dedupBy scopeKey entries;
       # Set of rendered node IDs for parent resolution.
       nodeIds = lib.listToAttrs (
         map (e: {
-          name = sanitize (fullName e);
+          name = seid e;
           value = true;
         }) nodes
       );
       # Set of excluded node IDs — edges FROM these are dropped.
       excludedIds = lib.listToAttrs (
         map (e: {
-          name = sanitize (fullName e);
+          name = seid e;
           value = true;
         }) (builtins.filter (e: e.excluded or false) entries)
       );
-      edges = dedupBy (e: "${e.parent or ""}->${fullName e}") (
+
+      # Resolve a parent reference to the correct scope-qualified ID.
+      # When the parent appears in multiple scopes, prefer the same scope
+      # as the child (same entityInstance).
+      resolveParentId =
+        parentName: childInst:
+        let
+          multi = isMultiInstance parentName;
+          qualified = sanitize "${parentName}@${childInst}";
+        in
+        if !multi then
+          sanitize parentName
+        else if childInst != "" && nodeIds ? ${qualified} then
+          qualified
+        else
+          sanitize parentName;
+
+      edges = dedupBy (e: "${resolveParentId (e.parent or "") (instOf e)}->${seid e}") (
         builtins.filter (
-          e:
-          e.parent != null
-          # Drop edges FROM excluded parents (tombstoned nodes have no children).
-          && !(excludedIds ? ${sanitize (e.parent or "")})
+          e: e.parent != null && !(excludedIds ? ${resolveParentId (e.parent or "") (instOf e)})
         ) entries
       );
 
@@ -281,7 +331,7 @@ let
         builtins.concatMap (
           e:
           lib.optional (e.parent != null) {
-            name = sanitize e.parent;
+            name = resolveParentId e.parent (instOf e);
             value = true;
           }
         ) entries
@@ -303,12 +353,12 @@ let
       mkNode =
         entry:
         let
-          fn = fullName entry;
-          merged = classesByName.${fn} or [ ];
-          perClass = perClassByName.${fn} or { };
+          sk = scopeKey entry;
+          merged = classesByName.${sk} or [ ];
+          perClass = perClassByName.${sk} or { };
         in
         {
-          id = entryId entry;
+          id = seid entry;
           # Short form when unique in this graph, full path otherwise.
           # See displayLabel / displayName / shortLabelCounts.
           label = displayLabel entry;
@@ -350,8 +400,8 @@ let
       # Chain identities are ctxId-free (see chainIdentity in aspect.nix),
       # so they match entry fullNames directly. Sanitize and use as edge source.
       mkEdge = edge: {
-        from = sanitize edge.parent;
-        to = entryId edge;
+        from = resolveParentId (edge.parent or "") (instOf edge);
+        to = seid edge;
         style = edgeStyle edge;
         label = if (edge.excluded or false) && (edge.replacedBy or null) != null then "replaced" else null;
       };
@@ -375,11 +425,10 @@ let
         builtins.concatMap (
           e:
           let
-            fn = fullName e;
             kind = e.entityKind or null;
           in
           lib.optional (kind != null) {
-            name = sanitize fn;
+            name = seid e;
             value = kind;
           }
         ) entries
@@ -389,7 +438,8 @@ let
           e:
           let
             rawParent = e.parent or null;
-            parentKind = if rawParent == null then null else (entryEntityKindMap.${sanitize rawParent} or null);
+            parentId = if rawParent == null then "" else resolveParentId rawParent (instOf e);
+            parentKind = if rawParent == null then null else (entryEntityKindMap.${parentId} or null);
             childKind = e.entityKind or null;
           in
           lib.optional (parentKind != null && childKind != null && parentKind != childKind) {
@@ -413,11 +463,20 @@ let
           # If the provider has a real top-level entry use its full
           # display ID; otherwise fall back to the sanitized bare
           # provider name. The phantom target gets a stub node below.
-          providerNodeId = if providerEntry != null then entryId providerEntry else sanitize providerName;
+          # For multi-instance providers, resolve to the same instance as the child.
+          providerNodeId =
+            if providerEntry != null then
+              let
+                fn = fullName providerEntry;
+                inst = instOf entry;
+              in
+              if isMultiInstance fn && inst != "" then sanitize "${fn}@${inst}" else sanitize fn
+            else
+              sanitize providerName;
         in
         lib.optional (prov != [ ] && providerName != "den") {
           from = providerNodeId;
-          to = entryId entry;
+          to = seid entry;
           style = "provide";
           label = "provides";
         }
@@ -443,7 +502,7 @@ let
           targetExists = targetKind != null && builtins.any (e: (e.entityKind or null) == targetKind) nodes;
         in
         lib.optional (isPol && targetExists) {
-          from = entryId entry;
+          from = seid entry;
           to = targetKindId;
           style = "policy";
           label = null;

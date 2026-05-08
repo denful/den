@@ -161,11 +161,7 @@ let
         let
           key = instKey inst;
           instNodes = builtins.filter (
-            n:
-            (n.entityInstance or null) == key
-            && n.id != rootId
-            && !(n.isPolicyDispatch or false)
-            && !(isEntityBoundary n)
+            n: (n.entityInstance or null) == key && n.id != rootId && !(n.isPolicyDispatch or false)
           ) nodes;
           instEdges = builtins.filter (
             e:
@@ -174,11 +170,9 @@ let
               toNode = nodeById.${e.to} or null;
               fromInst = if fromNode != null then fromNode.entityInstance or null else null;
               toInst = if toNode != null then toNode.entityInstance or null else null;
-              fromIsBridge =
-                fromNode != null && (isEntityBoundary fromNode || (fromNode.isPolicyDispatch or false));
             in
             fromNode != null
-            && !fromIsBridge
+            && !(fromNode.isPolicyDispatch or false)
             && fromInst == key
             && (toInst == null || toInst == key)
             && (e.style or "normal") != "policy"
@@ -192,20 +186,7 @@ let
           + "\n  end"
         );
 
-      # Entity boundary nodes: the resolution entry point for an entity
-      # kind (e.g., "user" node with entityKind "user"). These are shared
-      # structural connectors between scopes — they don't belong in any
-      # single instance subgraph. Rendered outside subgraphs alongside
-      # policy bridge nodes.
-      isEntityBoundary =
-        n:
-        let
-          ek = n.entityKind or null;
-        in
-        ek != null && n.fullLabel == ek;
-
       policyNodes = builtins.filter (n: n.isPolicyDispatch or false) nodes;
-      bridgeNodes = builtins.filter (n: isEntityBoundary n && !(n.isPolicyDispatch or false)) nodes;
 
       # `topLevelNodes` are the nodes declared outside any stage subgraph.
       # When the graph is flat (no stages), that's every non-host node.
@@ -235,7 +216,7 @@ let
 
       # Cross-instance edges + edges FROM bridge nodes. These are rendered
       # outside all subgraphs so mermaid doesn't pull bridge nodes into a
-      # subgraph via edge association.
+      # Cross-instance edges: both endpoints have an entityInstance but they differ.
       crossInstanceEdges = builtins.filter (
         e:
         let
@@ -243,11 +224,8 @@ let
           toNode = nodeById.${e.to} or null;
           fromInst = if fromNode != null then fromNode.entityInstance or null else null;
           toInst = if toNode != null then toNode.entityInstance or null else null;
-          fromIsBridge =
-            fromNode != null && (isEntityBoundary fromNode || (fromNode.isPolicyDispatch or false));
-          isCrossInst = fromInst != null && toInst != null && fromInst != toInst;
         in
-        (fromIsBridge || isCrossInst) && (e.style or "normal") != "policy"
+        fromInst != null && toInst != null && fromInst != toInst && (e.style or "normal") != "policy"
       ) edges;
 
       # Stages that would *not* get a subgraph declaration because they
@@ -334,7 +312,6 @@ let
           if hasEntityInstances then
             lib.concatMap instanceSubgraph (graph.entityInstances or [ ])
             ++ [ "" ]
-            ++ map nodeDecl bridgeNodes
             ++ map nodeDecl policyNodes
             ++ map edgeDecl (builtins.filter (e: (e.style or "normal") == "policy") edges)
             ++ map edgeDecl crossInstanceEdges
