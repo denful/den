@@ -138,6 +138,7 @@ let
     }:
     let
       sourceModules = collectFromSubtree wrappedPerScope scopeParent route.sourceScopeId route.fromClass;
+      hasInstantiate = route.instantiate or null != null;
       adapterMod = route.adapterModule or null;
       modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
       isFlakeRoute = route.intoClass == "flake";
@@ -159,8 +160,23 @@ let
           [ ];
       isAdapterRoute = route.adapterKey or null != null;
       adapterWrapped = if !isAdapterRoute then [ ] else [ (mkAdapterFunctor route sourceModules) ];
+      # Route with instantiate: collect modules, call instantiate function,
+      # place the result (a derivation) at the target path.
+      instantiateWrapped =
+        let
+          adaptArgsFn = route.adaptArgs or (_: { });
+          extraArgs = adaptArgsFn { };
+          evaluated = route.instantiate ({ modules = sourceModules; } // extraArgs);
+        in
+        [
+          {
+            config = lib.setAttrByPath route.path evaluated;
+          }
+        ];
       wrappedModules =
-        if modulesWithAdapter == [ ] then
+        if hasInstantiate then
+          if sourceModules == [ ] then [ ] else instantiateWrapped
+        else if modulesWithAdapter == [ ] then
           ensureEntry
         else if isAdapterRoute then
           adapterWrapped

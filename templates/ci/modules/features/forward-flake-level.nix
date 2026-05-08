@@ -200,6 +200,71 @@
       }
     );
 
+    # Route with instantiate: collect class modules, call a function,
+    # place the derivation at the target path.
+    test-route-with-instantiate = denTest (
+      {
+        den,
+        lib,
+        config,
+        inputs,
+        ...
+      }:
+      {
+        imports = [ inputs.den.flakeOutputs.packages ];
+
+        den.hosts.x86_64-linux.alpha = { };
+        den.hosts.x86_64-linux.beta = { };
+
+        den.classes.infra = { };
+
+        den.aspects.alpha.infra =
+          { host, ... }:
+          {
+            ${host.name}.type = "small";
+          };
+        den.aspects.beta.infra =
+          { host, ... }:
+          {
+            ${host.name}.type = "large";
+          };
+
+        # Route that collects infra class and instantiates via evalModules.
+        den.policies.infra-to-packages =
+          { system, ... }:
+          [
+            (den.lib.policy.route {
+              fromClass = "infra";
+              intoClass = "flake";
+              path = [
+                "flake"
+                "packages"
+                system
+                "infra"
+              ];
+              instantiate =
+                { modules, ... }:
+                let
+                  evaled =
+                    (lib.evalModules {
+                      modules = [
+                        { config._module.freeformType = lib.types.lazyAttrsOf lib.types.raw; }
+                      ]
+                      ++ modules;
+                    }).config;
+                in
+                builtins.removeAttrs evaled [ "_module" ];
+            })
+          ];
+
+        den.schema.flake-system.includes = [ den.policies.infra-to-packages ];
+
+        expr = config.flake.packages.x86_64-linux.infra;
+        expected.alpha.type = "small";
+        expected.beta.type = "large";
+      }
+    );
+
     test-route-flake-outputs-from-hosts = denTest (
       {
         den,
