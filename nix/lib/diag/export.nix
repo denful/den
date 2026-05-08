@@ -69,12 +69,21 @@ let
       source = view.compute graph;
       base = "${entityName}-${view.view}";
       viewName = view.view;
+      isRaw = view ? rawExt;
+      rawExt = view.rawExt or null;
       mdDrv = mkViewMd pkgs {
         inherit base viewName source;
         title = view.title;
         inherit entityName;
         inherit (view) altText svgInfix mdLang;
       };
+      rawDrv =
+        if rawExt == "json" then
+          pkgs.runCommand "${base}.${rawExt}" { nativeBuildInputs = [ pkgs.jq ]; } ''
+            echo ${lib.escapeShellArg source} | jq . > $out
+          ''
+        else
+          pkgs.writeText "${base}.${rawExt}" source;
       mkEntry = ext: tool: drv: {
         name = entityName;
         view = viewName;
@@ -86,8 +95,11 @@ let
           ;
       };
     in
-    [ (mkEntry "md" null mdDrv) ]
-    ++ lib.optional (view.svgFn != null) (mkEntry "svg" view.svgInfix (view.svgFn base source));
+    if isRaw then
+      [ (mkEntry rawExt null rawDrv) ]
+    else
+      [ (mkEntry "md" null mdDrv) ]
+      ++ lib.optional (view.svgFn != null) (mkEntry "svg" view.svgInfix (view.svgFn base source));
 
   # Multi-format DAG view: one md embedding three SVGs.
   mkDagEntries =

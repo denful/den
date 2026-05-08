@@ -44,6 +44,14 @@ let
     svgInfix = null;
     svgFn = null;
   };
+  # Raw format: bypasses markdown wrapping, outputs file directly.
+  # Used for JSON IR that should be piped through jq.
+  raw = ext: {
+    mdLang = null;
+    svgInfix = null;
+    svgFn = null;
+    rawExt = ext;
+  };
 
   # mkView — canonical constructor for a single view entry.
   #
@@ -128,7 +136,7 @@ let
           view = "ir";
           title = "Graph IR (JSON)";
           altText = "IR JSON";
-          fmt = json;
+          fmt = raw "json";
           compute = g: toJSON g;
         })
       ];
