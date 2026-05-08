@@ -29,6 +29,9 @@ jobs:
             unzip -u -d ~/versioned/docs ~/versioned/${id}.zip
           done
       - uses: actions/checkout@v6
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - uses: pnpm/action-setup@v4
         with:
           version: latest
