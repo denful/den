@@ -24,8 +24,13 @@ Den aspects API. Provides aspect type definitions and internal resolution helper
 ### `den.lib.aspects.resolve class aspect`
 
 **Internal.** Resolves an aspect for a given class (e.g., `"nixos"`), returning a
-module with `imports`. This function is used by the fx pipeline and is not a
-public API. Prefer using `entity.resolved` or the fx pipeline directly.
+module with `imports`. Runs the full pipeline including entity instantiation.
+
+### `den.lib.aspects.resolveImports class aspect`
+
+**Internal.** Like `resolve` but skips entity instantiation (phase 4).
+Use for nested resolution where only class imports are needed, such as
+extracting `homeManager` modules from a host's aspect tree.
 
 ## `den.lib.policy`
 
@@ -41,6 +46,11 @@ Policy effect constructors used inside policy functions. See
 
 Pipe builder API for quirk data routing. See
 [den.quirks reference](/reference/quirks/#pipe-builder-api).
+
+### `den.lib.policy.mkPolicy name fn`
+
+Create a named policy record for use in `includes` lists.
+See [Policies reference](/reference/policies/#denlibpolicymkpolicy-name-fn).
 
 ### `den.lib.policy.for entity policyOrList`
 

@@ -143,6 +143,25 @@ matching.
 
 ## Combinators
 
+### `den.lib.policy.mkPolicy name fn`
+
+Create a named policy record for direct use in `includes`. Use this when
+defining inline policies that don't need the `den.policies` registry:
+
+```nix
+den.default.includes = [
+  (den.lib.policy.mkPolicy "host-guards" ({ host, ... }: [
+    (den.lib.policy.resolve {
+      isNixos = host.class == "nixos";
+      isDarwin = host.class == "darwin";
+    })
+  ]))
+];
+```
+
+Returns `{ __isPolicy = true; name; fn; }` — the pipeline recognizes this
+as a policy and routes it to the dispatch system.
+
 ### `den.lib.policy.for entity policyOrList`
 
 Wrap a policy to fire only when a specific entity is in context, matched
