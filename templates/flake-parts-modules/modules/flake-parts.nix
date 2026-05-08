@@ -41,12 +41,6 @@ in
     inputs.pkgs-by-name-for-flake-parts.flakeModule
   ];
 
-  # Global nix-unit settings
-  perSystem.nix-unit = {
-    allowNetwork = true;
-    inherit inputs;
-  };
-
   # Wire collected class modules into perSystem.
   # config.flake.denModules.<system>.<class> holds raw module lists
   # produced by den.policies.collect-perSystem in den.nix.
@@ -56,6 +50,19 @@ in
       dm = config.flake.denModules.${system} or { };
     in
     {
+      # Global nix-unit settings
+      nix-unit = {
+        allowNetwork = true;
+        inherit inputs;
+        tests = {
+          _module.args = {
+            tux = config.flake.nixosConfigurations.igloo.config.users.users.tux;
+            igloo = config.flake.nixosConfigurations.igloo.config;
+          };
+          imports = dm.tests or [ ];
+        };
+      };
+
       treefmt.imports = dm.treefmt or [ ];
 
       devshells.default = {
@@ -65,14 +72,6 @@ in
 
       packages = evalClassModules args (dm.packages or [ ]);
 
-      nix-unit.tests = {
-        _module.args = {
-          tux = config.flake.nixosConfigurations.igloo.config.users.users.tux;
-          igloo = config.flake.nixosConfigurations.igloo.config;
-        };
-        imports = dm.tests or [ ];
-      };
-
-      files.imports = dm.files or [ ];
+      files.files = (evalClassModules args (dm.files or [ ])).files or [ ];
     };
 }

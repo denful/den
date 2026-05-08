@@ -197,7 +197,10 @@ let
     in
     if bestMatch != [ ] then
       builtins.head bestMatch
-    else if builtins.length children == 1 then
+    # Single-child fallback only for entity specs (which carry mainModule).
+    # Non-entity instantiate specs (e.g., collect-perSystem) should fall
+    # through to sourceScopeId so they collect from the full subtree.
+    else if spec ? mainModule && builtins.length children == 1 then
       builtins.head children
     else
       null;
@@ -336,7 +339,13 @@ let
                 extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
               else
                 null;
-            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
+            modules =
+              if preWalkedModules != null then
+                preWalkedModules
+              else if spec ? mainModule then
+                [ spec.mainModule ]
+              else
+                [ ];
             instantiateArgs =
               if spec ? pkgs then
                 {
@@ -478,7 +487,13 @@ let
               applyRoutes (fxResolve mkPipeline) ctx relevantContexts hostScopeId scopeParent subtreeRoutes
                 subtreePhase2;
             preWalkedModules = extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass;
-            modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
+            modules =
+              if preWalkedModules != null then
+                preWalkedModules
+              else if spec ? mainModule then
+                [ spec.mainModule ]
+              else
+                [ ];
             instantiateArgs =
               if spec ? pkgs then
                 {
