@@ -42,26 +42,32 @@ let
     {
       classes,
       root,
+      ctx ? { },
       extraHandlers ? { },
     }:
     let
+      rootScopeId = fxLib.pipeline.mkScopeId ctx;
       rawPerClass = lib.genAttrs classes (
         class:
         let
           comp = nxFx.send "resolve" {
             aspect = root;
             identity = fxLib.identity.key root;
-            ctx = { };
+            inherit ctx;
           };
         in
         nxFx.handle {
           handlers = fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {
-            inherit class;
-            ctx = { };
+            inherit class ctx;
           }) (fxLib.trace.tracingHandler class // extraHandlers);
           state = fxLib.pipeline.defaultState // {
             entries = [ ];
             ctxTrace = [ ];
+            inherit rootScopeId;
+            currentScope = rootScopeId;
+            scopeContexts = _: {
+              ${rootScopeId} = ctx;
+            };
           };
         } comp
       );

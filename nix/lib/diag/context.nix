@@ -17,10 +17,11 @@ let
       root,
       name,
       classes,
+      ctx ? { },
       direction ? "LR",
     }:
     let
-      captured = capture.captureWithPaths classes root;
+      captured = capture.captureWithPathsWith { inherit classes root ctx; };
 
       graph = graphLib.buildGraph {
         entries = captured.entries;
@@ -57,10 +58,11 @@ let
             ]
             ++ userClasses
           );
-      root = den.lib.resolveEntity "host" { inherit host; };
+      ctx = { inherit host; };
+      root = den.lib.resolveEntity "host" ctx;
     in
     context {
-      inherit root direction;
+      inherit root direction ctx;
       name = host.name;
       classes = actualClasses;
     };
@@ -85,10 +87,11 @@ let
             ]
             ++ (user.classes or [ "homeManager" ])
           );
-      root = den.lib.resolveEntity "user" { inherit host user; };
+      ctx = { inherit host user; };
+      root = den.lib.resolveEntity "user" ctx;
     in
     context {
-      inherit root direction;
+      inherit root direction ctx;
       name = user.name;
       classes = actualClasses;
     };
@@ -106,10 +109,11 @@ let
           classes
         else
           lib.unique ([ "homeManager" ] ++ (home.classes or [ "homeManager" ]));
-      root = den.lib.resolveEntity "home" { inherit home; };
+      ctx = { inherit home; };
+      root = den.lib.resolveEntity "home" ctx;
     in
     context {
-      inherit root direction;
+      inherit root direction ctx;
       name = home.name;
       classes = actualClasses;
     };
