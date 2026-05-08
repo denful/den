@@ -160,6 +160,13 @@ let
         constraintOwner = param.meta.constraintOwner or null;
         meaningful = n: n != null && isMeaningfulName n && builtins.match ".*<anon>.*" n == null;
         isAnon = !meaningful rawName;
+        # Parametric aspects carry fnArgNames (e.g. ["host" "user"]) from the
+        # wrapper's formal args.  Use these to label otherwise-anonymous nodes.
+        fnArgs = param.meta.fnArgNames or [ ];
+        isParametricAnon = isAnon && fnArgs != [ ];
+        # Policy-sourced aspects may carry __sourcePolicyName on the param
+        # (tagged by classify.nix / apply.nix).
+        sourcePolicyName = param.__sourcePolicyName or null;
         name =
           if isAnon && constraintOwner != null then
             "filter:${constraintOwner}"
@@ -169,6 +176,10 @@ let
               provTag = lib.optionalString (provPath != "") ":${provPath}";
             in
             "${entityKind}/resolve${aspectTag}${provTag}"
+          else if isAnon && sourcePolicyName != null then
+            "policy:${sourcePolicyName}"
+          else if isParametricAnon then
+            "<parametric:{${lib.concatStringsSep "," fnArgs}}>"
           else
             rawName;
         selfFullPath = if provPath != "" then "${provPath}/${name}" else name;
