@@ -174,8 +174,11 @@ let
               toNode = nodeById.${e.to} or null;
               fromInst = if fromNode != null then fromNode.entityInstance or null else null;
               toInst = if toNode != null then toNode.entityInstance or null else null;
+              fromIsBridge =
+                fromNode != null && (isEntityBoundary fromNode || (fromNode.isPolicyDispatch or false));
             in
             fromNode != null
+            && !fromIsBridge
             && fromInst == key
             && (toInst == null || toInst == key)
             && (e.style or "normal") != "policy"
@@ -230,7 +233,9 @@ let
         (fromNode != null && fromKind == null) || (isCrossKind && (e.style or "normal") != "policy")
       ) edges;
 
-      # Cross-instance edges: both endpoints have an entityInstance but they differ.
+      # Cross-instance edges + edges FROM bridge nodes. These are rendered
+      # outside all subgraphs so mermaid doesn't pull bridge nodes into a
+      # subgraph via edge association.
       crossInstanceEdges = builtins.filter (
         e:
         let
@@ -238,8 +243,11 @@ let
           toNode = nodeById.${e.to} or null;
           fromInst = if fromNode != null then fromNode.entityInstance or null else null;
           toInst = if toNode != null then toNode.entityInstance or null else null;
+          fromIsBridge =
+            fromNode != null && (isEntityBoundary fromNode || (fromNode.isPolicyDispatch or false));
+          isCrossInst = fromInst != null && toInst != null && fromInst != toInst;
         in
-        fromInst != null && toInst != null && fromInst != toInst && (e.style or "normal") != "policy"
+        (fromIsBridge || isCrossInst) && (e.style or "normal") != "policy"
       ) edges;
 
       # Stages that would *not* get a subgraph declaration because they
