@@ -329,6 +329,7 @@ in
     captureAll
     captureWithPaths
     captureWithPathsWith
+    captureFleet
     ;
 }
 // allRenderers

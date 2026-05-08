@@ -85,6 +85,48 @@ let
     };
 
   captureWithPaths = classes: root: captureWithPathsWith { inherit classes root; };
+
+  # Fleet-level capture: run the full pipeline from the flake root with
+  # trace handlers. Returns trace entries AND post-pipeline state for
+  # pipe flow analysis (scopedPipeEffects, scopedClassImports, scopeParent,
+  # scopeContexts, scopeEntityKind).
+  #
+  # Unlike per-host capture, this walks the ENTIRE flake scope tree:
+  # flake → fleet → environment → host → user.
+  captureFleet =
+    {
+      class ? "nixos",
+      extraHandlers ? { },
+    }:
+    let
+      flakeRoot = den.lib.resolveEntity "flake" { };
+      comp = nxFx.send "resolve" {
+        aspect = flakeRoot;
+        identity = fxLib.identity.key flakeRoot;
+        ctx = { };
+      };
+      result = nxFx.handle {
+        handlers = fxLib.pipeline.composeHandlers (fxLib.pipeline.defaultHandlers {
+          inherit class;
+          ctx = { };
+        }) (fxLib.trace.tracingHandler class // extraHandlers);
+        state = fxLib.pipeline.defaultState // {
+          entries = [ ];
+          ctxTrace = [ ];
+        };
+      } comp;
+      st = result.state;
+    in
+    {
+      entries = st.entries or [ ];
+      ctxTrace = st.ctxTrace or [ ];
+      # Post-pipeline scope data for pipe flow analysis.
+      scopeParent = (st.scopeParent or (_: { })) null;
+      scopeContexts = (st.scopeContexts or (_: { })) null;
+      scopeEntityKind = (st.scopeEntityKind or (_: { })) null;
+      scopedPipeEffects = (st.scopedPipeEffects or (_: { })) null;
+      scopedClassImports = (st.scopedClassImports or (_: { })) null;
+    };
 in
 {
   inherit
@@ -92,5 +134,6 @@ in
     captureAll
     captureWithPaths
     captureWithPathsWith
+    captureFleet
     ;
 }

@@ -162,6 +162,27 @@ in
 
       galleries = hostGalleries ++ [ fleetGallery ];
 
+      # --- Fleet capture debug ---
+      fleetCapture = diag.captureFleet { };
+
+      fleetDebug = pkgs.writeText "fleet-capture-debug.json" (
+        builtins.toJSON {
+          entryCount = builtins.length fleetCapture.entries;
+          ctxTraceKinds = map (e: { inherit (e) key selfName; }) fleetCapture.ctxTrace;
+          scopeIds = builtins.attrNames fleetCapture.scopeContexts;
+          scopeTree = fleetCapture.scopeParent;
+          scopeEntityKinds = fleetCapture.scopeEntityKind;
+          pipeEffectScopes = builtins.mapAttrs (
+            scope: effects:
+            map (e: {
+              pipeName = e.value.pipeName or e.pipeName or null;
+              stages = map (s: s.__pipeStage or "unknown") (e.value.stages or e.stages or [ ]);
+            }) effects
+          ) fleetCapture.scopedPipeEffects;
+          classImportKeys = builtins.mapAttrs (_: ci: builtins.attrNames ci) fleetCapture.scopedClassImports;
+        }
+      );
+
       readmeDrv = pkgs.writeText "README.md" ''
         # Fleet Demo Diagrams
 
@@ -187,12 +208,17 @@ in
       '';
     in
     {
-      packages = allPackages // {
-        write-diagrams = mkWriteScript pkgs {
-          entries = everyEntry;
-          inherit galleries readmeDrv;
-          destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/fleet-demo"'';
+      packages =
+        allPackages
+        // {
+          fleet-capture-debug = fleetDebug;
+        }
+        // {
+          write-diagrams = mkWriteScript pkgs {
+            entries = everyEntry;
+            inherit galleries readmeDrv;
+            destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/fleet-demo"'';
+          };
         };
-      };
     };
 }
