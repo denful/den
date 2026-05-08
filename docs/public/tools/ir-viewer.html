@@ -476,15 +476,17 @@
         }
       };
 
-      const handleFileDrop = useCallback((e) => {
-        e.preventDefault();
-        setDragover(false);
-        const file = e.dataTransfer?.files?.[0] || e.target?.files?.[0];
+      const loadFile = useCallback((file) => {
         if (!file) return;
         const reader = new FileReader();
         reader.onload = (ev) => {
           try {
-            const text = ev.target.result;
+            let text = ev.target.result;
+            // If it's a .md file, extract the JSON from the fenced block.
+            if (file.name.endsWith('.md')) {
+              const match = text.match(/```json\n([\s\S]*?)\n```/);
+              if (match) text = match[1];
+            }
             setJsonInput(text);
             const parsed = JSON.parse(text);
             const newFilters = { hosts: {}, showPolicies: true, showProviders: true };
@@ -496,6 +498,32 @@
         };
         reader.readAsText(file);
       }, [renderData]);
+
+      const handleFileDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragover(false);
+        loadFile(e.dataTransfer?.files?.[0]);
+      }, [loadFile]);
+
+      const handleFileInput = useCallback((e) => {
+        loadFile(e.target?.files?.[0]);
+      }, [loadFile]);
+
+      // Global drop handler — works even if dropped on ReactFlow canvas.
+      React.useEffect(() => {
+        const onDragOver = (e) => { e.preventDefault(); setDragover(true); };
+        const onDragLeave = (e) => { if (e.relatedTarget === null) setDragover(false); };
+        const onDrop = (e) => { e.preventDefault(); setDragover(false); loadFile(e.dataTransfer?.files?.[0]); };
+        document.addEventListener('dragover', onDragOver);
+        document.addEventListener('dragleave', onDragLeave);
+        document.addEventListener('drop', onDrop);
+        return () => {
+          document.removeEventListener('dragover', onDragOver);
+          document.removeEventListener('dragleave', onDragLeave);
+          document.removeEventListener('drop', onDrop);
+        };
+      }, [loadFile]);
 
       const toggleHost = (host) => {
         const newFilters = { ...filters, hosts: { ...filters.hosts, [host]: !filters.hosts[host] } };
@@ -518,13 +546,10 @@
 
             <div
               className={'drop-zone' + (dragover ? ' dragover' : '')}
-              onDragOver={(e) => { e.preventDefault(); setDragover(true); }}
-              onDragLeave={() => setDragover(false)}
-              onDrop={handleFileDrop}
               onClick={() => fileRef.current?.click()}
             >
-              Drop fleet-ir.json or ir.md here (or click)
-              <input ref={fileRef} type="file" accept=".json,.md" style={{ display: 'none' }} onChange={handleFileDrop} />
+              {dragover ? 'Drop file to load' : 'Drop JSON anywhere, or click to browse'}
+              <input ref={fileRef} type="file" accept=".json,.md" style={{ display: 'none' }} onChange={handleFileInput} />
             </div>
 
             <textarea
