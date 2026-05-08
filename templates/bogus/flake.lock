@@ -4,13 +4,13 @@
       "locked": {
         "lastModified": 1776710169,
         "narHash": "sha256-q4WXIX2E3w9Ld3MZ1Pl8Lh5SgrEFdEuzvY1Lj/Wo2kY=",
-        "owner": "vic",
+        "owner": "denful",
         "repo": "den",
         "rev": "0af82e24be89b9fd400bd0b58b0fed5ea0f269ad",
         "type": "github"
       },
       "original": {
-        "owner": "vic",
+        "owner": "denful",
         "ref": "main",
         "repo": "den",
         "type": "github"

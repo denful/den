@@ -24,13 +24,13 @@
       "locked": {
         "lastModified": 1776710169,
         "narHash": "sha256-q4WXIX2E3w9Ld3MZ1Pl8Lh5SgrEFdEuzvY1Lj/Wo2kY=",
-        "owner": "vic",
+        "owner": "denful",
         "repo": "den",
         "rev": "0af82e24be89b9fd400bd0b58b0fed5ea0f269ad",
         "type": "github"
       },
       "original": {
-        "owner": "vic",
+        "owner": "denful",
         "repo": "den",
         "type": "github"
       }
@@ -101,15 +101,15 @@
         ]
       },
       "locked": {
-        "lastModified": 1776721916,
-        "narHash": "sha256-AZihM2Nz0Uf58jH0rLN9R4z9W664mAZeJ/Q1KzfCv30=",
-        "owner": "sini",
+        "lastModified": 1777331512,
+        "narHash": "sha256-5x/93lLJLWdR0bHonXT4EXzYRoVbOVto/axHk2ZAeAc=",
+        "owner": "denful",
         "repo": "nix-effects",
-        "rev": "cf958815eb43e9e38aa35436d379b4135b5f3126",
+        "rev": "8d7e8a97fd1c47ef10c2354b10f2c3f7ac15232c",
         "type": "github"
       },
       "original": {
-        "owner": "sini",
+        "owner": "denful",
         "repo": "nix-effects",
         "type": "github"
       }
