@@ -16,10 +16,9 @@
       };
 
     http-backends =
-      { host, environment, ... }:
+      { host, ... }:
       {
         inherit (host) addr;
-        domain = environment.domainName;
         port = host.httpPort;
       };
   };

@@ -183,9 +183,19 @@ let
           builtins.filter (scopeId: lib.hasInfix "=${entityName}" scopeId) children
         else
           [ ];
+      # Among matches, prefer the shortest scope ID — the entity's own scope,
+      # not a descendant (e.g., "host=lb-prod" over "host=lb-prod,user=deploy").
+      bestMatch =
+        if builtins.length matchByName <= 1 then
+          matchByName
+        else
+          let
+            sorted = builtins.sort (a: b: builtins.stringLength a < builtins.stringLength b) matchByName;
+          in
+          [ (builtins.head sorted) ];
     in
-    if matchByName != [ ] then
-      builtins.head matchByName
+    if bestMatch != [ ] then
+      builtins.head bestMatch
     else if builtins.length children == 1 then
       builtins.head children
     else
@@ -566,12 +576,14 @@ let
         scopeEntityClass = result.state.scopeEntityClass or (_: { });
         inherit
           augmentedScopeContexts
-          scopedClassImportsRaw
           scopedProvides
           scopedRoutes
           scopeParent
           ctx
           ;
+        # Pass drained class imports so pipe-arg deferred aspects are
+        # included in per-host subtree assembly.
+        scopedClassImportsRaw = drainedClassImportsRaw;
         fxResolveFn = fxResolve mkPipeline;
       } phase3.classImports;
     in

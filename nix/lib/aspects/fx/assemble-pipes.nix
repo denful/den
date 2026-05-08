@@ -35,6 +35,24 @@ let
   # but not config. These are resolved eagerly using scope context.
   isPipelineParametric = val: builtins.isFunction val && !(builtins.functionArgs val) ? config;
 
+  # Resolve a local pipeline-parametric value eagerly using scope context.
+  # These are quirk values like `{ host, ... }: { addr = host.addr; }` that
+  # require pipeline context (host, user, etc.) but not NixOS config.
+  # Without this, the raw function would be passed to consumers as-is.
+  resolveLocalParametric =
+    scopeCtx: val:
+    if isPipelineParametric val then
+      let
+        thunkArgs = builtins.functionArgs val;
+        ctxArgs = lib.genAttrs (builtins.filter (k: scopeCtx ? ${k}) (builtins.attrNames thunkArgs)) (
+          k: scopeCtx.${k}
+        );
+        result = val (ctxArgs // { inherit lib; });
+      in
+      if builtins.isList result then result else [ result ]
+    else
+      [ val ];
+
   # Mark a config-dependent value for deferred resolution inside evalModules.
   # The marker is transparent to the module wrapper, which resolves it
   # using the evalModules fixpoint config.
@@ -587,9 +605,10 @@ let
             let
               rawEntries = scopeImports.${pipeName} or [ ];
               baseValues = flattenAndExtract rawEntries;
-              # Mark local config thunks for deferred resolution inside evalModules.
-              # Cross-host thunks are resolved eagerly in collectFromPeers.
-              markedBase = markConfigThunks baseValues;
+              # Resolve local pipeline-parametric values eagerly, then mark
+              # config-dependent thunks for deferred resolution inside evalModules.
+              resolvedBase = builtins.concatMap (resolveLocalParametric scopeCtx) baseValues;
+              markedBase = markConfigThunks resolvedBase;
               # Merge exposed data from children (also mark any thunks).
               exposedValues = exposedForScope.${pipeName} or [ ];
               markedExposed = markConfigThunks exposedValues;
@@ -623,7 +642,8 @@ let
                 let
                   rawEntries = scopeImports.${pipeName} or [ ];
                   baseValues = flattenAndExtract rawEntries;
-                  markedBase = markConfigThunks baseValues;
+                  resolvedBase = builtins.concatMap (resolveLocalParametric scopeCtx) baseValues;
+                  markedBase = markConfigThunks resolvedBase;
                   exposedValues = exposedForScope.${pipeName} or [ ];
                   markedExposed = markConfigThunks exposedValues;
                   combinedBase = markedBase ++ markedExposed;
