@@ -25,7 +25,7 @@ in
           { modules, ... }: inputs.terranix.lib.terranixConfiguration { inherit system modules; };
         intoAttr = [
           "terranixConfigurations"
-          "${host.name}"
+          host.name
         ];
         sourceScopeId = null;
       })

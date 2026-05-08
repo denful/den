@@ -350,12 +350,38 @@ let
                 };
             evaluated = spec.instantiate instantiateArgs;
           in
-          [ { config = lib.setAttrByPath ([ "flake" ] ++ spec.intoAttr) evaluated; } ]
+          [
+            {
+              path = [ "flake" ] ++ spec.intoAttr;
+              value = evaluated;
+            }
+          ]
       ) allInstantiates;
+      # Split: short paths (≤3 levels, e.g. flake/nixosConfigurations/name)
+      # become individual modules (lazy, no conflicts at single lazyAttrsOf).
+      # Long paths (>3 levels, e.g. flake/packages/x86_64-linux/name)
+      # are grouped by prefix and merged with recursiveUpdate to avoid
+      # conflicting definitions at intermediate lazyAttrsOf keys.
+      needsGrouping = entry: builtins.length entry.path > 3;
+      singles = map (entry: { config = lib.setAttrByPath entry.path entry.value; }) (
+        builtins.filter (e: !needsGrouping e) instantiateModules
+      );
+      grouped = builtins.foldl' (
+        acc: entry:
+        let
+          prefix = lib.concatStringsSep "/" (lib.init entry.path);
+        in
+        acc // { ${prefix} = (acc.${prefix} or [ ]) ++ [ entry ]; }
+      ) { } (builtins.filter needsGrouping instantiateModules);
+      groupedModules = lib.mapAttrsToList (_: entries: {
+        config = builtins.foldl' (
+          acc: entry: lib.recursiveUpdate acc (lib.setAttrByPath entry.path entry.value)
+        ) { } entries;
+      }) grouped;
     in
     classImports
     // {
-      flake = (classImports.flake or [ ]) ++ instantiateModules;
+      flake = (classImports.flake or [ ]) ++ singles ++ groupedModules;
     };
 
   # Full resolution: run pipeline, then assemble output through all phases.
