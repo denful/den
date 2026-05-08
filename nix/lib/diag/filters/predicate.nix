@@ -58,5 +58,6 @@ in
     // {
       entityKinds = [ ];
       entityEdges = [ ];
+      entityInstances = [ ];
     };
 }

@@ -82,5 +82,6 @@
       edges = taggedEdges;
       entityKinds = a.entityKinds or [ ];
       entityEdges = a.entityEdges or [ ];
+      entityInstances = a.entityInstances or [ ];
     };
 }

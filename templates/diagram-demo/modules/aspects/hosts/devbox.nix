@@ -10,7 +10,7 @@
 {
   den.aspects.devbox = {
     includes = [
-      <den/primary-user>
+      den.provides.primary-user
       den.aspects.workstation
       den.aspects.server
     ];

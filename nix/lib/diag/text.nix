@@ -117,21 +117,38 @@ let
         ]
       ) envScopes;
 
-      # Pipe table — only show pure consumers (collect but don't produce).
-      # If all collectors also produce, it's bidirectional (show all).
-      pipeRows = map (
+      # Pipe table — grouped by collection boundary (the parent scope of
+      # collecting hosts). pipe.collect finds siblings = same parent.
+      # The boundary kind is whatever entity kind the parent scope has.
+      hostParentScopes = lib.unique (map (hScope: scopeParent.${hScope} or null) hostScopes);
+
+      pipeRows = lib.concatMap (
         pipeName:
-        let
-          producers = builtins.filter (h: builtins.elem pipeName h.produces) pipesByHost;
-          collectors = builtins.filter (h: builtins.elem pipeName h.collects) pipesByHost;
-          pureConsumers = builtins.filter (h: !builtins.elem pipeName h.produces) collectors;
-          effectiveConsumers = if pureConsumers != [ ] then pureConsumers else collectors;
-        in
-        [
-          pipeName
-          (lib.concatStringsSep ", " (map (h: h.name) producers))
-          (lib.concatStringsSep ", " (map (h: h.name) effectiveConsumers))
-        ]
+        lib.concatMap (
+          parentScope:
+          let
+            parentKind = if parentScope != null then scopeEntityKind.${parentScope} or null else null;
+            parentName =
+              if parentScope != null && parentKind != null then extractName parentKind parentScope else "global";
+            boundary = if parentKind != null then "${parentKind}: ${parentName}" else "global";
+            siblingHosts = builtins.filter (h: (scopeParent.${h} or null) == parentScope) hostScopes;
+            siblingNames = map (extractName "host") siblingHosts;
+            producers = builtins.filter (
+              h: builtins.elem pipeName h.produces && builtins.elem h.name siblingNames
+            ) pipesByHost;
+            collectors = builtins.filter (
+              h: builtins.elem pipeName h.collects && builtins.elem h.name siblingNames
+            ) pipesByHost;
+            pureConsumers = builtins.filter (h: !builtins.elem pipeName h.produces) collectors;
+            effectiveConsumers = if pureConsumers != [ ] then pureConsumers else collectors;
+          in
+          lib.optional (producers != [ ] || effectiveConsumers != [ ]) [
+            pipeName
+            boundary
+            (lib.concatStringsSep ", " (map (h: h.name) producers))
+            (lib.concatStringsSep ", " (map (h: h.name) effectiveConsumers))
+          ]
+        ) hostParentScopes
       ) allPipeNames;
 
       # Policy table.
@@ -219,6 +236,7 @@ let
             ""
             (mkTable [
               "Pipe"
+              "Scope Boundary"
               "Producers"
               "Collectors"
             ] pipeRows)

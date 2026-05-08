@@ -32,6 +32,7 @@ let
     // {
       entityKinds = [ ];
       entityEdges = [ ];
+      entityInstances = [ ];
     };
 
   # Handlers view: nodes with resolution handlers plus immediate neighbors.

@@ -46,6 +46,7 @@ in
       edges = hostEdges ++ graph.entityEdges;
       entityKinds = [ ];
       entityEdges = [ ];
+      entityInstances = [ ];
     };
 
   # Aspect hierarchy only: user aspects with context wrappers folded out
@@ -120,6 +121,7 @@ in
       edges = treeEdges;
       entityKinds = [ ];
       entityEdges = [ ];
+      entityInstances = [ ];
     };
 
   # Attribution-based structural-decision view. Groups excluded nodes
@@ -182,6 +184,7 @@ in
     // {
       entityKinds = [ ];
       entityEdges = [ ];
+      entityInstances = [ ];
     };
 
   # Provider-resolved view: shows each provider aspect alongside its

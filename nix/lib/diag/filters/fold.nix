@@ -179,9 +179,17 @@ in
     graph:
     graph
     // {
-      nodes = map (n: n // { entityKind = null; }) graph.nodes;
+      nodes = map (
+        n:
+        n
+        // {
+          entityKind = null;
+          entityInstance = null;
+        }
+      ) graph.nodes;
       entityKinds = [ ];
       entityEdges = [ ];
+      entityInstances = [ ];
     };
 
 }
