@@ -1,14 +1,11 @@
-# Pipe flow visualization: cross-host quirk data flows.
+# Fleet-level visualizations from captureFleet data.
 #
-# Takes fleet capture data (from captureFleet) and builds a mermaid
-# flowchart showing:
-#   - Environment subgraphs grouping hosts
-#   - Pipe flow edges (producer → consumer) colored by pipe name
-#   - Aspect annotations showing which aspect produces/consumes each pipe
+# Three views:
+#   - Pipe flow: cross-host quirk data flows with environment subgraphs
+#   - Scope topology: fleet → environment → host → user resolution tree
+#   - Aspect matrix: which aspects land on which hosts
 #
-# Usage:
-#   fleetData = diag.captureFleet {};
-#   source = diag.toPipeFlowMermaid fleetData;
+# All take captureFleet output as input.
 {
   lib,
   themes,
@@ -267,11 +264,240 @@ let
 
   toPipeFlowMermaid = toPipeFlowMermaidWith { };
 
+  # --- View 2: Scope topology ---
+  #
+  # Renders the fleet scope tree as a top-down flowchart:
+  #   fleet → environment:prod → host:lb-prod → user:deploy
+  #                             → host:web-prod-1 → user:deploy
+  #           environment:staging → host:web-staging → user:deploy
+
+  # Extract a human-readable label from a scope ID.
+  scopeLabel =
+    scopeEntityKind: scopeId:
+    let
+      kind = scopeEntityKind.${scopeId} or null;
+      parts = lib.splitString "," scopeId;
+      # Find the part matching this scope's entity kind.
+      kindPart = if kind != null then lib.findFirst (p: lib.hasPrefix "${kind}=" p) null parts else null;
+      name = if kindPart != null then lib.removePrefix "${kind}=" kindPart else scopeId;
+    in
+    if kind != null then "${kind}: ${name}" else scopeId;
+
+  toScopeTopologyMermaidWith =
+    {
+      theme ? themes.defaultTheme,
+      mermaidConfig ? { },
+    }:
+    fleetCapture:
+    let
+      inherit (fleetCapture) scopeParent scopeEntityKind;
+
+      # All scopes except the unscoped root.
+      allScopes = builtins.filter (s: s != "__unscoped" && s != "") (builtins.attrNames scopeParent);
+
+      # Build nodes and edges from scope tree.
+      nodeDecl =
+        scopeId:
+        let
+          kind = scopeEntityKind.${scopeId} or null;
+          label = scopeLabel scopeEntityKind scopeId;
+          shape =
+            if kind == "fleet" then
+              "([\"${label}\"])"
+            else if kind == "environment" then
+              "[[\"${label}\"]]"
+            else if kind == "host" then
+              "[\"${label}\"]"
+            else if kind == "user" then
+              "([\"${label}\"])"
+            else
+              "[\"${label}\"]";
+        in
+        "  ${sanitize scopeId}${shape}";
+
+      edgeDecl =
+        scopeId:
+        let
+          parent = scopeParent.${scopeId} or null;
+        in
+        lib.optional (
+          parent != null && parent != "__unscoped" && parent != ""
+        ) "  ${sanitize parent} --> ${sanitize scopeId}";
+
+      # Color nodes by entity kind.
+      kindColors = {
+        fleet = theme.accent5 or "#89b4fa";
+        environment = theme.accent6 or "#cba6f7";
+        host = theme.accent3 or "#a6e3a1";
+        user = theme.accent1 or "#fab387";
+        "flake-system" = theme.accent4 or "#94e2d5";
+      };
+      nodeStyle =
+        scopeId:
+        let
+          kind = scopeEntityKind.${scopeId} or null;
+          color = kindColors.${kind} or (theme.nodeBg or "#313244");
+          text = theme.rootText or "#1e1e2e";
+        in
+        "  style ${sanitize scopeId} fill:${color},stroke:${color},color:${text}";
+    in
+    renderMermaid
+      {
+        inherit theme mermaidConfig;
+        diagramKind = "graph TD";
+      }
+      (
+        map nodeDecl allScopes
+        ++ [ "" ]
+        ++ lib.concatMap edgeDecl allScopes
+        ++ [ "" ]
+        ++ map nodeStyle allScopes
+      );
+
+  toScopeTopologyMermaid = toScopeTopologyMermaidWith { };
+
+  # --- View 3: Aspect coverage matrix ---
+  #
+  # Renders a table showing which meaningful aspects land on which hosts.
+  # Uses mermaid block-beta for a grid layout.
+  #
+  # Falls back to a simple flowchart with host subgraphs containing
+  # their aspects, since mermaid block-beta has limited support.
+
+  toAspectMatrixMermaidWith =
+    {
+      theme ? themes.defaultTheme,
+      mermaidConfig ? { },
+    }:
+    fleetCapture:
+    let
+      inherit (fleetCapture) entries scopeEntityKind;
+
+      # Host-level scopes.
+      hostScopes = builtins.filter (s: (scopeEntityKind.${s} or null) == "host") (
+        builtins.attrNames scopeEntityKind
+      );
+
+      # For each host scope, collect meaningful aspect names.
+      hostAspects = map (
+        hScope:
+        let
+          hName = hostNameFromScope hScope;
+          # Filter entries belonging to this host's instance.
+          hostInstance = "host:${hName}";
+          hostEntries = builtins.filter (
+            e:
+            (e.entityInstance or null) == hostInstance
+            && (e.hasClass or false)
+            && !(e.isPolicyDispatch or false)
+            && (e.provider or [ ]) == [ ]
+            && e.name != "host"
+            && e.name != "user"
+            && e.name != "default"
+            && !(lib.hasPrefix "<" (e.name or ""))
+          ) entries;
+          aspectNames = lib.unique (lib.sort (a: b: a < b) (map (e: e.name) hostEntries));
+        in
+        {
+          name = if hName != null then hName else hScope;
+          aspects = aspectNames;
+        }
+      ) hostScopes;
+
+      # All unique aspect names across all hosts.
+      allAspects = lib.unique (lib.sort (a: b: a < b) (lib.concatMap (h: h.aspects) hostAspects));
+
+      # Render as a flowchart with one subgraph per host listing its aspects.
+      hostSubgraph =
+        h:
+        let
+          aspectNodes = map (
+            a:
+            let
+              present = builtins.elem a h.aspects;
+            in
+            if present then "    ${sanitize "${h.name}_${a}"}[\"${a}\"]" else null
+          ) allAspects;
+          filtered = builtins.filter (x: x != null) aspectNodes;
+        in
+        "  subgraph ${sanitize "host_${h.name}"}[\"${h.name}\"]\n"
+        + lib.concatStringsSep "\n" filtered
+        + "\n  end";
+
+      # Style aspect nodes — same aspect on different hosts gets the same color.
+      aspectColor =
+        aspectName:
+        let
+          idx = lib.lists.findFirstIndex (a: a == aspectName) 0 allAspects;
+          colors = [
+            (theme.accent0 or "#f38ba8")
+            (theme.accent1 or "#fab387")
+            (theme.accent2 or "#f9e2af")
+            (theme.accent3 or "#a6e3a1")
+            (theme.accent4 or "#94e2d5")
+            (theme.accent5 or "#89b4fa")
+            (theme.accent6 or "#cba6f7")
+            (theme.accent7 or "#f2cdcd")
+          ];
+        in
+        builtins.elemAt colors (lib.mod idx (builtins.length colors));
+
+      nodeStyles = lib.concatMap (
+        h:
+        map (
+          a:
+          let
+            color = aspectColor a;
+            text = theme.rootText or "#1e1e2e";
+          in
+          "  style ${sanitize "${h.name}_${a}"} fill:${color},stroke:${color},color:${text}"
+        ) (builtins.filter (a: builtins.elem a h.aspects) allAspects)
+      ) hostAspects;
+
+      hostStyles = map (
+        h:
+        "  style ${sanitize "host_${h.name}"} fill:${theme.clusterBg or "#313244"},stroke:${
+            theme.clusterBorder or "#6c7086"
+          },stroke-width:2px"
+      ) hostAspects;
+
+      # Link same aspects across hosts with dotted edges for visual grouping.
+      crossHostLinks = lib.concatMap (
+        a:
+        let
+          hostsWithAspect = builtins.filter (h: builtins.elem a h.aspects) hostAspects;
+          pairs =
+            if builtins.length hostsWithAspect < 2 then
+              [ ]
+            else
+              let
+                first = builtins.head hostsWithAspect;
+                rest = builtins.tail hostsWithAspect;
+              in
+              map (h: {
+                from = sanitize "${first.name}_${a}";
+                to = sanitize "${h.name}_${a}";
+              }) rest;
+        in
+        map (p: "  ${p.from} -..- ${p.to}") pairs
+      ) allAspects;
+    in
+    renderMermaid {
+      inherit theme mermaidConfig;
+      diagramKind = "graph LR";
+    } (map hostSubgraph hostAspects ++ [ "" ] ++ crossHostLinks ++ [ "" ] ++ nodeStyles ++ hostStyles);
+
+  toAspectMatrixMermaid = toAspectMatrixMermaidWith { };
+
 in
 {
   inherit
     buildPipeFlows
     toPipeFlowMermaid
     toPipeFlowMermaidWith
+    toScopeTopologyMermaid
+    toScopeTopologyMermaidWith
+    toAspectMatrixMermaid
+    toAspectMatrixMermaidWith
     ;
 }

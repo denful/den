@@ -127,7 +127,7 @@ let
       renderUtil
       ;
   };
-  pipeFlow = import ./pipe-flow.nix {
+  pipeFlow = import ./fleet-views.nix {
     inherit
       lib
       themes
@@ -279,6 +279,14 @@ let
     };
     toPipeFlowMermaid = {
       withFn = pipeFlow.toPipeFlowMermaidWith;
+      mc = true;
+    };
+    toScopeTopologyMermaid = {
+      withFn = pipeFlow.toScopeTopologyMermaidWith;
+      mc = true;
+    };
+    toAspectMatrixMermaid = {
+      withFn = pipeFlow.toAspectMatrixMermaidWith;
       mc = true;
     };
   };

@@ -135,28 +135,33 @@ in
 
       # --- Pipe flow entries ---
 
-      pipeFlowEntries = [
+      mkFleetEntries = viewName: view: [
         {
           name = "fleet";
-          view = "pipe-flow";
+          view = viewName;
           dir = "fleet";
           ext = "md";
           tool = null;
-          drv = pipeFlowDrv;
+          drv = view.md;
         }
         {
           name = "fleet";
-          view = "pipe-flow";
+          view = viewName;
           dir = "fleet";
           ext = "svg";
           tool = "mmd";
-          drv = pipeFlowSvgDrv;
+          drv = view.svg;
         }
       ];
 
+      fleetViewEntries =
+        mkFleetEntries "pipe-flow" pipeFlowView
+        ++ mkFleetEntries "scope-topology" scopeTopoView
+        ++ mkFleetEntries "aspect-matrix" aspectMatrixView;
+
       # --- Assembly ---
 
-      everyEntry = hostEntries ++ userEntries ++ fleetEntriesList ++ pipeFlowEntries;
+      everyEntry = hostEntries ++ userEntries ++ fleetEntriesList ++ fleetViewEntries;
       allPackages = entriesToPackages everyEntry;
 
       # --- Galleries ---
@@ -183,17 +188,23 @@ in
 
       galleries = hostGalleries ++ [ fleetGallery ];
 
-      # --- Fleet pipe flow ---
+      # --- Fleet-level views from captureFleet ---
       fleetCapture = diag.captureFleet { };
-      pipeFlowSource = rc.render.toPipeFlowMermaid fleetCapture;
-      pipeFlowDrv = pkgs.writeText "pipe-flow.md" ''
-        # Pipe Flow: Fleet
 
-        ```mermaid
-        ${pipeFlowSource}
-        ```
-      '';
-      pipeFlowSvgDrv = rc.mmdSourceToSvg "pipe-flow" pipeFlowSource;
+      mkFleetView =
+        name: title: renderFn:
+        let
+          source = renderFn fleetCapture;
+          md = pkgs.writeText "${name}.md" "# ${title}\n\n![${title}](./${name}.mmd.svg)\n\n```mermaid\n${source}\n```\n";
+          svg = rc.mmdSourceToSvg name source;
+        in
+        {
+          inherit md svg;
+        };
+
+      pipeFlowView = mkFleetView "pipe-flow" "Pipe Flow" rc.render.toPipeFlowMermaid;
+      scopeTopoView = mkFleetView "scope-topology" "Scope Topology" rc.render.toScopeTopologyMermaid;
+      aspectMatrixView = mkFleetView "aspect-matrix" "Aspect Coverage" rc.render.toAspectMatrixMermaid;
 
       readmeDrv = pkgs.writeText "README.md" ''
         # Fleet Demo Diagrams
@@ -220,18 +231,12 @@ in
       '';
     in
     {
-      packages =
-        allPackages
-        // {
-          pipe-flow = pipeFlowDrv;
-          pipe-flow-svg = pipeFlowSvgDrv;
-        }
-        // {
-          write-diagrams = mkWriteScript pkgs {
-            entries = everyEntry;
-            inherit galleries readmeDrv;
-            destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/fleet-demo"'';
-          };
+      packages = allPackages // {
+        write-diagrams = mkWriteScript pkgs {
+          entries = everyEntry;
+          inherit galleries readmeDrv;
+          destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/fleet-demo"'';
         };
+      };
     };
 }
