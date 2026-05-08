@@ -68,6 +68,7 @@ let
         direction
         ;
       hasEntityKinds = entityKinds != [ ];
+      hasEntityInstances = (graph.entityInstances or [ ]) != [ ];
       nodeById = builtins.listToAttrs (
         map (n: {
           name = n.id;
@@ -86,7 +87,11 @@ let
       # `kindSuffix` lives AFTER parametric fnArgs so hexagon labels
       # read `name({ args }) · stage` (not `name · stage({ args })`).
       kindSuffix =
-        node: if !hasEntityKinds && (node.entityKind or null) != null then " · ${node.entityKind}" else "";
+        node:
+        if !hasEntityKinds && !hasEntityInstances && (node.entityKind or null) != null then
+          " · ${node.entityKind}"
+        else
+          "";
 
       mermaidShape =
         node:
@@ -147,12 +152,50 @@ let
           + "\n  end"
         );
 
+      # Instance-based subgraph grouping (used when entityInstances are present).
+      # Reconstruct the key that nodes carry in their entityInstance field.
+      instKey = inst: if inst.kind == inst.name then inst.name else "${inst.kind}:${inst.name}";
+
+      instanceSubgraph =
+        inst:
+        let
+          key = instKey inst;
+          instNodes = builtins.filter (
+            n: (n.entityInstance or null) == key && n.id != rootId && !(n.isPolicyDispatch or false)
+          ) nodes;
+          instEdges = builtins.filter (
+            e:
+            let
+              fromNode = nodeById.${e.from} or null;
+              toNode = nodeById.${e.to} or null;
+              fromInst = if fromNode != null then fromNode.entityInstance or null else null;
+              toInst = if toNode != null then toNode.entityInstance or null else null;
+            in
+            fromNode != null
+            && fromInst == key
+            && (toInst == null || toInst == key)
+            && (e.style or "normal") != "policy"
+          ) edges;
+        in
+        lib.optional (instNodes != [ ]) (
+          "  subgraph ${inst.id}[\"${inst.label}\"]\n"
+          + lib.concatMapStringsSep "\n" nodeDecl instNodes
+          + "\n"
+          + lib.concatMapStringsSep "\n" edgeDecl instEdges
+          + "\n  end"
+        );
+
+      policyNodes = builtins.filter (n: n.isPolicyDispatch or false) nodes;
+
       # `topLevelNodes` are the nodes declared outside any stage subgraph.
       # When the graph is flat (no stages), that's every non-host node.
       # When the graph has stage subgraphs, it's only the stage-null
       # nodes (the others get declared inside their subgraph block).
       topLevelNodes =
-        if hasEntityKinds then
+        if hasEntityInstances then
+          # All non-policy nodes live in instance subgraphs; only policy nodes are top-level.
+          [ ]
+        else if hasEntityKinds then
           builtins.filter (n: n.entityKind == null && n.id != rootId) nodes
         else
           builtins.filter (n: n.id != rootId) nodes;
@@ -168,6 +211,18 @@ let
           isCrossKind = fromKind != null && toKind != null && fromKind != toKind;
         in
         (fromNode != null && fromKind == null) || (isCrossKind && (e.style or "normal") != "policy")
+      ) edges;
+
+      # Cross-instance edges: both endpoints have an entityInstance but they differ.
+      crossInstanceEdges = builtins.filter (
+        e:
+        let
+          fromNode = nodeById.${e.from} or null;
+          toNode = nodeById.${e.to} or null;
+          fromInst = if fromNode != null then fromNode.entityInstance or null else null;
+          toInst = if toNode != null then toNode.entityInstance or null else null;
+        in
+        fromInst != null && toInst != null && fromInst != toInst && (e.style or "normal") != "policy"
       ) edges;
 
       # Stages that would *not* get a subgraph declaration because they
@@ -251,7 +306,13 @@ let
         ++ map nodeDecl topLevelNodes
         ++ [ "" ]
         ++ (
-          if hasEntityKinds then
+          if hasEntityInstances then
+            lib.concatMap instanceSubgraph (graph.entityInstances or [ ])
+            ++ [ "" ]
+            ++ map nodeDecl policyNodes
+            ++ map edgeDecl (builtins.filter (e: (e.style or "normal") == "policy") edges)
+            ++ map edgeDecl crossInstanceEdges
+          else if hasEntityKinds then
             lib.concatMap entitySubgraph entityKinds
             ++ map stubEntityDecl stubEntities
             ++ [ "" ]
@@ -266,7 +327,12 @@ let
           "  classDef root fill:${theme.rootFill},stroke:${theme.rootStroke},color:${theme.rootText},font-weight:bold"
         ]
         ++ nodeColorDefs
-        ++ lib.optionals hasEntityKinds (
+        ++ lib.optionals hasEntityInstances (
+          map (
+            inst: "style ${inst.id} fill:${theme.clusterBg},stroke:${theme.clusterBorder},stroke-width:2px"
+          ) (graph.entityInstances or [ ])
+        )
+        ++ lib.optionals (hasEntityKinds && !hasEntityInstances) (
           map (
             s: "style ${s.id} fill:${theme.clusterBg},stroke:${theme.clusterBorder},stroke-width:2px"
           ) entityKinds
