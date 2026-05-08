@@ -136,6 +136,7 @@ let
       ;
   };
   textLib = import ./text.nix { inherit lib; };
+  fleetIR = import ./fleet-ir.nix { inherit lib; };
   fleetLib = import ./fleet.nix {
     inherit
       den
@@ -183,6 +184,11 @@ let
 
   pipes = {
     buildFlows = pipeFlow.buildPipeFlows;
+  };
+
+  fleetGraph = {
+    build = fleetIR.buildFleetIR;
+    toJSON = fleetIR.toFleetJSON;
   };
 
   text = textLib;

@@ -175,7 +175,17 @@ in
         ++ mkFleetEntries "aspect-matrix" aspectMatrixView
         ++ mkFleetEntries "policy-resolution" policyMapView
         ++ mkFleetEntries "pipe-sequence" pipeSeqView
-        ++ mkFleetEntries "fleet-dag" fleetDagView;
+        ++ mkFleetEntries "fleet-dag" fleetDagView
+        ++ [
+          {
+            name = "fleet";
+            view = "fleet-ir";
+            dir = "fleet";
+            ext = "json";
+            tool = null;
+            drv = fleetIrDrv;
+          }
+        ];
 
       # --- Assembly ---
 
@@ -257,6 +267,8 @@ in
           rc.render.toPolicyResolutionMapMermaid;
       pipeSeqView = mkFleetView "pipe-sequence" "Pipe Sequence" rc.render.toPipeSequenceMermaid;
       fleetDagSource = rc.render.toFleetDagMermaid { inherit fleetCapture hostGraphs; };
+      fleetIrJson = diag.fleetGraph.toJSON { inherit fleetCapture hostGraphs; };
+      fleetIrDrv = pkgs.writeText "fleet-ir.json" fleetIrJson;
       fleetDagView = {
         md = pkgs.writeText "fleet-dag.md" "# Fleet DAG\n\n![Fleet DAG](./fleet-dag.mmd.svg)\n\n```mermaid\n${fleetDagSource}\n```\n";
         svg = rc.mmdSourceToSvg "fleet-dag" fleetDagSource;
