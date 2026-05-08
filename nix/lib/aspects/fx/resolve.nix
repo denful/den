@@ -51,6 +51,13 @@ let
   # but keeping duplicates wastes evaluation and can amplify lib.warn noise.
   wrapPerScope =
     ctx: scopeContexts: scopedClassImportsRaw:
+    {
+      # Optional: scope IDs to include in the classImports fold.
+      # When null, all scopes are folded. When set, only listed scopes
+      # are folded — entity subtree scopes are handled lazily by
+      # applyInstantiates subtree extraction via perScope.
+      foldScopes ? null,
+    }:
     let
       wrappedPerScope = lib.mapAttrs (
         scopeId: scopeClasses: wrapCollectedClasses (scopeContexts.${scopeId} or ctx) scopeClasses
@@ -93,10 +100,15 @@ let
                 };
               }
             ) acc allClasses;
+          scopesToFold =
+            if foldScopes != null then
+              map (sid: wrappedPerScope.${sid}) foldScopes
+            else
+              builtins.attrValues wrappedPerScope;
           final = builtins.foldl' go {
             classes = { };
             keys = { };
-          } (builtins.attrValues wrappedPerScope);
+          } scopesToFold;
         in
         final.classes;
     in
@@ -312,7 +324,7 @@ let
                   subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
                   subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
                   relevantContexts = lib.genAttrs relevantScopeIds (sid: augmentedScopeContexts.${sid});
-                  subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
+                  subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports { };
                   subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
                   subtreePhase3 =
                     applyRoutes fxResolveFn ctx relevantContexts hostScopeId subtreeRoutes
@@ -431,7 +443,7 @@ let
             subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
             subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
             relevantContexts = lib.genAttrs relevantScopeIds (sid: scopeContexts.${sid});
-            subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
+            subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports { };
             subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
             subtreePhase3 =
               applyRoutes (fxResolve mkPipeline) ctx relevantContexts hostScopeId subtreeRoutes
@@ -530,10 +542,51 @@ let
             ) accImports newEntries
         ) scopedClassImportsRaw (builtins.attrNames allDeferred);
 
-      phase1 = wrapPerScope ctx augmentedScopeContexts drainedClassImportsRaw;
-      phase2 = applyProvides ctx augmentedScopeContexts scopedProvides phase1;
+      # At the flake level, only fold non-entity scopes into classImports.
+      # Entity subtree scopes are handled lazily by applyInstantiates
+      # subtree extraction — folding them here would force wrapping of
+      # host/user modules (triggering lib.warn in HM modules, etc.).
+      # Non-flake pipelines (direct fxResolve calls, nested resolves)
+      # fold all scopes normally.
+      entityKinds = den.lib.schemaUtil.schemaEntityKinds;
+      isFlakePipeline = class == "flake";
+      foldScopeFilter =
+        if isFlakePipeline then
+          builtins.filter (
+            sid:
+            let
+              scopeCtx = augmentedScopeContexts.${sid} or { };
+            in
+            !builtins.any (k: scopeCtx ? ${k}) entityKinds
+          ) (builtins.attrNames drainedClassImportsRaw)
+        else
+          null;
+      phase1 = wrapPerScope ctx augmentedScopeContexts drainedClassImportsRaw {
+        foldScopes = foldScopeFilter;
+      };
+      # Also filter provides and routes at the flake level to avoid forcing
+      # entity-scope module evaluation. Subtree extraction in applyInstantiates
+      # re-runs provides/routes per host lazily.
+      isNonEntityScope =
+        sid:
+        let
+          scopeCtx = augmentedScopeContexts.${sid} or { };
+        in
+        !builtins.any (k: scopeCtx ? ${k}) entityKinds;
+      filteredProvides =
+        if isFlakePipeline then
+          lib.filterAttrs (sid: _: isNonEntityScope sid) scopedProvides
+        else
+          scopedProvides;
+      filteredRoutes =
+        if isFlakePipeline then
+          lib.filterAttrs (sid: _: isNonEntityScope sid) scopedRoutes
+        else
+          scopedRoutes;
+      phase2 = applyProvides ctx augmentedScopeContexts filteredProvides phase1;
       phase3 =
-        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId scopedRoutes
+        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
+          filteredRoutes
           phase2;
       phase4 = applyInstantiates {
         scopedInstantiates = result.state.scopedInstantiates null;
@@ -552,7 +605,41 @@ let
     {
       imports = phase4.${class} or [ ];
     };
+
+  # Like fxResolve but skips instantiation (phase 4).
+  # Returns only class imports from phases 1-3 (wrap, provides, routes).
+  # Use for nested resolution where entity instantiation is unwanted
+  # (e.g., extracting homeManager modules from a host's aspect tree).
+  fxResolveImports =
+    mkPipeline:
+    {
+      class,
+      self,
+      ctx,
+    }:
+    let
+      result = mkPipeline { inherit class; } { inherit self ctx; };
+      scopeContexts = result.state.scopeContexts null;
+      scopedClassImportsRaw = result.state.scopedClassImports null;
+
+      augmentedScopeContexts = assemblePipes {
+        inherit scopeContexts;
+        scopedClassImports = scopedClassImportsRaw;
+        scopedPipeEffects = result.state.scopedPipeEffects null;
+        scopeParent = result.state.scopeParent null;
+      };
+
+      phase1 = wrapPerScope ctx augmentedScopeContexts scopedClassImportsRaw { };
+      phase2 = applyProvides ctx augmentedScopeContexts (result.state.scopedProvides null) phase1;
+      phase3 =
+        applyRoutes (fxResolveImports mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
+          (result.state.scopedRoutes null)
+          phase2;
+    in
+    {
+      imports = phase3.classImports.${class} or [ ];
+    };
 in
 {
-  inherit fxResolve wrapCollectedClasses;
+  inherit fxResolve fxResolveImports wrapCollectedClasses;
 }

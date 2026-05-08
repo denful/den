@@ -220,6 +220,7 @@ let
   resolveModule = import ./resolve.nix { inherit lib den; };
   inherit (resolveModule) wrapCollectedClasses;
   fxResolve = resolveModule.fxResolve mkPipeline;
+  fxResolveImports = resolveModule.fxResolveImports mkPipeline;
 in
 {
   inherit
@@ -230,6 +231,7 @@ in
     mkScopeId
     fxFullResolve
     fxResolve
+    fxResolveImports
     wrapCollectedClasses
     ;
 }

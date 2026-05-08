@@ -62,6 +62,19 @@ let
       self = wrapped;
     };
 
+  # Like resolve but skips entity instantiation.
+  # Use for nested resolution (e.g., extracting homeManager modules from a host tree).
+  fxResolveTreeImports =
+    class: resolved:
+    let
+      wrapped = normalizeRoot resolved;
+      ctx = fx.aspect.ctxFromHandlers (resolved.__scopeHandlers or { });
+    in
+    fx.pipeline.fxResolveImports {
+      inherit class ctx;
+      self = wrapped;
+    };
+
   # Like resolve but returns full pipeline result including state.
   fxResolveTreeFull =
     class: resolved:
@@ -84,6 +97,7 @@ in
     policyTypes
     ;
   resolve = fxResolveTree;
+  resolveImports = fxResolveTreeImports;
   resolveWithState = fxResolveTreeFull;
   inherit (hasAspect) hasAspectIn collectPathSet mkEntityHasAspect;
   mkAspectsType = typeCfg: lib.mapAttrs (_: v: v typeCfg) rawTypes;
