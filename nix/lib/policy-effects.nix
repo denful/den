@@ -210,4 +210,11 @@
         };
     in
     if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
+
+  # Create a named policy record for use in includes.
+  # Usage: den.default.includes = [ (den.lib.policy.mkPolicy "host-guards" myPolicyFn) ];
+  mkPolicy = name: fn: {
+    __isPolicy = true;
+    inherit name fn;
+  };
 }
