@@ -17,10 +17,8 @@
       background-color: #111827;
       overflow: hidden;
     }
-    #root {
-      height: 100%;
-      width: 100%;
-    }
+    #root { height: 100%; width: 100%; }
+
     .control-panel {
       position: absolute;
       top: 15px;
@@ -34,11 +32,25 @@
       display: flex;
       flex-direction: column;
       gap: 10px;
-      width: 350px;
+      width: 380px;
+      max-height: calc(100vh - 30px);
+      overflow-y: auto;
     }
+    .tabs { display: flex; gap: 4px; }
+    .tab {
+      padding: 6px 12px;
+      border-radius: 4px 4px 0 0;
+      cursor: pointer;
+      font-size: 12px;
+      font-weight: bold;
+      border: 1px solid #4b5563;
+      border-bottom: none;
+    }
+    .tab.active { background: #374151; color: #f3f4f6; }
+    .tab:not(.active) { background: #1f2937; color: #9ca3af; }
     textarea {
       width: 100%;
-      height: 250px;
+      height: 200px;
       font-family: monospace;
       font-size: 11px;
       padding: 8px;
@@ -60,9 +72,9 @@
       font-weight: bold;
       transition: background 0.2s;
     }
-    button:hover {
-      background: #2563eb;
-    }
+    button:hover { background: #2563eb; }
+    button.secondary { background: #4b5563; }
+    button.secondary:hover { background: #6b7280; }
     .error {
       color: #fca5a5;
       font-size: 12px;
@@ -70,23 +82,62 @@
       padding: 4px;
       border-radius: 4px;
     }
+    .stats {
+      font-size: 11px;
+      color: #9ca3af;
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .stats span { color: #e5e7eb; font-weight: bold; }
+    .filter-row {
+      display: flex;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .filter-chip {
+      font-size: 10px;
+      padding: 3px 8px;
+      border-radius: 12px;
+      cursor: pointer;
+      border: 1px solid #4b5563;
+      transition: all 0.15s;
+    }
+    .filter-chip.active { background: #3b82f6; border-color: #3b82f6; color: white; }
+    .filter-chip:not(.active) { background: transparent; color: #9ca3af; }
     .legend {
       display: flex;
       flex-wrap: wrap;
       gap: 6px;
       font-size: 10px;
     }
-    .legend-item {
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
+    .legend-item { display: flex; align-items: center; gap: 4px; }
     .legend-swatch {
       width: 12px;
       height: 12px;
       border-radius: 2px;
       border: 1px solid rgba(255,255,255,0.2);
     }
+    .pipe-info {
+      font-size: 11px;
+      background: #374151;
+      padding: 8px;
+      border-radius: 4px;
+    }
+    .pipe-info h4 { margin: 0 0 4px 0; color: #f3f4f6; font-size: 12px; }
+    .pipe-info .flow { color: #10b981; }
+    .pipe-info .producer { color: #60a5fa; }
+    .drop-zone {
+      border: 2px dashed #4b5563;
+      border-radius: 4px;
+      padding: 12px;
+      text-align: center;
+      color: #9ca3af;
+      font-size: 12px;
+      cursor: pointer;
+      transition: border-color 0.2s;
+    }
+    .drop-zone.dragover { border-color: #3b82f6; color: #60a5fa; }
     .react-flow__node {
       font-family: monospace;
       font-size: 11px;
@@ -118,14 +169,13 @@
   <script src="https://unpkg.com/@babel/standalone@7.24.0/babel.min.js"></script>
 
   <script type="text/babel" data-type="module">
-    import React, { useState, useCallback } from 'react';
+    import React, { useState, useCallback, useRef } from 'react';
     import { createRoot } from 'react-dom/client';
     import { ReactFlow, MiniMap, Controls, Background, useNodesState, useEdgesState } from '@xyflow/react';
     import dagre from 'dagre';
 
     // --- Color palettes ---
 
-    // Node styles
     const nodeStyles = {
       default:  { bg: '#e2e8f0', border: '#64748b', color: '#1e293b' },
       adapter:  { bg: '#dbeafe', border: '#3b82f6', color: '#1e3a5f' },
@@ -135,72 +185,138 @@
       policy:   { bg: '#fef08a', border: '#ca8a04', color: '#713f12' },
     };
 
-    // Entity instance colors — cycle through for subgraph grouping
-    const instancePalette = [
-      '#3b82f680', '#8b5cf680', '#10b98180', '#f59e0b80',
-      '#ef444480', '#06b6d480', '#ec489980', '#84cc1680',
+    const hostPalette = [
+      '#3b82f6', '#8b5cf6', '#10b981', '#f59e0b',
+      '#ef4444', '#06b6d4', '#ec4899', '#84cc16',
     ];
 
-    // Edge styles
-    const edgeStyles = {
+    const edgeStyleMap = {
       normal:   { stroke: '#94a3b8', dash: 'none',  animated: false },
       provide:  { stroke: '#10b981', dash: 'none',  animated: true },
       policy:   { stroke: '#ca8a04', dash: '5 5',   animated: false },
       excluded: { stroke: '#fca5a5', dash: '8 4',   animated: false },
       replaced: { stroke: '#d97706', dash: '5 5',   animated: false },
+      pipe:     { stroke: '#a78bfa', dash: 'none',  animated: true },
     };
 
-    const defaultJSON = `{
-  "direction": "LR",
-  "edges": [
-    {"from": "host", "to": "workstation", "style": "normal"},
-    {"from": "workstation", "to": "desktop", "style": "normal"},
-    {"from": "workstation", "to": "docker", "style": "excluded"}
-  ],
-  "nodes": [
-    {"id": "host", "fullLabel": "host", "style": "adapter", "shape": "rect", "entityInstance": "host:myhost"},
-    {"id": "workstation", "fullLabel": "workstation", "style": "adapter", "shape": "hexagon", "entityInstance": "host:myhost"},
-    {"id": "desktop", "fullLabel": "desktop", "style": "adapter", "shape": "rect", "entityInstance": "host:myhost"},
-    {"id": "docker", "fullLabel": "virtualization/docker", "style": "excluded", "shape": "trapezoid", "entityInstance": "host:myhost"}
-  ],
-  "entityInstances": [
-    {"id": "ctx_host_myhost", "kind": "host", "name": "myhost", "label": "host: myhost"}
-  ]
-}`;
+    // --- Detect IR type ---
+    const isFleetIR = (data) => !!data.scopes;
 
-    // Build instance color map
-    const buildInstanceColors = (entityInstances) => {
+    // --- Build host color map ---
+    const buildHostColors = (data) => {
       const map = {};
-      (entityInstances || []).forEach((inst, i) => {
-        const key = inst.kind === inst.name ? inst.name : inst.kind + ':' + inst.name;
-        map[key] = instancePalette[i % instancePalette.length];
-      });
+      if (isFleetIR(data)) {
+        const hosts = (data.scopes || []).filter(s => s.kind === 'host');
+        hosts.forEach((h, i) => { map[h.name] = hostPalette[i % hostPalette.length]; });
+      } else {
+        const instances = data.entityInstances || [];
+        instances.forEach((inst, i) => {
+          const key = inst.kind === inst.name ? inst.name : inst.kind + ':' + inst.name;
+          map[key] = hostPalette[i % hostPalette.length] + '80';
+        });
+      }
       return map;
     };
 
-    // Transform Den IR into React Flow schema
-    const transformDenIR = (denData) => {
-      const direction = denData.direction || 'LR';
+    // --- Transform fleet IR ---
+    const transformFleetIR = (data, filters) => {
+      const direction = data.direction || 'LR';
       const sourcePosition = direction === 'LR' ? 'right' : 'bottom';
       const targetPosition = direction === 'LR' ? 'left' : 'top';
-      const instanceColors = buildInstanceColors(denData.entityInstances);
+      const hostColors = buildHostColors(data);
 
-      const nodes = (denData.nodes || []).map((n) => {
+      // Filter nodes by host if filters active
+      const activeHosts = Object.keys(filters.hosts || {}).filter(h => filters.hosts[h]);
+      const showAll = activeHosts.length === 0 || activeHosts.length === Object.keys(filters.hosts).length;
+
+      const filteredNodes = (data.nodes || []).filter(n => {
+        if (!showAll && n.host && !filters.hosts[n.host]) return false;
+        if (!filters.showPolicies && n.isPolicyDispatch) return false;
+        if (!filters.showProviders && n.isProvider) return false;
+        return true;
+      });
+
+      const nodeIdSet = new Set(filteredNodes.map(n => n.id));
+
+      const nodes = filteredNodes.map(n => {
         const s = nodeStyles[n.style] || nodeStyles.default;
-        const instanceColor = n.entityInstance ? instanceColors[n.entityInstance] : null;
+        const hostColor = n.host ? hostColors[n.host] : null;
+        const pipeProduces = n.pipes?.produces || [];
 
         let borderRadius = '4px';
         if (n.shape === 'hexagon') borderRadius = '16px';
         if (n.shape === 'trapezoid') borderRadius = '4px 4px 12px 12px';
 
-        // Build label with metadata
+        let label = n.label || n.fullLabel || n.id;
+        const meta = [];
+        if (n.host) meta.push(n.host);
+        if (n.classes?.length) meta.push(n.classes.join('+'));
+        if (n.isPolicyDispatch) meta.push('policy');
+        if (pipeProduces.length) meta.push('pipe: ' + pipeProduces.join(', '));
+        if (n.isParametric && n.fnArgNames?.length) meta.push('(' + n.fnArgNames.join(', ') + ')');
+        if (meta.length) label += '\n' + meta.join(' | ');
+
+        return {
+          id: n.id,
+          sourcePosition,
+          targetPosition,
+          data: { label },
+          style: {
+            background: s.bg,
+            border: '2px solid ' + (hostColor || s.border),
+            color: s.color,
+            borderRadius,
+            width: 220,
+            boxShadow: hostColor
+              ? `0 0 0 3px ${hostColor}40, 0 2px 4px rgba(0,0,0,0.2)`
+              : '0 2px 4px rgba(0,0,0,0.2)',
+            whiteSpace: 'pre-line',
+            fontSize: '10px',
+            lineHeight: '1.3',
+          }
+        };
+      });
+
+      const edges = (data.edges || [])
+        .filter(e => nodeIdSet.has(e.from) && nodeIdSet.has(e.to))
+        .map((e, idx) => {
+          const es = edgeStyleMap[e.style] || edgeStyleMap.normal;
+          return {
+            id: 'e-' + e.from + '-' + e.to + '-' + idx,
+            source: e.from,
+            target: e.to,
+            label: e.label,
+            animated: es.animated,
+            type: 'smoothstep',
+            style: { stroke: es.stroke, strokeDasharray: es.dash, strokeWidth: e.crossHost ? 2.5 : 1.5 },
+            labelStyle: { fill: '#e5e7eb', fontSize: '10px' },
+            labelBgStyle: { fill: '#1f2937', fillOpacity: 0.8 },
+          };
+        });
+
+      return { nodes, edges, direction, hostColors };
+    };
+
+    // --- Transform per-host IR (original format) ---
+    const transformHostIR = (data) => {
+      const direction = data.direction || 'LR';
+      const sourcePosition = direction === 'LR' ? 'right' : 'bottom';
+      const targetPosition = direction === 'LR' ? 'left' : 'top';
+      const hostColors = buildHostColors(data);
+
+      const nodes = (data.nodes || []).map(n => {
+        const s = nodeStyles[n.style] || nodeStyles.default;
+        const instanceColor = n.entityInstance ? hostColors[n.entityInstance] : null;
+
+        let borderRadius = '4px';
+        if (n.shape === 'hexagon') borderRadius = '16px';
+        if (n.shape === 'trapezoid') borderRadius = '4px 4px 12px 12px';
+
         let label = n.fullLabel || n.label || n.id;
         const meta = [];
-        if (n.classes && n.classes.length) meta.push(n.classes.join('+'));
+        if (n.classes?.length) meta.push(n.classes.join('+'));
         if (n.isPolicyDispatch) meta.push('policy');
-        if (n.isParametric && n.fnArgNames && n.fnArgNames.length) {
-          meta.push('(' + n.fnArgNames.join(', ') + ')');
-        }
+        if (n.isParametric && n.fnArgNames?.length) meta.push('(' + n.fnArgNames.join(', ') + ')');
         if (meta.length) label += '\n' + meta.join(' ');
 
         return {
@@ -224,8 +340,8 @@
         };
       });
 
-      const edges = (denData.edges || []).map((e, idx) => {
-        const es = edgeStyles[e.style] || edgeStyles.normal;
+      const edges = (data.edges || []).map((e, idx) => {
+        const es = edgeStyleMap[e.style] || edgeStyleMap.normal;
         return {
           id: 'e-' + e.from + '-' + e.to + '-' + idx,
           source: e.from,
@@ -239,51 +355,48 @@
         };
       });
 
-      return { nodes, edges, direction, instanceColors };
+      return { nodes, edges, direction, hostColors };
     };
 
+    // --- Dagre layout ---
     const getLayoutedElements = (nodes, edges, direction = 'LR') => {
       const g = new dagre.graphlib.Graph();
       g.setDefaultEdgeLabel(() => ({}));
-      g.setGraph({ rankdir: direction, nodesep: 50, ranksep: 200 });
+      g.setGraph({ rankdir: direction, nodesep: 40, ranksep: 160 });
 
-      nodes.forEach((node) => {
-        g.setNode(node.id, { width: 200, height: 50 });
-      });
-
-      edges.forEach((edge) => {
-        g.setEdge(edge.source, edge.target);
+      nodes.forEach(node => { g.setNode(node.id, { width: 220, height: 55 }); });
+      edges.forEach(edge => {
+        if (g.hasNode(edge.source) && g.hasNode(edge.target)) {
+          g.setEdge(edge.source, edge.target);
+        }
       });
 
       dagre.layout(g);
 
-      const layoutedNodes = nodes.map((node) => {
-        const pos = g.node(node.id);
-        return {
-          ...node,
-          position: { x: pos.x - 100, y: pos.y - 25 },
-        };
-      });
-
-      return { nodes: layoutedNodes, edges };
+      return {
+        nodes: nodes.map(node => {
+          const pos = g.node(node.id);
+          return pos ? { ...node, position: { x: pos.x - 110, y: pos.y - 27 } } : node;
+        }),
+        edges: edges.filter(e => g.hasNode(e.source) && g.hasNode(e.target)),
+      };
     };
 
-    function Legend({ instanceColors }) {
-      const styleEntries = Object.entries(nodeStyles);
-      const instanceEntries = Object.entries(instanceColors || {});
+    // --- Components ---
 
+    function Legend({ hostColors }) {
       return (
         <div className="legend">
-          {styleEntries.map(([name, s]) => (
+          {Object.entries(nodeStyles).map(([name, s]) => (
             <div key={name} className="legend-item">
               <div className="legend-swatch" style={{ background: s.bg, borderColor: s.border }} />
               <span>{name}</span>
             </div>
           ))}
-          {instanceEntries.length > 0 && (
+          {Object.entries(hostColors || {}).length > 0 && (
             <>
               <span style={{ width: '100%', borderTop: '1px solid #4b5563', margin: '2px 0' }} />
-              {instanceEntries.map(([name, color]) => (
+              {Object.entries(hostColors).map(([name, color]) => (
                 <div key={name} className="legend-item">
                   <div className="legend-swatch" style={{ background: color }} />
                   <span>{name}</span>
@@ -295,48 +408,174 @@
       );
     }
 
-    function App() {
-      const initialDenData = JSON.parse(defaultJSON);
-      const initialFlowData = transformDenIR(initialDenData);
-      const initialLayout = getLayoutedElements(initialFlowData.nodes, initialFlowData.edges, initialFlowData.direction);
+    function PipeInfo({ pipes }) {
+      if (!pipes || Object.keys(pipes).length === 0) return null;
+      return (
+        <div className="pipe-info">
+          <h4>Pipes</h4>
+          {Object.entries(pipes).map(([name, p]) => (
+            <div key={name} style={{ marginBottom: 6 }}>
+              <strong>{name}</strong>
+              {p.producers?.map((pr, i) => (
+                <div key={i} className="producer"> {pr.host}:{pr.aspect} produces</div>
+              ))}
+              {p.flows?.map((f, i) => (
+                <div key={i} className="flow"> {f.from} → {f.to}</div>
+              ))}
+            </div>
+          ))}
+        </div>
+      );
+    }
 
-      const [nodes, setNodes, onNodesChange] = useNodesState(initialLayout.nodes);
-      const [edges, setEdges, onEdgesChange] = useEdgesState(initialLayout.edges);
-      const [jsonInput, setJsonInput] = useState(defaultJSON);
-      const [error, setError] = useState("");
-      const [instanceColors, setInstanceColors] = useState(initialFlowData.instanceColors);
+    function App() {
+      const [nodes, setNodes, onNodesChange] = useNodesState([]);
+      const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+      const [jsonInput, setJsonInput] = useState('');
+      const [error, setError] = useState('');
+      const [hostColors, setHostColors] = useState({});
+      const [irData, setIrData] = useState(null);
+      const [filters, setFilters] = useState({ hosts: {}, showPolicies: true, showProviders: true });
+      const [dragover, setDragover] = useState(false);
+      const fileRef = useRef(null);
+
+      const renderData = useCallback((data, currentFilters) => {
+        const f = currentFilters || filters;
+        const isFleet = isFleetIR(data);
+
+        let flowData;
+        if (isFleet) {
+          // Initialize host filters if empty
+          if (Object.keys(f.hosts).length === 0) {
+            const hosts = {};
+            (data.scopes || []).filter(s => s.kind === 'host').forEach(s => { hosts[s.name] = true; });
+            f.hosts = hosts;
+          }
+          flowData = transformFleetIR(data, f);
+        } else {
+          flowData = transformHostIR(data);
+        }
+
+        const layouted = getLayoutedElements(flowData.nodes, flowData.edges, flowData.direction);
+        setNodes(layouted.nodes);
+        setEdges(layouted.edges);
+        setHostColors(flowData.hostColors);
+        setIrData(data);
+        setError('');
+      }, [filters]);
 
       const handleRender = () => {
         try {
           const parsed = JSON.parse(jsonInput);
-          if (!parsed.nodes || !parsed.edges) {
-            throw new Error("JSON must contain 'nodes' and 'edges' arrays.");
-          }
-
-          const flowData = transformDenIR(parsed);
-          const layouted = getLayoutedElements(flowData.nodes, flowData.edges, flowData.direction);
-
-          setNodes(layouted.nodes);
-          setEdges(layouted.edges);
-          setInstanceColors(flowData.instanceColors);
-          setError("");
+          if (!parsed.nodes || !parsed.edges) throw new Error("JSON must contain 'nodes' and 'edges'.");
+          const newFilters = { hosts: {}, showPolicies: true, showProviders: true };
+          setFilters(newFilters);
+          renderData(parsed, newFilters);
         } catch (err) {
-          setError("Invalid JSON: " + err.message);
+          setError('Invalid JSON: ' + err.message);
         }
       };
+
+      const handleFileDrop = useCallback((e) => {
+        e.preventDefault();
+        setDragover(false);
+        const file = e.dataTransfer?.files?.[0] || e.target?.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          try {
+            const text = ev.target.result;
+            setJsonInput(text);
+            const parsed = JSON.parse(text);
+            const newFilters = { hosts: {}, showPolicies: true, showProviders: true };
+            setFilters(newFilters);
+            renderData(parsed, newFilters);
+          } catch (err) {
+            setError('Failed to parse: ' + err.message);
+          }
+        };
+        reader.readAsText(file);
+      }, [renderData]);
+
+      const toggleHost = (host) => {
+        const newFilters = { ...filters, hosts: { ...filters.hosts, [host]: !filters.hosts[host] } };
+        setFilters(newFilters);
+        if (irData) renderData(irData, newFilters);
+      };
+
+      const toggleFilter = (key) => {
+        const newFilters = { ...filters, [key]: !filters[key] };
+        setFilters(newFilters);
+        if (irData) renderData(irData, newFilters);
+      };
+
+      const isFleet = irData && isFleetIR(irData);
 
       return (
         <div style={{ width: '100vw', height: '100vh' }}>
           <div className="control-panel">
-            <strong>DAG Input (Den IR)</strong>
+            <strong>Den IR Viewer</strong>
+
+            <div
+              className={'drop-zone' + (dragover ? ' dragover' : '')}
+              onDragOver={(e) => { e.preventDefault(); setDragover(true); }}
+              onDragLeave={() => setDragover(false)}
+              onDrop={handleFileDrop}
+              onClick={() => fileRef.current?.click()}
+            >
+              Drop fleet-ir.json or ir.md here (or click)
+              <input ref={fileRef} type="file" accept=".json,.md" style={{ display: 'none' }} onChange={handleFileDrop} />
+            </div>
+
             <textarea
               value={jsonInput}
               onChange={(e) => setJsonInput(e.target.value)}
               spellCheck="false"
+              placeholder="Paste Den IR JSON here..."
             />
             {error && <div className="error">{error}</div>}
             <button onClick={handleRender}>Render Graph</button>
-            <Legend instanceColors={instanceColors} />
+
+            {irData && (
+              <div className="stats">
+                <div>Nodes: <span>{nodes.length}</span></div>
+                <div>Edges: <span>{edges.length}</span></div>
+                {isFleet && <div>Scopes: <span>{irData.scopes?.length}</span></div>}
+                {isFleet && <div>Pipes: <span>{Object.keys(irData.pipes || {}).length}</span></div>}
+                <div>Type: <span>{isFleet ? 'Fleet' : 'Host'}</span></div>
+              </div>
+            )}
+
+            {isFleet && (
+              <>
+                <div style={{ fontSize: 11, color: '#9ca3af' }}>Filter by host:</div>
+                <div className="filter-row">
+                  {Object.keys(filters.hosts).map(h => (
+                    <div
+                      key={h}
+                      className={'filter-chip' + (filters.hosts[h] ? ' active' : '')}
+                      onClick={() => toggleHost(h)}
+                      style={filters.hosts[h] ? { borderColor: hostColors[h], background: hostColors[h] + '30' } : {}}
+                    >
+                      {h}
+                    </div>
+                  ))}
+                </div>
+                <div className="filter-row">
+                  <div
+                    className={'filter-chip' + (filters.showPolicies ? ' active' : '')}
+                    onClick={() => toggleFilter('showPolicies')}
+                  >policies</div>
+                  <div
+                    className={'filter-chip' + (filters.showProviders ? ' active' : '')}
+                    onClick={() => toggleFilter('showProviders')}
+                  >providers</div>
+                </div>
+              </>
+            )}
+
+            <Legend hostColors={hostColors} />
+            {isFleet && <PipeInfo pipes={irData.pipes} />}
           </div>
 
           <ReactFlow
@@ -345,12 +584,12 @@
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             fitView
-            minZoom={0.05}
+            minZoom={0.02}
           >
             <Background color="#374151" gap={16} />
             <Controls />
             <MiniMap
-              nodeStrokeColor={(n) => '#1a192b'}
+              nodeStrokeColor={() => '#1a192b'}
               nodeColor={(n) => n.style?.background || '#fff'}
               nodeBorderRadius={2}
               style={{ background: '#1f2937' }}
