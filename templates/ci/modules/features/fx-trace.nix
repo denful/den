@@ -503,5 +503,50 @@
       }
     );
 
+    test-tracingHandler-record-fired = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        comp = fx.send "record-fired" {
+          entityKind = "host";
+          firedPolicies = {
+            host-to-users = true;
+            host-to-default = true;
+          };
+        };
+        result = fx.handle {
+          handlers = den.lib.aspects.fx.pipeline.composeHandlers (den.lib.aspects.fx.pipeline.defaultHandlers
+            {
+              class = "nixos";
+              ctx = { };
+            }
+          ) (den.lib.aspects.fx.trace.tracingHandler "nixos");
+          state = den.lib.aspects.fx.pipeline.defaultState // {
+            entries = [ ];
+            ctxTrace = [ ];
+          };
+        } comp;
+        policyEntries = builtins.filter (e: e.isPolicyDispatch or false) result.state.entries;
+        policyNames = lib.sort (a: b: a < b) (map (e: e.policyName) policyEntries);
+      in
+      {
+        expr = {
+          count = builtins.length policyEntries;
+          names = policyNames;
+          fromKind = (builtins.head policyEntries).from;
+          toIsNull = (builtins.head policyEntries).to == null;
+        };
+        expected = {
+          count = 2;
+          names = [
+            "host-to-default"
+            "host-to-users"
+          ];
+          fromKind = "host";
+          toIsNull = true;
+        };
+      }
+    );
+
   };
 }

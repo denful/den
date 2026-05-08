@@ -197,6 +197,36 @@ let
             ctxTrace = (state.ctxTrace or [ ]) ++ [ ctxEntry ];
           };
       };
+    "record-fired" =
+      { param, state }:
+      let
+        firedNames = builtins.attrNames param.firedPolicies;
+        policyEntries = map (policyName: {
+          name = policyName;
+          class = "";
+          parent = null;
+          provider = [ ];
+          excluded = false;
+          excludedFrom = null;
+          replacedBy = null;
+          isProvider = false;
+          handlers = [ ];
+          hasClass = false;
+          isParametric = false;
+          fnArgNames = [ ];
+          entityKind = param.entityKind;
+          isPolicyDispatch = true;
+          policyName = policyName;
+          from = param.entityKind;
+          to = null;
+        }) firedNames;
+      in
+      {
+        resume = null;
+        state = state // {
+          entries = (state.entries or [ ]) ++ policyEntries;
+        };
+      };
   };
 
 in
