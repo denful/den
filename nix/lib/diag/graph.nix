@@ -537,11 +537,29 @@ let
           n
       ) rawNodes;
 
-      # Assign "flake" instance to unscoped nodes when entity instances exist.
+      # Assign unscoped nodes to the root entity instance. The root
+      # entity is determined from ctxTrace (first entry = the entity kind
+      # that the capture started from). Unscoped nodes are children of
+      # the root entity that resolve before deriveEntityKind can find an
+      # ancestor — they belong in the root's subgraph, not "flake".
       hasAnyInstances = builtins.any (n: n.entityInstance != null) finalNodes;
+      rootInstance =
+        if ctxTrace != [ ] then
+          let
+            rootCtx = builtins.head ctxTrace;
+          in
+          "${rootCtx.entityKind}:${rootCtx.selfName}"
+        else
+          null;
       taggedNodes =
         if hasAnyInstances then
-          map (n: if n.entityInstance == null then n // { entityInstance = "flake"; } else n) finalNodes
+          map (
+            n:
+            if n.entityInstance == null then
+              n // { entityInstance = if rootInstance != null then rootInstance else "flake"; }
+            else
+              n
+          ) finalNodes
         else
           finalNodes;
 

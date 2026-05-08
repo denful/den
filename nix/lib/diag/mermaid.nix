@@ -160,9 +160,7 @@ let
         inst:
         let
           key = instKey inst;
-          instNodes = builtins.filter (
-            n: (n.entityInstance or null) == key && n.id != rootId && !(n.isPolicyDispatch or false)
-          ) nodes;
+          instNodes = builtins.filter (n: (n.entityInstance or null) == key && n.id != rootId) nodes;
           instEdges = builtins.filter (
             e:
             let
@@ -172,7 +170,6 @@ let
               toInst = if toNode != null then toNode.entityInstance or null else null;
             in
             fromNode != null
-            && !(fromNode.isPolicyDispatch or false)
             && fromInst == key
             && (toInst == null || toInst == key)
             && (e.style or "normal") != "policy"
@@ -186,7 +183,11 @@ let
           + "\n  end"
         );
 
-      policyNodes = builtins.filter (n: n.isPolicyDispatch or false) nodes;
+      # Policy nodes without an entityInstance are rendered outside subgraphs.
+      # Those with an entityInstance go inside their scope's subgraph.
+      policyNodes = builtins.filter (
+        n: (n.isPolicyDispatch or false) && (n.entityInstance or null) == null
+      ) nodes;
 
       # `topLevelNodes` are the nodes declared outside any stage subgraph.
       # When the graph is flat (no stages), that's every non-host node.
