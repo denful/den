@@ -135,6 +135,7 @@ let
       renderUtil
       ;
   };
+  textLib = import ./text.nix { inherit lib; };
   fleetLib = import ./fleet.nix {
     inherit
       den
@@ -183,6 +184,8 @@ let
   pipes = {
     buildFlows = pipeFlow.buildPipeFlows;
   };
+
+  text = textLib;
 
   inherit (json) toJSON;
 
@@ -337,6 +340,8 @@ in
     homeContext
     graph
     fleet
+    pipes
+    text
     views
     renderers
     renderContext

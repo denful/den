@@ -203,6 +203,27 @@ in
           inherit md svg;
         };
 
+      # --- Text summaries ---
+      fleetSummaryText = diag.text.fleetSummary fleetCapture;
+      fleetSummaryDrv = pkgs.writeText "fleet-summary.md" fleetSummaryText;
+
+      hostSummaryDrvs = lib.listToAttrs (
+        map (
+          host:
+          let
+            entity = diag.hostContext { inherit host; };
+            text = diag.text.hostSummary {
+              graph = entity;
+              inherit host fleetCapture;
+            };
+          in
+          {
+            name = "${host.name}-summary";
+            value = pkgs.writeText "${host.name}-summary.md" text;
+          }
+        ) allHosts
+      );
+
       pipeFlowView = mkFleetView "pipe-flow" "Pipe Flow" rc.render.toPipeFlowMermaid;
       scopeTopoView = mkFleetView "scope-topology" "Scope Topology" rc.render.toScopeTopologyMermaid;
       aspectMatrixView = mkFleetView "aspect-matrix" "Aspect Coverage" rc.render.toAspectMatrixMermaid;
@@ -235,12 +256,18 @@ in
       '';
     in
     {
-      packages = allPackages // {
-        write-diagrams = mkWriteScript pkgs {
-          entries = everyEntry;
-          inherit galleries readmeDrv;
-          destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/fleet-demo"'';
+      packages =
+        allPackages
+        // hostSummaryDrvs
+        // {
+          fleet-summary = fleetSummaryDrv;
+        }
+        // {
+          write-diagrams = mkWriteScript pkgs {
+            entries = everyEntry;
+            inherit galleries readmeDrv;
+            destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/fleet-demo"'';
+          };
         };
-      };
     };
 }
