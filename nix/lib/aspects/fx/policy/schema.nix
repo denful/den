@@ -115,7 +115,7 @@ let
 
   # Emit late policy effects into a single sibling scope.
   emitLateForSibling =
-    parentScope: allAspectPolicies: firedPerScope: sib:
+    parentScope: parentFiredPolicies: allAspectPolicies: firedPerScope: sib:
     let
       dispatchKey = "${sib.targetKind}@${sib.scopeId}";
       alreadyFired = firedPerScope.${dispatchKey} or { };
@@ -125,10 +125,17 @@ let
       # context but are a different entity kind). This prevents policies
       # like to-os-outputs from re-firing at deeper entity scopes and
       # producing duplicate instantiates.
+      #
+      # Also exclude policies that already fired at the parent scope during
+      # installPolicies. Output policies (to-packages, to-apps, etc.) fire
+      # at flake-system scope and produce route effects. Without this check,
+      # late dispatch re-fires them at entity scopes (host/home/user),
+      # creating duplicate routes that leak packages across scope boundaries.
       entityKinds = den.lib.schemaUtil.schemaEntityKinds;
       latePolicies = lib.filterAttrs (
         name: policy:
         !(alreadyFired ? ${name})
+        && !(parentFiredPolicies ? ${name})
         && (
           let
             policyArgs = builtins.functionArgs (policy.fn or policy);
@@ -208,9 +215,18 @@ let
           subtreePolicies = builtins.foldl' (
             acc: sid: acc // (scopedAspectPolicies.${sid} or { })
           ) { } relevantScopes;
+          # Collect all policies that already fired at the parent scope
+          # (under any entity kind). These should not re-fire at children
+          # via late dispatch — they already produced their effects.
+          parentFiredPolicies = builtins.foldl' (
+            acc: key: if lib.hasSuffix "@${parentScope}" key then acc // (firedPerScope.${key} or { }) else acc
+          ) { } (builtins.attrNames firedPerScope);
         in
         builtins.foldl' (
-          acc: sib: fx.bind acc (_: emitLateForSibling parentScope subtreePolicies firedPerScope sib)
+          acc: sib:
+          fx.bind acc (
+            _: emitLateForSibling parentScope parentFiredPolicies subtreePolicies firedPerScope sib
+          )
         ) (fx.pure null) siblingMetas
       )
     );
