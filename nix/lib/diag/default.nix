@@ -289,6 +289,10 @@ let
       withFn = pipeFlow.toAspectMatrixMermaidWith;
       mc = true;
     };
+    toPolicyResolutionMapMermaid = {
+      withFn = pipeFlow.toPolicyResolutionMapMermaidWith;
+      mc = true;
+    };
   };
 
   # Default-args pairs: { toFoo = withFn {}; toFooWith = withFn; }

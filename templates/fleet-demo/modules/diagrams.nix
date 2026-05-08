@@ -157,7 +157,8 @@ in
       fleetViewEntries =
         mkFleetEntries "pipe-flow" pipeFlowView
         ++ mkFleetEntries "scope-topology" scopeTopoView
-        ++ mkFleetEntries "aspect-matrix" aspectMatrixView;
+        ++ mkFleetEntries "aspect-matrix" aspectMatrixView
+        ++ mkFleetEntries "policy-resolution" policyMapView;
 
       # --- Assembly ---
 
@@ -205,6 +206,9 @@ in
       pipeFlowView = mkFleetView "pipe-flow" "Pipe Flow" rc.render.toPipeFlowMermaid;
       scopeTopoView = mkFleetView "scope-topology" "Scope Topology" rc.render.toScopeTopologyMermaid;
       aspectMatrixView = mkFleetView "aspect-matrix" "Aspect Coverage" rc.render.toAspectMatrixMermaid;
+      policyMapView =
+        mkFleetView "policy-resolution" "Policy Resolution Map"
+          rc.render.toPolicyResolutionMapMermaid;
 
       readmeDrv = pkgs.writeText "README.md" ''
         # Fleet Demo Diagrams

@@ -489,6 +489,107 @@ let
 
   toAspectMatrixMermaid = toAspectMatrixMermaidWith { };
 
+  # --- View 4: Policy entity resolution map ---
+  #
+  # Shows the fleet scope tree annotated with which policies drive each
+  # entity transition: fleet → environment (via fleet-to-envs) → host
+  # (via env-to-hosts) → user (via host-to-users).
+
+  toPolicyResolutionMapMermaidWith =
+    {
+      theme ? themes.defaultTheme,
+      mermaidConfig ? { },
+    }:
+    fleetCapture:
+    let
+      inherit (fleetCapture)
+        entries
+        scopeParent
+        scopeEntityKind
+        ;
+
+      # Policy entries grouped by entity kind they fire at.
+      policyEntries = builtins.filter (e: e.isPolicyDispatch or false) entries;
+
+      # For each scope transition (parent → child), find the policy that
+      # fires at the parent scope and creates child scopes of the child's kind.
+      # The policy's `from` matches the parent's entity kind.
+      policiesAtKind =
+        kind: lib.unique (map (e: e.name) (builtins.filter (e: (e.from or null) == kind) policyEntries));
+
+      allScopes = builtins.filter (s: s != "__unscoped" && s != "") (builtins.attrNames scopeParent);
+
+      # Group scopes by parent for fan-out display.
+      childrenOf =
+        parent:
+        lib.sort (a: b: a < b) (builtins.filter (s: (scopeParent.${s} or null) == parent) allScopes);
+
+      # Build nodes with entity-kind-specific shapes.
+      nodeDecl =
+        scopeId:
+        let
+          kind = scopeEntityKind.${scopeId} or null;
+          label = scopeLabel scopeEntityKind scopeId;
+          shape =
+            if kind == "fleet" then
+              "([\"${label}\"])"
+            else if kind == "environment" then
+              "{{\"${label}\"}}"
+            else if kind == "host" then
+              "[\"${label}\"]"
+            else if kind == "user" then
+              "([\"${label}\"])"
+            else
+              "[\"${label}\"]";
+        in
+        "  ${sanitize scopeId}${shape}";
+
+      # Build edges annotated with the policy that drives the transition.
+      edgeDecl =
+        scopeId:
+        let
+          parent = scopeParent.${scopeId} or null;
+          parentKind = if parent != null then scopeEntityKind.${parent} or null else null;
+          policies = if parentKind != null then policiesAtKind parentKind else [ ];
+          policyLabel = if policies != [ ] then lib.concatStringsSep ", " policies else null;
+          arrow = if policyLabel != null then "-->|${policyLabel}|" else "-->";
+        in
+        lib.optional (
+          parent != null && parent != "__unscoped" && parent != ""
+        ) "  ${sanitize parent} ${arrow} ${sanitize scopeId}";
+
+      # Color by entity kind.
+      kindColors = {
+        fleet = theme.accent5 or "#89b4fa";
+        environment = theme.accent6 or "#cba6f7";
+        host = theme.accent3 or "#a6e3a1";
+        user = theme.accent1 or "#fab387";
+        "flake-system" = theme.accent4 or "#94e2d5";
+      };
+      nodeStyle =
+        scopeId:
+        let
+          kind = scopeEntityKind.${scopeId} or null;
+          color = kindColors.${kind} or (theme.nodeBg or "#313244");
+          text = theme.rootText or "#1e1e2e";
+        in
+        "  style ${sanitize scopeId} fill:${color},stroke:${color},color:${text}";
+    in
+    renderMermaid
+      {
+        inherit theme mermaidConfig;
+        diagramKind = "graph TD";
+      }
+      (
+        map nodeDecl allScopes
+        ++ [ "" ]
+        ++ lib.concatMap edgeDecl allScopes
+        ++ [ "" ]
+        ++ map nodeStyle allScopes
+      );
+
+  toPolicyResolutionMapMermaid = toPolicyResolutionMapMermaidWith { };
+
 in
 {
   inherit
@@ -499,5 +600,7 @@ in
     toScopeTopologyMermaidWith
     toAspectMatrixMermaid
     toAspectMatrixMermaidWith
+    toPolicyResolutionMapMermaid
+    toPolicyResolutionMapMermaidWith
     ;
 }
