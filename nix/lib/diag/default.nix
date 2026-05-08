@@ -300,6 +300,10 @@ let
       withFn = pipeFlow.toPipeSequenceMermaidWith;
       mc = true;
     };
+    toFleetDagMermaid = {
+      withFn = pipeFlow.toFleetDagMermaidWith;
+      mc = true;
+    };
   };
 
   # Default-args pairs: { toFoo = withFn {}; toFooWith = withFn; }

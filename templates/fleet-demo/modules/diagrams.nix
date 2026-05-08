@@ -174,7 +174,8 @@ in
         ++ mkFleetEntries "scope-topology" scopeTopoView
         ++ mkFleetEntries "aspect-matrix" aspectMatrixView
         ++ mkFleetEntries "policy-resolution" policyMapView
-        ++ mkFleetEntries "pipe-sequence" pipeSeqView;
+        ++ mkFleetEntries "pipe-sequence" pipeSeqView
+        ++ mkFleetEntries "fleet-dag" fleetDagView;
 
       # --- Assembly ---
 
@@ -207,6 +208,14 @@ in
 
       # --- Fleet-level views from captureFleet ---
       fleetCapture = diag.captureFleet { };
+
+      # Per-host graph IRs for fleet DAG composition.
+      hostGraphs = lib.listToAttrs (
+        map (host: {
+          name = host.name;
+          value = diag.hostContext { inherit host; };
+        }) allHosts
+      );
 
       mkFleetView =
         name: title: renderFn:
@@ -247,6 +256,11 @@ in
         mkFleetView "policy-resolution" "Policy Resolution Map"
           rc.render.toPolicyResolutionMapMermaid;
       pipeSeqView = mkFleetView "pipe-sequence" "Pipe Sequence" rc.render.toPipeSequenceMermaid;
+      fleetDagSource = rc.render.toFleetDagMermaid { inherit fleetCapture hostGraphs; };
+      fleetDagView = {
+        md = pkgs.writeText "fleet-dag.md" "# Fleet DAG\n\n![Fleet DAG](./fleet-dag.mmd.svg)\n\n```mermaid\n${fleetDagSource}\n```\n";
+        svg = rc.mmdSourceToSvg "fleet-dag" fleetDagSource;
+      };
 
       readmeDrv = pkgs.writeText "README.md" ''
         # Fleet Demo Diagrams

@@ -694,6 +694,141 @@ let
 
   toPipeSequenceMermaid = toPipeSequenceMermaidWith { };
 
+  # --- View 6: Fleet-wide DAG ---
+  #
+  # Composes all hosts' aspect trees into a single DAG with:
+  #   - Environment subgraphs containing host subgraphs
+  #   - Per-host aspects inside their host subgraph
+  #   - Cross-host pipe flow edges
+  #   - User scopes nested under their host
+  #
+  # Takes fleet capture data + a function to build per-host graphs.
+  toFleetDagMermaidWith =
+    {
+      theme ? themes.defaultTheme,
+      mermaidConfig ? { },
+    }:
+    {
+      fleetCapture,
+      hostGraphs, # attrset: { "lb-prod" = graphIR; "web-prod-1" = graphIR; ... }
+    }:
+    let
+      flows = buildPipeFlows fleetCapture;
+      tracedProducers = fleetCapture.pipeProducers or [ ];
+
+      # Prefix all node/edge IDs with the host name to avoid collisions
+      # across hosts (e.g., "default" exists on every host).
+      prefixId = hostName: id: "${sanitize hostName}__${id}";
+
+      # Build per-host subgraph content.
+      hostBlock =
+        hostName: graph:
+        let
+          meaningful = builtins.filter (
+            n:
+            (n.hasClass or false)
+            && !(n.isPolicyDispatch or false)
+            && !(lib.hasPrefix "<" n.label)
+            && n.label != "host"
+            && n.label != "user"
+            && n.label != "default"
+          ) graph.nodes;
+
+          nodeDecl =
+            n:
+            let
+              shape =
+                if n.shape == "hexagon" then
+                  "{{\"${n.label}\"}}"
+                else if n.shape == "trapezoid" then
+                  "[/\"${n.label}\"\\]"
+                else
+                  "[\"${n.label}\"]";
+            in
+            "      ${prefixId hostName n.id}${shape}";
+
+          # Internal edges within this host.
+          internalEdges = builtins.filter (
+            e:
+            let
+              fromNode = lib.findFirst (n: n.id == e.from) null graph.nodes;
+              toNode = lib.findFirst (n: n.id == e.to) null graph.nodes;
+            in
+            fromNode != null
+            && toNode != null
+            && (fromNode.hasClass or false)
+            && (toNode.hasClass or false)
+            && !(fromNode.isPolicyDispatch or false)
+            && !(toNode.isPolicyDispatch or false)
+            && (e.style or "normal") == "normal"
+          ) graph.edges;
+
+          edgeDecl = e: "      ${prefixId hostName e.from} --> ${prefixId hostName e.to}";
+        in
+        if meaningful == [ ] then
+          [ ]
+        else
+          [
+            "    subgraph ${sanitize "host_${hostName}"}[\"${hostName}\"]"
+          ]
+          ++ map nodeDecl (lib.sort (a: b: a.label < b.label) meaningful)
+          ++ map edgeDecl internalEdges
+          ++ [ "    end" ];
+
+      # Environment subgraphs containing host subgraphs.
+      envBlock =
+        env:
+        let
+          hostBlocks = lib.concatMap (
+            h:
+            let
+              graph = hostGraphs.${h.name} or null;
+            in
+            if graph != null then hostBlock h.name graph else [ ]
+          ) env.hosts;
+        in
+        if hostBlocks == [ ] then
+          [ ]
+        else
+          [ "  subgraph ${sanitize "env_${env.name}"}[\"${env.name}\"]" ] ++ hostBlocks ++ [ "  end" ];
+
+      # Pipe flow edges between hosts (cross-host only).
+      pipeEdges = map (
+        e: "  ${sanitize "host_${e.from}"} -->|${e.pipe}| ${sanitize "host_${e.to}"}"
+      ) flows.flowEdges;
+
+      # Host subgraph styles.
+      hostStyles = lib.concatMap (
+        env:
+        map (
+          h:
+          "  style ${sanitize "host_${h.name}"} fill:${theme.nodeBg or "#313244"},stroke:${theme.nodeBorder or "#a6adc8"},stroke-width:1px"
+        ) env.hosts
+      ) flows.environments;
+
+      envStyles = map (
+        env:
+        "  style ${sanitize "env_${env.name}"} fill:${theme.clusterBg or "#313244"},stroke:${
+            theme.clusterBorder or "#6c7086"
+          },stroke-width:2px"
+      ) flows.environments;
+    in
+    renderMermaid
+      {
+        inherit theme mermaidConfig;
+        diagramKind = "graph LR";
+      }
+      (
+        lib.concatMap envBlock flows.environments
+        ++ [ "" ]
+        ++ pipeEdges
+        ++ [ "" ]
+        ++ hostStyles
+        ++ envStyles
+      );
+
+  toFleetDagMermaid = toFleetDagMermaidWith { };
+
 in
 {
   inherit
@@ -708,5 +843,7 @@ in
     toPolicyResolutionMapMermaidWith
     toPipeSequenceMermaid
     toPipeSequenceMermaidWith
+    toFleetDagMermaid
+    toFleetDagMermaidWith
     ;
 }
