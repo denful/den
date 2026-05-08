@@ -11,49 +11,43 @@ import { Aside } from '@astrojs/starlight/components';
 
 The terranix demo shows how to generate Terraform/OpenTofu configuration directly
 from den host definitions. Each host aspect contributes NixOS config **and**
-Terraform resources in a single declaration. A route policy collects the
-`terranix` class modules and feeds them through
-[terranixConfiguration](https://terranix.org), producing `config.tf.json`.
+Terraform resources in a single declaration. The `terranix` class uses the same
+`policy.instantiate` mechanism as `nixosSystem` — one pipeline walk, per-host
+isolation, no extra plumbing.
 
 ## How It Works
 
 ```
 den.aspects.* ──┬── nixos     → nixosConfigurations.<host>
-                └── terranix  → packages.<system>.tf  (config.tf.json)
+                └── terranix  → terranixConfigurations.<host>  (config.tf.json)
 ```
 
 Host aspects declare Terraform resources alongside NixOS config. The pipeline
-walks the aspect tree once, collecting both classes. A route with `instantiate`
-feeds the collected `terranix` modules through `terranixConfiguration`:
+walks the aspect tree once, collecting both classes. A `policy.instantiate`
+per host calls `terranixConfiguration` on the collected `terranix` modules:
 
 ```nix
-# modules/terranix.nix (simplified)
-den.policies.to-terranix = { system, ... }:
-  let hosts = builtins.attrValues (den.hosts.${system} or {}); in [
-    (den.lib.policy.route {
-      fromClass = "terranix";
-      intoClass = "flake";
-      path = [ "flake" "packages" system ];
-      instantiate = { modules, ... }:
-        lib.listToAttrs (map (host:
-          lib.nameValuePair "${host.name}-tf"
-            (inputs.terranix.lib.terranixConfiguration { inherit system modules; })
-        ) hosts);
-    })
-    (den.lib.policy.route {
-      fromClass = "terranix";
-      intoClass = "flake";
-      path = [ "flake" "apps" system ];
-      instantiate = { modules, ... }:
-        # ... per-host plan/apply/destroy app wrappers
-    })
-  ];
+# modules/terranix.nix
+den.policies.host-to-terranix = { host, system, ... }: [
+  (den.lib.policy.instantiate {
+    name = "${host.name}-tf";
+    class = "terranix";
+    instantiate = { modules, ... }:
+      inputs.terranix.lib.terranixConfiguration { inherit system modules; };
+    intoAttr = [ "terranixConfigurations" host.name ];
+  })
+];
+
+den.schema.host.includes = [ den.policies.host-to-terranix ];
 ```
 
-The `route.instantiate` field is the key: it collects all `terranix`-class
-modules from the scope subtree, calls the function with `{ modules }`, and places
-the resulting value at the target path. Each route produces a per-host attrset
-of outputs — packages (config.tf.json) and apps (opentofu wrappers).
+This is the same pattern as `to-os-outputs` with `nixosSystem`:
+- `class` determines which modules to collect from the host's subtree
+- `instantiate` is the function that processes them (terranixConfiguration)
+- `intoAttr` is where the result lands in the flake outputs
+
+Per-host isolation is automatic — `applyInstantiates` collects only from the
+host's scope subtree, so `web-1`'s config contains only `web-1`'s resources.
 
 ## Project Structure
 
@@ -64,7 +58,7 @@ templates/terranix-demo/
     den.nix                       # two hosts (web-1, web-2) with infra fields
     flake-parts.nix               # standard wiring
     host-schema.nix               # extends host schema: server-type, region, image
-    terranix.nix                  # route policy: terranix → packages.tf
+    terranix.nix                  # policy.instantiate per host
     aspects/
       provider.nix                # hcloud provider + token variable
       server.nix                  # per-host hcloud_server resource
@@ -135,40 +129,31 @@ serverAspect = { host, ... }: {
 
 ## Flake Outputs
 
-The template produces per-host packages and apps:
-
 | Output | Description |
 |--------|-------------|
-| `packages.<system>.<host>-tf` | `config.tf.json` derivation |
-| `apps.<system>.<host>-plan` | Run `tofu plan` for host |
-| `apps.<system>.<host>-apply` | Run `tofu apply` for host |
-| `apps.<system>.<host>-destroy` | Run `tofu destroy` for host |
+| `terranixConfigurations.<host>` | `config.tf.json` derivation per host |
+| `nixosConfigurations.<host>` | NixOS system configuration per host |
 
-Each host's `config.tf.json` contains the full fleet infrastructure
-(all hosts' resources), matching Terraform's single-state model.
+Each host's `config.tf.json` contains only that host's resources —
+per-host isolation via subtree collection.
 
 ## Try It
 
 ```console
 # Build config.tf.json for web-1
-nix build --override-input den . ./templates/terranix-demo#packages.x86_64-linux.web-1-tf
+nix build --override-input den . ./templates/terranix-demo#terranixConfigurations.web-1
 cat result
 
-# Run plan/apply/destroy via apps
-nix run .#web-1-plan
-nix run .#web-1-apply
-nix run .#web-1-destroy
-
-# Inspect the config without building
+# Inspect the config
 nix eval --override-input den . \
-  ./templates/terranix-demo#packages.x86_64-linux.web-1-tf.config
+  ./templates/terranix-demo#terranixConfigurations.web-1.config
 
 # Verify NixOS configs still work
 nix eval --override-input den . \
   ./templates/terranix-demo#nixosConfigurations.web-1.config.services.nginx.enable
 ```
 
-The generated `config.tf.json` contains:
+The generated `config.tf.json` for `web-1` contains:
 
 | Block | Content |
 |-------|---------|
@@ -176,24 +161,15 @@ The generated `config.tf.json` contains:
 | `variable.hcloud_token` | Sensitive API token |
 | `provider.hcloud` | Provider config referencing the variable |
 | `resource.hcloud_server.web-1` | cx22 in fsn1 |
-| `resource.hcloud_server.web-2` | cx22 in nbg1 |
 | `output.web-1_ip` | Public IPv4 |
-| `output.web-2_ip` | Public IPv4 |
 
 ## Using with Terraform/OpenTofu
 
-The app wrappers handle workspace setup and `tofu init` automatically:
-
 ```console
-# Plan changes (uses TF_WORKDIR or .terraform-<host>/ by default)
-TF_VAR_hcloud_token="your-token" nix run .#web-1-plan
-
-# Apply
-TF_VAR_hcloud_token="your-token" nix run .#web-1-apply
-
-# Or manually with the config derivation
-nix build .#packages.x86_64-linux.web-1-tf -o config.tf.json
-tofu init && tofu plan
+nix build .#terranixConfigurations.web-1 -o config.tf.json
+tofu init
+TF_VAR_hcloud_token="your-token" tofu plan
+TF_VAR_hcloud_token="your-token" tofu apply
 ```
 
 ## What It Demonstrates
@@ -201,8 +177,8 @@ tofu init && tofu plan
 | Feature | Shown |
 |---------|:-----:|
 | Custom class (`terranix`) | ✓ |
-| Route with `instantiate` | ✓ |
-| Per-host flake apps (plan/apply/destroy) | ✓ |
+| `policy.instantiate` for non-NixOS output | ✓ |
+| Per-host subtree isolation | ✓ |
 | Host schema extensions | ✓ |
 | Parametric aspects with host-qualified names | ✓ |
 | Dual-class aspects (nixos + terranix) | ✓ |
@@ -211,5 +187,5 @@ tofu init && tofu plan
 ## See Also
 
 - [Custom Classes](/guides/custom-classes/) — defining new classes
-- [Policies reference](/reference/policies/) — `policy.route` and `instantiate`
+- [Policies reference](/reference/policies/) — `policy.instantiate` and `policy.route`
 - [terranix.org](https://terranix.org) — terranix documentation

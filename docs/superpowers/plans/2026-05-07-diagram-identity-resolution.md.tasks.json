@@ -1,0 +1,89 @@
+{
+  "planPath": "docs/superpowers/plans/2026-05-07-diagram-identity-resolution.md",
+  "tasks": [
+    {
+      "id": 2,
+      "subject": "Task 1: Fix entityKind seeding and ctxTrace population",
+      "status": "pending",
+      "description": "**Goal:** Make tracingHandler produce entries with correct entityKind and populate ctxTrace.\n\n**Files:**\n- Modify: nix/lib/aspects/fx/trace.nix\n- Test: templates/ci/modules/features/fx-trace.nix\n\n**Verify:** nix develop -c just ci fx-trace",
+      "metadata": {
+        "files": ["nix/lib/aspects/fx/trace.nix", "templates/ci/modules/features/fx-trace.nix"],
+        "verifyCommand": "nix develop -c just ci fx-trace",
+        "acceptanceCriteria": ["entityKind seeded from param.__entityKind", "ctxTrace populated with dedup", "existing tests pass"]
+      }
+    },
+    {
+      "id": 3,
+      "subject": "Task 2: Add record-fired handler for policy trace entries",
+      "status": "pending",
+      "blockedBy": [2],
+      "description": "**Goal:** Capture fired policy names as trace entries for policy dispatch nodes.\n\n**Files:**\n- Modify: nix/lib/aspects/fx/trace.nix\n- Test: templates/ci/modules/features/fx-trace.nix\n\n**Verify:** nix develop -c just ci fx-trace",
+      "metadata": {
+        "files": ["nix/lib/aspects/fx/trace.nix", "templates/ci/modules/features/fx-trace.nix"],
+        "verifyCommand": "nix develop -c just ci fx-trace",
+        "acceptanceCriteria": ["record-fired handler added", "policy entries have isPolicyDispatch=true", "compose with defaultHandlers works"]
+      }
+    },
+    {
+      "id": 4,
+      "subject": "Task 3: Add entityInstance tracking to trace and graph IR",
+      "status": "pending",
+      "blockedBy": [3],
+      "description": "**Goal:** Each trace entry carries entityInstance field, graph IR gains entityInstances list.\n\n**Files:**\n- Modify: nix/lib/aspects/fx/trace.nix\n- Modify: nix/lib/diag/graph.nix\n\n**Verify:** nix develop -c just ci fx-trace + build laptop-ir",
+      "metadata": {
+        "files": ["nix/lib/aspects/fx/trace.nix", "nix/lib/diag/graph.nix", "nix/lib/diag/json.nix"],
+        "verifyCommand": "nix develop -c just ci fx-trace",
+        "acceptanceCriteria": ["entityInstance on trace entries", "entityInstances in graph IR", "entityKinds retained", "json.nix serializes entityInstances"]
+      }
+    },
+    {
+      "id": 5,
+      "subject": "Task 4: Update mermaid renderer for instance subgraphs",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** DAG diagrams group nodes into per-instance subgraphs with policy bridges.\n\n**Files:**\n- Modify: nix/lib/diag/mermaid.nix\n\n**Verify:** Build laptop-dag, check for subgraph blocks",
+      "metadata": {
+        "files": ["nix/lib/diag/mermaid.nix"],
+        "verifyCommand": "nix build --override-input den . ./templates/diagram-demo#laptop-dag --no-link --print-out-paths",
+        "acceptanceCriteria": ["per-instance subgraphs", "flake subgraph for unscoped", "policy bridges"]
+      }
+    },
+    {
+      "id": 6,
+      "subject": "Task 5: Investigate and fix anonymous nodes",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** Determine what anon nodes are, then prune artifacts or enrich labels.\n\n**Files:**\n- Modify: nix/lib/aspects/fx/trace.nix\n\n**Verify:** Build laptop-dag, check for unexplained anon nodes",
+      "metadata": {
+        "files": ["nix/lib/aspects/fx/trace.nix"],
+        "verifyCommand": "nix build --override-input den . ./templates/diagram-demo#laptop-dag --no-link --print-out-paths",
+        "acceptanceCriteria": ["no unexplained anon nodes", "entityKind disambiguation works", "policy naming works"]
+      }
+    },
+    {
+      "id": 7,
+      "subject": "Task 6: Rename views from stage to scope vocabulary",
+      "status": "pending",
+      "blockedBy": [4],
+      "description": "**Goal:** Update view IDs, titles, and function names from stage to scope.\n\n**Files:**\n- Modify: nix/lib/diag/views.nix, sequence.nix, default.nix, diagrams.nix\n\n**Verify:** Build laptop-scope-seq",
+      "metadata": {
+        "files": ["nix/lib/diag/views.nix", "nix/lib/diag/sequence.nix", "nix/lib/diag/default.nix", "templates/diagram-demo/modules/diagrams.nix"],
+        "verifyCommand": "nix build --override-input den . ./templates/diagram-demo#laptop-scope-seq --no-link --print-out-paths",
+        "acceptanceCriteria": ["view IDs renamed", "function names renamed", "titles updated"]
+      }
+    },
+    {
+      "id": 8,
+      "subject": "Task 7: Update filters and full verification",
+      "status": "pending",
+      "blockedBy": [5, 6, 7],
+      "description": "**Goal:** Ensure all filters handle entityInstances, full CI + diagram regen passes.\n\n**Files:**\n- Modify: nix/lib/diag/filters/\n\n**Verify:** nix develop -c just ci + write-diagrams",
+      "metadata": {
+        "files": ["nix/lib/diag/filters/fold.nix", "nix/lib/diag/filters/reshape.nix", "nix/lib/diag/filters/closure.nix", "nix/lib/diag/filters/predicate.nix", "nix/lib/diag/filters/diff.nix"],
+        "verifyCommand": "nix develop -c just ci",
+        "acceptanceCriteria": ["filters handle entityInstances", "full CI passes", "all diagrams build"]
+      }
+    }
+  ],
+  "lastUpdated": "2026-05-07T00:00:00Z"
+}

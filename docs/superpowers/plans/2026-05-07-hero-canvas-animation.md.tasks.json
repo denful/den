@@ -1,0 +1,41 @@
+{
+  "planPath": "docs/superpowers/plans/2026-05-07-hero-canvas-animation.md",
+  "tasks": [
+    {
+      "id": 9,
+      "subject": "Task 1: Create LogoAnimation.astro component",
+      "status": "pending",
+      "description": "**Goal:** Create the self-contained canvas animation component with topology algorithm, theme-aware colors, visibility pausing, and SPA cleanup.\n\n**Files:**\n- Create: `docs/src/components/LogoAnimation.astro`\n- Reference: `/home/sini/foo-wip.html`\n\n**Acceptance Criteria:**\n- Canvas renders at 400x400\n- Animation cycles infinitely\n- Colors from CSS vars, theme toggle updates via MutationObserver\n- IntersectionObserver pauses when off-screen\n- astro:before-swap cleanup\n- No \"den\" text overlay\n- Correct sizing styles for hero slot\n\n**Verify:** Visual inspection — import in index.mdx body, run docs dev server",
+      "metadata": {
+        "files": ["docs/src/components/LogoAnimation.astro"],
+        "verifyCommand": "cd docs && npm run dev",
+        "acceptanceCriteria": ["canvas 400x400", "infinite loop", "catppuccin colors from CSS vars", "theme toggle", "IntersectionObserver pause", "SPA cleanup", "no text overlay", "hero slot sizing"]
+      }
+    },
+    {
+      "id": 10,
+      "subject": "Task 2: Create Hero.astro override",
+      "status": "pending",
+      "blockedBy": [9],
+      "description": "**Goal:** Override Starlight's Hero component to render LogoAnimation on the index page, preserving all other hero behavior.\n\n**Files:**\n- Create: `docs/src/components/Hero.astro`\n- Reference: `docs/node_modules/@astrojs/starlight/components/Hero.astro`\n\n**Acceptance Criteria:**\n- Index page renders LogoAnimation in image slot\n- Non-index pages with hero images render correctly\n- All hero markup preserved\n- All hero styles preserved\n\n**Verify:** Visual inspection — index shows animation, other pages unchanged",
+      "metadata": {
+        "files": ["docs/src/components/Hero.astro"],
+        "verifyCommand": "cd docs && npm run dev",
+        "acceptanceCriteria": ["index renders LogoAnimation", "non-index renders original images", "hero markup preserved", "hero styles preserved"]
+      }
+    },
+    {
+      "id": 11,
+      "subject": "Task 3: Wire config and clean up index.mdx",
+      "status": "pending",
+      "blockedBy": [9, 10],
+      "description": "**Goal:** Register Hero override in astro.config.mjs and remove static image from index.mdx.\n\n**Files:**\n- Modify: `docs/astro.config.mjs`\n- Modify: `docs/src/content/docs/index.mdx`\n\n**Acceptance Criteria:**\n- astro.config.mjs has Hero override\n- index.mdx has no hero.image section\n- Docs site builds without errors\n- Landing page shows animation in hero slot\n- Other doc pages render normally\n\n**Verify:** `cd docs && npm run build` succeeds",
+      "metadata": {
+        "files": ["docs/astro.config.mjs", "docs/src/content/docs/index.mdx"],
+        "verifyCommand": "cd docs && npm run build",
+        "acceptanceCriteria": ["Hero override in config", "no hero.image in frontmatter", "build succeeds", "animation visible", "other pages normal"]
+      }
+    }
+  ],
+  "lastUpdated": "2026-05-07T00:00:00Z"
+}
