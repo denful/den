@@ -510,32 +510,24 @@
         loadFile(e.target?.files?.[0]);
       }, [loadFile]);
 
-      // Global drop handler — works even if dropped on ReactFlow canvas.
+      // Track drag state — show overlay when dragging files over the page.
       React.useEffect(() => {
-        const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; setDragover(true); };
-        const onDragLeave = (e) => { if (e.relatedTarget === null) setDragover(false); };
-        const onDrop = (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          setDragover(false);
-          console.log('drop event', e.dataTransfer?.files);
-          const file = e.dataTransfer?.files?.[0];
-          if (file) {
-            console.log('loading file:', file.name, file.size);
-            loadFile(file);
-          } else {
-            console.log('no file in drop event');
-          }
-        };
-        window.addEventListener('dragover', onDragOver, true);
-        window.addEventListener('drop', onDrop, true);
-        document.addEventListener('dragleave', onDragLeave);
+        let dragCount = 0;
+        const onDragEnter = (e) => { dragCount++; if (dragCount === 1) setDragover(true); };
+        const onDragLeave = (e) => { dragCount--; if (dragCount === 0) setDragover(false); };
+        const onDragOver = (e) => { e.preventDefault(); };
+        const onDrop = (e) => { e.preventDefault(); dragCount = 0; setDragover(false); };
+        document.body.addEventListener('dragenter', onDragEnter);
+        document.body.addEventListener('dragleave', onDragLeave);
+        document.body.addEventListener('dragover', onDragOver);
+        document.body.addEventListener('drop', onDrop);
         return () => {
-          window.removeEventListener('dragover', onDragOver, true);
-          window.removeEventListener('drop', onDrop, true);
-          document.removeEventListener('dragleave', onDragLeave);
+          document.body.removeEventListener('dragenter', onDragEnter);
+          document.body.removeEventListener('dragleave', onDragLeave);
+          document.body.removeEventListener('dragover', onDragOver);
+          document.body.removeEventListener('drop', onDrop);
         };
-      }, [loadFile]);
+      }, []);
 
       const toggleHost = (host) => {
         const newFilters = { ...filters, hosts: { ...filters.hosts, [host]: !filters.hosts[host] } };
@@ -551,16 +543,46 @@
 
       const isFleet = irData && isFleetIR(irData);
 
+      const overlayDrop = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragover(false);
+        const file = e.dataTransfer?.files?.[0];
+        if (file) loadFile(file);
+      }, [loadFile]);
+
+      const overlayDragOver = useCallback((e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        e.dataTransfer.dropEffect = 'copy';
+      }, []);
+
       return (
         <div style={{ width: '100vw', height: '100vh' }}>
+          {dragover && (
+            <div
+              onDrop={overlayDrop}
+              onDragOver={overlayDragOver}
+              style={{
+                position: 'fixed', inset: 0, zIndex: 100,
+                background: 'rgba(59,130,246,0.15)',
+                border: '3px dashed #3b82f6',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontSize: 24, color: '#60a5fa', fontWeight: 'bold',
+                pointerEvents: 'all',
+              }}
+            >
+              Drop JSON file to load
+            </div>
+          )}
           <div className="control-panel">
             <strong>Den IR Viewer</strong>
 
             <div
-              className={'drop-zone' + (dragover ? ' dragover' : '')}
+              className="drop-zone"
               onClick={() => fileRef.current?.click()}
             >
-              {dragover ? 'Drop file to load' : 'Drop JSON anywhere, or click to browse'}
+              Drop JSON anywhere, or click to browse
               <input ref={fileRef} type="file" accept=".json,.md" style={{ display: 'none' }} onChange={handleFileInput} />
             </div>
 
