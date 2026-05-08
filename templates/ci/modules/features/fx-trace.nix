@@ -442,5 +442,66 @@
       }
     );
 
+    test-tracingHandler-entity-kind-seeded = denTest (
+      { den, ... }:
+      let
+        entity = {
+          name = "host";
+          __entityKind = "host";
+          meta = {
+            provider = [ ];
+          };
+          nixos = {
+            a = 1;
+          };
+          includes = [
+            {
+              name = "child";
+              meta = {
+                provider = [ ];
+              };
+              nixos = {
+                b = 2;
+              };
+              includes = [ ];
+            }
+          ];
+        };
+        result =
+          den.lib.aspects.fx.pipeline.mkPipeline
+            {
+              class = "nixos";
+              extraHandlers = den.lib.aspects.fx.trace.tracingHandler "nixos";
+              extraState = {
+                entries = [ ];
+                ctxTrace = [ ];
+              };
+            }
+            {
+              self = entity // {
+                into = _: { };
+                provides = { };
+              };
+              ctx = { };
+            };
+        hostEntry = lib.findFirst (e: e.name == "host") null result.state.entries;
+        childEntry = lib.findFirst (e: e.name == "child") null result.state.entries;
+      in
+      {
+        expr = {
+          hostEntityKind = hostEntry.entityKind;
+          childEntityKind = childEntry.entityKind;
+          ctxTraceLength = builtins.length result.state.ctxTrace;
+          ctxTraceKey = (builtins.head result.state.ctxTrace).key;
+        };
+        expected = {
+          hostEntityKind = "host";
+          childEntityKind = "host";
+          ctxTraceLength = 1;
+          ctxTraceKey = "host";
+        };
+      }
+    );
+
   };
 }

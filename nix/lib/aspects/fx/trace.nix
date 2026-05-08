@@ -15,14 +15,20 @@ let
     state:
     let
       chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
+      kindMap = state.entityKindMap or { };
       entries = state.entries or [ ];
       ancestorKinds = lib.filter (s: s != null) (
         map (
           id:
-          let
-            hit = lib.findFirst (e: (e.path or e.name) == id && e.entityKind != null) null entries;
-          in
-          if hit != null then hit.entityKind else null
+          # Check the kindMap first (populated by resolve-children before
+          # children fire), then fall back to entries for cross-entity lookups.
+          if kindMap ? ${id} then
+            kindMap.${id}
+          else
+            let
+              hit = lib.findFirst (e: (e.path or e.name) == id && e.entityKind != null) null entries;
+            in
+            if hit != null then hit.entityKind else null
         ) (lib.reverseList chain)
       );
     in
@@ -93,6 +99,14 @@ let
       };
   };
 
+  # Resolve a human-readable name for an entity kind from scope context.
+  resolveEntityName =
+    ek: scopeCtx:
+    let
+      entity = scopeCtx.${ek} or null;
+    in
+    if entity != null && entity ? name then entity.name else ek;
+
   # Combined resolve-complete handler for tracing: collects trace entries and paths.
   # Module collection is handled by classCollectorHandler via emit-class effects.
   # Use as extraHandlers with mkPipeline.
@@ -100,12 +114,35 @@ let
   # Disambiguates anonymous entries using entity kind tags, matching the
   # legacy structuredTrace adapter's naming: entityKind/kind(aspect):provider.
   tracingHandler = class: {
+    # Record entityKind by identity at resolve time (before children fire),
+    # so deriveEntityKind can find ancestors via entityKindMap.
+    "resolve" =
+      { param, state }:
+      let
+        ek = param.aspect.__entityKind or null;
+        identity = param.identity;
+      in
+      {
+        # Mirror default resolve handler: forward to compile.
+        resume = den.lib.fx.send "compile" param;
+        state =
+          state
+          // lib.optionalAttrs (ek != null) {
+            entityKindMap = (state.entityKindMap or { }) // {
+              ${identity} = ek;
+            };
+          };
+      };
     "resolve-complete" =
       { param, state }:
       let
         rawName = param.meta.originalName or param.name or "<anon>";
         provPath = lib.concatStringsSep "/" (param.meta.provider or [ ]);
-        entityKind = deriveEntityKind state;
+        entityKind =
+          let
+            direct = param.__entityKind or null;
+          in
+          if direct != null then direct else deriveEntityKind state;
         # Derive ctxAspect from includes chain: nearest meaningful ancestor's
         # base name (strip provider path and ctxId suffix for readability).
         chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
@@ -139,12 +176,26 @@ let
           inherit name entityKind;
           parent = chainParent chain selfFullPath;
         };
+        scope = state.currentScope;
+        scopeCtx = if scope == null then { } else ((state.scopeContexts or (_: { })) null).${scope} or { };
+        isNewKind = !(builtins.any (e: e.key == entityKind) (state.ctxTrace or [ ]));
+        ctxEntry = {
+          key = entityKind;
+          selfName = resolveEntityName entityKind scopeCtx;
+          inherit entityKind;
+          ctxKeys = builtins.attrNames scopeCtx;
+        };
       in
       {
         resume = param;
-        state = state // {
-          entries = (state.entries or [ ]) ++ [ entry ];
-        };
+        state =
+          state
+          // {
+            entries = (state.entries or [ ]) ++ [ entry ];
+          }
+          // lib.optionalAttrs (entityKind != null && isNewKind) {
+            ctxTrace = (state.ctxTrace or [ ]) ++ [ ctxEntry ];
+          };
       };
   };
 
