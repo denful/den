@@ -616,6 +616,84 @@ let
 
   toPolicyResolutionMapMermaid = toPolicyResolutionMapMermaidWith { };
 
+  # --- View 5: Pipe sequence diagram ---
+  #
+  # Shows quirk production and collection as a sequence diagram.
+  # Hosts are participants, grouped by environment via boxes.
+  # Emissions are notes, collections are arrows.
+
+  toPipeSequenceMermaidWith =
+    {
+      theme ? themes.defaultTheme,
+      mermaidConfig ? { },
+    }:
+    fleetCapture:
+    let
+      flows = buildPipeFlows fleetCapture;
+      tracedProducers = fleetCapture.pipeProducers or [ ];
+
+      # All hosts across all environments, ordered by environment.
+      allHosts = lib.concatMap (env: env.hosts) flows.environments;
+
+      # Participant declarations grouped by environment.
+      envBoxes = lib.concatMap (
+        env:
+        let
+          hostDecls = map (h: "    participant ${sanitize h.name} as ${h.name}") env.hosts;
+        in
+        [ "    box ${env.name}" ] ++ hostDecls ++ [ "    end" ]
+      ) flows.environments;
+
+      # Per-pipe blocks: emission notes then collection arrows.
+      pipeBlock =
+        pipeName:
+        let
+          # Find producing hosts and their aspects from trace data.
+          producersByHost = lib.foldl' (
+            acc: p:
+            let
+              hName = hostNameFromScope p.scope;
+            in
+            if hName != null then
+              acc // { ${hName} = lib.unique ((acc.${hName} or [ ]) ++ [ p.aspectIdentity ]); }
+            else
+              acc
+          ) { } (builtins.filter (p: p.pipeName == pipeName) tracedProducers);
+
+          producerHosts = builtins.attrNames producersByHost;
+
+          # Emission notes.
+          emissionNotes = map (
+            hName:
+            let
+              aspects = producersByHost.${hName};
+            in
+            "    Note over ${sanitize hName}: ${lib.concatStringsSep ", " aspects} → ${pipeName}"
+          ) producerHosts;
+
+          # Collection arrows from flow edges.
+          pipeEdges = builtins.filter (e: e.pipe == pipeName) flows.flowEdges;
+          collectionArrows = map (e: "    ${sanitize e.from} -->> ${sanitize e.to}: ${pipeName}") pipeEdges;
+        in
+        lib.optional (emissionNotes != [ ] || collectionArrows != [ ]) ""
+        ++ emissionNotes
+        ++ collectionArrows;
+
+      pipeNames = lib.unique (map (p: p.pipeName) tracedProducers ++ map (e: e.pipe) flows.flowEdges);
+    in
+    if allHosts == [ ] then
+      renderMermaid {
+        inherit theme mermaidConfig;
+        diagramKind = "sequenceDiagram";
+      } [ "    participant none as No hosts" ]
+    else
+      renderMermaid {
+        inherit theme mermaidConfig;
+        diagramKind = "sequenceDiagram";
+      } (envBoxes ++ lib.concatMap pipeBlock pipeNames);
+
+  toPipeSequenceMermaid = toPipeSequenceMermaidWith { };
+
 in
 {
   inherit
@@ -628,5 +706,7 @@ in
     toAspectMatrixMermaidWith
     toPolicyResolutionMapMermaid
     toPolicyResolutionMapMermaidWith
+    toPipeSequenceMermaid
+    toPipeSequenceMermaidWith
     ;
 }

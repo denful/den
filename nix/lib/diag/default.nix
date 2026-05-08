@@ -296,6 +296,10 @@ let
       withFn = pipeFlow.toPolicyResolutionMapMermaidWith;
       mc = true;
     };
+    toPipeSequenceMermaid = {
+      withFn = pipeFlow.toPipeSequenceMermaidWith;
+      mc = true;
+    };
   };
 
   # Default-args pairs: { toFoo = withFn {}; toFooWith = withFn; }
