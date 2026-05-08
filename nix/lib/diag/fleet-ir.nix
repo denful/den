@@ -145,35 +145,49 @@ let
         builtins.attrNames producersByPipe ++ builtins.attrNames consumersByPipe
       );
 
-      # Build flow edges from pipe data.
-      # Reuse the pure-consumer heuristic from fleet-views.
-      buildPipeFlows =
+      # Build pipe metadata and flow edges, scoped by parent (siblings only).
+      # pipe.collect only reaches siblings (same scopeParent).
+      hostParentScopes = lib.unique (map (hScope: scopeParent.${hScope} or null) hostScopes);
+
+      buildPipeData =
         pipeName:
         let
           producers = producersByPipe.${pipeName} or [ ];
           consumers = consumersByPipe.${pipeName} or [ ];
 
-          producerHosts = lib.unique (
-            builtins.filter (h: h != null) (map (p: hostNameFromScope p.scope) producers)
-          );
-          consumerHostScopes = lib.unique (
-            builtins.filter (h: h != null) (
-              map (c: hostNameFromScope c.scope) (builtins.filter (c: c.hasCollect or false) consumers)
-            )
-          );
-
-          # Pure consumers = collect but don't produce.
-          pureConsumerHosts = builtins.filter (h: !builtins.elem h producerHosts) consumerHostScopes;
-          effectiveConsumers = if pureConsumerHosts != [ ] then pureConsumerHosts else consumerHostScopes;
-
-          flows = lib.concatMap (
-            consumer:
-            map (producer: {
-              from = producer;
-              to = consumer;
-              pipe = pipeName;
-            }) (builtins.filter (p: p != consumer) producerHosts)
-          ) effectiveConsumers;
+          flowsPerParent = lib.concatMap (
+            parentScope:
+            let
+              siblingHosts = builtins.filter (h: (scopeParent.${h} or null) == parentScope) hostScopes;
+              siblingNames = builtins.filter (h: h != null) (map hostNameFromScope siblingHosts);
+              localProducerNames = lib.unique (
+                builtins.filter (h: h != null) (
+                  map (p: hostNameFromScope p.scope) (
+                    builtins.filter (p: builtins.elem (hostNameFromScope p.scope) siblingNames) producers
+                  )
+                )
+              );
+              localConsumerNames = lib.unique (
+                builtins.filter (h: h != null) (
+                  map (c: hostNameFromScope c.scope) (
+                    builtins.filter (
+                      c: (c.hasCollect or false) && builtins.elem (hostNameFromScope c.scope) siblingNames
+                    ) consumers
+                  )
+                )
+              );
+              pureConsumers = builtins.filter (h: !builtins.elem h localProducerNames) localConsumerNames;
+              effectiveConsumers = if pureConsumers != [ ] then pureConsumers else localConsumerNames;
+            in
+            lib.concatMap (
+              consumer:
+              map (producer: {
+                from = producer;
+                to = consumer;
+                inherit pipeName;
+              }) (builtins.filter (p: p != consumer) localProducerNames)
+            ) effectiveConsumers
+          ) hostParentScopes;
         in
         {
           producers = map (p: {
@@ -187,10 +201,10 @@ let
             stages = c.stageTypes or [ ];
             hasCollect = c.hasCollect or false;
           }) (builtins.filter (c: c.hasCollect or false) consumers);
-          inherit flows;
+          flows = flowsPerParent;
         };
 
-      pipes = lib.genAttrs allPipeNames buildPipeFlows;
+      pipes = lib.genAttrs allPipeNames buildPipeData;
 
       # --- Nodes: compose per-host graphs with host-namespaced IDs ---
 
@@ -275,8 +289,8 @@ let
           from = sanitize "host_${flow.from}";
           to = sanitize "host_${flow.to}";
           style = "pipe";
-          label = pipeName;
-          pipe = pipeName;
+          label = flow.pipeName;
+          pipe = flow.pipeName;
           crossHost = true;
           host = null;
         }) (pipes.${pipeName}).flows
@@ -309,7 +323,6 @@ let
       direction = "LR";
       inherit
         scopes
-        nodes
         pipes
         entityInstances
         ;

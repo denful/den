@@ -65,7 +65,7 @@ let
     lib.types.submodule {
       inherit imports;
 
-      freeformType = lib.types.lazyAttrsOf lib.types.unspecified;
+      freeformType = lib.types.lazyAttrsOf lib.types.anything;
     };
 
   systemOut =
