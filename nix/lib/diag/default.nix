@@ -127,6 +127,14 @@ let
       renderUtil
       ;
   };
+  pipeFlow = import ./pipe-flow.nix {
+    inherit
+      lib
+      themes
+      util
+      renderUtil
+      ;
+  };
   fleetLib = import ./fleet.nix {
     inherit
       den
@@ -170,6 +178,10 @@ let
 
   fleet = {
     of = fleetLib.fleetGraph;
+  };
+
+  pipes = {
+    buildFlows = pipeFlow.buildPipeFlows;
   };
 
   inherit (json) toJSON;
@@ -263,6 +275,10 @@ let
     };
     toStateMermaid = {
       withFn = state.toStateMermaidWith;
+      mc = true;
+    };
+    toPipeFlowMermaid = {
+      withFn = pipeFlow.toPipeFlowMermaidWith;
       mc = true;
     };
   };

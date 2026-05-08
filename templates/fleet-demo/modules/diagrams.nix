@@ -162,26 +162,17 @@ in
 
       galleries = hostGalleries ++ [ fleetGallery ];
 
-      # --- Fleet capture debug ---
+      # --- Fleet pipe flow ---
       fleetCapture = diag.captureFleet { };
+      pipeFlowSource = rc.render.toPipeFlowMermaid fleetCapture;
+      pipeFlowDrv = pkgs.writeText "pipe-flow.md" ''
+        # Pipe Flow: Fleet
 
-      fleetDebug = pkgs.writeText "fleet-capture-debug.json" (
-        builtins.toJSON {
-          entryCount = builtins.length fleetCapture.entries;
-          ctxTraceKinds = map (e: { inherit (e) key selfName; }) fleetCapture.ctxTrace;
-          scopeIds = builtins.attrNames fleetCapture.scopeContexts;
-          scopeTree = fleetCapture.scopeParent;
-          scopeEntityKinds = fleetCapture.scopeEntityKind;
-          pipeEffectScopes = builtins.mapAttrs (
-            scope: effects:
-            map (e: {
-              pipeName = e.value.pipeName or e.pipeName or null;
-              stages = map (s: s.__pipeStage or "unknown") (e.value.stages or e.stages or [ ]);
-            }) effects
-          ) fleetCapture.scopedPipeEffects;
-          classImportKeys = builtins.mapAttrs (_: ci: builtins.attrNames ci) fleetCapture.scopedClassImports;
-        }
-      );
+        ```mermaid
+        ${pipeFlowSource}
+        ```
+      '';
+      pipeFlowSvgDrv = rc.mmdSourceToSvg "pipe-flow" pipeFlowSource;
 
       readmeDrv = pkgs.writeText "README.md" ''
         # Fleet Demo Diagrams
@@ -211,7 +202,8 @@ in
       packages =
         allPackages
         // {
-          fleet-capture-debug = fleetDebug;
+          pipe-flow = pipeFlowDrv;
+          pipe-flow-svg = pipeFlowSvgDrv;
         }
         // {
           write-diagrams = mkWriteScript pkgs {
