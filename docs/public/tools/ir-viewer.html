@@ -512,16 +512,28 @@
 
       // Global drop handler — works even if dropped on ReactFlow canvas.
       React.useEffect(() => {
-        const onDragOver = (e) => { e.preventDefault(); setDragover(true); };
+        const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); setDragover(true); };
         const onDragLeave = (e) => { if (e.relatedTarget === null) setDragover(false); };
-        const onDrop = (e) => { e.preventDefault(); setDragover(false); loadFile(e.dataTransfer?.files?.[0]); };
-        document.addEventListener('dragover', onDragOver);
+        const onDrop = (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setDragover(false);
+          console.log('drop event', e.dataTransfer?.files);
+          const file = e.dataTransfer?.files?.[0];
+          if (file) {
+            console.log('loading file:', file.name, file.size);
+            loadFile(file);
+          } else {
+            console.log('no file in drop event');
+          }
+        };
+        window.addEventListener('dragover', onDragOver, true);
+        window.addEventListener('drop', onDrop, true);
         document.addEventListener('dragleave', onDragLeave);
-        document.addEventListener('drop', onDrop);
         return () => {
-          document.removeEventListener('dragover', onDragOver);
+          window.removeEventListener('dragover', onDragOver, true);
+          window.removeEventListener('drop', onDrop, true);
           document.removeEventListener('dragleave', onDragLeave);
-          document.removeEventListener('drop', onDrop);
         };
       }, [loadFile]);
 
