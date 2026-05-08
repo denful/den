@@ -51,6 +51,10 @@ let
               combinedEffects = mergeEffects accEffects dispatched;
             in
             if newEnrichKeys == [ ] then
+              let
+                combinedEnrichment = accEnrichment // dispatched.enrichment;
+                enrichedCtx = currentCtx // combinedEnrichment;
+              in
               fx.bind
                 (fx.send "record-fired" {
                   inherit entityKind;
@@ -58,13 +62,25 @@ let
                 })
                 (
                   _:
-                  let
-                    enrichedCtx = currentCtx // accEnrichment // dispatched.enrichment;
-                  in
-                  fx.send "emit-policy-effects" {
-                    effects = combinedEffects;
-                    inherit entityKind enrichedCtx;
-                  }
+                  fx.bind
+                    # Persist enrichment into scopeContexts so child scopes
+                    # and the post-walk drain can see it.
+                    (
+                      if combinedEnrichment != { } then
+                        fx.send "widen-context" {
+                          enrichment = combinedEnrichment;
+                          inherit currentCtx;
+                        }
+                      else
+                        fx.pure null
+                    )
+                    (
+                      _:
+                      fx.send "emit-policy-effects" {
+                        effects = combinedEffects;
+                        inherit entityKind enrichedCtx;
+                      }
+                    )
                 )
             else if iteration >= maxPolicyIterations then
               throw "den: enrichment cycle at ${entityKind} — fired: ${lib.concatStringsSep ", " (builtins.attrNames updatedFired)}, enrichment keys: ${

@@ -480,23 +480,56 @@ let
         inherit scopeParent;
       };
 
-      # Post-assembly drain: resolve pipe-arg deferred includes.
-      # Aspects deferred because they required pipe args (e.g., { firewall, ... })
-      # can now be compiled since assemblePipes made those args available.
+      # Post-assembly drain: resolve deferred includes.
+      # Two categories of deferred includes are drained here:
+      # 1. Pipe-arg deferred: required args are pipe names, now available
+      #    from assemblePipes.
+      # 2. Enrichment-deferred: required args (e.g., isNixos) were provided
+      #    by a parent scope's policy enrichment but weren't available when
+      #    the child scope was walked. The drain inherits parent scope context
+      #    to resolve these.
       drainedClassImportsRaw =
         let
           allDeferred = (result.state.scopedDeferredIncludes or (_: { })) null;
           inherit (den.lib.aspects.fx.keyClassification) classifyKeys;
           inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList;
+          # Build enriched context for a scope by inheriting parent enrichment.
+          # Walks up scopeParent to find enrichment keys not present in the
+          # scope's own context.
+          # Walk up scopeParent to inherit enrichment from all ancestors.
+          enrichedScopeCtx =
+            scopeId:
+            let
+              ownCtx = augmentedScopeContexts.${scopeId} or { };
+              inherit_ =
+                sid:
+                let
+                  pid = scopeParent.${sid} or null;
+                in
+                if pid == null || pid == sid then
+                  { }
+                else
+                  let
+                    parentCtx = augmentedScopeContexts.${pid} or { };
+                    grandparentCtx = inherit_ pid;
+                  in
+                  grandparentCtx // parentCtx;
+              ancestorCtx = inherit_ scopeId;
+              # Only inherit keys not already in the scope's own context.
+              inherited = lib.filterAttrs (k: _: !(ownCtx ? ${k})) ancestorCtx;
+            in
+            ownCtx // inherited;
         in
         lib.foldl' (
           accImports: scopeId:
           let
             deferred = allDeferred.${scopeId} or [ ];
-            pipeDeferred = builtins.filter (d: d.hasPipeArgs or false) deferred;
-            scopeCtx = augmentedScopeContexts.${scopeId} or { };
+            scopeCtx = enrichedScopeCtx scopeId;
+            # Drain all deferred includes whose args are now satisfied,
+            # not just pipe-arg deferred ones.
+            drainable = builtins.filter (d: builtins.all (k: scopeCtx ? ${k}) (d.requiredArgs or [ ])) deferred;
           in
-          if pipeDeferred == [ ] then
+          if drainable == [ ] then
             accImports
           else
             let
@@ -504,32 +537,25 @@ let
                 d:
                 let
                   child = d.child;
-                  requiredArgs = d.requiredArgs;
-                  satisfied = builtins.all (k: scopeCtx ? ${k}) requiredArgs;
+                  classified = classifyKeys null child;
                 in
-                if !satisfied then
-                  [ ]
-                else
+                lib.concatMap (
+                  k:
                   let
-                    classified = classifyKeys null child;
+                    modules = unwrapContentValuesList child.${k};
                   in
-                  lib.concatMap (
-                    k:
-                    let
-                      modules = unwrapContentValuesList child.${k};
-                    in
-                    map (module: {
-                      __rawEntry = true;
-                      class = k;
-                      inherit module;
-                      ctx = scopeCtx;
-                      identity = child.name or "<deferred>";
-                      aspectPolicy = child.meta.collisionPolicy or null;
-                      globalPolicy = den.config.classModuleCollisionPolicy or "error";
-                      isContextDependent = false;
-                    }) modules
-                  ) classified.classKeys
-              ) pipeDeferred;
+                  map (module: {
+                    __rawEntry = true;
+                    class = k;
+                    inherit module;
+                    ctx = scopeCtx;
+                    identity = child.name or "<deferred>";
+                    aspectPolicy = child.meta.collisionPolicy or null;
+                    globalPolicy = den.config.classModuleCollisionPolicy or "error";
+                    isContextDependent = false;
+                  }) modules
+                ) classified.classKeys
+              ) drainable;
             in
             builtins.foldl' (
               acc: entry:

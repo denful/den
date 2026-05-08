@@ -120,22 +120,23 @@ let
       dispatchKey = "${sib.targetKind}@${sib.scopeId}";
       alreadyFired = firedPerScope.${dispatchKey} or { };
       # Filter policies to those not already fired AND whose entity-kind
-      # requirements don't exceed the target kind. A policy registered at
-      # an environment scope with { environment, ... }: should not re-fire
-      # at host scopes — it targets a different entity kind.
-      entityKinds = den.lib.schemaUtil.schemaEntityKinds;
+      # requirements are available in the target scope's context.
+      # A policy requiring { host, ... } fires at both host and user scopes
+      # (since user scopes inherit host context). A policy requiring
+      # { environment, ... } only fires where environment is in context.
       latePolicies = lib.filterAttrs (
         name: policy:
         !(alreadyFired ? ${name})
         && (
           let
+            entityKinds = den.lib.schemaUtil.schemaEntityKinds;
             policyArgs = builtins.functionArgs (policy.fn or policy);
             requiredEntityArgs = builtins.filter (
               k: builtins.elem k entityKinds && !(policyArgs.${k} or false)
             ) (builtins.attrNames policyArgs);
           in
-          # Allow if the policy requires the target entity kind or has no entity-kind requirements.
-          requiredEntityArgs == [ ] || builtins.elem sib.targetKind requiredEntityArgs
+          # Allow if the scope context satisfies the policy's entity-kind requirements.
+          requiredEntityArgs == [ ] || builtins.all (k: sib.scopedCtx ? ${k}) requiredEntityArgs
         )
       ) allAspectPolicies;
     in
