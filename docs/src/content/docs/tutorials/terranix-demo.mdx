@@ -27,22 +27,33 @@ walks the aspect tree once, collecting both classes. A route with `instantiate`
 feeds the collected `terranix` modules through `terranixConfiguration`:
 
 ```nix
-# modules/terranix.nix
-den.policies.to-terranix = { system, ... }: [
-  (den.lib.policy.route {
-    fromClass = "terranix";
-    intoClass = "flake";
-    path = [ "flake" "packages" system "tf" ];
-    instantiate = { modules, ... }:
-      inputs.terranix.lib.terranixConfiguration { inherit system modules; };
-  })
-];
+# modules/terranix.nix (simplified)
+den.policies.to-terranix = { system, ... }:
+  let hosts = builtins.attrValues (den.hosts.${system} or {}); in [
+    (den.lib.policy.route {
+      fromClass = "terranix";
+      intoClass = "flake";
+      path = [ "flake" "packages" system ];
+      instantiate = { modules, ... }:
+        lib.listToAttrs (map (host:
+          lib.nameValuePair "${host.name}-tf"
+            (inputs.terranix.lib.terranixConfiguration { inherit system modules; })
+        ) hosts);
+    })
+    (den.lib.policy.route {
+      fromClass = "terranix";
+      intoClass = "flake";
+      path = [ "flake" "apps" system ];
+      instantiate = { modules, ... }:
+        # ... per-host plan/apply/destroy app wrappers
+    })
+  ];
 ```
 
 The `route.instantiate` field is the key: it collects all `terranix`-class
 modules from the scope subtree, calls the function with `{ modules }`, and places
-the resulting derivation at the target path — the same pattern that
-`policy.instantiate` uses for `nixosSystem`, but via a route.
+the resulting value at the target path. Each route produces a per-host attrset
+of outputs — packages (config.tf.json) and apps (opentofu wrappers).
 
 ## Project Structure
 
@@ -122,16 +133,35 @@ serverAspect = { host, ... }: {
 };
 ```
 
+## Flake Outputs
+
+The template produces per-host packages and apps:
+
+| Output | Description |
+|--------|-------------|
+| `packages.<system>.<host>-tf` | `config.tf.json` derivation |
+| `apps.<system>.<host>-plan` | Run `tofu plan` for host |
+| `apps.<system>.<host>-apply` | Run `tofu apply` for host |
+| `apps.<system>.<host>-destroy` | Run `tofu destroy` for host |
+
+Each host's `config.tf.json` contains the full fleet infrastructure
+(all hosts' resources), matching Terraform's single-state model.
+
 ## Try It
 
 ```console
-# Build config.tf.json
-nix build --override-input den . ./templates/terranix-demo#packages.x86_64-linux.tf
+# Build config.tf.json for web-1
+nix build --override-input den . ./templates/terranix-demo#packages.x86_64-linux.web-1-tf
 cat result
+
+# Run plan/apply/destroy via apps
+nix run .#web-1-plan
+nix run .#web-1-apply
+nix run .#web-1-destroy
 
 # Inspect the config without building
 nix eval --override-input den . \
-  ./templates/terranix-demo#packages.x86_64-linux.tf.config
+  ./templates/terranix-demo#packages.x86_64-linux.web-1-tf.config
 
 # Verify NixOS configs still work
 nix eval --override-input den . \
@@ -152,11 +182,18 @@ The generated `config.tf.json` contains:
 
 ## Using with Terraform/OpenTofu
 
+The app wrappers handle workspace setup and `tofu init` automatically:
+
 ```console
-nix build .#packages.x86_64-linux.tf -o config.tf.json
-tofu init
-TF_VAR_hcloud_token="your-token" tofu plan
-TF_VAR_hcloud_token="your-token" tofu apply
+# Plan changes (uses TF_WORKDIR or .terraform-<host>/ by default)
+TF_VAR_hcloud_token="your-token" nix run .#web-1-plan
+
+# Apply
+TF_VAR_hcloud_token="your-token" nix run .#web-1-apply
+
+# Or manually with the config derivation
+nix build .#packages.x86_64-linux.web-1-tf -o config.tf.json
+tofu init && tofu plan
 ```
 
 ## What It Demonstrates
@@ -165,6 +202,7 @@ TF_VAR_hcloud_token="your-token" tofu apply
 |---------|:-----:|
 | Custom class (`terranix`) | ✓ |
 | Route with `instantiate` | ✓ |
+| Per-host flake apps (plan/apply/destroy) | ✓ |
 | Host schema extensions | ✓ |
 | Parametric aspects with host-qualified names | ✓ |
 | Dual-class aspects (nixos + terranix) | ✓ |
