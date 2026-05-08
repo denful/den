@@ -48,5 +48,6 @@ in
       edges = map sanitizeEdge (g.edges or [ ]);
       entityKinds = g.entityKinds or [ ];
       entityEdges = g.entityEdges or [ ];
+      entityInstances = g.entityInstances or [ ];
     };
 }

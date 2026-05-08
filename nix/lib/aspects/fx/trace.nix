@@ -172,12 +172,14 @@ let
           else
             rawName;
         selfFullPath = if provPath != "" then "${provPath}/${name}" else name;
-        entry = mkBaseEntry class param // {
-          inherit name entityKind;
-          parent = chainParent chain selfFullPath;
-        };
         scope = state.currentScope;
         scopeCtx = if scope == null then { } else ((state.scopeContexts or (_: { })) null).${scope} or { };
+        entityInstance =
+          if entityKind != null then "${entityKind}:${resolveEntityName entityKind scopeCtx}" else null;
+        entry = mkBaseEntry class param // {
+          inherit name entityKind entityInstance;
+          parent = chainParent chain selfFullPath;
+        };
         isNewKind = !(builtins.any (e: e.key == entityKind) (state.ctxTrace or [ ]));
         ctxEntry = {
           key = entityKind;
@@ -200,6 +202,13 @@ let
     "record-fired" =
       { param, state }:
       let
+        scope = state.currentScope;
+        scopeCtx = if scope == null then { } else ((state.scopeContexts or (_: { })) null).${scope} or { };
+        entityInstance =
+          if param.entityKind != null then
+            "${param.entityKind}:${resolveEntityName param.entityKind scopeCtx}"
+          else
+            null;
         firedNames = builtins.attrNames param.firedPolicies;
         policyEntries = map (policyName: {
           name = policyName;
@@ -215,6 +224,7 @@ let
           isParametric = false;
           fnArgNames = [ ];
           entityKind = param.entityKind;
+          inherit entityInstance;
           isPolicyDispatch = true;
           policyName = policyName;
           from = param.entityKind;

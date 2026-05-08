@@ -32,6 +32,7 @@ let
     # booleans below (`isExcluded`, `isReplaced`) instead.
     style = "default";
     entityKind = null;
+    entityInstance = null;
     classes = [ ];
     class = "";
     perClass = { };
@@ -67,6 +68,7 @@ let
     isParametric = false;
     fnArgNames = [ ];
     entityKind = null;
+    entityInstance = null;
   };
 
   # Full path: "provider/sub/.../name". Used for stable IDs and edge
@@ -320,6 +322,7 @@ let
           shape = nodeShape entry;
           style = nodeStyle entry;
           entityKind = entry.entityKind or null;
+          entityInstance = entry.entityInstance or null;
           # `classes` is the set of classes this aspect contributes to
           # (hasClass = true for each). `class` is the legacy joined-
           # with-`+` single string for renderers that display it.
@@ -474,11 +477,36 @@ let
         else
           n
       ) rawNodes;
+
+      # Assign "flake" instance to unscoped nodes when entity instances exist.
+      hasAnyInstances = builtins.any (n: n.entityInstance != null) finalNodes;
+      taggedNodes =
+        if hasAnyInstances then
+          map (n: if n.entityInstance == null then n // { entityInstance = "flake"; } else n) finalNodes
+        else
+          finalNodes;
+
+      entityInstanceNames = lib.unique (
+        builtins.filter (s: s != null) (map (n: n.entityInstance) taggedNodes)
+      );
+      entityInstances = map (
+        inst:
+        let
+          parts = lib.splitString ":" inst;
+          kind = builtins.head parts;
+          name = if builtins.length parts > 1 then lib.concatStringsSep ":" (lib.tail parts) else inst;
+        in
+        {
+          id = sanitize "ctx_${inst}";
+          inherit kind name;
+          label = if inst == "flake" then "flake" else "${kind}: ${name}";
+        }
+      ) entityInstanceNames;
     in
     {
       inherit rootName direction;
       rootId = sanitize rootName;
-      nodes = finalNodes;
+      nodes = taggedNodes;
       edges =
         map mkEdge (
           lib.sort (
@@ -489,7 +517,7 @@ let
         ++ providerEdges
         ++ policyEdges;
       entityKinds = map mkEntityKind entityKindNames;
-      inherit entityEdges;
+      inherit entityEdges entityInstances;
     };
 
 in
