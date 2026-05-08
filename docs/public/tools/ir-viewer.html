@@ -512,7 +512,7 @@
 
       // Global drop handler — works even if dropped on ReactFlow canvas.
       React.useEffect(() => {
-        const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); setDragover(true); };
+        const onDragOver = (e) => { e.preventDefault(); e.stopPropagation(); e.dataTransfer.dropEffect = 'copy'; setDragover(true); };
         const onDragLeave = (e) => { if (e.relatedTarget === null) setDragover(false); };
         const onDrop = (e) => {
           e.preventDefault();
