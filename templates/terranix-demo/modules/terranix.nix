@@ -1,35 +1,48 @@
-# Terranix integration: terranix as an entity kind.
+# Terranix integration: policy.instantiate collects modules, terranix flake-module
+# provides apps (plan/apply/destroy), devShells, and packages.
 #
-# Each host gets a terranix entity child scope. applyInstantiates
-# collects terranix class modules from the host subtree and calls
-# terranixConfiguration, placing the result at packages.<system>.<host>-tf.
+#   nix run .#<host>           — tofu apply
+#   nix run .#<host>.plan      — tofu plan
+#   nix run .#<host>.destroy   — tofu destroy
+#   nix develop .#<host>       — shell with tofu + scripts
+#   nix build .#<host>.config  — config.tf.json
 {
   den,
   inputs,
   lib,
+  config,
   ...
 }:
-let
-  inherit (den.lib.policy) resolve;
-in
 {
+  imports = [ inputs.terranix.flakeModule ];
+
   den.classes.terranix = { };
 
+  # Per-host: collect terranix class modules from host subtree,
+  # store the raw module list at terranixModules.<host>.
   den.policies.host-to-terranix =
-    { host, system, ... }:
+    { host, ... }:
     [
       (den.lib.policy.instantiate {
         name = "${host.name}-tf";
         class = "terranix";
-        instantiate =
-          { modules, ... }: inputs.terranix.lib.terranixConfiguration { inherit system modules; };
+        instantiate = { modules, ... }: modules;
         intoAttr = [
-          "terranixConfigurations"
+          "terranixModules"
           host.name
         ];
-        sourceScopeId = null;
       })
     ];
 
   den.schema.host.includes = [ den.policies.host-to-terranix ];
+
+  # Feed pipeline-collected modules into terranix's flake-module.
+  perSystem =
+    { pkgs, system, ... }:
+    {
+      terranix.terranixConfigurations = lib.mapAttrs (_: modules: {
+        inherit modules;
+        terraformWrapper.package = pkgs.opentofu;
+      }) (config.flake.terranixModules or { });
+    };
 }
