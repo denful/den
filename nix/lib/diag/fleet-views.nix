@@ -114,15 +114,25 @@ let
       ) envScopes;
 
       # Build flow edges: for each host that collects a pipe, find siblings
-      # that produce it.
+      # that produce it. Only show a host as a meaningful collector if it
+      # does NOT also produce the same pipe (indicating it has a consumer
+      # aspect like haproxy). Exception: when ALL collectors also produce
+      # (bidirectional pattern like host-addrs), show all edges.
       flowEdges = lib.concatMap (
         env:
         lib.concatMap (
-          consumer:
+          pipeName:
+          let
+            producers = builtins.filter (h: builtins.elem pipeName h.produces) env.hosts;
+            collectors = builtins.filter (h: builtins.elem pipeName h.collects) env.hosts;
+            # Pure consumers: collect but don't produce.
+            pureConsumers = builtins.filter (h: !builtins.elem pipeName h.produces) collectors;
+            # If no pure consumers exist, it's bidirectional (all produce+collect).
+            effectiveConsumers = if pureConsumers != [ ] then pureConsumers else collectors;
+          in
           lib.concatMap (
-            pipeName:
+            consumer:
             let
-              producers = builtins.filter (h: builtins.elem pipeName h.produces) env.hosts;
               # Exclude self-collection.
               otherProducers = builtins.filter (h: h.scope != consumer.scope) producers;
             in
@@ -132,8 +142,8 @@ let
               pipe = pipeName;
               environment = env.name;
             }) otherProducers
-          ) consumer.collects
-        ) env.hosts
+          ) effectiveConsumers
+        ) (lib.unique (lib.concatMap (h: h.collects) env.hosts))
       ) environments;
     in
     {

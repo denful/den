@@ -117,17 +117,20 @@ let
         ]
       ) envScopes;
 
-      # Pipe table.
+      # Pipe table — only show pure consumers (collect but don't produce).
+      # If all collectors also produce, it's bidirectional (show all).
       pipeRows = map (
         pipeName:
         let
-          producers = map (h: h.name) (builtins.filter (h: builtins.elem pipeName h.produces) pipesByHost);
-          collectors = map (h: h.name) (builtins.filter (h: builtins.elem pipeName h.collects) pipesByHost);
+          producers = builtins.filter (h: builtins.elem pipeName h.produces) pipesByHost;
+          collectors = builtins.filter (h: builtins.elem pipeName h.collects) pipesByHost;
+          pureConsumers = builtins.filter (h: !builtins.elem pipeName h.produces) collectors;
+          effectiveConsumers = if pureConsumers != [ ] then pureConsumers else collectors;
         in
         [
           pipeName
-          (lib.concatStringsSep ", " producers)
-          (lib.concatStringsSep ", " collectors)
+          (lib.concatStringsSep ", " (map (h: h.name) producers))
+          (lib.concatStringsSep ", " (map (h: h.name) effectiveConsumers))
         ]
       ) allPipeNames;
 
