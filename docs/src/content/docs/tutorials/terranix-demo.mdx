@@ -1,0 +1,177 @@
+---
+title: "Template: Terranix Demo"
+description: Generate Terraform configuration from den host definitions using terranix.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+[`templates/terranix-demo`](https://github.com/denful/den/tree/main/templates/terranix-demo)
+</Aside>
+
+The terranix demo shows how to generate Terraform/OpenTofu configuration directly
+from den host definitions. Each host aspect contributes NixOS config **and**
+Terraform resources in a single declaration. A route policy collects the
+`terranix` class modules and feeds them through
+[terranixConfiguration](https://terranix.org), producing `config.tf.json`.
+
+## How It Works
+
+```
+den.aspects.* ──┬── nixos     → nixosConfigurations.<host>
+                └── terranix  → packages.<system>.tf  (config.tf.json)
+```
+
+Host aspects declare Terraform resources alongside NixOS config. The pipeline
+walks the aspect tree once, collecting both classes. A route with `instantiate`
+feeds the collected `terranix` modules through `terranixConfiguration`:
+
+```nix
+# modules/terranix.nix
+den.policies.to-terranix = { system, ... }: [
+  (den.lib.policy.route {
+    fromClass = "terranix";
+    intoClass = "flake";
+    path = [ "flake" "packages" system "tf" ];
+    instantiate = { modules, ... }:
+      inputs.terranix.lib.terranixConfiguration { inherit system modules; };
+  })
+];
+```
+
+The `route.instantiate` field is the key: it collects all `terranix`-class
+modules from the scope subtree, calls the function with `{ modules }`, and places
+the resulting derivation at the target path — the same pattern that
+`policy.instantiate` uses for `nixosSystem`, but via a route.
+
+## Project Structure
+
+```
+templates/terranix-demo/
+  flake.nix                       # inputs: den, terranix, nixpkgs, etc.
+  modules/
+    den.nix                       # two hosts (web-1, web-2) with infra fields
+    flake-parts.nix               # standard wiring
+    host-schema.nix               # extends host schema: server-type, region, image
+    terranix.nix                  # route policy: terranix → packages.tf
+    aspects/
+      provider.nix                # hcloud provider + token variable
+      server.nix                  # per-host hcloud_server resource
+      hosts/
+        web-1.nix                 # web-1 NixOS config (nginx)
+        web-2.nix                 # web-2 NixOS config (nginx)
+```
+
+## Host Definitions
+
+Hosts carry infrastructure fields alongside standard den config:
+
+```nix
+# modules/den.nix
+den.hosts.x86_64-linux = {
+  web-1 = {
+    server-type = "cx22";
+    region = "fsn1";
+    users.deploy = { };
+  };
+  web-2 = {
+    server-type = "cx22";
+    region = "nbg1";
+    users.deploy = { };
+  };
+};
+```
+
+The `server-type`, `region`, and `image` fields are added via a host schema extension:
+
+```nix
+# modules/host-schema.nix
+den.schema.host.imports = [ infraFields ];
+```
+
+## Shared Aspects
+
+A provider aspect (included in `den.default`) declares the Hetzner Cloud
+provider for all hosts:
+
+```nix
+# modules/aspects/provider.nix
+den.aspects.hcloud-provider = {
+  terranix = {
+    terraform.required_providers.hcloud = { source = "hetznercloud/hcloud"; };
+    provider.hcloud.token = "\${var.hcloud_token}";
+  };
+};
+```
+
+A parametric server aspect generates a Terraform resource per host. It uses a
+host-qualified `name` so each host produces a uniquely-keyed module:
+
+```nix
+# modules/aspects/server.nix
+serverAspect = { host, ... }: {
+  name = "hcloud-server/${host.name}";
+  terranix = {
+    resource.hcloud_server.${host.name} = {
+      name = host.hostName;
+      server_type = host.server-type;
+      location = host.region;
+      image = host.image;
+    };
+  };
+};
+```
+
+## Try It
+
+```console
+# Build config.tf.json
+nix build --override-input den . ./templates/terranix-demo#packages.x86_64-linux.tf
+cat result
+
+# Inspect the config without building
+nix eval --override-input den . \
+  ./templates/terranix-demo#packages.x86_64-linux.tf.config
+
+# Verify NixOS configs still work
+nix eval --override-input den . \
+  ./templates/terranix-demo#nixosConfigurations.web-1.config.services.nginx.enable
+```
+
+The generated `config.tf.json` contains:
+
+| Block | Content |
+|-------|---------|
+| `terraform.required_providers` | Hetzner Cloud provider |
+| `variable.hcloud_token` | Sensitive API token |
+| `provider.hcloud` | Provider config referencing the variable |
+| `resource.hcloud_server.web-1` | cx22 in fsn1 |
+| `resource.hcloud_server.web-2` | cx22 in nbg1 |
+| `output.web-1_ip` | Public IPv4 |
+| `output.web-2_ip` | Public IPv4 |
+
+## Using with Terraform/OpenTofu
+
+```console
+nix build .#packages.x86_64-linux.tf -o config.tf.json
+tofu init
+TF_VAR_hcloud_token="your-token" tofu plan
+TF_VAR_hcloud_token="your-token" tofu apply
+```
+
+## What It Demonstrates
+
+| Feature | Shown |
+|---------|:-----:|
+| Custom class (`terranix`) | ✓ |
+| Route with `instantiate` | ✓ |
+| Host schema extensions | ✓ |
+| Parametric aspects with host-qualified names | ✓ |
+| Dual-class aspects (nixos + terranix) | ✓ |
+| Third-party integrations (terranix) | ✓ |
+
+## See Also
+
+- [Custom Classes](/guides/custom-classes/) — defining new classes
+- [Policies reference](/reference/policies/) — `policy.route` and `instantiate`
+- [terranix.org](https://terranix.org) — terranix documentation

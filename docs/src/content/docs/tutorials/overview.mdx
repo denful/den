@@ -20,6 +20,8 @@ nix flake init -t github:denful/den#<template>
 | [**nvf-standalone**](/tutorials/nvf-standalone/) | Den based NVF without NixOS | ✓ | ✗ | ✗ |
 | [**microvm**](/tutorials/microvm/) | MicroVM host and guests | ✓ | ✗ | ✗ |
 | [**flake-parts-modules**](/tutorials/flake-parts-modules/) | flake-parts perSystem submodules | ✓ | ✓ | ✗ |
+| [**fleet-demo**](/tutorials/fleet-demo/) | Multi-host fleet with environments | ✓ | ✓ | ✓ |
+| [**terranix-demo**](/tutorials/terranix-demo/) | Terraform config from den hosts | ✓ | ✓ | ✗ |
 | [**bogus**](/tutorials/bogus/) | Bug reproduction | ✓ | ✓ | ✓ |
 | [**ci**](/tutorials/ci/) | Den's own test suite | ✓ | ✓ | ✓ |
 
@@ -59,6 +61,8 @@ Den uses [import-tree](https://github.com/vic/import-tree) to recursively load a
 - **microvm** — Demostrates Den extensibility showcasing MicroVM virtualization.
 - **nvf-standalone** — Demostrates Den outside the NixOS/nix-Darwin framework.
 - **flake-parts-modules** — Integrate Den aspects with third-party flake-parts perSystem submodules.
+- **fleet-demo** — Multi-host fleet with environments, cross-host `pipe.collect`, haproxy load balancing
+- **terranix-demo** — Generate Terraform config from den hosts using `route.instantiate`
 - **bogus** — Creating minimal reproductions for bug reports with nix-unit
 - **ci** — Comprehensive tests covering every Den feature (your best learning resource)
 

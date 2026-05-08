@@ -1,0 +1,182 @@
+---
+title: "Template: Fleet Demo"
+description: Multi-host fleet with environments, cross-host pipe.collect, haproxy load balancing, and /etc/hosts generation.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+[`templates/fleet-demo`](https://github.com/denful/den/tree/main/templates/fleet-demo)
+</Aside>
+
+The fleet demo demonstrates Den's multi-host capabilities: custom entity types, environment scoping, quirk-based data flow, and cross-host collection.
+
+## Topology
+
+```
+flake
++-- flake-system (x86_64-linux)
+|   +-- [packages, checks, devShells]
++-- fleet
+    +-- environment:prod
+    |   +-- host:lb-prod        (haproxy load balancer)
+    |   +-- host:web-prod-1     (nginx backend)
+    |   +-- host:web-prod-2     (nginx backend)
+    +-- environment:staging
+        +-- host:web-staging    (nginx backend)
+```
+
+Hosts are grouped by environment. `pipe.collect` gathers data only from
+same-environment peers — the production load balancer sees only production
+backends.
+
+## Key Concepts
+
+### Custom Entity Types
+
+The demo defines `environment` as a user-space entity type:
+
+```nix
+# modules/environments.nix
+den.schema.environment.isEntity = true;
+
+options.fleet.environments = lib.mkOption {
+  type = lib.types.attrsOf environmentType;
+};
+```
+
+No framework changes required — entity types are declared entirely in user flakes.
+
+### Fleet Topology Policies
+
+Three policies wire the scope tree:
+
+```nix
+# modules/policies/fleet.nix
+
+# flake -> fleet (single fleet entity)
+den.policies.to-fleet = _: [ resolve.to "fleet" { fleet = { name = "fleet"; }; } ];
+
+# fleet -> environments (one per registered environment)
+den.policies.fleet-to-envs = { fleet, ... }:
+  lib.mapAttrsToList (_: env: resolve.to "environment" { environment = env; })
+    config.fleet.environments;
+
+# environment -> hosts (hosts whose environment matches)
+den.policies.env-to-hosts = { environment, ... }:
+  lib.concatMap (...) # resolve.to "host" + policy.instantiate per host
+```
+
+The default host-walking policies (`to-os-outputs`, `to-hm-outputs`) are excluded
+so the fleet topology controls the scope tree:
+
+```nix
+den.schema.flake-system.excludes = [
+  den.policies.to-os-outputs
+  den.policies.to-hm-outputs
+];
+```
+
+### Quirks and Pipes
+
+Two quirks enable cross-host data flow:
+
+| Quirk | Producer | Consumer | Purpose |
+|-------|----------|----------|---------|
+| `http-backends` | nginx aspects | haproxy aspect | Backend server addresses |
+| `host-addrs` | hostfile aspect | hostfile aspect | `/etc/hosts` entries |
+
+**Producer** — each nginx host emits its address:
+
+```nix
+# modules/aspects/features/nginx.nix
+den.aspects.nginx = {
+  nixos = { ... }: { services.nginx.enable = true; /* ... */ };
+
+  http-backends = { host, ... }: {
+    inherit (host) addr;
+    port = host.httpPort;
+  };
+};
+```
+
+**Collection policy** — every host collects from peers:
+
+```nix
+# modules/policies/pipes.nix
+den.policies.collect-backends = { host, ... }: [
+  (pipe.from "http-backends" [
+    (pipe.collect ({ host, ... }: true))
+  ])
+];
+```
+
+**Consumer** — haproxy receives the collected data as a function argument:
+
+```nix
+# modules/aspects/features/haproxy.nix
+den.aspects.haproxy = {
+  nixos = { http-backends, lib, ... }: {
+    services.haproxy.config = /* generate config from http-backends */;
+  };
+};
+```
+
+The pipeline automatically resolves parametric quirk values (`{ host, ... }: ...`)
+using each source scope's context before delivering them.
+
+## Project Structure
+
+```
+templates/fleet-demo/
+  flake.nix
+  modules/
+    den.nix                      # hosts, defaults, systems
+    environments.nix             # environment entity type + host schema extensions
+    flake-parts.nix              # standard wiring
+    policies/
+      fleet.nix                  # fleet -> env -> host scope tree
+      pipes.nix                  # quirk declarations + collection policies
+    aspects/
+      features/
+        nginx.nix                # web server + http-backends producer
+        haproxy.nix              # load balancer (consumes http-backends)
+        hostfile.nix             # /etc/hosts (consumes + produces host-addrs)
+      hosts/
+        lb-prod.nix              # includes haproxy + hostfile
+        web-prod-1.nix           # includes nginx + hostfile
+        web-prod-2.nix           # includes nginx + hostfile
+        web-staging.nix          # includes nginx + hostfile
+      users/
+        deploy.nix               # deploy user (all hosts)
+```
+
+## Try It
+
+```console
+# Verify haproxy gets both production backends
+nix eval --override-input den . \
+  ./templates/fleet-demo#nixosConfigurations.lb-prod.config.services.haproxy.config
+
+# Verify /etc/hosts has all production peers
+nix eval --override-input den . \
+  ./templates/fleet-demo#nixosConfigurations.web-prod-1.config.networking.extraHosts
+```
+
+## What It Demonstrates
+
+| Feature | Shown |
+|---------|:-----:|
+| Custom entity types (environment) | ✓ |
+| Multi-level scope tree (fleet → env → host) | ✓ |
+| Quirk declarations (`den.quirks`) | ✓ |
+| Cross-host `pipe.collect` | ✓ |
+| Environment-scoped isolation | ✓ |
+| Parametric quirk values (`{ host, ... }:`) | ✓ |
+| Schema policy excludes | ✓ |
+
+## See Also
+
+- [Quirks & Pipes](/explanation/quirks-and-pipes/) — how quirks flow through the pipeline
+- [Fleets & Multi-Host](/explanation/fleet/) — scope partitioning and entity resolution
+- [Policies reference](/reference/policies/) — policy effect types

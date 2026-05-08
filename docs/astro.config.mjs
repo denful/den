@@ -110,6 +110,8 @@ export default defineConfig({
 								{ label: 'NVF Standalone', slug: 'tutorials/nvf-standalone' },
 								{ label: 'MicroVM', slug: 'tutorials/microvm' },
 								{ label: 'Example', slug: 'tutorials/example' },
+								{ label: 'Fleet Demo', slug: 'tutorials/fleet-demo' },
+								{ label: 'Terranix Demo', slug: 'tutorials/terranix-demo' },
 								{ label: 'Bug Reproduction', slug: 'tutorials/bogus' },
 								{ label: 'CI Tests', slug: 'tutorials/ci' },
 								{ label: 'Flake Parts Modules', slug: 'tutorials/flake-parts-modules' },
