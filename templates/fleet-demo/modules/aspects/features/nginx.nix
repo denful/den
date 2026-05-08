@@ -14,5 +14,13 @@
           root = "/var/www";
         };
       };
+
+    http-backends =
+      { host, environment, ... }:
+      {
+        inherit (host) addr;
+        domain = environment.domainName;
+        port = host.httpPort;
+      };
   };
 }

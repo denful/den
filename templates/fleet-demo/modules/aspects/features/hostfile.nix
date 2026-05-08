@@ -11,5 +11,12 @@
           entry: "${entry.addr} ${entry.hostname}"
         ) host-addrs;
       };
+
+    host-addrs =
+      { host, config, ... }:
+      {
+        hostname = config.networking.hostName;
+        addr = host.addr;
+      };
   };
 }

@@ -8,10 +8,5 @@
       den.aspects.haproxy
       den.aspects.hostfile
     ];
-
-    host-addrs = {
-      hostname = "lb-prod";
-      addr = "10.0.1.1";
-    };
   };
 }
