@@ -17,7 +17,7 @@ in
     description = "Host address entries for /etc/hosts generation";
   };
 
-  # Every host collects http-backends from peers.
+  # Hosts collect http-backends from peers (consumed by haproxy where present).
   den.policies.collect-backends =
     { host, ... }:
     [

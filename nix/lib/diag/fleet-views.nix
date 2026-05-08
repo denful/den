@@ -88,11 +88,17 @@ let
             hScope:
             let
               hName = hostNameFromScope hScope;
-              classKeys = builtins.attrNames (scopedClassImports.${hScope} or { });
-              # Pipe keys this host produces (present in classImports but not a class).
-              pipeKeys = builtins.filter (
-                k: k != "nixos" && k != "homeManager" && k != "user" && k != "darwin"
-              ) classKeys;
+              # Use trace-level pipeProducers when available for accurate
+              # aspect-level production tracking.
+              tracedProducers = fleetCapture.pipeProducers or [ ];
+              pipeKeys =
+                if tracedProducers != [ ] then
+                  lib.unique (map (p: p.pipeName) (builtins.filter (p: p.scope == hScope) tracedProducers))
+                else
+                  let
+                    classKeys = builtins.attrNames (scopedClassImports.${hScope} or { });
+                  in
+                  builtins.filter (k: k != "nixos" && k != "homeManager" && k != "user" && k != "darwin") classKeys;
               # Pipe effects (pipe.collect) at this scope.
               effects = scopedPipeEffects.${hScope} or [ ];
               collectPipes = lib.unique (
@@ -194,12 +200,22 @@ let
       envSubgraph =
         env:
         let
+          tracedProducers = fleetCapture.pipeProducers or [ ];
           hostDecls = map (
             h:
             let
-              produces = if h.produces != [ ] then " (${lib.concatStringsSep ", " h.produces})" else "";
+              # Show producing aspect:pipe pairs for richer labels.
+              aspectPipes =
+                if tracedProducers != [ ] then
+                  let
+                    hostProds = builtins.filter (p: p.scope == h.scope) tracedProducers;
+                  in
+                  map (p: "${p.aspectIdentity}→${p.pipeName}") hostProds
+                else
+                  h.produces;
+              annotation = if aspectPipes != [ ] then " (${lib.concatStringsSep ", " aspectPipes})" else "";
             in
-            "    ${sanitize h.name}([\"${h.name}${produces}\"])"
+            "    ${sanitize h.name}([\"${h.name}${annotation}\"])"
           ) env.hosts;
         in
         "  subgraph ${sanitize "env_${env.name}"}[\"${env.name}\"]\n"

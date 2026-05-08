@@ -126,6 +126,9 @@ let
       scopeEntityKind = (st.scopeEntityKind or (_: { })) null;
       scopedPipeEffects = (st.scopedPipeEffects or (_: { })) null;
       scopedClassImports = (st.scopedClassImports or (_: { })) null;
+      # Phase 2: pipe production/consumption from trace handlers.
+      pipeProducers = st.pipeProducers or [ ];
+      pipeConsumers = st.pipeConsumers or [ ];
     };
 in
 {

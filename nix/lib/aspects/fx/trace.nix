@@ -210,6 +210,49 @@ let
             ctxTrace = (state.ctxTrace or [ ]) ++ [ ctxEntry ];
           };
       };
+    # Track pipe production: when an aspect emits data for a pipe key.
+    "emit-class" =
+      { param, state }:
+      let
+        isPipe = param.__isPipeEntry or false;
+        scope = state.currentScope;
+      in
+      {
+        resume = null;
+        state =
+          state
+          // lib.optionalAttrs isPipe {
+            pipeProducers = (state.pipeProducers or [ ]) ++ [
+              {
+                pipeName = param.class;
+                aspectIdentity = param.identity;
+                inherit scope;
+              }
+            ];
+          };
+      };
+    # Track pipe consumption: when a policy registers pipe.collect or other pipe effects.
+    "register-pipe-effect" =
+      { param, state }:
+      let
+        pipeName = param.value.pipeName or param.pipeName or null;
+        stages = param.value.stages or param.stages or [ ];
+        hasCollect = builtins.any (s: (s.__pipeStage or null) == "collect") stages;
+        scope = state.currentScope;
+      in
+      {
+        resume = null;
+        state =
+          state
+          // lib.optionalAttrs (pipeName != null) {
+            pipeConsumers = (state.pipeConsumers or [ ]) ++ [
+              {
+                inherit pipeName hasCollect scope;
+                stageTypes = map (s: s.__pipeStage or "unknown") stages;
+              }
+            ];
+          };
+      };
     "record-fired" =
       { param, state }:
       let
