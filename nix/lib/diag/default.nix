@@ -354,6 +354,7 @@ in
     homeContext
     graph
     fleet
+    fleetGraph
     pipes
     text
     views

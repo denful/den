@@ -1,55 +1,35 @@
-# Terranix integration via per-host route into flake-parts.
+# Terranix integration: terranix as an entity kind.
 #
-# Each host scope's route collects only its own terranix class modules
-# and delivers them into terranixConfigurations.<host.name>.
-#
-# terranix's flake-module handles all output generation:
-#   nix run .#<host>           — tofu apply
-#   nix run .#<host>.plan      — tofu plan
-#   nix run .#<host>.destroy   — tofu destroy
-#   nix develop .#<host>       — shell with tofu + scripts
-{ den, inputs, ... }:
+# Each host gets a terranix entity child scope. applyInstantiates
+# collects terranix class modules from the host subtree and calls
+# terranixConfiguration, placing the result at packages.<system>.<host>-tf.
+{
+  den,
+  inputs,
+  lib,
+  ...
+}:
 let
-  inherit (den.lib.policy) resolve route;
-  perSystemModule = den.lib.aspects.resolveImports "flake-parts" (
-    den.lib.resolveEntity "flake-parts" { }
-  );
+  inherit (den.lib.policy) resolve;
 in
 {
-  imports = [ inputs.terranix.flakeModule ];
-
   den.classes.terranix = { };
-  den.classes.flake-parts = { };
 
-  # Walk hosts in the flake-parts entity so per-host routes fire.
-  den.policies.flake-parts-to-host =
-    _:
-    map (host: resolve.to "host" { inherit host; }) (
-      builtins.concatMap builtins.attrValues (builtins.attrValues den.hosts)
-    );
-
-  # Per-host: collect terranix class from host subtree → terranixConfigurations.<name>
-  den.policies.terranix-per-host =
-    { host, ... }:
+  den.policies.host-to-terranix =
+    { host, system, ... }:
     [
-      (route {
-        fromClass = "terranix";
-        intoClass = "flake-parts";
-        path = [
-          "terranix"
-          "terranixConfigurations"
-          host.name
-        ];
+      (den.lib.policy.instantiate {
+        name = "${host.name}-tf";
+        class = "terranix";
         instantiate =
-          { modules, ... }:
-          {
-            inherit modules;
-          };
+          { modules, ... }: inputs.terranix.lib.terranixConfiguration { inherit system modules; };
+        intoAttr = [
+          "terranixConfigurations"
+          "${host.name}"
+        ];
+        sourceScopeId = null;
       })
     ];
 
-  den.schema.flake-parts.includes = [ den.policies.flake-parts-to-host ];
-  den.schema.host.includes = [ den.policies.terranix-per-host ];
-
-  perSystem.imports = [ perSystemModule ];
+  den.schema.host.includes = [ den.policies.host-to-terranix ];
 }
