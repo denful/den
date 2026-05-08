@@ -93,17 +93,17 @@ let
         })
 
         (mkView {
-          view = "stage-seq";
-          title = "Stage Sequence";
-          altText = "Stage sequence";
+          view = "scope-seq";
+          title = "Scope Sequence";
+          altText = "Scope sequence";
           fmt = mmd mmdSourceToSvg;
           compute = g: render.toSequenceMermaid g;
         })
 
         (mkView {
-          view = "stage-seq-full";
-          title = "Stage Sequence (expanded)";
-          altText = "Stage sequence expanded";
+          view = "scope-seq-full";
+          title = "Scope Sequence (expanded)";
+          altText = "Scope sequence expanded";
           fmt = mmd mmdSourceToSvg;
           compute = g: render.toSequenceMermaidExpanded g;
         })
@@ -159,11 +159,11 @@ let
         })
 
         (mkView {
-          view = "stage-edges";
-          title = "Stage Topology";
-          altText = "Stage edges";
+          view = "scope-edges";
+          title = "Scope Topology";
+          altText = "Scope edges";
           fmt = mmd mmdSourceToSvg;
-          compute = g: render.toStageEdgesMermaid g;
+          compute = g: render.toScopeEdgesMermaid g;
         })
 
         (mkView {

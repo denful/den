@@ -205,8 +205,8 @@ let
       withFn = sequence.toPolicySequenceMermaidWith;
       mc = true;
     };
-    toStageEdgesMermaid = {
-      withFn = sequence.toStageEdgesMermaidWith;
+    toScopeEdgesMermaid = {
+      withFn = sequence.toScopeEdgesMermaidWith;
       mc = true;
     };
     toSankeyMermaid = {

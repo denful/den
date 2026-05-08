@@ -271,13 +271,13 @@ in
         | View | Description |
         | ---- | ----------- |
         | `dag` | Full DAG (mermaid + dot + puml) |
-        | `aspects` | Aspect hierarchy with stage subgraphs |
+        | `aspects` | Aspect hierarchy with scope subgraphs |
         | `simple` | Simplified (providers folded) |
-        | `ctx` | Context pipeline stages |
-        | `stage-seq` | Stage sequence (compact) |
-        | `stage-seq-full` | Stage sequence (expanded) |
+        | `ctx` | Context pipeline scopes |
+        | `scope-seq` | Scope sequence (compact) |
+        | `scope-seq-full` | Scope sequence (expanded) |
         | `policy-seq` | Policy resolution sequence |
-        | `stage-edges` | Stage topology |
+        | `scope-edges` | Scope topology |
         | `providers` | Provider hierarchy |
         | `providers-resolved` | Provider → resolved output |
         | `adapters` | Constraint impact |

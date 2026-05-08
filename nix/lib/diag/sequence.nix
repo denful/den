@@ -318,7 +318,7 @@ let
   # Entity kind topology: focused flowchart showing only pipeline entity
   # kinds and their transition edges. Answers "what is the resolution order?"
   # without any aspect-level detail.
-  toStageEdgesMermaidWith =
+  toScopeEdgesMermaidWith =
     {
       theme ? themes.defaultTheme,
       mermaidConfig ? { },
@@ -356,7 +356,7 @@ let
         diagramKind = "graph LR";
       } (map nodeDecl ordered ++ (if edgeLines != [ ] then [ "" ] ++ edgeLines else [ ]));
 
-  toStageEdgesMermaid = toStageEdgesMermaidWith { };
+  toScopeEdgesMermaid = toScopeEdgesMermaidWith { };
 
   # Policy-centric sequence: policies ARE the participants.
   # Shows each policy as an actor, what context it receives,
@@ -520,8 +520,8 @@ in
     toSequenceMermaidWith
     toSequenceMermaidExpanded
     toSequenceMermaidExpandedWith
-    toStageEdgesMermaid
-    toStageEdgesMermaidWith
+    toScopeEdgesMermaid
+    toScopeEdgesMermaidWith
     toPolicySequenceMermaid
     toPolicySequenceMermaidWith
     ;
