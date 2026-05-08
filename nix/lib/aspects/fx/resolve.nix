@@ -278,7 +278,11 @@ let
         else
           let
             hostClass = spec.class or "nixos";
-            hostScopeId = findHostScopeId scopeParent allScopeIds spec;
+            rawHostScopeId = findHostScopeId scopeParent allScopeIds spec;
+            # Fall back to source scope when no entity scope matches.
+            # This allows policy.instantiate to collect from any scope level
+            # (e.g., flake-system scope for perSystem class collection).
+            hostScopeId = if rawHostScopeId != null then rawHostScopeId else spec.sourceScopeId;
             # Re-run assembly phases for the host subtree with correct rootScopeId.
             preWalkedModules =
               if hostScopeId != null then
