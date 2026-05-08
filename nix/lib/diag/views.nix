@@ -244,7 +244,6 @@ let
         render,
         renderDense,
         mmdSourceToSvg,
-        pumlSourceToSvg,
         ...
       }:
       [
@@ -254,14 +253,6 @@ let
           altText = "Aspect namespace";
           fmt = mmd mmdSourceToSvg;
           compute = _: renderDense.toMermaid (graph.ofNamespace { });
-        })
-
-        (mkView {
-          view = "c4context";
-          title = "Fleet C4 Context";
-          altText = "Fleet C4";
-          fmt = puml pumlSourceToSvg;
-          compute = render.toC4Context;
         })
 
         (mkView {

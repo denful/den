@@ -133,9 +133,30 @@ in
         viewDefs = fleetViewDefs;
       };
 
+      # --- Pipe flow entries ---
+
+      pipeFlowEntries = [
+        {
+          name = "fleet";
+          view = "pipe-flow";
+          dir = "fleet";
+          ext = "md";
+          tool = null;
+          drv = pipeFlowDrv;
+        }
+        {
+          name = "fleet";
+          view = "pipe-flow";
+          dir = "fleet";
+          ext = "svg";
+          tool = "mmd";
+          drv = pipeFlowSvgDrv;
+        }
+      ];
+
       # --- Assembly ---
 
-      everyEntry = hostEntries ++ userEntries ++ fleetEntriesList;
+      everyEntry = hostEntries ++ userEntries ++ fleetEntriesList ++ pipeFlowEntries;
       allPackages = entriesToPackages everyEntry;
 
       # --- Galleries ---
