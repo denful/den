@@ -375,9 +375,16 @@ let
         entityEdges
         ;
 
+      orEmpty = v: if v == null then "" else v;
       policyNodes = lib.sort (
         a: b:
-        (a.from or "") < (b.from or "") || ((a.from or "") == (b.from or "") && (a.to or "") < (b.to or ""))
+        let
+          af = orEmpty (a.from or null);
+          bf = orEmpty (b.from or null);
+          at = orEmpty (a.to or null);
+          bt = orEmpty (b.to or null);
+        in
+        af < bf || (af == bf && at < bt)
       ) (builtins.filter (n: n.isPolicyDispatch or false) nodes);
 
       # Aspects grouped by target entity kind.
@@ -468,7 +475,7 @@ let
           (
             acc: pn:
             let
-              to = pn.to or "";
+              to = orEmpty (pn.to or null);
               isFirst = !(acc.seen ? ${to});
               pAlias = aliasOf (pn.policyName or pn.label);
             in
