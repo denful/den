@@ -24,9 +24,8 @@ in
         instantiate =
           { modules, ... }: inputs.terranix.lib.terranixConfiguration { inherit system modules; };
         intoAttr = [
-          "packages"
-          system
-          host.name
+          "terranixConfigurations"
+          "${host.name}"
         ];
         sourceScopeId = null;
       })

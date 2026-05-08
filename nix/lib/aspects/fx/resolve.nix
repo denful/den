@@ -268,7 +268,7 @@ let
     let
       allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
       allScopeIds = builtins.attrNames augmentedScopeContexts;
-      instantiateConfigs = lib.concatMap (
+      instantiateModules = lib.concatMap (
         spec:
         let
           hasOutput = (spec.intoAttr or [ ]) != [ ];
@@ -350,16 +350,12 @@ let
                 };
             evaluated = spec.instantiate instantiateArgs;
           in
-          [ (lib.setAttrByPath ([ "flake" ] ++ spec.intoAttr) evaluated) ]
+          [ { config = lib.setAttrByPath ([ "flake" ] ++ spec.intoAttr) evaluated; } ]
       ) allInstantiates;
     in
     classImports
     // {
-      flake =
-        (classImports.flake or [ ])
-        ++ lib.optional (instantiateConfigs != [ ]) {
-          config = builtins.foldl' lib.recursiveUpdate { } instantiateConfigs;
-        };
+      flake = (classImports.flake or [ ]) ++ instantiateModules;
     };
 
   # Full resolution: run pipeline, then assemble output through all phases.
