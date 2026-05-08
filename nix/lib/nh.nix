@@ -1,6 +1,5 @@
 { lib, den, ... }:
 let
-  defaultAction = "build";
 
   mkApp =
     getCommand:
@@ -8,6 +7,8 @@ let
       outPrefix ? [ ],
       fromFlake ? true,
       fromPath ? ".",
+      defaultAction ? "build",
+      defaultArgs ? [ ],
     }:
     pkgs: item:
     pkgs.writeShellApplication {
@@ -33,7 +34,7 @@ let
               item.name
             ]);
 
-          args = lib.concatStringsSep " " from;
+          args = lib.concatStringsSep " " (from ++ defaultArgs);
         in
         ''
           action="''${1:-${defaultAction}}"

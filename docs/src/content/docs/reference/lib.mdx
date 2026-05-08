@@ -130,6 +130,8 @@ All functions take an `args` attrset:
 | `fromFlake` | `bool` | `true` | Use flake ref (`path#attr`) or file ref (`--file path attr`) |
 | `fromPath` | `str` | `"."` | Flake path or file path |
 | `outPrefix` | `list` | `[]` | Prefix prepended to the output attribute path |
+| `defaultAction` | `build` | `str` | The default action to perform if no args are provided |
+| `defaultArgs` | `[]` | `[str]` | Additional default args to add to each invocation, e.g., `--print-build-logs` |
 
 ### Usage
 
