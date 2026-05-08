@@ -161,7 +161,11 @@ let
         let
           key = instKey inst;
           instNodes = builtins.filter (
-            n: (n.entityInstance or null) == key && n.id != rootId && !(n.isPolicyDispatch or false)
+            n:
+            (n.entityInstance or null) == key
+            && n.id != rootId
+            && !(n.isPolicyDispatch or false)
+            && !(isEntityBoundary n)
           ) nodes;
           instEdges = builtins.filter (
             e:
@@ -185,7 +189,20 @@ let
           + "\n  end"
         );
 
+      # Entity boundary nodes: the resolution entry point for an entity
+      # kind (e.g., "user" node with entityKind "user"). These are shared
+      # structural connectors between scopes — they don't belong in any
+      # single instance subgraph. Rendered outside subgraphs alongside
+      # policy bridge nodes.
+      isEntityBoundary =
+        n:
+        let
+          ek = n.entityKind or null;
+        in
+        ek != null && n.fullLabel == ek;
+
       policyNodes = builtins.filter (n: n.isPolicyDispatch or false) nodes;
+      bridgeNodes = builtins.filter (n: isEntityBoundary n && !(n.isPolicyDispatch or false)) nodes;
 
       # `topLevelNodes` are the nodes declared outside any stage subgraph.
       # When the graph is flat (no stages), that's every non-host node.
@@ -193,7 +210,7 @@ let
       # nodes (the others get declared inside their subgraph block).
       topLevelNodes =
         if hasEntityInstances then
-          # All non-policy nodes live in instance subgraphs; only policy nodes are top-level.
+          # All non-policy/non-boundary nodes live in instance subgraphs.
           [ ]
         else if hasEntityKinds then
           builtins.filter (n: n.entityKind == null && n.id != rootId) nodes
@@ -309,6 +326,7 @@ let
           if hasEntityInstances then
             lib.concatMap instanceSubgraph (graph.entityInstances or [ ])
             ++ [ "" ]
+            ++ map nodeDecl bridgeNodes
             ++ map nodeDecl policyNodes
             ++ map edgeDecl (builtins.filter (e: (e.style or "normal") == "policy") edges)
             ++ map edgeDecl crossInstanceEdges
