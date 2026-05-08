@@ -123,6 +123,27 @@ let
       # merge ONLY the entries where `hasClass = true`. Otherwise every
       # aspect would look like it belongs to every class just because
       # the traversal visited it.
+      # Pre-tag entries: assign root entity instance to entries with null
+      # entityInstance so they merge correctly with same-scope entries
+      # during dedup rather than creating duplicates.
+      rootInstance =
+        if ctxTrace != [ ] then
+          let
+            rootCtx = builtins.head ctxTrace;
+          in
+          "${rootCtx.entityKind}:${rootCtx.selfName}"
+        else
+          null;
+      # Pre-tag: assign root entity instance to null-instance entries so
+      # they merge with same-scope entries during dedup (no duplicates).
+      preTagged = map (
+        e:
+        if (e.entityInstance or null) == null && rootInstance != null then
+          e // { entityInstance = rootInstance; }
+        else
+          e
+      ) entries;
+
       # Coerce null entityInstance to empty string for safe interpolation.
       instOf = e: if e.entityInstance or null == null then "" else e.entityInstance;
 
@@ -143,7 +164,7 @@ let
           k = scopeKey e;
         in
         acc // { ${k} = (acc.${k} or [ ]) ++ [ e ]; }
-      ) { } entries;
+      ) { } preTagged;
 
       # Detect fullNames appearing in multiple entity instances — these
       # need scope-qualified IDs so nodes don't collide.
@@ -154,7 +175,7 @@ let
           inst = instOf e;
         in
         acc // { ${fn} = lib.unique ((acc.${fn} or [ ]) ++ [ inst ]); }
-      ) { } entries;
+      ) { } preTagged;
       isMultiInstance = fn: builtins.length (instancesPerFullName.${fn} or [ ]) > 1;
 
       # Scope-qualified entry ID: append entity instance suffix when the
@@ -224,7 +245,7 @@ let
         ) { } es
       ) groupedByName;
 
-      nodes = dedupBy scopeKey entries;
+      nodes = dedupBy scopeKey preTagged;
       # Set of rendered node IDs for parent resolution.
       nodeIds = lib.listToAttrs (
         map (e: {
@@ -237,7 +258,7 @@ let
         map (e: {
           name = seid e;
           value = true;
-        }) (builtins.filter (e: e.excluded or false) entries)
+        }) (builtins.filter (e: e.excluded or false) preTagged)
       );
 
       # Resolve a parent reference to the correct scope-qualified ID.
@@ -259,7 +280,7 @@ let
       edges = dedupBy (e: "${resolveParentId (e.parent or "") (instOf e)}->${seid e}") (
         builtins.filter (
           e: e.parent != null && !(excludedIds ? ${resolveParentId (e.parent or "") (instOf e)})
-        ) entries
+        ) preTagged
       );
 
       # Disambiguation: if two distinct entries would render to the same
@@ -292,13 +313,13 @@ let
         map (e: {
           name = e.name;
           value = e;
-        }) (builtins.filter (e: (e.provider or [ ]) == [ ]) entries)
+        }) (builtins.filter (e: (e.provider or [ ]) == [ ]) preTagged)
       );
 
       # Entity kinds from __ctxTrace.
       ctxItems = builtins.filter (i: i.selfName != "<anon>") ctxTrace;
       entityKindNames = lib.unique (
-        builtins.filter (s: s != null) (map (e: e.entityKind or null) entries)
+        builtins.filter (s: s != null) (map (e: e.entityKind or null) preTagged)
       );
 
       # Node shape classification.
@@ -334,7 +355,7 @@ let
             name = resolveParentId e.parent (instOf e);
             value = true;
           }
-        ) entries
+        ) preTagged
       );
       isLeafNode = node: !(childSet ? ${node.id});
 
@@ -431,7 +452,7 @@ let
             name = seid e;
             value = kind;
           }
-        ) entries
+        ) preTagged
       );
       entityEdges = dedupBy (e: "${e.from}->${e.to}") (
         builtins.concatMap (
@@ -448,7 +469,7 @@ let
             style = "normal";
             label = null;
           }
-        ) entries
+        ) preTagged
       );
 
       # Provider-provenance edges: dotted "provided-by" links from provider
@@ -537,31 +558,10 @@ let
           n
       ) rawNodes;
 
-      # Assign unscoped nodes to the root entity instance. The root
-      # entity is determined from ctxTrace (first entry = the entity kind
-      # that the capture started from). Unscoped nodes are children of
-      # the root entity that resolve before deriveEntityKind can find an
-      # ancestor — they belong in the root's subgraph, not "flake".
-      hasAnyInstances = builtins.any (n: n.entityInstance != null) finalNodes;
-      rootInstance =
-        if ctxTrace != [ ] then
-          let
-            rootCtx = builtins.head ctxTrace;
-          in
-          "${rootCtx.entityKind}:${rootCtx.selfName}"
-        else
-          null;
-      taggedNodes =
-        if hasAnyInstances then
-          map (
-            n:
-            if n.entityInstance == null then
-              n // { entityInstance = if rootInstance != null then rootInstance else "flake"; }
-            else
-              n
-          ) finalNodes
-        else
-          finalNodes;
+      # All entries were pre-tagged with rootInstance before dedup, so
+      # nodes already have correct entityInstance values. No post-hoc
+      # tagging needed.
+      taggedNodes = finalNodes;
 
       entityInstanceNames = lib.unique (
         builtins.filter (s: s != null) (map (n: n.entityInstance) taggedNodes)
