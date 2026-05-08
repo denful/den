@@ -154,6 +154,21 @@ in
         }
       ];
 
+      # Text summary entries (markdown only, no SVG).
+      mkTextEntry = name: dir: drv: {
+        inherit name dir drv;
+        view = "summary";
+        ext = "md";
+        tool = null;
+      };
+
+      textEntries = [
+        (mkTextEntry "fleet" "fleet" fleetSummaryDrv)
+      ]
+      ++ map (
+        host: mkTextEntry host.name "hosts/${host.name}" hostSummaryDrvs."${host.name}-summary"
+      ) allHosts;
+
       fleetViewEntries =
         mkFleetEntries "pipe-flow" pipeFlowView
         ++ mkFleetEntries "scope-topology" scopeTopoView
@@ -162,7 +177,7 @@ in
 
       # --- Assembly ---
 
-      everyEntry = hostEntries ++ userEntries ++ fleetEntriesList ++ fleetViewEntries;
+      everyEntry = hostEntries ++ userEntries ++ fleetEntriesList ++ fleetViewEntries ++ textEntries;
       allPackages = entriesToPackages everyEntry;
 
       # --- Galleries ---
