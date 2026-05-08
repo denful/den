@@ -124,25 +124,6 @@ den.default.includes = [ den.policies.my-policy ];
 
 Policies and aspects mix freely in `includes`.
 
-## Deactivation
-
-Use `excludes` to prevent a policy from firing in a subtree:
-
-```nix
-den.aspects.igloo = {
-  excludes = [ den.policies.blocked ];
-};
-```
-
-Excludes are **authoritative** — parent excludes cannot be overridden by
-child includes. The constraint registry uses the policy's identity for
-matching.
-
-
----
-
-## Combinators
-
 ### `den.lib.policy.mkPolicy name fn`
 
 Create a named policy record for direct use in `includes`. Use this when
@@ -161,6 +142,25 @@ den.default.includes = [
 
 Returns `{ __isPolicy = true; name; fn; }` — the pipeline recognizes this
 as a policy and routes it to the dispatch system.
+
+## Deactivation
+
+Use `excludes` to prevent a policy from firing in a subtree:
+
+```nix
+den.aspects.igloo = {
+  excludes = [ den.policies.blocked ];
+};
+```
+
+Excludes are **authoritative** — parent excludes cannot be overridden by
+child includes. The constraint registry uses the policy's identity for
+matching.
+
+
+---
+
+## Combinators
 
 ### `den.lib.policy.for entity policyOrList`
 
