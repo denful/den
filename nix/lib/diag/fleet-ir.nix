@@ -251,7 +251,7 @@ let
           }
         ) graph.nodes;
 
-      allNodes = lib.concatMap (
+      allAspectNodes = lib.concatMap (
         hostName:
         let
           graph = hostGraphs.${hostName} or null;
@@ -259,8 +259,67 @@ let
         if graph != null then hostNodes hostName graph else [ ]
       ) (builtins.attrNames hostGraphs);
 
-      # --- Edges: internal + cross-host ---
+      # --- Scope hierarchy nodes ---
+      # Create nodes for fleet, environment, host, user, flake-system scopes
+      # so the full resolution tree is visible in the graph.
 
+      scopeNodeId = scopeId: sanitize "scope_${scopeId}";
+
+      scopeShape =
+        kind:
+        if kind == "fleet" then
+          "rect"
+        else if kind == "environment" then
+          "hexagon"
+        else if kind == "host" then
+          "rect"
+        else if kind == "user" then
+          "rect"
+        else
+          "rect";
+
+      scopeNodes = map (
+        scopeId:
+        let
+          kind = scopeEntityKind.${scopeId} or null;
+          name = if kind != null then extractScopeName kind scopeId else scopeId;
+        in
+        {
+          id = scopeNodeId scopeId;
+          label = if kind != null then "${kind}: ${name}" else scopeId;
+          fullLabel = if kind != null then "${kind}: ${name}" else scopeId;
+          pathKey = scopeId;
+          shape = scopeShape kind;
+          style = "default";
+          entityKind = kind;
+          entityInstance = if kind != null then "${kind}:${name}" else null;
+          classes = [ ];
+          class = "";
+          perClass = { };
+          fnArgNames = [ ];
+          isParametric = false;
+          isProvider = false;
+          providerPath = [ ];
+          hasClass = false;
+          isPolicyDispatch = false;
+          policyName = null;
+          from = null;
+          to = null;
+          host = null;
+          scope = scopeId;
+          originalId = scopeId;
+          isScope = true;
+          pipes = {
+            produces = [ ];
+          };
+        }
+      ) allScopeIds;
+
+      allNodes = scopeNodes ++ allAspectNodes;
+
+      # --- Edges ---
+
+      # Internal aspect edges (per-host).
       hostEdges =
         hostName: graph:
         map (
@@ -282,21 +341,71 @@ let
         if graph != null then hostEdges hostName graph else [ ]
       ) (builtins.attrNames hostGraphs);
 
-      # Cross-host pipe flow edges.
+      # Scope hierarchy edges: parent → child for the entire scope tree.
+      scopeHierarchyEdges = lib.concatMap (
+        scopeId:
+        let
+          parent = scopeParent.${scopeId} or null;
+        in
+        lib.optional (parent != null && parent != "__unscoped" && parent != "") {
+          from = scopeNodeId parent;
+          to = scopeNodeId scopeId;
+          style = "normal";
+          label = null;
+          host = null;
+          crossHost = false;
+        }
+      ) allScopeIds;
+
+      # Host scope → root aspect node edge (connect scope node to the host's root aspect).
+      hostRootEdges = lib.concatMap (
+        hostName:
+        let
+          graph = hostGraphs.${hostName} or null;
+          hostScopeId = lib.findFirst (
+            s: (scopeEntityKind.${s} or null) == "host" && hostNameFromScope s == hostName
+          ) null hostScopes;
+          rootNodeId = if graph != null then prefixId hostName graph.rootId else null;
+        in
+        lib.optional (hostScopeId != null && rootNodeId != null) {
+          from = scopeNodeId hostScopeId;
+          to = rootNodeId;
+          style = "normal";
+          label = null;
+          host = hostName;
+          crossHost = false;
+        }
+      ) (builtins.attrNames hostGraphs);
+
+      # Cross-host pipe flow edges — connect host scope nodes.
       pipeFlowEdges = lib.concatMap (
         pipeName:
-        map (flow: {
-          from = sanitize "host_${flow.from}";
-          to = sanitize "host_${flow.to}";
-          style = "pipe";
-          label = flow.pipeName;
-          pipe = flow.pipeName;
-          crossHost = true;
-          host = null;
-        }) (pipes.${pipeName}).flows
+        let
+          hostScopeOf =
+            hName:
+            lib.findFirst (
+              s: (scopeEntityKind.${s} or null) == "host" && hostNameFromScope s == hName
+            ) null hostScopes;
+        in
+        map (
+          flow:
+          let
+            fromScope = hostScopeOf flow.from;
+            toScope = hostScopeOf flow.to;
+          in
+          {
+            from = if fromScope != null then scopeNodeId fromScope else sanitize "host_${flow.from}";
+            to = if toScope != null then scopeNodeId toScope else sanitize "host_${flow.to}";
+            style = "pipe";
+            label = flow.pipeName;
+            pipe = flow.pipeName;
+            crossHost = true;
+            host = null;
+          }
+        ) (pipes.${pipeName}).flows
       ) allPipeNames;
 
-      allEdges = allInternalEdges ++ pipeFlowEdges;
+      allEdges = scopeHierarchyEdges ++ hostRootEdges ++ allInternalEdges ++ pipeFlowEdges;
 
       # --- Entity instances with full hierarchy ---
 
