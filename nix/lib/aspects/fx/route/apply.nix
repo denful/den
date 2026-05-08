@@ -137,11 +137,23 @@ let
       scopeParent,
     }:
     let
-      sourceModules = collectFromSubtree wrappedPerScope scopeParent route.sourceScopeId route.fromClass;
+      isFlakeRoute = route.intoClass == "flake";
+      # Subtree collection only for flake routes — parametric class keys
+      # resolve at entity scopes (host/user) which are descendants of the
+      # route's scope.  Non-flake routes (e.g. into "flake-parts") collect
+      # only from their own scope to avoid pulling modules from unrelated
+      # entity subtrees whose scope args won't be available after adaptArgs.
+      sourceModules =
+        if isFlakeRoute then
+          collectFromSubtree wrappedPerScope scopeParent route.sourceScopeId route.fromClass
+        else
+          let
+            scopeExists = wrappedPerScope ? ${route.sourceScopeId};
+          in
+          if !scopeExists then [ ] else wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
       hasInstantiate = route.instantiate or null != null;
       adapterMod = route.adapterModule or null;
       modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
-      isFlakeRoute = route.intoClass == "flake";
       ensureEntry =
         if
           !isFlakeRoute
