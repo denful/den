@@ -2,10 +2,7 @@
 #
 # Generates haproxy backend configuration from all peer hosts'
 # http-backend entries in the same environment.
-{ lib, den, ... }:
-let
-  inherit (den.lib.policy) pipe;
-in
+{ lib, ... }:
 {
   den.aspects.haproxy = {
     nixos =
@@ -29,14 +26,5 @@ in
           ++ backendLines
         );
       };
-
-    # Collect http-backends from peers — only fires where haproxy is included.
-    policies.collect-backends =
-      { host, ... }:
-      [
-        (pipe.from "http-backends" [
-          (pipe.collect ({ host, ... }: true))
-        ])
-      ];
   };
 }

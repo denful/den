@@ -17,6 +17,15 @@ in
     description = "Host address entries for /etc/hosts generation";
   };
 
+  # Every host collects http-backends from peers.
+  den.policies.collect-backends =
+    { host, ... }:
+    [
+      (pipe.from "http-backends" [
+        (pipe.collect ({ host, ... }: true))
+      ])
+    ];
+
   # Every host collects host-addrs from peers for /etc/hosts.
   den.policies.collect-host-addrs =
     { host, ... }:
@@ -27,6 +36,7 @@ in
     ];
 
   den.schema.host.includes = [
+    den.policies.collect-backends
     den.policies.collect-host-addrs
   ];
 }
