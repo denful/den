@@ -5,6 +5,7 @@
     "Justfile"
     "AGENT*.md"
     "*.txt"
+    "*.svg"
     "ci.bash"
   ];
   perSystem.treefmt.programs.deadnix.enable = false;
