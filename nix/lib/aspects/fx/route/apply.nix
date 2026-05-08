@@ -111,16 +111,33 @@ let
       };
     };
 
+  # Collect class modules from a scope and all its descendants.
+  collectFromSubtree =
+    wrappedPerScope: scopeParent: rootScopeId: fromClass:
+    let
+      allScopeIds = builtins.attrNames wrappedPerScope;
+      isInSubtree =
+        sid:
+        sid == rootScopeId
+        || (
+          let
+            parent = scopeParent.${sid} or null;
+          in
+          parent != null && parent != sid && isInSubtree parent
+        );
+      subtreeScopes = builtins.filter isInSubtree allScopeIds;
+    in
+    lib.concatMap (sid: wrappedPerScope.${sid}.${fromClass} or [ ]) subtreeScopes;
+
   applySimpleRoute =
     acc:
     {
       route,
       wrappedPerScope,
+      scopeParent,
     }:
     let
-      scopeExists = wrappedPerScope ? ${route.sourceScopeId};
-      sourceModules =
-        if !scopeExists then [ ] else wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ];
+      sourceModules = collectFromSubtree wrappedPerScope scopeParent route.sourceScopeId route.fromClass;
       adapterMod = route.adapterModule or null;
       modulesWithAdapter = if adapterMod == null then sourceModules else sourceModules ++ [ adapterMod ];
       isFlakeRoute = route.intoClass == "flake";
@@ -207,6 +224,7 @@ let
       scopedRoutes,
       wrappedPerScope,
       classImports,
+      scopeParent ? { },
       scopeContexts ? { },
       ctx ? { },
       fxResolve ? null,
@@ -232,7 +250,7 @@ let
               ;
           }
         else
-          applySimpleRoute acc { inherit route wrappedPerScope; }
+          applySimpleRoute acc { inherit route wrappedPerScope scopeParent; }
       )
       {
         inherit classImports;

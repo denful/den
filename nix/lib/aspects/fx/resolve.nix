@@ -148,11 +148,12 @@ let
 
   # Phase 3: Apply routes.
   applyRoutes =
-    fxResolve: ctx: scopeContexts: rootScopeId: scopedRoutes: acc:
+    fxResolve: ctx: scopeContexts: rootScopeId: scopeParent: scopedRoutes: acc:
     route.applyRoutes {
       inherit
         scopedRoutes
         scopeContexts
+        scopeParent
         ctx
         rootScopeId
         fxResolve
@@ -325,7 +326,7 @@ let
                   subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
                   subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
                   subtreePhase3 =
-                    applyRoutes fxResolveFn ctx relevantContexts hostScopeId subtreeRoutes
+                    applyRoutes fxResolveFn ctx relevantContexts hostScopeId scopeParent subtreeRoutes
                       subtreePhase2;
                 in
                 extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
@@ -444,7 +445,7 @@ let
             subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
             subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
             subtreePhase3 =
-              applyRoutes (fxResolve mkPipeline) ctx relevantContexts hostScopeId subtreeRoutes
+              applyRoutes (fxResolve mkPipeline) ctx relevantContexts hostScopeId scopeParent subtreeRoutes
                 subtreePhase2;
             preWalkedModules = extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass;
             modules = if preWalkedModules != null then preWalkedModules else [ spec.mainModule ];
@@ -569,7 +570,8 @@ let
       phase1 = wrapPerScope ctx augmentedScopeContexts drainedClassImportsRaw;
       phase2 = applyProvides ctx augmentedScopeContexts scopedProvides phase1;
       phase3 =
-        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId scopedRoutes
+        applyRoutes (fxResolve mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId scopeParent
+          scopedRoutes
           phase2;
       phase4 = applyInstantiates {
         scopedInstantiates = result.state.scopedInstantiates null;
@@ -618,6 +620,7 @@ let
       phase2 = applyProvides ctx augmentedScopeContexts (result.state.scopedProvides null) phase1;
       phase3 =
         applyRoutes (fxResolveImports mkPipeline) ctx augmentedScopeContexts result.state.rootScopeId
+          (result.state.scopeParent null)
           (result.state.scopedRoutes null)
           phase2;
     in

@@ -160,6 +160,46 @@
       }
     );
 
+    # Parametric packages from user includes roll up to flake output.
+    # The { host }: wrapper resolves per-host at user scope; the
+    # to-packages route collects from the flake-system subtree.
+    test-parametric-packages-from-user-includes = denTest (
+      {
+        den,
+        lib,
+        config,
+        inputs,
+        ...
+      }:
+      {
+        imports = [ inputs.den.flakeOutputs.packages ];
+
+        den.hosts.x86_64-linux.alpha.users.a = { };
+        den.hosts.aarch64-linux.beta.users.b = { };
+
+        den.aspects.a.includes = [ den.aspects.nh-tool ];
+        den.aspects.b.includes = [ den.aspects.nh-tool ];
+
+        den.aspects.nh-tool = {
+          packages =
+            { host }:
+            { pkgs, ... }:
+            {
+              "sw-${host.name}" = pkgs.writeText "sw-${host.name}" host.name;
+            };
+        };
+
+        expr = {
+          alpha = config.flake.packages.x86_64-linux ? sw-alpha;
+          beta = config.flake.packages.aarch64-linux ? sw-beta;
+        };
+        expected = {
+          alpha = true;
+          beta = true;
+        };
+      }
+    );
+
     test-route-flake-outputs-from-hosts = denTest (
       {
         den,
