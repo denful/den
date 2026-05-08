@@ -1,4 +1,4 @@
-{ den, lib, ... }:
+{ lib, ... }:
 {
   # Virtualization with provider sub-aspects for each runtime.
   # Hosts include the providers they want: server gets docker, workstation gets podman.

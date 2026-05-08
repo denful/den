@@ -1,4 +1,4 @@
-{ den, ... }:
+{ ... }:
 {
   den.aspects.gnome = {
     nixos.services.xserver.desktopManager.gnome.enable = true;

@@ -6,7 +6,7 @@
 #   3. exclude — remove tailscale and docker (podman from workstation wins)
 #   4. substitute — swap regreet greeter for gdm
 #   5. Multi-user — alice (hyprland) + bob (gnome) on same host
-{ den, __findFile, ... }:
+{ den, ... }:
 {
   den.aspects.devbox = {
     includes = [

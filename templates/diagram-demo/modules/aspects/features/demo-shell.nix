@@ -1,4 +1,4 @@
-{ den, ... }:
+{ ... }:
 {
   # Renamed from `shell` to avoid collision with gwenodai's shell aspect.
   den.aspects.demo-shell = {
