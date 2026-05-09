@@ -31,11 +31,17 @@ let
         ];
         classModule =
           if builtins.elem class validClasses then { ${class}.unfree.packages = allowed-names; } else { };
-        # When resolving for homeManager at user scope, also emit to the
-        # host's OS class. This ensures nixpkgs.config.allowUnfreePredicate
-        # covers these packages when home-manager.useGlobalPkgs = true.
+        # When resolving for homeManager or a non-module-system class (e.g.
+        # "user"), also emit to the host's OS class.  This ensures
+        # nixpkgs.config.allowUnfreePredicate covers these packages:
+        #   - homeManager + useGlobalPkgs = true → OS-level predicate needed
+        #   - "user" class (no HM) → only the host's OS config exists
         hostModule =
-          if class == "homeManager" && host != null && builtins.elem host.class validClasses then
+          if
+            (class == "homeManager" || !builtins.elem class validClasses)
+            && host != null
+            && builtins.elem host.class validClasses
+          then
             { ${host.class}.unfree.packages = allowed-names; }
           else
             { };
