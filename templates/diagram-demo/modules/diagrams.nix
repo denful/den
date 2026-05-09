@@ -174,9 +174,123 @@ in
         viewDefs = fleetViewDefs;
       };
 
+      # --- Fleet-level views from captureFleet ---
+      fleetCapture = diag.captureFleet { };
+
+      # Per-host graph IRs for fleet DAG composition.
+      hostGraphs = lib.listToAttrs (
+        map (host: {
+          name = host.name;
+          value = diag.hostContext { inherit host; };
+        }) allHosts
+      );
+
+      mkFleetView =
+        name: title: renderFn:
+        let
+          source = renderFn fleetCapture;
+          md = pkgs.writeText "${name}.md" "# ${title}\n\n![${title}](./${name}.mmd.svg)\n\n```mermaid\n${source}\n```\n";
+          svg = rc.mmdSourceToSvg name source;
+        in
+        {
+          inherit md svg;
+        };
+
+      # --- Text summaries ---
+      fleetSummaryText = diag.text.fleetSummary fleetCapture;
+      fleetSummaryDrv = pkgs.writeText "fleet-summary.md" fleetSummaryText;
+
+      hostSummaryDrvs = lib.listToAttrs (
+        map (
+          host:
+          let
+            entity = diag.hostContext { inherit host; };
+            text = diag.text.hostSummary {
+              graph = entity;
+              inherit host fleetCapture;
+            };
+          in
+          {
+            name = "${host.name}-summary";
+            value = pkgs.writeText "${host.name}-summary.md" text;
+          }
+        ) allHosts
+      );
+
+      pipeFlowView = mkFleetView "pipe-flow" "Pipe Flow" rc.render.toPipeFlowMermaid;
+      scopeTopoView = mkFleetView "scope-topology" "Scope Topology" rc.render.toScopeTopologyMermaid;
+      aspectMatrixView = mkFleetView "aspect-matrix" "Aspect Coverage" rc.render.toAspectMatrixMermaid;
+      policyMapView =
+        mkFleetView "policy-resolution" "Policy Resolution Map"
+          rc.render.toPolicyResolutionMapMermaid;
+      pipeSeqView = mkFleetView "pipe-sequence" "Pipe Sequence" rc.render.toPipeSequenceMermaid;
+      fleetDagSource = rc.render.toFleetDagMermaid { inherit fleetCapture hostGraphs; };
+      fleetIrJson = diag.fleetGraph.toJSON { inherit fleetCapture hostGraphs; };
+      fleetIrDrv = pkgs.runCommand "fleet-ir.json" { nativeBuildInputs = [ pkgs.jq ]; } ''
+        echo ${lib.escapeShellArg fleetIrJson} | jq . > $out
+      '';
+      fleetDagView = {
+        md = pkgs.writeText "fleet-dag.md" "# Fleet DAG\n\n![Fleet DAG](./fleet-dag.mmd.svg)\n\n```mermaid\n${fleetDagSource}\n```\n";
+        svg = rc.mmdSourceToSvg "fleet-dag" fleetDagSource;
+      };
+
+      # --- Fleet view entries ---
+
+      mkFleetEntries = viewName: view: [
+        {
+          name = "fleet";
+          view = viewName;
+          dir = "fleet";
+          ext = "md";
+          tool = null;
+          drv = view.md;
+        }
+        {
+          name = "fleet";
+          view = viewName;
+          dir = "fleet";
+          ext = "svg";
+          tool = "mmd";
+          drv = view.svg;
+        }
+      ];
+
+      mkTextEntry = name: dir: drv: {
+        inherit name dir drv;
+        view = "summary";
+        ext = "md";
+        tool = null;
+      };
+
+      textEntries = [
+        (mkTextEntry "fleet" "fleet" fleetSummaryDrv)
+      ]
+      ++ map (
+        host: mkTextEntry host.name "hosts/${host.name}" hostSummaryDrvs."${host.name}-summary"
+      ) allHosts;
+
+      fleetViewEntries =
+        mkFleetEntries "pipe-flow" pipeFlowView
+        ++ mkFleetEntries "scope-topology" scopeTopoView
+        ++ mkFleetEntries "aspect-matrix" aspectMatrixView
+        ++ mkFleetEntries "policy-resolution" policyMapView
+        ++ mkFleetEntries "pipe-sequence" pipeSeqView
+        ++ mkFleetEntries "fleet-dag" fleetDagView
+        ++ [
+          {
+            name = "fleet";
+            view = "fleet-ir";
+            dir = "fleet";
+            ext = "json";
+            tool = null;
+            drv = fleetIrDrv;
+          }
+        ];
+
       # --- Assembly ---
 
-      everyEntry = hostEntries ++ userEntries ++ homeEntries ++ fleetEntriesList;
+      everyEntry =
+        hostEntries ++ userEntries ++ homeEntries ++ fleetEntriesList ++ fleetViewEntries ++ textEntries;
       allPackages = entriesToPackages everyEntry;
       allFiles = entriesToFiles everyEntry;
 
@@ -288,6 +402,19 @@ in
         | `c4component` | C4 component view |
         | `ir` | Graph IR (JSON) |
 
+        ## Fleet Views
+
+        | View | Description |
+        | ---- | ----------- |
+        | `pipe-flow` | Cross-host pipe data flow |
+        | `scope-topology` | Scope hierarchy topology |
+        | `aspect-matrix` | Aspect coverage matrix |
+        | `policy-resolution` | Policy resolution map |
+        | `pipe-sequence` | Pipe sequence diagram |
+        | `fleet-dag` | Fleet-wide DAG |
+        | `fleet-ir` | Graph IR (JSON, for ir-viewer) |
+        | `summary` | Text summary (fleet + per-host) |
+
         ## Usage
 
         ```bash
@@ -296,13 +423,19 @@ in
       '';
     in
     {
-      packages = allPackages // {
-        write-diagrams = mkWriteScript pkgs {
-          entries = everyEntry;
-          inherit galleries readmeDrv;
-          destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/diagram-demo"'';
+      packages =
+        allPackages
+        // hostSummaryDrvs
+        // {
+          fleet-summary = fleetSummaryDrv;
+        }
+        // {
+          write-diagrams = mkWriteScript pkgs {
+            entries = everyEntry;
+            inherit galleries readmeDrv;
+            destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)/templates/diagram-demo"'';
+          };
         };
-      };
 
       files.gitToplevel = self;
       files.files = allFiles ++ [
