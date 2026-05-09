@@ -18,21 +18,39 @@ let
       "provides"
     ];
     __fn =
-      { class, ... }:
-      if
-        (builtins.elem class [
+      {
+        class,
+        host ? null,
+        ...
+      }:
+      let
+        validClasses = [
           "nixos"
           "darwin"
           "homeManager"
-        ])
-      then
-        {
-          ${class}.permittedInsecurePackages.packages = allowed-names;
-        }
-      else
-        { };
+        ];
+        classModule =
+          if builtins.elem class validClasses then
+            { ${class}.permittedInsecurePackages.packages = allowed-names; }
+          else
+            { };
+        # When resolving for homeManager or a non-module-system class (e.g.
+        # "user"), also emit to the host's OS class so
+        # nixpkgs.config.permittedInsecurePackages covers these packages.
+        hostModule =
+          if
+            (class == "homeManager" || !builtins.elem class validClasses)
+            && host != null
+            && builtins.elem host.class validClasses
+          then
+            { ${host.class}.permittedInsecurePackages.packages = allowed-names; }
+          else
+            { };
+      in
+      classModule // hostModule;
     __args = {
       class = true;
+      host = true;
     };
   };
 in
