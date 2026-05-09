@@ -14,6 +14,7 @@ in
     (route {
       fromClass = "packages";
       intoClass = "flake-parts";
+      collectSubtree = true;
       path = [ "packages" ];
       adaptArgs = { config, ... }: config.allModuleArgs;
     })

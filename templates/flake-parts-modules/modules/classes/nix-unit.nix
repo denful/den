@@ -21,6 +21,7 @@ in
     (route {
       fromClass = "tests";
       intoClass = "flake-parts";
+      collectSubtree = true;
       path = [
         "nix-unit"
         "tests"

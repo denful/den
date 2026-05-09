@@ -274,7 +274,7 @@ let
       instantiateModules = lib.concatMap (
         spec:
         let
-          hasOutput = (spec.intoAttr or [ ]) != [ ] || (spec.intoPath or [ ]) != [ ];
+          hasOutput = (spec.intoAttr or [ ]) != [ ];
         in
         if !hasOutput then
           [ ]
@@ -365,36 +365,25 @@ let
           in
           [
             {
-              path = spec.intoPath or ([ "flake" ] ++ spec.intoAttr);
+              path = [ "flake" ] ++ spec.intoAttr;
               value = evaluated;
             }
           ]
       ) allInstantiates;
-      # Split: short paths (≤3 levels, e.g. flake/nixosConfigurations/name)
-      # become individual modules (lazy, no conflicts at single lazyAttrsOf).
-      # Long paths (>3 levels, e.g. flake/packages/x86_64-linux/name)
-      # are grouped by prefix and merged with recursiveUpdate to avoid
-      # conflicting definitions at intermediate lazyAttrsOf keys.
-      needsGrouping = entry: builtins.length entry.path > 3;
-      singles = map (entry: { config = lib.setAttrByPath entry.path entry.value; }) (
-        builtins.filter (e: !needsGrouping e) instantiateModules
-      );
-      grouped = builtins.foldl' (
-        acc: entry:
-        let
-          prefix = lib.concatStringsSep "/" (lib.init entry.path);
-        in
-        acc // { ${prefix} = (acc.${prefix} or [ ]) ++ [ entry ]; }
-      ) { } (builtins.filter needsGrouping instantiateModules);
-      groupedModules = lib.mapAttrsToList (_: entries: {
-        config = builtins.foldl' (
-          acc: entry: lib.recursiveUpdate acc (lib.setAttrByPath entry.path entry.value)
-        ) { } entries;
-      }) grouped;
+      # Merge all instantiate outputs into a single module via recursiveUpdate.
+      # This avoids conflicting definitions at intermediate lazyAttrsOf keys
+      # (e.g., multiple instantiates targeting different keys under the same
+      # freeform parent). Leaf values remain lazy — recursiveUpdate only
+      # merges attrset structure, not leaf thunks.
+      instantiateConfigs = map (entry: lib.setAttrByPath entry.path entry.value) instantiateModules;
     in
     classImports
     // {
-      flake = (classImports.flake or [ ]) ++ singles ++ groupedModules;
+      flake =
+        (classImports.flake or [ ])
+        ++ lib.optional (instantiateConfigs != [ ]) {
+          config = builtins.foldl' lib.recursiveUpdate { } instantiateConfigs;
+        };
     };
 
   # Full resolution: run pipeline, then assemble output through all phases.
@@ -426,7 +415,7 @@ let
             lib.concatMap (
               spec:
               let
-                hasOutput = (spec.intoAttr or [ ]) != [ ] || (spec.intoPath or [ ]) != [ ];
+                hasOutput = (spec.intoAttr or [ ]) != [ ];
                 hostScopeId = if hasOutput then findHostScopeId scopeParent allScopeIds spec else null;
               in
               if hostScopeId == null then
