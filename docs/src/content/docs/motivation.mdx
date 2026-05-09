@@ -55,7 +55,7 @@ Being an fan of functional programming, the most composable things I know are fu
 }
 ```
 
-The result of that exploration was [flake-aspects](https://github.com/vic/flake-aspects). Which is a dependency free library (usable with/without flakes) that focuses on composability not on wiring/building configurations.
+The result of that exploration was [flake-aspects](https://github.com/denful/flake-aspects). Which is a dependency free library (usable with/without flakes) that focuses on composability not on wiring/building configurations.
 
 
 `flake-aspects` allows for aspects to be parametric by using the Nix [`__functor` pattern](/explanation/aspects/#the-__functor-pattern), it also allows aspects to be nested unlike the flat-structure we had in `flake.modules` which caused people to use weird-named modules `flake.modules.nixos."host/desktop"` or similar for string-based-semantics. It also allows declaring dependencies between aspects themselves, not using **stringly-typed** references like `.modules = [ "base" "gaming" ]` which was one of the shortcomings early-days unify had.
@@ -64,7 +64,7 @@ An important point is that parametric aspect's context **are not** _module.args,
 
 
 <Aside>
-Some [people](https://codeberg.org/FrdrCkII/nixconf/src/commit/9bef0f86a790d93c20e693dc4c020c83b0396e8f/lib/aspects.prt.nix) have found [`flake-aspects`](https://github.com/vic/flake-aspects) enough to implement their own Dendritic setups, or even for mixing with other non-dendritic infra.
+Some [people](https://codeberg.org/FrdrCkII/nixconf/src/commit/9bef0f86a790d93c20e693dc4c020c83b0396e8f/lib/aspects.prt.nix) have found [`flake-aspects`](https://github.com/denful/flake-aspects) enough to implement their own Dendritic setups, or even for mixing with other non-dendritic infra.
 </Aside>
 
 ## Den builds upon flake-aspects
@@ -98,14 +98,14 @@ Den, tries to answer some specific issues regarding NixOS/nix-Darwin configurati
 
 Based on Den sharable aspects (which depend on a minimal surface syntax for namespaces), I'm planning to create [denful](https://github.com/denful/denful). A lazyvim-like configurations distribution that people can include from, just like they do with editor distributions.
 
-And this exploration is all part of the `dendrix` initiative. Trying to come up with better ways to share configurations *even* between flakes/no-flakes users. `dendrix` indexes using [`import-tree`](https://github.com/vic/import-tree) collections instead of flakes, because flakes demand all its inputs to be downloaded, a collection of modules in an import-tree can define the inputs they need by using [`flake-file`](https://github.com/vic/flake-file) and these inputs can be propagated to the final user's flake or npins/unflake.
+And this exploration is all part of the `dendrix` initiative. Trying to come up with better ways to share configurations *even* between flakes/no-flakes users. `dendrix` indexes using [`import-tree`](https://github.com/denful/import-tree) collections instead of flakes, because flakes demand all its inputs to be downloaded, a collection of modules in an import-tree can define the inputs they need by using [`flake-file`](https://github.com/denful/flake-file) and these inputs can be propagated to the final user's flake or npins/unflake.
 
 So, `dendrix` became something like an index of browsable aspects found in GitHub, my intention was that showing the different aspects each people produces would motivate re-usability, because a major problem I see in the Nix community is most people just copy and paste and/or re-invent the wheel in so many infinite ways. 
 
 Den is more about giving to others (creating useful Nix software/configurations), not just about make things work locally.
 
 <Aside type="tip" title="Support Den development" icon="heart">
-I've been working over a year on these [dendritic libs](https://vic.github.io/dendrix/Dendritic-Ecosystem.html#vics-dendritic-libraries), but time is our most scarce resource. If you like my work, consider [sponsoring](https://github.com/sponsors/vic)
+I've been working over a year on these [dendritic libs](https://denful.github.io/dendrix/Dendritic-Ecosystem.html#vics-dendritic-libraries), but time is our most scarce resource. If you like my work, consider [sponsoring](https://github.com/sponsors/vic)
 </Aside>
 
 

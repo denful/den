@@ -53,10 +53,10 @@ all task:
   just {{task}} flake-parts-modules
 
 fmt:
-  nix run github:vic/checkmate#fmt --override-input target .
+  nix run github:denful/checkmate#fmt --override-input target .
 
 unit:
-  nix flake check --override-input target . github:vic/checkmate
+  nix flake check --override-input target . github:denful/checkmate
 
 repl:
   nix repl --override-input den . ./templates/ci
