@@ -6,16 +6,8 @@
   ...
 }:
 {
-  # --- Class declarations ---
-  # Framework already registers `packages`; declare the rest.
-  den.classes = {
-    treefmt = { };
-    devshell = { };
-    files = { };
-    tests = { };
-  };
+  imports = [ inputs.den.flakeModule ];
 
-  # --- Host setup ---
   den.hosts.x86_64-linux.igloo.users.tux = { };
 
   den.aspects.igloo = {
@@ -45,7 +37,39 @@
       };
   };
 
-  # --- Flake-level aspects ---
+  # Enter flake-parts scope from flake-system (inherits { system }).
+  # This integrates the flake-parts resolution into the main pipeline
+  # so we don't need a separate den.lib.aspects.resolve call.
+  den.policies.to-flake-parts =
+    { system, ... }:
+    [
+      (den.lib.policy.resolve.to "flake-parts" {
+        flake-parts = {
+          name = "flake-parts-${system}";
+          aspect = { };
+        };
+      })
+    ];
+  den.schema.flake-system.includes = [ den.policies.to-flake-parts ];
+
+  # Collect the assembled flake-parts class and store as a module list.
+  den.policies.collect-flake-parts = _: [
+    (den.lib.policy.instantiate {
+      name = "flake-parts";
+      class = "flake-parts";
+      instantiate = { modules, ... }: modules;
+      intoAttr = [ "denPerSystem" ];
+    })
+  ];
+
+  # Walk flake-level aspects in the flake-parts scope.
+  # Class files add their own routes via den.schema.flake-parts.includes.
+  den.schema.flake-parts.isEntity = true;
+  den.schema.flake-parts.includes = [
+    den.aspects.foo
+    den.policies.collect-flake-parts
+  ];
+
   den.aspects.foo = {
     includes = [ den.aspects.bar ];
 
@@ -105,46 +129,7 @@
           pkgs.hello
         ];
       };
+
   };
 
-  # --- Pipeline wiring ---
-  # Walk flake-level aspects at flake-system scope (context = { system }).
-  # Function modules won't be wrapped with den args — they receive
-  # perSystem args when imported into flake-parts.
-  den.schema.flake-system.includes = [
-    den.aspects.foo
-    den.policies.collect-perSystem
-  ];
-
-  # Exclude framework's packages route — it evaluates eagerly with only
-  # { pkgs }, breaking modules that need perSystem config.
-  # flake-parts handles packages output via perSystem automatically.
-  den.schema.flake-system.excludes = [ den.policies.to-packages ];
-
-  # Collect each custom class into flake.denModules.<system>.<class>.
-  # Fires once per system. policy.instantiate (with sourceScopeId fallback)
-  # collects from the full flake-system subtree including host/user scopes.
-  den.policies.collect-perSystem =
-    { system, ... }:
-    map
-      (
-        cls:
-        den.lib.policy.instantiate {
-          name = "${cls}-${system}";
-          class = cls;
-          instantiate = { modules, ... }: modules;
-          intoAttr = [
-            "denModules"
-            system
-            cls
-          ];
-        }
-      )
-      [
-        "treefmt"
-        "devshell"
-        "files"
-        "tests"
-        "packages"
-      ];
 }

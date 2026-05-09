@@ -144,7 +144,7 @@ let
       # only from their own scope to avoid pulling modules from unrelated
       # entity subtrees whose scope args won't be available after adaptArgs.
       sourceModules =
-        if isFlakeRoute then
+        if isFlakeRoute || (route.collectSubtree or false) then
           collectFromSubtree wrappedPerScope scopeParent route.sourceScopeId route.fromClass
         else
           let

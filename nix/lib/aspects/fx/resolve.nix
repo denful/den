@@ -274,7 +274,7 @@ let
       instantiateModules = lib.concatMap (
         spec:
         let
-          hasOutput = (spec.intoAttr or [ ]) != [ ];
+          hasOutput = (spec.intoAttr or [ ]) != [ ] || (spec.intoPath or [ ]) != [ ];
         in
         if !hasOutput then
           [ ]
@@ -365,7 +365,7 @@ let
           in
           [
             {
-              path = [ "flake" ] ++ spec.intoAttr;
+              path = spec.intoPath or ([ "flake" ] ++ spec.intoAttr);
               value = evaluated;
             }
           ]
@@ -426,7 +426,7 @@ let
             lib.concatMap (
               spec:
               let
-                hasOutput = (spec.intoAttr or [ ]) != [ ];
+                hasOutput = (spec.intoAttr or [ ]) != [ ] || (spec.intoPath or [ ]) != [ ];
                 hostScopeId = if hasOutput then findHostScopeId scopeParent allScopeIds spec else null;
               in
               if hostScopeId == null then
