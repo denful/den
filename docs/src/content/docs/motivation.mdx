@@ -81,7 +81,7 @@ Den, tries to answer some specific issues regarding NixOS/nix-Darwin configurati
 
 - How to [include features](/guides/batteries) that affect all entities
 
-  `den.default.includes = [ (den._.unfree ["vscode"]) ]`
+  `den.default.includes = [ (den.batteries.unfree ["vscode"]) ]`
 
 - How a `Host` can affect its `User`s configurations, and [viceversa](/guides/configure-aspects).
 

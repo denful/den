@@ -132,18 +132,18 @@ managed machine outside of your control.
 #### Host-specific standalone home configuration
 
 To create host-specific configurations for your standalone home, you can use the
-[`den.provides.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix)
+[`den.batteries.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix)
 battery:
 
 ```nix
 den.homes.x86_64-linux."tux@igloo" = { };
-den.schema.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den.batteries.mutual-provider ];
 ```
 
 You can then configure it using the following aspect:
 
 ```nix
-den.aspects.tux.provides.igloo = { }; # user configuration for tux that should only apply on igloo
+den.aspects.tux.igloo = { }; # user configuration for tux that should only apply on igloo
 ```
 
 #### Separate host and user configuration

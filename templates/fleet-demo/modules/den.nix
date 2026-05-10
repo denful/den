@@ -51,8 +51,8 @@
   };
 
   den.default.includes = [
-    den.provides.define-user
-    den.provides.hostname
+    den.batteries.define-user
+    den.batteries.hostname
   ];
 
   den.systems = [ "x86_64-linux" ];

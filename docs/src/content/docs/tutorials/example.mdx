@@ -81,13 +81,13 @@ The `eg/` directory defines reusable aspects under the `eg` namespace:
 { eg, ... }:
 {
   eg.vm.provides = {
-    gui.includes = [ eg.vm  eg.vm-bootable._.gui  eg.xfce-desktop ];
-    tui.includes = [ eg.vm  eg.vm-bootable._.tui ];
+    gui.includes = [ eg.vm  eg.vm-bootable.gui  eg.xfce-desktop ];
+    tui.includes = [ eg.vm  eg.vm-bootable.tui ];
   };
 }
 ```
 
-Aspects can have nested **provides** — `eg.vm._.gui` and `eg.vm._.tui` are sub-aspects accessed via the `_.` provider syntax.
+Aspects can have nested **provides** — `eg.vm.gui` and `eg.vm.tui` are sub-aspects accessed via the `_.` provider syntax.
 
 ### Angle Brackets
 
@@ -97,12 +97,12 @@ Aspects can have nested **provides** — `eg.vm._.gui` and `eg.vm._.tui` are sub
 {
   den.default.includes = [
     <eg/routes>          # resolves to eg.routes
-    <den/define-user>    # resolves to den.provides.define-user
+    <den/define-user>    # resolves to den.batteries.define-user
   ];
 }
 ```
 
-The `<name>` syntax is shorthand for aspect lookup. `<den/define-user>` resolves to `den.provides.define-user`. See [Angle Brackets](/guides/angle-brackets/).
+The `<name>` syntax is shorthand for aspect lookup. `<den/define-user>` resolves to `den.batteries.define-user`. See [Angle Brackets](/guides/angle-brackets/).
 
 ### Mutual Providers
 

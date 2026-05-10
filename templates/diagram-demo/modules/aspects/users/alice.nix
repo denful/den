@@ -70,7 +70,7 @@
 
   den.aspects.alice = {
     includes = [
-      den.provides.primary-user
+      den.batteries.primary-user
       den.aspects.demo-shell
       den.aspects.hyprland
       den.aspects.dev-tools

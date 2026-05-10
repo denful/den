@@ -148,7 +148,7 @@ NixOS/nix-Darwin/homes configurations.
 flowchart LR
   Schema["den.hosts / den.homes"] --> Pipeline["den.policies pipeline"]
   Aspects["den.aspects"] --> Pipeline
-  Batteries["den.provides"] --> Pipeline
+  Batteries["den.batteries"] --> Pipeline
   Pipeline --> Resolve["Resolution"]
   Resolve --> Out["nixos / darwin / homeConfigurations"]
 ```

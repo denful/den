@@ -15,7 +15,7 @@ evaluate — but you should migrate to remove the warnings and use the current A
 | ----------------------------------- | ---------------------------------------- | --------------------------------------------- |
 | `den.ctx.<name> = { ... }`          | `den.aspects.<name> = { ... }`           | Aspect definitions live here now.             |
 | `den.ctx.<name>.includes`           | `den.schema.<kind>.includes`             | Explicit activation on entity kinds.          |
-| `den.ctx.<name>.provides.<p>`       | `den.schema.<kind>.includes` or policy   | Cross-entity inclusion via schema or policy.  |
+| `den.ctx.<name>.<p>`       | `den.schema.<kind>.includes` or policy   | Cross-entity inclusion via schema or policy.  |
 | `den.ctx.<name>.into`               | `den.policies`                           | Entity topology via first-class policies.     |
 | `den.ctx.<name>.meta.adapter`       | *(removed)*                              | Pipeline handles class routing automatically. |
 | `den.lib.ctxApply`                  | *(removed)*                              | No shim — see step 5 below.                  |
@@ -63,10 +63,10 @@ The shim will be removed after the first stable release.
 
     ```nix
     # Before
-    den.ctx.host.includes = [ den.provides.hostname ];
+    den.ctx.host.includes = [ den.batteries.hostname ];
 
     # After
-    den.schema.host.includes = [ den.provides.hostname ];
+    den.schema.host.includes = [ den.batteries.hostname ];
     ```
 
 3. **Move `into` transitions to `den.policies`**

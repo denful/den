@@ -9,7 +9,7 @@ let
 in
 {
   # make USB/VM installers.
-  eg.vm-bootable.provides = {
+  eg.vm-bootable = {
     tui = installer "minimal";
     gui = installer "graphical-base";
   };

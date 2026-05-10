@@ -21,7 +21,7 @@
   };
 
   den.aspects.tux = {
-    includes = [ den.provides.primary-user ];
+    includes = [ den.batteries.primary-user ];
     user.extraGroups = [ "audio" ];
   };
 }

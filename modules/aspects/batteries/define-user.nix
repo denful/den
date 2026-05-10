@@ -8,14 +8,14 @@ let
     ## Usage
 
        # for NixOS/Darwin
-       den.aspects.my-user.includes = [ den.provides.define-user ]
+       den.aspects.my-user.includes = [ den.batteries.define-user ]
 
        # for standalone home-manager
-       den.aspects.my-home.includes = [ den.provides.define-user ]
+       den.aspects.my-home.includes = [ den.batteries.define-user ]
 
     or globally (automatically applied depending on context):
 
-       den.default.includes = [ den.provides.define-user ]
+       den.default.includes = [ den.batteries.define-user ]
   '';
 
   homeDir =
@@ -52,7 +52,7 @@ let
     };
 in
 {
-  den.provides.define-user = {
+  den.batteries.define-user = {
     name = "define-user";
     inherit description;
     includes = [

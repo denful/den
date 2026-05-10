@@ -69,7 +69,7 @@ Key points:
   };
 
   den.aspects.tux = {
-    includes = [ den.provides.primary-user ];
+    includes = [ den.batteries.primary-user ];
   };
 }
 ```
@@ -86,7 +86,7 @@ Key points:
 graph TD
   H["den.hosts.x86_64-linux.igloo"] -->|"ctx.host"| A["den.aspects.igloo"]
   H -->|"ctx.user"| U["den.aspects.tux"]
-  U -->|"includes"| PU["den.provides.primary-user"]
+  U -->|"includes"| PU["den.batteries.primary-user"]
   A -->|"resolve nixos"| NixOS["nixosConfigurations.igloo"]
 ```
 

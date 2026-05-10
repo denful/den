@@ -4,8 +4,8 @@
     nixos.system.stateVersion = "25.11";
     homeManager.home.stateVersion = "25.11";
     includes = [
-      den.provides.hostname
-      den.provides.define-user
+      den.batteries.hostname
+      den.batteries.define-user
     ];
     # Stub boot config so NixOS evaluation doesn't fail
     nixos.boot.loader.grub.enable = false;

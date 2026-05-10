@@ -3,9 +3,10 @@
   options.den = lib.mkOption {
     type = lib.types.submodule {
       imports = [
-        (lib.mkAliasOptionModule [ "_" ] [ "provides" ])
+        (lib.mkAliasOptionModule [ "provides" ] [ "batteries" ])
+        (lib.mkAliasOptionModule [ "_" ] [ "batteries" ])
       ];
-      options.provides = lib.mkOption {
+      options.batteries = lib.mkOption {
         defaultText = lib.literalExpression "{ }";
         default = { };
         description = "Batteries Included - re-usable high-level aspects";
@@ -14,7 +15,7 @@
             (config.den.lib.aspects.mkAspectsType {
               providerPrefix = [
                 "den"
-                "provides"
+                "batteries"
               ];
             }).providerType
           );

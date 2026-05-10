@@ -246,7 +246,7 @@ Each aspect uses several Nix classes to define behaviour.
 { den, inputs, ... }: {
   den.aspects.workstation = {
     # re-usable configuration aspects. Den batteries and yours.
-    includes = [ den.provides.hostname den.aspects.work-vpn ];
+    includes = [ den.batteries.hostname den.aspects.work-vpn ];
 
     # regular nixos/darwin modules or any other Nix class
     nixos  = { pkgs, ... }: { imports = [ inputs.disko.nixosModules.disko ]; };
@@ -304,8 +304,8 @@ homeManager to hjem or others.
     };
 
     includes = [
-      den.provides.primary-user        # re-usable batteries
-      (den.provides.user-shell "fish") # parametric aspects
+      den.batteries.primary-user        # re-usable batteries
+      (den.batteries.user-shell "fish") # parametric aspects
       den.aspects.tiling-wm            # your own aspects
       den.aspects.gaming.provides.emulators
     ];
@@ -317,7 +317,7 @@ homeManager to hjem or others.
 
 [Custom classes](https://den.oeiuwq.com/guides/custom-classes) is how Den implements `user`, `homeManager`, `hjem`, `wsl`, `microvm` support. You can use the very same mechanism to create your own Nix classes.
 
-The `den.provides.forward` battery is the core of it.
+The `den.batteries.forward` battery is the core of it.
 
 ```nix
 # Example: A class for role-based configuration between users and hosts
@@ -325,7 +325,7 @@ The `den.provides.forward` battery is the core of it.
 roleClass =
   { host, user }:
   { class, aspect-chain }:
-  den._.forward {
+  den.batteries.forward {
     each = lib.intersectLists (host.roles or []) (user.roles or []);
     fromClass = lib.id;
     intoClass = _: host.class;
@@ -381,7 +381,7 @@ den.hosts.aarch64-darwin.apple.users.tux = { };
 
 den.aspects.hmPlatforms =
   { class, aspect-chain }:
-  den._.forward {
+  den.batteries.forward {
     each = [ "Linux" "Darwin" ];
     fromClass = platform: "hm${platform}";
     intoClass = _: "homeManager";
@@ -411,7 +411,7 @@ when impermanence module is enabled at host.
 > Inspired by @Doc-Steve
 
 ```nix
-persys = { host }: den._.forward {
+persys = { host }: den.batteries.forward {
   each = lib.singleton true;
   fromClass = _: "persys";
   intoClass = _: host.class;
@@ -444,7 +444,7 @@ den.aspects.guest = {
   microvm.autostart = true;
 
   # guest supports all Den features.
-  includes = [ den.provides.hostname ];
+  includes = [ den.batteries.hostname ];
   # As MicroVM guest propagated into host.nixos.microvm.vms.<name>.config;
   nixos = { pkgs, ... }: { environment.systemPackages = [ pkgs.hello ]; };
 };

@@ -44,7 +44,7 @@ The `den.ctx` namespace was split into three independent concerns:
 |---|---|---|
 | `den.ctx.<name> = { ... }` | `den.aspects.<name> = { ... }` | Aspect definitions |
 | `den.ctx.<name>.into.<other>` | `den.policies.<name>` | Entity topology (fan-out, routing) |
-| `den.ctx.<name>.provides.<other>` | `den.schema.<kind>.includes` | Cross-entity inclusion |
+| `den.ctx.<name>.<other>` | `den.schema.<kind>.includes` | Cross-entity inclusion |
 | Implicit activation | `den.schema.<kind>.includes = [ ... ]` | Explicit activation via includes |
 
 ## Example migration

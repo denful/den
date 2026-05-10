@@ -59,7 +59,7 @@ On top of the library, Den provides `modules/` which implement:
 
 - **Schema types** (`den.hosts`, `den.homes`) for declaring NixOS/Darwin/HM entities
 - **Aspects & Policies** (`den.aspects`, `den.policies`) for the resolution pipeline
-- **Batteries** (`den.provides.*`) for common OS configuration patterns
+- **Batteries** (`den.batteries.*`) for common OS configuration patterns
 - **Output generation** (`modules/config.nix`) instantiating configurations into flake outputs
 
 The framework is entirely optional. You can use `den.lib` directly without
@@ -75,7 +75,7 @@ flowchart TD
   subgraph "Den Framework (OS-specific)"
     schema["den.hosts / den.homes"]
     ctx["den.schema + den.policies"]
-    batteries["den.provides"]
+    batteries["den.batteries"]
     output["flake output generation"]
   end
   parametric --> ctx

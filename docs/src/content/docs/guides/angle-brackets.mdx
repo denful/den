@@ -42,26 +42,26 @@ The `<name>` expression resolves through these paths in order:
 
 1. **`<den.x.y>`** -- resolves to `config.den.x.y`
 2. **`<aspect>`** -- resolves to `config.den.aspects.aspect` (if `aspect` exists in `den.aspects`)
-3. **`<aspect/sub>`** -- resolves to `config.den.aspects.aspect.provides.sub`
+3. **`<aspect/sub>`** -- resolves to `config.den.aspects.aspect.sub`
 4. **`<namespace>`** -- resolves to `config.den.ful.namespace` (if it is a denful)
 
-The `/` separator is translated to `.provides.` in the lookup path.
+The `/` separator is translated to `.` in the lookup path.
 
 ## Examples
 
 ```nix
 # Without angle brackets
 den.aspects.laptop.includes = [
-  den.aspects.tools.provides.editors
-  den.aspects.alice.provides.work-vpn
-  den.provides.primary-user
+  den.aspects.tools.editors
+  den.aspects.alice.work-vpn
+  den.batteries.primary-user
 ];
 
 # With angle brackets
 den.aspects.laptop.includes = [
   <tools/editors>
   <alice/work-vpn>
-  <den.provides.primary-user>
+  <den.batteries.primary-user>
 ];
 ```
 

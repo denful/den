@@ -14,7 +14,7 @@
     includes = with den.aspects; [ relay ];
     meta.handleWith = [
       # Remove nginx-exporter specifically (single provider exclusion)
-      (den.lib.aspects.fx.constraints.exclude den.aspects.monitoring._.nginx-exporter)
+      (den.lib.aspects.fx.constraints.exclude den.aspects.monitoring.nginx-exporter)
       # Remove all aspects whose provider chain starts with "monitoring" (prefix filter)
       (den.lib.aspects.fx.constraints.filterBy (
         a: lib.take 1 (a.meta.provider or [ ]) != [ "monitoring" ]

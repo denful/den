@@ -17,5 +17,5 @@
   #
 
   # automatically set hostname on all hosts.
-  den.schema.host.includes = [ den.provides.hostname ];
+  den.schema.host.includes = [ den.batteries.hostname ];
 }

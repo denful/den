@@ -203,8 +203,8 @@ Aspects form a directed acyclic graph through `includes` and form a tree of rela
 den.aspects.workstation = {
   includes = [
     den.aspects.dev-tools
-    den.aspects.gaming.provides.emulation
-    den.provides.primary-user
+    den.aspects.gaming.emulation
+    den.batteries.primary-user
   ];
   nixos.services.xserver.enable = true;
 };
@@ -221,7 +221,7 @@ Den separates **what exists** from **what it does**:
 | Aspects | Configure behavior | `den.aspects.laptop.nixos.networking.hostName = "laptop"` |
 | Policies | Entity topology and routing | `den.policies.host-to-users` fans out from hosts to users |
 | Quirks | Structured data flow | `den.quirks.firewall` + `pipe.collect` aggregates across hosts |
-| Batteries | Reusable patterns | `den.provides.primary-user`, `den.provides.user-shell` |
+| Batteries | Reusable patterns | `den.batteries.primary-user`, `den.batteries.user-shell` |
 
 This separation means you can reorganize files, rename aspects, or add platforms
 without restructuring your configuration logic.

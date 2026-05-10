@@ -84,14 +84,14 @@ capability with clearer semantics and composability.
 
 Tracks the structural origin of an aspect as a path. Top-level aspects
 have `meta.provider = []`. An aspect provided by `foo` (via
-`foo.provides.bar` or `foo._.bar`) has `meta.provider = ["foo"]`.
-Deeply nested providers accumulate: `foo._.bar._.baz` has
+`foo.bar` or `foo.bar`) has `meta.provider = ["foo"]`.
+Deeply nested providers accumulate: `foo.bar.baz` has
 `meta.provider = ["foo" "bar"]`.
 
 The `meta.provider` list can be used to distinguish aspects by origin
 during pipeline resolution.
 
-## `den.provides` (aliased as `den._`)
+## `den.batteries` (aliased as `den.batteries`)
 
 This is the place for Den built-in batteries, reusable aspects that serve
 as basic utilities and examples.
@@ -104,7 +104,7 @@ Entities (hosts, users, homes) expose `.resolved` — the aspect produced
 by their context pipeline. Forwards can use this to pull configuration
 from one entity into another without manually wiring context calls.
 
-When `den._.forward` is called without `fromAspect`, it defaults to
+When `den.batteries.forward` is called without `fromAspect`, it defaults to
 `item.resolved`, resolving the source entity through its own context
 pipeline:
 
@@ -112,7 +112,7 @@ pipeline:
 # Collect SSH host keys from all other hosts
 den.aspects.iceberg.includes = [
   ({ host }:
-    den._.forward {
+    den.batteries.forward {
       each = lib.filter (h: h != host) (lib.attrValues den.hosts.${host.system});
       fromClass = _: "ssh-host-key";
       intoClass = _: host.class; # "nixos" or "darwin"

@@ -34,14 +34,14 @@ let
     in
     if head == "den" then
       let
-        # <den/X/Y> — when X is a den.provides provider, resolve through
+        # <den/X/Y> — when X is a den.batteries provider, resolve through
         # that provider with provides fallback for deeper keys.
         firstTail = if tail != [ ] then lib.head tail else null;
-        isProvider = firstTail != null && builtins.hasAttr firstTail config.den.provides;
+        isProvider = firstTail != null && builtins.hasAttr firstTail config.den.batteries;
       in
       if isProvider then
         let
-          provider = config.den.provides.${firstTail};
+          provider = config.den.batteries.${firstTail};
           rest = lib.tail tail;
         in
         if rest == [ ] then provider else resolveWithProvidesFallback provider rest

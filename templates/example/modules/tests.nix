@@ -23,9 +23,8 @@
       # checks."apple builds" = checkCond "apple-builds" appleBuilds;
       # checks."vm builds" = checkCond "vm-builds" vmBuilds;
 
-      checks."alice enabled igloo nh" = checkCond "alice.provides.igloo" igloo.programs.nh.enable;
-      checks."igloo enabled alice tmux" =
-        checkCond "igloo.provides.alice" alice-at-igloo.programs.tmux.enable;
+      checks."alice enabled igloo nh" = checkCond "alice.igloo" igloo.programs.nh.enable;
+      checks."igloo enabled alice tmux" = checkCond "igloo.alice" alice-at-igloo.programs.tmux.enable;
 
       checks."alice-custom-emacs" = checkCond "hm.programs.emacs.package" (
         "emacs-nox" == lib.getName alice-at-igloo.programs.emacs.package

@@ -71,18 +71,18 @@ Also read the **No Monoliths** aside in that page about splitting this example c
   den.hosts.aarch64-darwin.iceberg.users.tux = {};
 
   den.aspects.igloo = {
-    includes = [ den.provides.hostname ];
+    includes = [ den.batteries.hostname ];
     nixos = { pkgs, ... }: { environment.systemPackages = [ pkgs.hello ]; };
   };
 
   den.aspects.tux = {
-    includes = [ den.provides.define-user den.provides.primary-user ];
+    includes = [ den.batteries.define-user den.batteries.primary-user ];
     homeManager = { pkgs, ... }: { home.packages = [ pkgs.vim ]; };
   };
 }
 ```
 
-Den batteries like `den.provides.define-user` and `den.provides.primary-user` work cross-platform, on NixOS, Darwin and WSL.
+Den batteries like `den.batteries.define-user` and `den.batteries.primary-user` work cross-platform, on NixOS, Darwin and WSL.
 
 ### Step 2. Use `igloo` NixOS module in your **current flake**
 
@@ -206,5 +206,5 @@ You can now head over to other guides or the reference:
 - [den.schema](/reference/schema)
 - [den.aspects](/reference/aspects)
 - [den.policies](/reference/policies)
-- [den.provides](/reference/batteries)
+- [den.batteries](/reference/batteries)
 

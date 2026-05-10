@@ -20,13 +20,13 @@ let
     This is exactly how `homeManager` class support is implemented in Den.
     See home-manager/hm-integration.nix.
 
-    Den also provides the mentioned `user` class (`den.provides.os-user`) for setting 
+    Den also provides the mentioned `user` class (`den.batteries.os-user`) for setting 
     NixOS/Darwin options under `users.users.<userName>` at os-level.
 
     Any other user-environments like `nix-maid` or `hjem` or user-custom classes
-    are easily implemented using `den.provides.forward`.
+    are easily implemented using `den.batteries.forward`.
 
-    Note: `den.provides.forward` returns an aspect that needs to be included for
+    Note: `den.batteries.forward` returns an aspect that needs to be included for
     the new class to exist.
 
     See templates/ci/modules/guarded-forward.nix, templates/ci/modules/forward-from-custom-class.nix
@@ -35,7 +35,7 @@ let
 
 in
 {
-  den.provides.forward = {
+  den.batteries.forward = {
     inherit description;
     __functor = _self: den.lib.forward.forwardEach;
   };

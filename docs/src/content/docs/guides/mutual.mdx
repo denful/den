@@ -60,14 +60,14 @@ sequenceDiagram
 This is the normal host resolution pipeline. All OS contributions come from the host itself and from each of its users.
 
 
-## `den.provides.mutual-provider`
+## `den.batteries.mutual-provider`
 
-The [`den.provides.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix) battery allows you to define mutual configurations by letting you define named aspects under `.provides.` to create explicit relationships between users and hosts.
+The [`den.batteries.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix) battery allows you to define mutual configurations by letting you define named aspects under `.` to create explicit relationships between users and hosts.
 
 ```nix
 # mutual-provider is activated at a {host,user} context
 # either per-user or for all of them.
-den.schema.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den.batteries.mutual-provider ];
 
 # user aspect provides to specific host or to all where it lives
 den.aspects.tux = {
@@ -94,11 +94,11 @@ sequenceDiagram
    participant host as host resolution
    participant user as user resolution
    participant igloo as den.aspects.igloo
-   participant igloo-users as den.aspects.igloo.provides.to-users
-   participant igloo-tux as den.aspects.igloo.provides.tux
+   participant igloo-users as den.aspects.igloo.to-users
+   participant igloo-tux as den.aspects.igloo.tux
    participant tux as den.aspects.tux
-   participant tux-hosts as den.aspects.tux.provides.to-hosts
-   participant tux-igloo as den.aspects.tux.provides.igloo
+   participant tux-hosts as den.aspects.tux.to-hosts
+   participant tux-igloo as den.aspects.tux.igloo
 
    Den  ->>  host  :  {host = igloo}
 
@@ -146,7 +146,7 @@ A user `alice` can provide configurations for other users in the same system,
 either by name or for all of them (excluding alice itself).
 
 ```nix
-den.schema.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den.batteries.mutual-provider ];
 
 den.aspects.alice = {
   provides.bob = { homeManager.programs.vim.enable = true; };
@@ -162,7 +162,7 @@ If you have two standalone homes sharing same user aspect, you can provide host 
 configuration even if the Host is not a NixOS system managed by you.
 
 ```nix
-den.schema.home.includes = [ den._.mutual-provider ];
+den.schema.home.includes = [ den.batteries.mutual-provider ];
 
 den.homes.x86_64-linux."tux@igloo" = {};
 den.homes.x86_64-linux."tux@iceberg" = {};

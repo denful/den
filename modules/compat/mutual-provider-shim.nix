@@ -1,10 +1,10 @@
 # Inert compatibility shim. Cross-entity routing (to-users, to-hosts, named
 # targets) is now built into emitAspectPolicies. Users who include
-# den._.mutual-provider in their defaults don't break — this evaluates to an
+# den.batteries.mutual-provider in their defaults don't break — this evaluates to an
 # inert aspect that produces no effects.
 { ... }:
 {
-  den.provides.mutual-provider = {
+  den.batteries.mutual-provider = {
     name = "mutual-provider";
     description = "Inert compat shim — cross-entity routing is built-in.";
     __functor = _: _: {

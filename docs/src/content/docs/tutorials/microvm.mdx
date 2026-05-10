@@ -145,10 +145,10 @@ den.aspects.microvm-guest-config = { host, vm }: {
     sharedNixStore
 
     # Den resolved NixOS module forwarded to <host>.nixos.microvm.vms.${vm.name}.config
-    (den.provides.forward { ... })
+    (den.batteries.forward { ... })
 
     # Forward guest `microvm` class directly to <host>.nixos.microvm.vms.${vm.name}
-    (den.provides.forward { ... })
+    (den.batteries.forward { ... })
   ];
 };
 ```

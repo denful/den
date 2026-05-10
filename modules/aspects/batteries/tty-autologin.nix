@@ -4,7 +4,7 @@ let
 
     This battery must be included in a Host aspect.
 
-       den.aspects.my-laptop.includes = [ (den.provides.tty-autologin "root") ];
+       den.aspects.my-laptop.includes = [ (den.batteries.tty-autologin "root") ];
   '';
 
   # From https://discourse.nixos.org/t/autologin-for-single-tty/49427/2
@@ -31,7 +31,7 @@ let
   };
 in
 {
-  den.provides.tty-autologin = {
+  den.batteries.tty-autologin = {
     inherit description __functor;
   };
 }

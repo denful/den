@@ -2,7 +2,7 @@
 {
   den.aspects.hyprland = {
     includes = [
-      (den.provides.unfree [
+      (den.batteries.unfree [
         "nvidia-x11"
         "nvidia-settings"
       ])

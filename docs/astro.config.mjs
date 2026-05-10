@@ -171,7 +171,7 @@ export default defineConfig({
 					items: [
 						{ label: 'den.schema', slug: 'reference/schema' },
 						{ label: 'den.aspects', slug: 'reference/aspects' },
-						{ label: 'den.provides', slug: 'reference/batteries' },
+						{ label: 'den.batteries', slug: 'reference/batteries' },
 						{ label: 'den.ctx (compat)', slug: 'explanation/context-system', badge: { text: 'legacy', variant: 'note' } },
 						{ label: 'den.quirks', slug: 'reference/quirks' },
 						{ label: 'den.policies', slug: 'reference/policies' },

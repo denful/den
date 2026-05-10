@@ -66,7 +66,7 @@ let
     let
       # Rescue explicit __functor from defs before the submodule merge
       # destroys it (freeform keys become deferred modules).
-      # Providers like den.provides.forward define their own __functor.
+      # Providers like den.batteries.forward define their own __functor.
       explicitFunctors = builtins.filter (
         d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
       ) defs;
@@ -90,7 +90,7 @@ let
       );
     in
     # __functor makes merged aspects callable (aspect { host = ...; }).
-    # Explicit functors (e.g. den.provides.forward) take priority.
+    # Explicit functors (e.g. den.batteries.forward) take priority.
     merged
     // {
       __functor = if originalFunctor != null then originalFunctor else resolveAspectWith;

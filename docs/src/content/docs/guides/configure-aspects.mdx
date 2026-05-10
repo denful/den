@@ -72,8 +72,8 @@ In addition to per-class modules, an aspect has an `includes` list referencing o
 
     # Dependencies
     includes = [
-      den.provides.primary-user
-      den.aspects.gaming.provides.emulation
+      den.batteries.primary-user
+      den.aspects.gaming.emulation
     ];
   };
 
@@ -141,23 +141,23 @@ configuration accordingly.
 
 ## Provides
 
-`provides` creates named sub-aspects accessible via `den.aspects.<name>._.<sub>`
-or `den.aspects.<name>.provides.<sub>`:
+`provides` creates named sub-aspects accessible via `den.aspects.<name>.<sub>`
+or `den.aspects.<name>.<sub>`:
 
 ```nix
-den.aspects.tools.provides.editors = {
+den.aspects.tools.editors = {
   homeManager.programs.helix.enable = true;
   homeManager.programs.vim.enable = true;
 };
 
 # Used elsewhere:
-den.aspects.alice.includes = [ den.aspects.tools._.editors ];
+den.aspects.alice.includes = [ den.aspects.tools.editors ];
 ```
 
 `provides` can also be parametric functions:
 
 ```nix
-den.aspects.alice.provides.work-vpn = { host, user, ... }:
+den.aspects.alice.work-vpn = { host, user, ... }:
   lib.optionalAttrs host.hasVpn {
     nixos.services.openvpn.servers.work.config = "...";
   };
@@ -206,8 +206,8 @@ patterns above are a permanent API for existing usage.
     nixos.system.stateVersion = "25.11";
     homeManager.home.stateVersion = "25.11";
     includes = [
-      den.provides.define-user
-      den.provides.inputs'
+      den.batteries.define-user
+      den.batteries.inputs'
     ];
   };
 }

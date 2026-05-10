@@ -6,7 +6,7 @@ let
 
     ## Usage
 
-      den.aspects.tux.includes = [ den._.host-aspects ];
+      den.aspects.tux.includes = [ den.batteries.host-aspects ];
 
     Any host aspect that defines a `homeManager` key will have that
     config forwarded to the user's homeManager evaluation. Other host-class
@@ -33,7 +33,7 @@ let
     );
 in
 {
-  den.provides.host-aspects = {
+  den.batteries.host-aspects = {
     name = "host-aspects";
     inherit description;
     includes = [ from-host ];

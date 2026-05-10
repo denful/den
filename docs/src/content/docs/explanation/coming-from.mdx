@@ -95,7 +95,7 @@ Beyond mapping existing concepts, Den introduces:
 - **Cross-class composition** -- one aspect configures `nixos` + `homeManager` + `darwin` in a single place.
 - **Parametric dispatch** -- function argument shape determines when config applies, replacing conditionals.
 - **Policy-driven topology** -- [policies](/explanation/policies/) define how entities relate (host-to-users, host-to-wsl, custom), and the graph is extensible.
-- **Reusable batteries** -- common patterns like primary-user setup or user shell config ship as includable aspects via `den.provides.*`.
+- **Reusable batteries** -- common patterns like primary-user setup or user shell config ship as includable aspects via `den.batteries.*`.
 - **Shareable libraries** -- `den.ful` namespaces let you publish and consume aspect collections across flakes.
 
 ## What stays the same

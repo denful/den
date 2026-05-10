@@ -4,54 +4,54 @@ let
     This is a private aspect always included in den.default.
 
     It adds a module option that gathers all packages defined
-    in den.provides.insecure usages and declares a
-    nixpkgs.config.permittedInsecurePackages for each class.
+    in den.batteries.unfree usages and declares a
+    nixpkgs.config.allowUnfreePredicate for each class.
 
   '';
 
-  insecureModule =
+  unfreeModule =
     { config, ... }@args:
     let
       globalPkgs = args.osConfig.home-manager.useGlobalPkgs or false;
-      hasInsecure = config.permittedInsecurePackages.packages != [ ];
+      hasUnfree = config.unfree.packages != [ ];
     in
     {
-      key = "den/insecure-predicate";
-      options.permittedInsecurePackages.packages = lib.mkOption {
+      key = "den/unfree-predicate";
+      options.unfree.packages = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         defaultText = lib.literalExpression "[ ]";
         default = [ ];
       };
-      config.nixpkgs = lib.mkIf (hasInsecure && !globalPkgs) {
-        config.permittedInsecurePackages = config.permittedInsecurePackages.packages;
+      config.nixpkgs = lib.mkIf (hasUnfree && !globalPkgs) {
+        config.allowUnfreePredicate = (pkg: builtins.elem (lib.getName pkg) config.unfree.packages);
       };
     };
 
   osAspect =
     { host }:
     {
-      name = "insecure-predicate/os";
-      ${host.class}.imports = [ insecureModule ];
+      name = "unfree-predicate/os";
+      ${host.class}.imports = [ unfreeModule ];
     };
 
   userAspect =
     { host, user }:
     {
-      name = "insecure-predicate/user";
+      name = "unfree-predicate/user";
     }
     // lib.optionalAttrs (lib.elem "homeManager" user.classes) {
-      homeManager.imports = [ insecureModule ];
+      homeManager.imports = [ unfreeModule ];
     };
 
   homeAspect =
     { home }:
     {
-      name = "insecure-predicate/home";
-      ${home.class}.imports = [ insecureModule ];
+      name = "unfree-predicate/home";
+      ${home.class}.imports = [ unfreeModule ];
     };
 
   aspect = {
-    name = "insecure-predicate";
+    name = "unfree-predicate";
     inherit description;
     includes = [
       osAspect

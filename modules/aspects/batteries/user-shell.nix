@@ -8,7 +8,7 @@ let
 
       den.aspects.vic.includes = [
         # will always love red snappers.
-        (den.provides.user-shell "fish")
+        (den.batteries.user-shell "fish")
       ];
   '';
 
@@ -30,7 +30,7 @@ let
 
 in
 {
-  den.provides.user-shell = shell: {
+  den.batteries.user-shell = shell: {
     inherit description;
     includes = [
       ({ host, user }: { name = "user-shell/${user.userName}@${host.name}"; } // userShell shell user)

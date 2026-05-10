@@ -2,7 +2,7 @@
 {
   den.aspects.dev-tools = {
     includes = [
-      (den.provides.unfree [ "vscode" ])
+      (den.batteries.unfree [ "vscode" ])
     ];
     homeManager =
       { pkgs, ... }:

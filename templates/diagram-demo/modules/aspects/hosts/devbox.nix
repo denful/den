@@ -10,7 +10,7 @@
 {
   den.aspects.devbox = {
     includes = [
-      den.provides.primary-user
+      den.batteries.primary-user
       den.aspects.workstation
       den.aspects.server
     ];
@@ -18,7 +18,7 @@
       # No tailscale on devbox
       (den.lib.aspects.fx.constraints.exclude den.aspects.tailscale)
       # Prefer podman over docker (podman comes from workstation)
-      (den.lib.aspects.fx.constraints.exclude den.aspects.virtualization._.docker)
+      (den.lib.aspects.fx.constraints.exclude den.aspects.virtualization.docker)
       # Use gdm instead of the default regreet greeter
       (den.lib.aspects.fx.constraints.substitute den.aspects.regreet den.aspects.gdm)
     ];

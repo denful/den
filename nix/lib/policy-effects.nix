@@ -66,7 +66,7 @@
   };
 
   # Route class or quirk content from one scope partition into a target class.
-  # Tier 1 delivery — replaces den.provides.forward for the common case.
+  # Tier 1 delivery — replaces den.batteries.forward for the common case.
   route = spec: {
     __policyEffect = "route";
     value = spec;

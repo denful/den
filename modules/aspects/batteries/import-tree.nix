@@ -4,7 +4,7 @@
   ...
 }:
 {
-  den.provides.import-tree.description = ''
+  den.batteries.import-tree.description = ''
     Recursively imports non-dendritic .nix files depending on their Nix configuration `class`.
 
     This can be used to help migrating from huge existing setups.
@@ -13,7 +13,7 @@
     ```
       # this is at <repo>/modules/non-dendritic.nix
       den.aspects.my-laptop.includes = [
-        (den.provides.import-tree.provides.host ../non-dendritic)
+        (den.batteries.import-tree.provides.host ../non-dendritic)
       ]
     ```
 
@@ -43,23 +43,23 @@
       this aspect can be included explicitly on any aspect:
 
           # example: will import ./disko/_nixos files automatically.
-          den.aspects.my-disko.includes = [ (den.provides.import-tree ./disko/) ];
+          den.aspects.my-disko.includes = [ (den.batteries.import-tree ./disko/) ];
 
       or it can be default imported per host/user/home:
 
           # load from ./hosts/<host>/_nixos
-          den.schema.host.includes = [ (den.provides.import-tree.provides.host ./hosts) ];
+          den.schema.host.includes = [ (den.batteries.import-tree.provides.host ./hosts) ];
 
           # load from ./users/<user>/{_homeManager, _nixos}
-          den.schema.user.includes = [ (den.provides.import-tree.provides.user ./users) ];
+          den.schema.user.includes = [ (den.batteries.import-tree.provides.user ./users) ];
 
           # load from ./homes/<home>/_homeManager
-          den.schema.home.includes = [ (den.provides.import-tree.provides.home ./homes) ];
+          den.schema.home.includes = [ (den.batteries.import-tree.provides.home ./homes) ];
 
       you are also free to create your own auto-imports layout following the implementation of these.
   '';
 
-  den.provides.import-tree.__functor = _: root: {
+  den.batteries.import-tree.__functor = _: root: {
     name = "import-tree(${baseNameOf (toString root)})";
     meta.provider = [
       "den"
@@ -77,9 +77,9 @@
     };
   };
 
-  den.provides.import-tree.provides = {
-    host = root: { host, ... }: den.provides.import-tree "${toString root}/${host.name}";
-    home = root: { home, ... }: den.provides.import-tree "${toString root}/${home.name}";
-    user = root: { user, ... }: den.provides.import-tree "${toString root}/${user.name}";
+  den.batteries.import-tree.provides = {
+    host = root: { host, ... }: den.batteries.import-tree "${toString root}/${host.name}";
+    home = root: { home, ... }: den.batteries.import-tree "${toString root}/${home.name}";
+    user = root: { user, ... }: den.batteries.import-tree "${toString root}/${user.name}";
   };
 }

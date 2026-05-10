@@ -5,6 +5,6 @@
     tailscale
     desktop
     virtualization
-    virtualization._.podman
+    virtualization.podman
   ];
 }

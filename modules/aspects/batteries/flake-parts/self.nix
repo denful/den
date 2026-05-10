@@ -1,7 +1,7 @@
 { withSystem, ... }:
 let
   description = ''
-    Provides the `flake-parts` `inputs'` (the flake's `inputs` with system pre-selected)
+    Provides the `flake-parts` `self'` (the flake's `self` with system pre-selected)
     as a top-level module argument.
 
     This allows modules to access per-system flake outputs without needing
@@ -12,32 +12,32 @@ let
     **Global (Recommended):**
     Apply to all hosts, users, and homes.
 
-        den.default.includes = [ den.provides.inputs' ];
+        den.default.includes = [ den.batteries.self' ];
 
     **Specific:**
     Apply only to a specific host, user, or home aspect.
 
-        den.aspects.my-laptop.includes = [ den.provides.inputs' ];
-        den.aspects.alice.includes = [ den.provides.inputs' ];
+        den.aspects.my-laptop.includes = [ den.batteries.self' ];
+        den.aspects.alice.includes = [ den.batteries.self' ];
 
     **Note:** This aspect is contextual. When included in a `host` aspect, it
-    configures `inputs'` for the host's OS. When included in a `user` or `home`
-    aspect, it configures `inputs'` for the corresponding Home Manager configuration.
+    configures `self'` for the host's OS. When included in a `user` or `home`
+    aspect, it configures `self'` for the corresponding Home Manager configuration.
   '';
 
   mkAspect =
     class: system:
     withSystem system (
-      { inputs', ... }:
+      { self', ... }:
       {
-        ${class}._module.args.inputs' = inputs';
+        ${class}._module.args.self' = self';
       }
     );
 
   osAspect =
     { host }:
     {
-      name = "inputs'/os";
+      name = "self'/os";
     }
     // mkAspect host.class host.system;
 
@@ -47,26 +47,25 @@ let
       host,
     }:
     {
-      name = "inputs'/user";
+      name = "self'/user";
       includes = map (c: mkAspect c host.system) user.classes;
     };
 
-  hmAspect =
+  homeAspect =
     { home }:
     {
-      name = "inputs'/home";
+      name = "self'/home";
     }
     // mkAspect home.class home.system;
-
 in
 {
-  den.provides.inputs' = {
-    name = "inputs'";
+  den.batteries.self' = {
+    name = "self'";
     inherit description;
     includes = [
       osAspect
       userAspect
-      hmAspect
+      homeAspect
     ];
   };
 }

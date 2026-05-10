@@ -25,7 +25,7 @@ modules/
     angle-brackets.nix                   # <den/...> syntax
     conditional-config.nix               # conditional imports/configs
     default-includes.nix                 # den.default behavior
-    forward.nix                          # den._.forward
+    forward.nix                          # den.batteries.forward
     homes.nix                            # standalone HM
     host-options.nix                     # host/user schema options
     namespaces.nix                       # namespace define/merge/export
@@ -129,7 +129,7 @@ The `provider/` subdirectory is a **separate flake** that defines a namespace `p
 { inputs, ... }:
 {
   imports = [ inputs.den.flakeModule  (inputs.den.namespace "provider" true) ];
-  provider.tools._.dev._.editors = {
+  provider.tools.dev.editors = {
     nixos.programs.vim.enable = true;
   };
 }

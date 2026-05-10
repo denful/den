@@ -9,7 +9,7 @@ let
 
     ## Usage
 
-       den.aspects.my-user.includes = [ den.provides.primary-user ];
+       den.aspects.my-user.includes = [ den.batteries.primary-user ];
 
   '';
 
@@ -31,5 +31,5 @@ let
 
 in
 {
-  den.provides.primary-user = userToHostContext;
+  den.batteries.primary-user = userToHostContext;
 }

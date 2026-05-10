@@ -86,7 +86,7 @@ let
 
       userForward =
         { host, user }:
-        den.provides.forward {
+        den.batteries.forward {
           each = lib.singleton true;
           fromClass = _: className;
           intoClass = _: host.class;

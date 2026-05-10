@@ -1,6 +1,6 @@
 ---
 title: Custom Nix Classes
-description: Create new classes via den.provides.forward.
+description: Create new classes via den.batteries.forward.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -27,12 +27,12 @@ This is how Den implements:
 
 ## The `forward` Battery
 
-`den.provides.forward` creates a new class by forwarding its module contents
+`den.batteries.forward` creates a new class by forwarding its module contents
 into a target path on an existing class:
 
 ```nix
 { host }:
-den.provides.forward {
+den.batteries.forward {
   each = lib.attrValues host.users;
   fromClass = user: "user";
   intoClass = user: host.class;
@@ -83,7 +83,7 @@ Suppose you want a `container` class that forwards into
 { den, lib, ... }:
 let
   fwd = { host, user }:
-    den.provides.forward {
+    den.batteries.forward {
       each = lib.singleton user;
       fromClass = _: "container";
       intoClass = _: host.class;
@@ -109,7 +109,7 @@ den.aspects.alice.container = {
 `forward` supports optional parameters for complex scenarios:
 
 ```nix
-den.provides.forward {
+den.batteries.forward {
   each = lib.singleton true; # <- true is the single item, mostly ignored.
   fromClass = _item: "wsl";
   intoClass = _item: host.class;
@@ -167,7 +167,7 @@ class while keeping a separate name in your aspects.
 ```nix
 hmAlias =
   { class, aspect-chain }:
-  den._.forward {
+  den.batteries.forward {
     each = lib.singleton class;
     fromClass = _: "hm";
     intoClass = _: "homeManager";
@@ -200,7 +200,7 @@ Darwin and not NixOS.
 ```nix
 hmPlatforms =
   { class, aspect-chain }:
-  den._.forward {
+  den.batteries.forward {
     each = [ "Linux" "Darwin" "Aarch64" "64bit" ];
     fromClass = platform: "hm${platform}";
     intoClass = _: "homeManager";
@@ -231,7 +231,7 @@ The `os` forward class ([provided by Den](https://github.com/denful/den/blob/mai
 
 ```nix
 # Note: this is already provided by Den at provides/os-class.nix
-os-class = { class, aspect-chain }: den._.forward {
+os-class = { class, aspect-chain }: den.batteries.forward {
   each = [ "nixos" "darwin" ];
   fromClass = _: "os";
   intoClass = lib.id;
@@ -255,7 +255,7 @@ A dynamic class for matching roles between users and hosts.
 roleClass =
   { host, user }:
   { class, aspect-chain }:
-  den._.forward {
+  den.batteries.forward {
     each = lib.intersectLists (host.roles or []) (user.roles or []);
     fromClass = lib.id;
     intoClass = _: host.class;
@@ -287,7 +287,7 @@ den.aspects.alice = {
 ```nix
 gitClass =
   { class, aspect-chain }:
-  den._.forward {
+  den.batteries.forward {
     each = lib.singleton true;
     fromClass = _: "git";
     intoClass = _: "homeManager";
@@ -313,7 +313,7 @@ same pkgs but still configure both at the same time.
 ```nix
 nixClass =
   { class, aspect-chain }:
-  den._.forward {
+  den.batteries.forward {
     each = [ "nixos" "homeManager" ];
     fromClass = _: "nix";
     intoClass = lib.id;
@@ -348,7 +348,7 @@ The froward-guard itself is reponsible checking in only one place, instead of ha
 ```nix
 # Custom `persys` forwards config into nixos.environment.persistance."/nix/persist/system"
 # only if environment.persistance option is present.
-persys = { class, aspect-chain }: den._.forward {
+persys = { class, aspect-chain }: den.batteries.forward {
   each = lib.singleton true;
   fromClass = _item: "persys";
   intoClass = _item: class;

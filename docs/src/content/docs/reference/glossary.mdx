@@ -15,7 +15,7 @@ See: [Aspects](/explanation/aspects/)
 
 ### battery
 
-A reusable aspect provider shipped with Den under `den.provides` (aliased `den._`). Batteries solve common configuration tasks like user creation, hostname setting, and home environment integration.
+A reusable aspect provider shipped with Den under `den.batteries` (aliased `den.batteries`). Batteries solve common configuration tasks like user creation, hostname setting, and home environment integration.
 
 See: [Batteries](/reference/batteries/)
 
@@ -81,13 +81,13 @@ See: [Policies](/explanation/policies/)
 
 ### provides
 
-Overloaded term with two distinct meanings. On an aspect, `provides` defines named sub-aspects that dependents can include. As a battery namespace (`den.provides`), these are reusable aspect providers shipped with Den.
+Overloaded term with two distinct meanings. On an aspect, `provides` defines named sub-aspects that dependents can include. As a battery namespace (`den.batteries`), these are reusable aspect providers shipped with Den.
 
 See: [Aspects](/explanation/aspects/), [Batteries](/reference/batteries/)
 
 ### provider
 
-An aspect intended for reuse via `includes`. `den.provides.*` (batteries) are the built-in providers, but any aspect can serve as a provider.
+An aspect intended for reuse via `includes`. `den.batteries.*` (batteries) are the built-in providers, but any aspect can serve as a provider.
 
 See: [Batteries](/reference/batteries/)
 

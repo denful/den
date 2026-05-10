@@ -6,7 +6,7 @@ let
 
     ## Usage
 
-      den.aspects.my-laptop.includes = [ (den.provides.unfree [ "example-unfree-package" ]) ];
+      den.aspects.my-laptop.includes = [ (den.batteries.unfree [ "example-unfree-package" ]) ];
 
     It will dynamically provide a module for each class when accessed.
   '';
@@ -54,7 +54,7 @@ let
   };
 in
 {
-  den.provides.unfree = {
+  den.batteries.unfree = {
     inherit description __functor;
   };
 }

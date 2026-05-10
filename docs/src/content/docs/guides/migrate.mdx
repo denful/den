@@ -44,16 +44,16 @@ Migration to Den is incremental. You do not need to rewrite everything at once.
 
 3. Import Existing Modules
 
-    Use `den.provides.import-tree` to load your existing non-dendritic modules:
+    Use `den.batteries.import-tree` to load your existing non-dendritic modules:
 
     ```nix
     # modules/legacy.nix
     { den, ... }: {
       den.schema.host.includes = [
-        (den.provides.import-tree._.host ./hosts)
+        (den.batteries.import-tree.host ./hosts)
       ];
       den.schema.user.includes = [
-        (den.provides.import-tree._.user ./users)
+        (den.batteries.import-tree.user ./users)
       ];
     }
     ```
@@ -105,7 +105,7 @@ Migration to Den is incremental. You do not need to rewrite everything at once.
 5. Remove Legacy
 
     As aspects replace legacy modules, remove the corresponding files from
-    `hosts/` and `users/`. Eventually remove `den.provides.import-tree` usage.
+    `hosts/` and `users/`. Eventually remove `den.batteries.import-tree` usage.
 
 </Steps>
 
@@ -114,5 +114,5 @@ Migration to Den is incremental. You do not need to rewrite everything at once.
 - **Start with one host.** Migrate a single machine first to learn the pattern.
 - **Keep legacy working.** `import-tree` loads your existing files alongside
   Den aspects -- they coexist without conflicts.
-- **Use batteries.** Replace manual user/shell/HM setup with `den.provides.*`.
+- **Use batteries.** Replace manual user/shell/HM setup with `den.batteries.*`.
 - **Test with VM.** Use `nix run .#vm` to validate changes before applying to hardware.

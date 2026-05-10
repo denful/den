@@ -1,6 +1,6 @@
 ---
 title: Batteries
-description: Complete reference for all den.provides batteries -- reusable aspect providers shipped with Den.
+description: Complete reference for all den.batteries batteries -- reusable aspect providers shipped with Den.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -9,7 +9,7 @@ import { Aside } from '@astrojs/starlight/components';
 [`modules/aspects/provides/`](https://github.com/denful/den/blob/main/modules/aspects/provides/)
 </Aside>
 
-Den ships reusable aspect providers under `den.provides` (aliased `den._`).
+Den ships reusable aspect providers under `den.batteries` (aliased `den.batteries`).
 Each battery contributes NixOS/Darwin/home-manager modules to hosts and
 users that include them.
 
@@ -22,35 +22,35 @@ Batteries fall into two categories:
 
 ## System
 
-### `den._.define-user`
+### `den.batteries.define-user`
 
 Creates OS-level user accounts (`users.users.<name>`) with `isNormalUser` and `home` directory. Also sets `home.username` and `home.homeDirectory` for Home Manager. Works on NixOS, Darwin, and standalone Home Manager.
 
 **Opt-in.**
 
 ```nix
-den.default.includes = [ den.provides.define-user ];
+den.default.includes = [ den.batteries.define-user ];
 ```
 
 <Aside title="Source" icon="github">
 [`provides/define-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/define-user.nix)
 </Aside>
 
-### `den._.hostname`
+### `den.batteries.hostname`
 
 Sets the system hostname from `den.hosts.<name>.hostName`. Works on NixOS and Darwin.
 
 **Opt-in.**
 
 ```nix
-den.default.includes = [ den.provides.hostname ];
+den.default.includes = [ den.batteries.hostname ];
 ```
 
 <Aside title="Source" icon="github">
 [`provides/hostname.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/hostname.nix)
 </Aside>
 
-### `den._.os-class`
+### `den.batteries.os-class`
 
 Provides an `os` convenience class that forwards its contents into both `nixos` and `darwin` classes. This lets you write platform-agnostic host configuration without duplicating it across classes.
 
@@ -66,7 +66,7 @@ den.aspects.my-host = {
 [`provides/os-class.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/os-class.nix)
 </Aside>
 
-### `den._.os-user`
+### `den.batteries.os-user`
 
 Provides a `user` class that forwards settings into the host's `users.users.<userName>` at OS level. Instead of writing the full `nixos.users.users.alice` path, you write directly into the `user` class.
 
@@ -83,21 +83,21 @@ den.aspects.alice.user = { pkgs, ... }: {
 [`provides/os-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/os-user.nix)
 </Aside>
 
-### `den._.primary-user`
+### `den.batteries.primary-user`
 
 Marks a user as the primary (admin-level) user. On NixOS, adds `wheel` and `networkmanager` groups. On Darwin, sets `system.primaryUser`. On WSL, sets `defaultUser`.
 
 **Opt-in.**
 
 ```nix
-den.aspects.alice.includes = [ den.provides.primary-user ];
+den.aspects.alice.includes = [ den.batteries.primary-user ];
 ```
 
 <Aside title="Source" icon="github">
 [`provides/primary-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/primary-user.nix)
 </Aside>
 
-### `den._.user-shell`
+### `den.batteries.user-shell`
 
 Sets the user's login shell at both OS and Home Manager levels. Enables `programs.<shell>.enable` and sets `users.users.<name>.shell`.
 
@@ -105,7 +105,7 @@ Sets the user's login shell at both OS and Home Manager levels. Enables `program
 
 ```nix
 den.aspects.alice.includes = [
-  (den.provides.user-shell "fish")
+  (den.batteries.user-shell "fish")
 ];
 ```
 
@@ -113,24 +113,24 @@ den.aspects.alice.includes = [
 [`provides/user-shell.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/user-shell.nix)
 </Aside>
 
-### `den._.mutual-provider`
+### `den.batteries.mutual-provider`
 
 Allows hosts and users to contribute configuration to each other through the `provides` attribute. Users can provide to specific hosts or to all hosts they belong to, and vice versa.
 
 **Opt-in.** Typically included for the user entity kind.
 
 ```nix
-den.schema.user.includes = [ den._.mutual-provider ];
+den.schema.user.includes = [ den.batteries.mutual-provider ];
 ```
 
 Then in aspects:
 
 ```nix
 # user provides to a specific host
-den.aspects.tux.provides.igloo.nixos.programs.emacs.enable = true;
+den.aspects.tux.igloo.nixos.programs.emacs.enable = true;
 
 # host provides to all its users
-den.aspects.igloo.provides.to-users = { user, ... }: {
+den.aspects.igloo.to-users = { user, ... }: {
   homeManager.programs.helix.enable = true;
 };
 ```
@@ -139,21 +139,21 @@ den.aspects.igloo.provides.to-users = { user, ... }: {
 [`provides/mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix)
 </Aside>
 
-### `den._.host-aspects`
+### `den.batteries.host-aspects`
 
 Projects user-relevant classes (like `homeManager`) from the host's aspect tree onto users who opt in. Any `homeManager` key defined in the host aspect is forwarded to the user's home-manager evaluation.
 
 **Opt-in.**
 
 ```nix
-den.aspects.tux.includes = [ den._.host-aspects ];
+den.aspects.tux.includes = [ den.batteries.host-aspects ];
 ```
 
 <Aside title="Source" icon="github">
 [`provides/host-aspects.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/host-aspects.nix)
 </Aside>
 
-### `den._.tty-autologin`
+### `den.batteries.tty-autologin`
 
 Configures automatic TTY1 login on NixOS via a systemd getty override. NixOS only.
 
@@ -161,7 +161,7 @@ Configures automatic TTY1 login on NixOS via a systemd getty override. NixOS onl
 
 ```nix
 den.aspects.laptop.includes = [
-  (den.provides.tty-autologin "alice")
+  (den.batteries.tty-autologin "alice")
 ];
 ```
 
@@ -169,7 +169,7 @@ den.aspects.laptop.includes = [
 [`provides/tty-autologin.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/tty-autologin.nix)
 </Aside>
 
-### `den._.wsl`
+### `den.batteries.wsl`
 
 Enables WSL support on NixOS using the NixOS-WSL project. Adds a `wsl-host` entity kind and forwards the `wsl` class into the host's NixOS configuration.
 
@@ -183,14 +183,14 @@ den.hosts.x86_64-linux.igloo.wsl.enable = true;
 [`provides/wsl.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/wsl.nix)
 </Aside>
 
-### `den._.forward`
+### `den.batteries.forward`
 
 A generic forwarding primitive that creates custom Nix classes by routing module contents from one class into a target submodule path. This is how `os-user`, `homeManager`, `hjem`, and `maid` integrations are implemented internally.
 
 **Opt-in.** Used when building custom classes. See the [Custom Classes](/guides/custom-classes/) guide.
 
 ```nix
-den.provides.forward {
+den.batteries.forward {
   each = lib.singleton user;
   fromClass = _: "myClass";
   intoClass = _: host.class;
@@ -203,7 +203,7 @@ den.provides.forward {
 [`provides/forward.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/forward.nix)
 </Aside>
 
-### `den._.import-tree`
+### `den.batteries.import-tree`
 
 Recursively imports non-dendritic `.nix` files, auto-detecting class from directory name conventions (`_nixos/`, `_darwin/`, `_homeManager/`). Useful for migrating existing configurations.
 
@@ -212,17 +212,17 @@ Recursively imports non-dendritic `.nix` files, auto-detecting class from direct
 ```nix
 # Import per host
 den.schema.host.includes = [
-  (den.provides.import-tree._.host ./hosts)
+  (den.batteries.import-tree.host ./hosts)
 ];
 
 # Import per user
 den.schema.user.includes = [
-  (den.provides.import-tree._.user ./users)
+  (den.batteries.import-tree.user ./users)
 ];
 
 # Import for a specific aspect
 den.aspects.laptop.includes = [
-  (den.provides.import-tree ./disko)
+  (den.batteries.import-tree ./disko)
 ];
 ```
 
@@ -234,7 +234,7 @@ den.aspects.laptop.includes = [
 
 ## Home Environments
 
-### `den._.home-manager`
+### `den.batteries.home-manager`
 
 Integrates [home-manager](https://github.com/nix-community/home-manager) as a user environment class. Defines the `hm-host` entity kind, imports the appropriate home-manager NixOS or Darwin module, and merges `home-manager.users.<name>` from each user's `homeManager` class.
 
@@ -250,7 +250,7 @@ den.aspects.alice.homeManager = {
 [`provides/home-manager.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/home-manager.nix)
 </Aside>
 
-### `den._.hjem`
+### `den.batteries.hjem`
 
 Integrates [hjem](https://github.com/feel-co/hjem) as an alternative home environment. Imports hjem's NixOS or Darwin module and merges `hjem.users.<name>` from each user's `hjem` class.
 
@@ -266,7 +266,7 @@ den.aspects.alice.hjem = {
 [`provides/hjem.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/hjem.nix)
 </Aside>
 
-### `den._.maid`
+### `den.batteries.maid`
 
 Integrates [maid](https://github.com/maid-nix/maid) as an alternative home environment. NixOS only. Merges configuration into `users.users.<name>.maid` for each user's `maid` class.
 
@@ -286,7 +286,7 @@ den.aspects.alice.maid = {
 
 ## Package Management
 
-### `den._.unfree`
+### `den.batteries.unfree`
 
 Allows specific unfree packages by name via `nixpkgs.config.allowUnfreePredicate`. Works for any class (`nixos`, `darwin`, `homeManager`). The predicate builder is automatically included in `den.default`.
 
@@ -294,7 +294,7 @@ Allows specific unfree packages by name via `nixpkgs.config.allowUnfreePredicate
 
 ```nix
 den.aspects.laptop.includes = [
-  (den.provides.unfree [ "nvidia-x11" "steam" ])
+  (den.batteries.unfree [ "nvidia-x11" "steam" ])
 ];
 ```
 
@@ -302,7 +302,7 @@ den.aspects.laptop.includes = [
 [`provides/unfree/unfree.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/unfree/unfree.nix)
 </Aside>
 
-### `den._.insecure`
+### `den.batteries.insecure`
 
 Allows specific insecure packages by name and version via `nixpkgs.config.permittedInsecurePackages`. Works for any class (`nixos`, `darwin`, `homeManager`). The predicate builder is automatically included in `den.default`.
 
@@ -310,7 +310,7 @@ Allows specific insecure packages by name and version via `nixpkgs.config.permit
 
 ```nix
 den.aspects.laptop.includes = [
-  (den.provides.insecure [ "openssl-1.1.1w" ])
+  (den.batteries.insecure [ "openssl-1.1.1w" ])
 ];
 ```
 
@@ -324,28 +324,28 @@ den.aspects.laptop.includes = [
 
 These batteries require flake-parts as the module system.
 
-### `den._.inputs'`
+### `den.batteries.inputs'`
 
 Provides `inputs'` (the flake's inputs with system pre-selected) as a top-level module argument. Contextual: configures the appropriate class depending on whether it is included in a host, user, or home aspect.
 
 **Opt-in.**
 
 ```nix
-den.default.includes = [ den.provides.inputs' ];
+den.default.includes = [ den.batteries.inputs' ];
 ```
 
 <Aside title="Source" icon="github">
 [`provides/flake-parts/inputs.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/flake-parts/inputs.nix)
 </Aside>
 
-### `den._.self'`
+### `den.batteries.self'`
 
 Provides `self'` (the flake's self outputs with system pre-selected) as a top-level module argument. Contextual: configures the appropriate class depending on whether it is included in a host, user, or home aspect.
 
 **Opt-in.**
 
 ```nix
-den.default.includes = [ den.provides.self' ];
+den.default.includes = [ den.batteries.self' ];
 ```
 
 <Aside title="Source" icon="github">
@@ -362,9 +362,9 @@ Apply batteries to all hosts, users, and homes:
 
 ```nix
 den.default.includes = [
-  den.provides.define-user
-  den.provides.hostname
-  den.provides.inputs'
+  den.batteries.define-user
+  den.batteries.hostname
+  den.batteries.inputs'
 ];
 ```
 
@@ -374,9 +374,9 @@ Apply batteries to specific aspects:
 
 ```nix
 den.aspects.alice.includes = [
-  den.provides.primary-user
-  (den.provides.user-shell "zsh")
-  (den.provides.unfree [ "vscode" ])
+  den.batteries.primary-user
+  (den.batteries.user-shell "zsh")
+  (den.batteries.unfree [ "vscode" ])
 ];
 ```
 
@@ -386,7 +386,7 @@ Apply batteries to all entities of a kind:
 
 ```nix
 den.schema.user.includes = [
-  den._.mutual-provider
+  den.batteries.mutual-provider
 ];
 ```
 
@@ -398,8 +398,8 @@ Batteries compose freely with inline configuration:
 # den.lib.parametric is deprecated — bare attrsets work directly:
 den.aspects.my-admin = {
   includes = [
-    den.provides.primary-user
-    (den.provides.user-shell "fish")
+    den.batteries.primary-user
+    (den.batteries.user-shell "fish")
     { nixos.security.sudo.wheelNeedsPassword = false; }
   ];
 };

@@ -7,7 +7,7 @@ let
 
     ## Usage
 
-       den.defaults.includes = [ den.provides.hostname ];
+       den.defaults.includes = [ den.batteries.hostname ];
   '';
 
   setHostname =
@@ -18,7 +18,7 @@ let
     };
 in
 {
-  den.provides.hostname = {
+  den.batteries.hostname = {
     name = "hostname";
     inherit description;
     includes = [ setHostname ];

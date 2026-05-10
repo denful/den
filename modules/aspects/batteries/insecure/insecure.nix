@@ -6,7 +6,7 @@ let
 
     ## Usage
 
-      den.aspects.my-laptop.includes = [ (den.provides.insecure [ "example-insecure-package-1.0.0" ]) ];
+      den.aspects.my-laptop.includes = [ (den.batteries.insecure [ "example-insecure-package-1.0.0" ]) ];
 
     It will dynamically provide a module for each class when accessed.
   '';
@@ -55,7 +55,7 @@ let
   };
 in
 {
-  den.provides.insecure = {
+  den.batteries.insecure = {
     inherit description __functor;
   };
 }

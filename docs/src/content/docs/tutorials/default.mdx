@@ -75,8 +75,8 @@ The host aspect provides:
 {
   den.aspects.tux = {
     includes = [
-      den.provides.primary-user
-      (den.provides.user-shell "fish")
+      den.batteries.primary-user
+      (den.batteries.user-shell "fish")
     ];
     homeManager = { pkgs, ... }: {
       home.packages = [ pkgs.htop ];
@@ -106,7 +106,7 @@ The user aspect:
 ```nix
 { inputs, den, ... }:
 {
-  den.aspects.igloo.includes = [ (den.provides.tty-autologin "tux") ];
+  den.aspects.igloo.includes = [ (den.batteries.tty-autologin "tux") ];
 
   perSystem = { pkgs, ... }: {
     packages.vm = pkgs.writeShellApplication {

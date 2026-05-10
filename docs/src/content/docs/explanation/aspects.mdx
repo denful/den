@@ -93,11 +93,10 @@ den.aspects.igloo.includes = [
 
 ### Provides
 
-Named sub-aspects scoped to this aspect, accessible via `den.aspects.igloo._.name`
-or `den.aspects.igloo.provides.name`:
+Named sub-aspects scoped to this aspect, accessible via `den.aspects.igloo.name`:
 
 ```nix
-den.aspects.igloo.provides.gpu = { host, ... }:
+den.aspects.igloo.gpu = { host, ... }:
   lib.optionalAttrs (host ? gpu) {
     nixos.hardware.nvidia.enable = true;
   };

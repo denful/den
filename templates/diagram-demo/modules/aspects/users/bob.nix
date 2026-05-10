@@ -6,7 +6,7 @@
 {
   den.aspects.bob = {
     includes = [
-      den.provides.primary-user
+      den.batteries.primary-user
       den.aspects.gnome
       den.aspects.dev-tools
     ];
