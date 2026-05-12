@@ -169,6 +169,22 @@ den.aspects.laptop.includes = [
 [`provides/tty-autologin.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/tty-autologin.nix)
 </Aside>
 
+### `den.batteries.vm-autologin`
+
+Configures automatic TTY1 login on NixOS VMs via a systemd getty override. NixOS VMs only.
+
+**Opt-in.** Takes a username as argument.
+
+```nix
+den.aspects.laptop.includes = [
+  (den.batteries.vm-autologin "alice")
+];
+```
+
+<Aside title="Source" icon="github">
+[`provides/tty-autologin.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/vm-autologin.nix)
+</Aside>
+
 ### `den.batteries.wsl`
 
 Enables WSL support on NixOS using the NixOS-WSL project. Adds a `wsl-host` entity kind and forwards the `wsl` class into the host's NixOS configuration.

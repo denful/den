@@ -139,6 +139,7 @@ export default defineConfig({
 								{ label: 'mutual-provider — host↔user config', link: '/reference/batteries/#den_mutual-provider' },
 								{ label: 'host-aspects — project host classes', link: '/reference/batteries/#den_host-aspects' },
 								{ label: 'tty-autologin — TTY auto-login', link: '/reference/batteries/#den_tty-autologin' },
+								{ label: 'vm-autologin — auto-login for VMs', link: '/reference/batteries/#den_vm-autologin' },
 								{ label: 'wsl — WSL support', link: '/reference/batteries/#den_wsl' },
 								{ label: 'forward — custom class factory', link: '/reference/batteries/#den_forward' },
 								{ label: 'import-tree — legacy module import', link: '/reference/batteries/#den_import-tree' },

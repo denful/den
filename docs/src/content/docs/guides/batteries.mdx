@@ -153,6 +153,14 @@ Enables automatic TTY1 login on NixOS:
 den.aspects.laptop.includes = [ (den.batteries.tty-autologin "alice") ];
 ```
 
+### `den.batteries.vm-autologin`
+
+Enables automatic TTY1 login on NixOS VMs:
+
+```nix
+den.aspects.laptop.includes = [ (den.batteries.vm-autologin "alice") ];
+```
+
 ### `den.batteries.inputs'`
 
 Provides flake-parts `inputs'` (system-specialized inputs) as a module argument:
