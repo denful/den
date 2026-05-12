@@ -5,7 +5,7 @@ However, you will learn more by reading templates/ci which tests all of Den.
 
 Steps you can follow after cloning this template:
 
-- Be sure to read the [den documentation](https://den.oeiuwq.com)
+- Be sure to read the [den documentation](https://den.denful.dev)
 
 - Update den input.
 

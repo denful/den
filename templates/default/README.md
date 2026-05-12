@@ -2,7 +2,7 @@
 
 Steps you can follow after cloning this template:
 
-- Be sure to read the [den documentation](https://den.oeiuwq.com)
+- Be sure to read the [den documentation](https://den.denful.dev)
 
 - Update den input.
 

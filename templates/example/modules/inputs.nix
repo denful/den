@@ -3,7 +3,7 @@
 #
 # Inputs can be placed in any module, the best practice is to have them
 # as close as possible to their actual usage.
-# See: https://dendritic.oeiuwq.com/Dendritic.html#minimal-and-focused-flakenix
+# See: https://denful.dev/Dendritic.html#minimal-and-focused-flakenix
 #
 # For our template, we enable home-manager and nix-darwin by default, but
 # you are free to remove them if not being used by you.

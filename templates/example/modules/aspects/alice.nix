@@ -68,7 +68,7 @@
 
   # This is a context-aware aspect, that emits configurations
   # **anytime** at least the `user` data is in context.
-  # read more at https://den.oeiuwq.com/explanation/parametric/
+  # read more at https://den.denful.dev/explanation/parametric/
   den.aspects.cooper =
     { user, ... }:
     {

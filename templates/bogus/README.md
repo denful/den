@@ -1,4 +1,4 @@
-# READ: https://den.oeiuwq.com/tutorials/bogus/
+# READ: https://den.denful.dev/tutorials/bogus/
 
 Use this template for:
 

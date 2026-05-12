@@ -108,7 +108,7 @@ For brevity and teaching purposes, this guide uses a single `modules/den.nix` fi
 
 The recommendation is to split your modules as they make sense to you. Any file can contribute to any Den aspects and hosts/users can be defined anywhere.
 
-Recommended read: [Dendritic Advantages](https://dendrix.oeiuwq.com/Dendritic.html#dendritic-advantages) and [Dendritic FAQ](https://github.com/Doc-Steve/dendritic-design-with-flake-parts/wiki/FAQ)
+Recommended read: [Dendritic Advantages](https://dendrix.denful.dev/Dendritic.html#dendritic-advantages) and [Dendritic FAQ](https://github.com/Doc-Steve/dendritic-design-with-flake-parts/wiki/FAQ)
 </Aside>
 
 ```nix "x86_64-linux.igloo" "users.tux" "den.flakeModule" "aspects.igloo" "aspects.tux" "user.classes" "_nixos/configuration.nix" "hostname" "includes =" "define-user" "primary-user" "(1)"  "(2)"  "(3)"  "(4)"  "(5)"  "(6)"  "(7)"  "(8)"  "(9)"
@@ -219,7 +219,7 @@ This is all that is happening at `modules/den.nix`.
 
 6. **Enhance** the `igloo` host aspect.
 
-    Remember that `den.aspects.igloo` was _already_ created for you by Den from the host definition?. Well, in this step **you are extending** the aspect with more configuration. Any file can do this, contribute to any host or user aspect as they please. This is called [**Incremental Features**](https://dendrix.oeiuwq.com/Dendritic.html#incremental-features) in the Dendritic Advantages article.
+    Remember that `den.aspects.igloo` was _already_ created for you by Den from the host definition?. Well, in this step **you are extending** the aspect with more configuration. Any file can do this, contribute to any host or user aspect as they please. This is called [**Incremental Features**](https://dendrix.denful.dev/Dendritic.html#incremental-features) in the Dendritic Advantages article.
 
 7. Include re-usable features from other, generic aspects.
 

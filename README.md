@@ -1,13 +1,13 @@
 <p align="right">
-  <a href="https://dendritic.oeiuwq.com/sponsor"><img src="https://img.shields.io/badge/sponsor-vic-white?logo=githubsponsors&logoColor=white&labelColor=%23FF0000" alt="Sponsor Vic"/></a>
+  <a href="https://denful.dev/sponsor"><img src="https://img.shields.io/badge/sponsor-vic-white?logo=githubsponsors&logoColor=white&labelColor=%23FF0000" alt="Sponsor Vic"/></a>
   <a href="https://deepwiki.com/denful/den"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
   <a href="https://github.com/denful/den/releases"><img src="https://img.shields.io/github/v/release/denful/den?style=plastic&logo=github&color=purple"/></a>
-  <a href="https://dendritic.oeiuwq.com"><img src="https://img.shields.io/badge/Dendritic-Nix-informational?logo=nixos&logoColor=white" alt="Dendritic Nix"/></a>
+  <a href="https://denful.dev"><img src="https://img.shields.io/badge/Dendritic-Nix-informational?logo=nixos&logoColor=white" alt="Dendritic Nix"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/denful/den" alt="License"/></a>
   <a href="https://github.com/denful/den/actions"><img src="https://github.com/denful/den/actions/workflows/test.yml/badge.svg" alt="CI Status"/></a>
 </p>
 
-> den and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [dendritic libs](https://dendritic.oeiuwq.com) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://dendritic.oeiuwq.com/sponsor)
+> den and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [dendritic libs](https://denful.dev) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://denful.dev/sponsor)
 
 # den - Aspect-oriented, Context-driven Dendritic Nix configurations.
 
@@ -65,7 +65,7 @@ nixosConfigurations.my-laptop = lib.nixosSystem {
 
 Den has Zero Dependencies. `den.lib` is domain agnostic, it can be used to configure anything Nix-configurable.
 
-On top of `den.lib`, Den also provides a [framework](https://den.oeiuwq.com/explanation/context-pipeline/) for the NixOS/nix-Darwin/Home-Manager Nix domains.
+On top of `den.lib`, Den also provides a [framework](https://den.denful.dev/explanation/context-pipeline/) for the NixOS/nix-Darwin/Home-Manager Nix domains.
 
 Den embraces your Nix choices and does not impose itself. All parts of Den are optional and replaceable. Works with your current setup, with/without flakes, flake-parts or any other Nix module system.
 
@@ -78,37 +78,37 @@ Den embraces your Nix choices and does not impose itself. All parts of Den are o
 
 <img width="300" height="300" alt="den" src="https://github.com/user-attachments/assets/af9c9bca-ab8b-4682-8678-31a70d510bbb" />
 
-## [Documentation](https://den.oeiuwq.com)
+## [Documentation](https://den.denful.dev)
 
-- [From Zero To Den](https://den.oeiuwq.com/guides/from-zero-to-den/)
+- [From Zero To Den](https://den.denful.dev/guides/from-zero-to-den/)
 
-- [From Flake To Den](https://den.oeiuwq.com/guides/from-flake-to-den/)
+- [From Flake To Den](https://den.denful.dev/guides/from-flake-to-den/)
 
-- [Core Principles](https://den.oeiuwq.com/explanation/core-principles/)
+- [Core Principles](https://den.denful.dev/explanation/core-principles/)
 
-- [Custom Nix Classes](https://den.oeiuwq.com/guides/custom-classes/)
+- [Custom Nix Classes](https://den.denful.dev/guides/custom-classes/)
 
-- [Homes Integration](https://den.oeiuwq.com/guides/home-manager/)
+- [Homes Integration](https://den.denful.dev/guides/home-manager/)
 
-- [Batteries](https://den.oeiuwq.com/guides/batteries/)
+- [Batteries](https://den.denful.dev/guides/batteries/)
 
-- [Mutual Providers](https://den.oeiuwq.com/guides/mutual/)
+- [Mutual Providers](https://den.denful.dev/guides/mutual/)
 
-- [Sharing Namespaces](https://den.oeiuwq.com/guides/namespaces/)
+- [Sharing Namespaces](https://den.denful.dev/guides/namespaces/)
 
-- [`<angle/brackets>`](https://den.oeiuwq.com/guides/angle-brackets/)
+- [`<angle/brackets>`](https://den.denful.dev/guides/angle-brackets/)
 
-- [Tests as Code Examples](https://den.oeiuwq.com/tutorials/ci/)
+- [Tests as Code Examples](https://den.denful.dev/tutorials/ci/)
 
 ## Project
 
-- [Versioning](https://den.oeiuwq.com/releases/)
+- [Versioning](https://den.denful.dev/releases/)
 
-- [Motivation](https://den.oeiuwq.com/motivation/)
+- [Motivation](https://den.denful.dev/motivation/)
 
-- [Community](https://den.oeiuwq.com/community/)
+- [Community](https://den.denful.dev/community/)
 
-- [Contributing](https://den.oeiuwq.com/contributing/)
+- [Contributing](https://den.denful.dev/contributing/)
 
 </div>
 </td>
@@ -116,23 +116,23 @@ Den embraces your Nix choices and does not impose itself. All parts of Den are o
 
 ### Templates:
 
-[default](https://den.oeiuwq.com/tutorials/default/): +flake-file +flake-parts +home-manager
+[default](https://den.denful.dev/tutorials/default/): +flake-file +flake-parts +home-manager
 
-[minimal](https://den.oeiuwq.com/tutorials/minimal): +flakes -flake-parts -home-manager
+[minimal](https://den.denful.dev/tutorials/minimal): +flakes -flake-parts -home-manager
 
-[noflake](https://den.oeiuwq.com/tutorials/noflake): -flakes +npins +lib.evalModules +nix-maid
+[noflake](https://den.denful.dev/tutorials/noflake): -flakes +npins +lib.evalModules +nix-maid
 
-[nvf-standalone](https://den.oeiuwq.com/tutorials/nvf-standalone): Standalone neovim apps, showcasing Den without NixOS/Darwin.
+[nvf-standalone](https://den.denful.dev/tutorials/nvf-standalone): Standalone neovim apps, showcasing Den without NixOS/Darwin.
 
-[microvm](https://den.oeiuwq.com/tutorials/microvm): MicroVM runnable-pkg and guests. custom ctx-pipeline.
+[microvm](https://den.denful.dev/tutorials/microvm): MicroVM runnable-pkg and guests. custom ctx-pipeline.
 
-[flake-parts-modules](https://den.oeiuwq.com/tutorials/flake-parts-modules): Den forward classes for third-party perSystem submodules: nix-unit on aspects, mightyiam/files generation, devshells, etc.
+[flake-parts-modules](https://den.denful.dev/tutorials/flake-parts-modules): Den forward classes for third-party perSystem submodules: nix-unit on aspects, mightyiam/files generation, devshells, etc.
 
-[example](https://den.oeiuwq.com/tutorials/example): cross-platform
+[example](https://den.denful.dev/tutorials/example): cross-platform
 
-[ci](https://den.oeiuwq.com/tutorials/ci): Each feature tested as code examples
+[ci](https://den.denful.dev/tutorials/ci): Each feature tested as code examples
 
-[bogus](https://den.oeiuwq.com/tutorials/bogus): Isolated test for bug reproduction
+[bogus](https://den.denful.dev/tutorials/bogus): Isolated test for bug reproduction
 
 ### Examples:
 
@@ -254,7 +254,7 @@ Each aspect uses several Nix classes to define behaviour.
 
     # Custom Nix classes. `os` applies to both nixos and darwin.
     # Contributed by @Risa-G.
-    # See https://den.oeiuwq.com/guides/custom-classes/#user-contributed-examples
+    # See https://den.denful.dev/guides/custom-classes/#user-contributed-examples
     os = { pkgs, ... }: {
       environment.systemPackages = [ pkgs.direnv ];
     };
@@ -315,7 +315,7 @@ homeManager to hjem or others.
 
 ### Custom Dendritic Nix Classes
 
-[Custom classes](https://den.oeiuwq.com/guides/custom-classes) is how Den implements `user`, `homeManager`, `hjem`, `wsl`, `microvm` support. You can use the very same mechanism to create your own Nix classes.
+[Custom classes](https://den.denful.dev/guides/custom-classes) is how Den implements `user`, `homeManager`, `hjem`, `wsl`, `microvm` support. You can use the very same mechanism to create your own Nix classes.
 
 The `den.batteries.forward` battery is the core of it.
 
@@ -429,7 +429,7 @@ den.aspects.my-laptop.persys.hideMounts = true;
 
 ### User-defined Extensions to Den context pipeline.
 
-See example [`template/microvm`](https://den.oeiuwq.com/tutorials/microvm) for an example
+See example [`template/microvm`](https://den.denful.dev/tutorials/microvm) for an example
 of custom `den.schema` and `den.policies` extensions for supporting
 Declarative [MicroVM](https://microvm-nix.github.io/microvm.nix/declarative.html) guests with automatic host-shared `/nix/store`.
 
