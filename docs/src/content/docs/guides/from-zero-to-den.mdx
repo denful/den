@@ -228,7 +228,7 @@ This is all that is happening at `modules/den.nix`.
     Den aspects are parametric, they are funtions taking a contexts. A context like `{host}` is simply an attribute set that holds the `igloo` host definition from our examples. These are **arguments** to real Nix functions, NOT `_module.args` nor `specialArgs`. This is why these values can be used for conditional includes.
 
     Den **provides** some common batteries. Re-usable aspects like
-    [`den.batteries.hostname`](https://github.com/denful/den/blob/main/modules/aspects/provides/hostname.nix) which is defined like this:
+    [`den.batteries.hostname`](https://github.com/denful/den/blob/main/modules/aspects/batteries/hostname.nix) which is defined like this:
 
     ```nix "host," "host.hostName"
     den.batteries.hostname = { host, ... }: { # host = igloo definition
@@ -247,7 +247,7 @@ This is all that is happening at `modules/den.nix`.
 
 10. Include re-usable `{host, user}` batteries.
 
-    Batteries like [`den.batteries.primary-user`](https://github.com/denful/den/blob/main/modules/aspects/provides/primary-user.nix) take the `{host, user}` context where `host` is the `igloo` definition and `user` is the `tux` definition.
+    Batteries like [`den.batteries.primary-user`](https://github.com/denful/den/blob/main/modules/aspects/batteries/primary-user.nix) take the `{host, user}` context where `host` is the `igloo` definition and `user` is the `tux` definition.
 
     These batteries also serve as example for you to create custom re-usable pieces of configuration shareable on several user/hosts or shared with the community.
 

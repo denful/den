@@ -6,8 +6,8 @@ description: Create new classes via den.batteries.forward.
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`forward.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/forward.nix) --
-[`os-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/os-user.nix) --
+[`forward.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/forward.nix) --
+[`os-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-user.nix) --
 [`forward-alias-class.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/forward-alias-class.nix) --
 [`forward-from-custom-class.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/forward-from-custom-class.nix) --
 [`guarded-forward.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/guarded-forward.nix)
@@ -52,7 +52,7 @@ den.batteries.forward {
 
 ## Example: The Built-in `user` Class
 
-The `user` class ([`provides/os-user.nix`](https://github.com/denful/den/tree/main/modules/aspects/provides/os-user.nix)) 
+The `user` class ([`provides/os-user.nix`](https://github.com/denful/den/tree/main/modules/aspects/batteries/os-user.nix)) 
 forwards OS-level user settings to NixOS/nix-Darwin lightweight user-environment.
 
 ```nix
@@ -225,7 +225,7 @@ den.aspects.tux = {
 
 ### Example: Config across `nixos` and `darwin` classes.
 
-The `os` forward class ([provided by Den](https://github.com/denful/den/blob/main/modules/aspects/provides/os-class.nix)) can be useful for settings that must be forwarded to both on NixOS and MacOS.
+The `os` forward class ([provided by Den](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-class.nix)) can be useful for settings that must be forwarded to both on NixOS and MacOS.
 
 > Requested by @Risa-G at [#222](https://github.com/denful/den/discussions/222)
 

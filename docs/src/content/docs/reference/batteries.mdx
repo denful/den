@@ -6,7 +6,7 @@ description: Complete reference for all den.batteries batteries -- reusable aspe
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`modules/aspects/provides/`](https://github.com/denful/den/blob/main/modules/aspects/provides/)
+[`modules/aspects/batteries/`](https://github.com/denful/den/blob/main/modules/aspects/batteries/)
 </Aside>
 
 Den ships reusable aspect providers under `den.batteries` (aliased `den.batteries`).
@@ -33,7 +33,7 @@ den.default.includes = [ den.batteries.define-user ];
 ```
 
 <Aside title="Source" icon="github">
-[`provides/define-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/define-user.nix)
+[`provides/define-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/define-user.nix)
 </Aside>
 
 ### `den.batteries.hostname`
@@ -47,7 +47,7 @@ den.default.includes = [ den.batteries.hostname ];
 ```
 
 <Aside title="Source" icon="github">
-[`provides/hostname.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/hostname.nix)
+[`provides/hostname.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/hostname.nix)
 </Aside>
 
 ### `den.batteries.os-class`
@@ -63,7 +63,7 @@ den.aspects.my-host = {
 ```
 
 <Aside title="Source" icon="github">
-[`provides/os-class.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/os-class.nix)
+[`provides/os-class.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-class.nix)
 </Aside>
 
 ### `den.batteries.os-user`
@@ -80,7 +80,7 @@ den.aspects.alice.user = { pkgs, ... }: {
 ```
 
 <Aside title="Source" icon="github">
-[`provides/os-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/os-user.nix)
+[`provides/os-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-user.nix)
 </Aside>
 
 ### `den.batteries.primary-user`
@@ -94,7 +94,7 @@ den.aspects.alice.includes = [ den.batteries.primary-user ];
 ```
 
 <Aside title="Source" icon="github">
-[`provides/primary-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/primary-user.nix)
+[`provides/primary-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/primary-user.nix)
 </Aside>
 
 ### `den.batteries.user-shell`
@@ -110,7 +110,7 @@ den.aspects.alice.includes = [
 ```
 
 <Aside title="Source" icon="github">
-[`provides/user-shell.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/user-shell.nix)
+[`provides/user-shell.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/user-shell.nix)
 </Aside>
 
 ### `den.batteries.mutual-provider`
@@ -136,7 +136,7 @@ den.aspects.igloo.to-users = { user, ... }: {
 ```
 
 <Aside title="Source" icon="github">
-[`provides/mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix)
+[`provides/mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix)
 </Aside>
 
 ### `den.batteries.host-aspects`
@@ -150,7 +150,7 @@ den.aspects.tux.includes = [ den.batteries.host-aspects ];
 ```
 
 <Aside title="Source" icon="github">
-[`provides/host-aspects.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/host-aspects.nix)
+[`provides/host-aspects.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/host-aspects.nix)
 </Aside>
 
 ### `den.batteries.tty-autologin`
@@ -166,7 +166,7 @@ den.aspects.laptop.includes = [
 ```
 
 <Aside title="Source" icon="github">
-[`provides/tty-autologin.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/tty-autologin.nix)
+[`provides/tty-autologin.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/tty-autologin.nix)
 </Aside>
 
 ### `den.batteries.wsl`
@@ -180,7 +180,7 @@ den.hosts.x86_64-linux.igloo.wsl.enable = true;
 ```
 
 <Aside title="Source" icon="github">
-[`provides/wsl.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/wsl.nix)
+[`provides/wsl.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/wsl.nix)
 </Aside>
 
 ### `den.batteries.forward`
@@ -200,7 +200,7 @@ den.batteries.forward {
 ```
 
 <Aside title="Source" icon="github">
-[`provides/forward.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/forward.nix)
+[`provides/forward.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/forward.nix)
 </Aside>
 
 ### `den.batteries.import-tree`
@@ -227,7 +227,7 @@ den.aspects.laptop.includes = [
 ```
 
 <Aside title="Source" icon="github">
-[`provides/import-tree.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/import-tree.nix)
+[`provides/import-tree.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/import-tree.nix)
 </Aside>
 
 ---
@@ -247,7 +247,7 @@ den.aspects.alice.homeManager = {
 ```
 
 <Aside title="Source" icon="github">
-[`provides/home-manager.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/home-manager.nix)
+[`provides/home-manager.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/home-manager.nix)
 </Aside>
 
 ### `den.batteries.hjem`
@@ -263,7 +263,7 @@ den.aspects.alice.hjem = {
 ```
 
 <Aside title="Source" icon="github">
-[`provides/hjem.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/hjem.nix)
+[`provides/hjem.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/hjem.nix)
 </Aside>
 
 ### `den.batteries.maid`
@@ -279,7 +279,7 @@ den.aspects.alice.maid = {
 ```
 
 <Aside title="Source" icon="github">
-[`provides/maid.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/maid.nix)
+[`provides/maid.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/maid.nix)
 </Aside>
 
 ---
@@ -299,7 +299,7 @@ den.aspects.laptop.includes = [
 ```
 
 <Aside title="Source" icon="github">
-[`provides/unfree/unfree.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/unfree/unfree.nix)
+[`provides/unfree/unfree.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/unfree/unfree.nix)
 </Aside>
 
 ### `den.batteries.insecure`
@@ -315,7 +315,7 @@ den.aspects.laptop.includes = [
 ```
 
 <Aside title="Source" icon="github">
-[`provides/insecure/insecure.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/insecure/insecure.nix)
+[`provides/insecure/insecure.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/insecure/insecure.nix)
 </Aside>
 
 ---
@@ -335,7 +335,7 @@ den.default.includes = [ den.batteries.inputs' ];
 ```
 
 <Aside title="Source" icon="github">
-[`provides/flake-parts/inputs.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/flake-parts/inputs.nix)
+[`provides/flake-parts/inputs.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/flake-parts/inputs.nix)
 </Aside>
 
 ### `den.batteries.self'`
@@ -349,7 +349,7 @@ den.default.includes = [ den.batteries.self' ];
 ```
 
 <Aside title="Source" icon="github">
-[`provides/flake-parts/self.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/flake-parts/self.nix)
+[`provides/flake-parts/self.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/flake-parts/self.nix)
 </Aside>
 
 ---

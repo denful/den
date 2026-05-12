@@ -6,7 +6,7 @@ description: How to configure mutual configs in Den.
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix)
+[`mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix)
 </Aside>
 
 ## What Mutual-Config Mean
@@ -62,7 +62,7 @@ This is the normal host resolution pipeline. All OS contributions come from the 
 
 ## `den.batteries.mutual-provider`
 
-The [`den.batteries.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/provides/mutual-provider.nix) battery allows you to define mutual configurations by letting you define named aspects under `.` to create explicit relationships between users and hosts.
+The [`den.batteries.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix) battery allows you to define mutual configurations by letting you define named aspects under `.` to create explicit relationships between users and hosts.
 
 ```nix
 # mutual-provider is activated at a {host,user} context
