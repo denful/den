@@ -25,7 +25,7 @@
         sel.appendChild(opt);
       };
 
-      fetch('https://den.oeiuwq.com/versions.json')
+      fetch('/versions.json')
         .then(r => r.json()).catch(e => [])
         .then(r => { init(); return r.map(v => v.name) })
         .then(r => r.forEach(addVersion));
