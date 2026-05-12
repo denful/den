@@ -8,7 +8,7 @@ let
   '';
 
   # From https://discourse.nixos.org/t/autologin-for-single-tty/49427/2
-  tty-autologin-module =
+  vm-autologin-module =
     username:
     { pkgs, config, ... }:
     {
@@ -22,12 +22,12 @@ let
     };
 
   __functor = _self: username: {
-    name = "tty-autologin(${username})";
+    name = "vm-autologin(${username})";
     meta.provider = [
       "den"
       "provides"
     ];
-    nixos.virtualisation.vmVariant = tty-autologin-module username;
+    nixos.virtualisation.vmVariant = vm-autologin-module username;
   };
 in
 {
