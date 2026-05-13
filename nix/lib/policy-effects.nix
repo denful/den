@@ -1,6 +1,27 @@
 # Typed policy effect constructors.
 # Policies return lists of these; the pipeline dispatches on __policyEffect.
 { ... }:
+let
+  # Coerce a value into an inner policy record for use in `for` / `when`.
+  # Accepts: policies (__isPolicy), effect descriptors (__policyEffect),
+  # or raw functions (ctx -> [effects]).
+  toInnerPolicy =
+    p:
+    if p.__isPolicy or false then
+      p
+    else if p.__policyEffect or null != null then
+      {
+        __isPolicy = true;
+        name = "<effect:${p.__policyEffect}>";
+        fn = _: [ p ];
+      }
+    else
+      {
+        __isPolicy = true;
+        name = "<inline>";
+        fn = p;
+      };
+in
 {
   # Create a new context scope (fan-out). Each resolve creates a parallel
   # branch — a sibling context with new bindings merged into parent.
@@ -165,15 +186,7 @@
       wrap =
         p:
         let
-          inner =
-            if p.__isPolicy or false then
-              p
-            else
-              {
-                __isPolicy = true;
-                name = "<inline>";
-                fn = p;
-              };
+          inner = toInnerPolicy p;
         in
         {
           __isPolicy = true;
@@ -198,15 +211,7 @@
       wrap =
         p:
         let
-          inner =
-            if p.__isPolicy or false then
-              p
-            else
-              {
-                __isPolicy = true;
-                name = "<inline>";
-                fn = p;
-              };
+          inner = toInnerPolicy p;
         in
         {
           __isPolicy = true;
