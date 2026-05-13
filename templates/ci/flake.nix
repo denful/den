@@ -26,7 +26,7 @@
     nix-unit.url = "github:nix-community/nix-unit";
     nix-unit.inputs.nixpkgs.follows = "nixpkgs";
 
-    nix-effects.url = "github:denful/nix-effects";
+    nix-effects.url = "github:denful/nix-effects/den";
     nix-effects.inputs.nixpkgs.follows = "nixpkgs";
     nix-effects.inputs.nix-unit.follows = "nix-unit";
   };

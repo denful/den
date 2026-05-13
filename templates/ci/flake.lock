@@ -101,15 +101,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1777331512,
-        "narHash": "sha256-5x/93lLJLWdR0bHonXT4EXzYRoVbOVto/axHk2ZAeAc=",
+        "lastModified": 1778686186,
+        "narHash": "sha256-oxjrcHFSV2+Rxg4LE4Hupa5HjleTvU1Ir6jp5SburLE=",
         "owner": "denful",
         "repo": "nix-effects",
-        "rev": "8d7e8a97fd1c47ef10c2354b10f2c3f7ac15232c",
+        "rev": "c3c68a45deb892d028711eeff8b80937e30a90dd",
         "type": "github"
       },
       "original": {
         "owner": "denful",
+        "ref": "den",
         "repo": "nix-effects",
         "type": "github"
       }
@@ -184,15 +185,14 @@
         ]
       },
       "locked": {
-        "lastModified": 1,
-        "narHash": "sha256-cTWTT24Up7414XnePBgu30Q6SmQ4OR0zYI4irvZ9g7I=",
         "path": "./provider",
         "type": "path"
       },
       "original": {
         "path": "./provider",
         "type": "path"
-      }
+      },
+      "parent": []
     },
     "root": {
       "inputs": {
