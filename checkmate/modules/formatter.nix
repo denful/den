@@ -2,6 +2,7 @@
   perSystem.treefmt.settings.global.excludes = [
     ".claude/**"
     ".github/*TEMPLATE*/*"
+    ".github/CODEOWNERS"
     "docs/*"
     "Justfile"
     "AGENT*.md"
