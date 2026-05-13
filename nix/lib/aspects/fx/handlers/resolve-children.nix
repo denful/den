@@ -63,12 +63,20 @@ in
       {
         resume = fx.bind (chainWrap chainIdentity isMeaningful (resolveChildSequence aspect)) (
           allChildren:
-          let
-            resolved = aspect // {
-              includes = allChildren;
-            };
-          in
-          fx.bind (fx.send "resolve-complete" resolved) (_: fx.pure resolved)
+          # Re-evaluate deferred conditional guards now that the subtree
+          # has been walked and the pathSet is more complete.
+          fx.bind (fx.effects.hasHandler "drain-conditionals") (
+            hasDrain:
+            fx.bind (if hasDrain then fx.send "drain-conditionals" null else fx.pure [ ]) (
+              conditionalResults:
+              let
+                resolved = aspect // {
+                  includes = allChildren ++ conditionalResults;
+                };
+              in
+              fx.bind (fx.send "resolve-complete" resolved) (_: fx.pure resolved)
+            )
+          )
         );
         inherit state;
       };

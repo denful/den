@@ -75,5 +75,25 @@
         expected = "from-zed";
       }
     );
+
+    # policy.when wrapping an inline aspect attrset should work.
+    test-when-inline-aspect = denTest (
+      { den, igloo, ... }:
+      let
+        inherit (den.lib) policy;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.schema.host.includes = [
+          (policy.when (_: true) {
+            nixos.networking.hostName = "from-inline";
+          })
+        ];
+
+        expr = igloo.networking.hostName;
+        expected = "from-inline";
+      }
+    );
   };
 }

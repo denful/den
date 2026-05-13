@@ -18,7 +18,8 @@ let
   schemaArgKinds = builtins.filter (
     k: k != "conf" && k != "aspect" && !(lib.hasPrefix "_" k)
   ) schemaNames;
+  schemaEntityKindsSet = lib.genAttrs schemaEntityKinds (_: true);
 in
 {
-  inherit schemaEntityKinds schemaArgKinds;
+  inherit schemaEntityKinds schemaEntityKindsSet schemaArgKinds;
 }

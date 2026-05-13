@@ -3,9 +3,9 @@
 {
   lib,
   schemaEntityKinds,
+  schemaEntityKindsSet,
 }:
 let
-  schemaEntityKindsSet = lib.genAttrs schemaEntityKinds (_: true);
 
   # Classify a resolve effect into schema vs enrichment (single-pass partition).
   classifyResolve =

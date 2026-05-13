@@ -25,6 +25,8 @@ let
     // handlers.compileStaticHandler
     // handlers.compileParametricHandler
     // handlers.compileConditionalHandler
+    // handlers.deferConditionalHandler
+    // handlers.drainConditionalsHandler
     // handlers.compileForwardHandler
     // handlers.bindHandler
     // handlers.deferHandler
@@ -145,9 +147,10 @@ in
       }
     );
 
-    # resolve-conditional: guard fails — tombstone in includes, no classes emitted.
+    # resolve-conditional: guard fails — deferred, then drained as tombstone
+    # at resolve-children boundary. No classes emitted.
     test-resolve-conditional-guard-fail = denTest (
-      { den, ... }:
+      { den, lib, ... }:
       let
         fx = den.lib.fx;
         child = {
@@ -171,15 +174,18 @@ in
           handlers = mkHandlers { inherit den; };
           state = defaultState;
         } comp;
-        tombstone = builtins.head (builtins.head result.value).includes;
+        children = (builtins.head result.value).includes;
+        tombstone = lib.findFirst (c: c.meta.excluded or false) null children;
       in
       {
         expr = {
           classCount = builtins.length (result.state.classes or [ ]);
-          tombstoneGuardFailed = tombstone.meta.guardFailed or false;
+          tombstoneFound = tombstone != null;
+          tombstoneGuardFailed = if tombstone != null then tombstone.meta.guardFailed or false else false;
         };
         expected = {
           classCount = 0;
+          tombstoneFound = true;
           tombstoneGuardFailed = true;
         };
       }

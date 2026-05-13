@@ -7,6 +7,7 @@
   constantHandler,
   mkScopeId,
   schemaEntityKinds,
+  schemaEntityKindsSet,
   classifyPolicyResult,
   extractTaggedEffects,
   dispatchAspect,
@@ -15,8 +16,6 @@
   mkSupplementalResolution,
 }:
 let
-  schemaEntityKindsSet = lib.genAttrs schemaEntityKinds (_: true);
-
   # Determine target entity kind from a schema effect.
   resolveTargetKind =
     entityKind: schemaEffect:

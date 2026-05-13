@@ -127,10 +127,10 @@
         fx = den.lib.fx;
         handlers = den.lib.aspects.fx.handlers;
         inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
-        inherit (den.lib.schemaUtil) schemaEntityKinds;
+        inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
 
         classify = import ../../../../nix/lib/aspects/fx/policy/classify.nix {
-          inherit lib schemaEntityKinds;
+          inherit lib schemaEntityKinds schemaEntityKindsSet;
         };
         dispatch = import ../../../../nix/lib/aspects/fx/policy/dispatch.nix {
           inherit lib resolveArgsSatisfied;

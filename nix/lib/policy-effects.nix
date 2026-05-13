@@ -4,7 +4,7 @@
 let
   # Coerce a value into an inner policy record for use in `for` / `when`.
   # Accepts: policies (__isPolicy), effect descriptors (__policyEffect),
-  # or raw functions (ctx -> [effects]).
+  # inline aspect attrsets, or raw functions (ctx -> [effects]).
   toInnerPolicy =
     p:
     if p.__isPolicy or false then
@@ -14,6 +14,17 @@ let
         __isPolicy = true;
         name = "<effect:${p.__policyEffect}>";
         fn = _: [ p ];
+      }
+    else if builtins.isAttrs p then
+      {
+        __isPolicy = true;
+        name = "<inline-aspect>";
+        fn = _: [
+          {
+            __policyEffect = "include";
+            value = p;
+          }
+        ];
       }
     else
       {
@@ -204,11 +215,36 @@ in
     if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
 
   # Wrap a policy (or list of policies) to only fire when predicate is true.
+  # When wrapping inline aspects or effect descriptors, emits a conditional
+  # aspect (meta.guard) instead of a policy. This avoids the cycle where
+  # predicates that access entity.hasAspect trigger config.resolved during
+  # policy dispatch. The compile-conditional handler provides hasAspect from
+  # the in-flight pathSet, plus entity-shaped stubs for destructuring.
   when =
     predicate: policiesOrSingle:
     let
       policies = if builtins.isList policiesOrSingle then policiesOrSingle else [ policiesOrSingle ];
-      wrap =
+      # Wrap a non-policy value as a conditional aspect (compile-conditional path).
+      wrapAsConditional =
+        p:
+        let
+          effectType = p.__policyEffect or null;
+          aspects =
+            if effectType == "include" then
+              [ p.value ]
+            else if effectType != null then
+              throw "den: policy.when does not support ${effectType} effect descriptors — only include and inline aspects"
+            else
+              [ p ];
+        in
+        {
+          name = "<when>";
+          meta.guard = predicate;
+          meta.aspects = aspects;
+          includes = [ ];
+        };
+      # Wrap a policy value with predicate gating (dispatch path).
+      wrapAsPolicy =
         p:
         let
           inner = toInnerPolicy p;
@@ -218,6 +254,8 @@ in
           inherit (inner) name;
           fn = ctx: if predicate ctx then inner.fn ctx else [ ];
         };
+      wrap =
+        p: if p.__isPolicy or false || builtins.isFunction p then wrapAsPolicy p else wrapAsConditional p;
     in
     if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
 

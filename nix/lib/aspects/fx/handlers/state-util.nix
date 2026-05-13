@@ -8,7 +8,7 @@
       ${field} =
         _:
         let
-          all = state.${field} null;
+          all = (state.${field} or (_: { })) null;
         in
         all // { ${scope} = (all.${scope} or [ ]) ++ [ item ]; };
     };
@@ -21,7 +21,7 @@
       ${field} =
         _:
         let
-          all = state.${field} null;
+          all = (state.${field} or (_: { })) null;
         in
         all // { ${scope} = (all.${scope} or [ ]) ++ items; };
     };
@@ -34,7 +34,7 @@
       ${field} =
         _:
         let
-          all = state.${field} null;
+          all = (state.${field} or (_: { })) null;
         in
         all // { ${scope} = (all.${scope} or { }) // attrs; };
     };

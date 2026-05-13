@@ -65,6 +65,8 @@ let
     // handlers.compileHandler
     // handlers.compileForwardHandler
     // handlers.compileConditionalHandler
+    // handlers.deferConditionalHandler
+    // handlers.drainConditionalsHandler
     // handlers.compileParametricHandler
     // handlers.compileStaticHandler
     // handlers.bindHandler
@@ -139,6 +141,7 @@ let
     # Pre-merged flat view (avoid O(S) rebuild per installPolicies call).
     flatAspectPolicies = { };
     scopedDeferredIncludes = _: { };
+    scopedDeferredConditionals = _: { };
     scopedIncludesChain = _: { };
     scopedConstraintRegistry = _: { };
     scopedConstraintFilters = _: { };

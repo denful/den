@@ -19,9 +19,9 @@ let
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   inherit (den.lib.aspects.fx) identity;
-  inherit (den.lib.schemaUtil) schemaEntityKinds;
+  inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
 
-  classify = import ./classify.nix { inherit lib schemaEntityKinds; };
+  classify = import ./classify.nix { inherit lib schemaEntityKinds schemaEntityKindsSet; };
   inherit (classify) classifyPolicyResult hasEffects extractTaggedEffects;
 
   dispatch = import ./dispatch.nix {
@@ -53,6 +53,7 @@ let
       constantHandler
       mkScopeId
       schemaEntityKinds
+      schemaEntityKindsSet
       classifyPolicyResult
       extractTaggedEffects
       dispatchAspect

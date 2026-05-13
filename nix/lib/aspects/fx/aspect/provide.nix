@@ -11,8 +11,7 @@ let
   inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.aspects.fx.contentUtil) applyProvide;
   inherit (den.lib.aspects) isParametricWrapper;
-  inherit (den.lib.schemaUtil) schemaEntityKinds;
-  schemaEntityKindsSet = lib.genAttrs schemaEntityKinds (_: true);
+  inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
 
   mkCrossPolicy =
     aspectName: nodeIdentity: provides: key:

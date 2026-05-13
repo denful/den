@@ -140,9 +140,14 @@
               inherit state;
             };
         };
-        comp = fx.send "compile-conditional" param;
+        comp = fx.bind (fx.send "compile-conditional" param) (_: fx.send "drain-conditionals" null);
         result = fx.handle {
-          handlers = handlers.compileConditionalHandler // identity.pathSetHandler // stubs;
+          handlers =
+            handlers.compileConditionalHandler
+            // handlers.deferConditionalHandler
+            // handlers.drainConditionalsHandler
+            // identity.pathSetHandler
+            // stubs;
           inherit state;
         } comp;
         tombstones = result.value;
@@ -187,9 +192,18 @@
               inherit state;
             };
         };
-        comp = fx.send "compile-conditional" param;
+        comp = fx.bind (fx.send "compile-conditional" param) (
+          _:
+          # Drain deferred conditionals to produce tombstones.
+          fx.send "drain-conditionals" null
+        );
         result = fx.handle {
-          handlers = handlers.compileConditionalHandler // identity.pathSetHandler // stubs;
+          handlers =
+            handlers.compileConditionalHandler
+            // handlers.deferConditionalHandler
+            // handlers.drainConditionalsHandler
+            // identity.pathSetHandler
+            // stubs;
           inherit state;
         } comp;
       in
