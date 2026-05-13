@@ -162,11 +162,9 @@ let
             && route.path or [ ] != [ ]
             && modulesWithAdapter == [ ]
           )
-          (_: {
-            config = lib.setAttrByPath route.path (_: {
-              imports = [ ];
-            });
-          });
+          {
+            config = lib.setAttrByPath route.path { };
+          };
       isAdapterRoute = route.adapterKey or null != null;
       adapterWrapped = lib.optional isAdapterRoute (mkAdapterFunctor route sourceModules);
       # Route with instantiate: collect modules, call instantiate function,
