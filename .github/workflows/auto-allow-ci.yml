@@ -1,7 +1,9 @@
 name: auto-allow-ci
 on:
   pull_request_target:
-    types: [opened, synchronize, reopened]
+    types: [opened, reopened]
+permissions:
+  pull-requests: write
 jobs:
   label:
     runs-on: ubuntu-latest
