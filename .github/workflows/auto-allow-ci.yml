@@ -1,0 +1,22 @@
+name: auto-allow-ci
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check author permission
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          perm=$(gh api repos/${{ github.repository }}/collaborators/${{ github.event.pull_request.user.login }}/permission --jq '.permission')
+          if [[ "$perm" == "admin" || "$perm" == "write" ]]; then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Add allow-ci label
+        if: steps.check.outputs.allowed == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh issue edit ${{ github.event.pull_request.number }} --repo ${{ github.repository }} --add-label allow-ci
