@@ -51,6 +51,7 @@ let
       specialArgs = {
         inherit inputs;
         inherit withSystem;
+        __denTest = true;
       };
       modules = [
         module
