@@ -63,6 +63,7 @@ let
 
   defaultState = {
     currentScope = "__test";
+    rootScopeId = "__test";
     scopedIncludesChain = _: { };
     scopedConstraintRegistry = _: { };
     scopedConstraintFilters = _: { };

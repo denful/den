@@ -27,24 +27,74 @@ let
       )
     ) (fx.pure [ ]) aspects;
 
+  # Check if an aspect identity is excluded in the current scope.
+  # Mirrors the constraint lookup in check-constraint (constraint.nix)
+  # but only checks for excludes, not substitutes or filters.
+  isExcludedInScope =
+    { constraintRegistry, includesChain }:
+    nodeIdentity:
+    let
+      parts = lib.splitString "/" nodeIdentity;
+      prefixes = lib.genList (i: lib.concatStringsSep "/" (lib.take (i + 1) parts)) (
+        builtins.length parts - 1
+      );
+      exact = constraintRegistry.${nodeIdentity} or [ ];
+      allEntries =
+        if constraintRegistry == { } then
+          exact
+        else if builtins.length parts > 1 then
+          exact ++ builtins.concatMap (p: constraintRegistry.${p} or [ ]) prefixes
+        else
+          exact;
+      isAncestor = ownerChain: lib.take (builtins.length ownerChain) includesChain == ownerChain;
+      inScope =
+        entry:
+        entry.type == "exclude"
+        && ((entry.scope or "global") == "global" || isAncestor (entry.ownerChain or [ ]));
+    in
+    builtins.any inScope allEntries;
+
   # In-flight pathSet is not class-partitioned, so forClass approximates
   # as forAnyClass (may produce false positives across classes, never false
   # negatives). Accurate enough for guards — the pathSet reflects all
   # classes walked so far in the current resolution.
-  mkPipelineHasAspect = pathSet: {
-    __functor = _: ref: pathSet ? ${identity.key ref};
-    forClass = _: ref: pathSet ? ${identity.key ref};
-    forAnyClass = ref: pathSet ? ${identity.key ref};
+  mkPipelineHasAspect = pathSet: excludeCheck: {
+    __functor =
+      _: ref:
+      let
+        k = identity.key ref;
+      in
+      pathSet ? ${k} && !excludeCheck k;
+    forClass =
+      _: ref:
+      let
+        k = identity.key ref;
+      in
+      pathSet ? ${k} && !excludeCheck k;
+    forAnyClass =
+      ref:
+      let
+        k = identity.key ref;
+      in
+      pathSet ? ${k} && !excludeCheck k;
   };
 
   # Build guard context with entity-shaped stubs so predicates written as
   # ({ host, ... }: host.hasAspect ref) work without touching config.resolved.
   # Uses scope handler keys to identify entity kinds without evaluating the
   # handlers (which would force entity config and cycle).
+  # Exclude-aware: consults the constraint registry to respect per-scope
+  # policy excludes, so hasAspect returns false for excluded aspects.
   mkGuardCtx =
-    pathSet: scopeHandlers:
+    {
+      pathSet,
+      scopeHandlers,
+      constraintRegistry ? { },
+      includesChain ? [ ],
+    }:
     let
-      pipelineHasAspect = mkPipelineHasAspect pathSet;
+      excludeCheck = isExcludedInScope { inherit constraintRegistry includesChain; };
+      pipelineHasAspect = mkPipelineHasAspect pathSet excludeCheck;
       handlerKeys = builtins.attrNames scopeHandlers;
       entityKeys = builtins.filter (k: schemaEntityKindsSet ? ${k}) handlerKeys;
       entityStubs = lib.genAttrs entityKeys (_: {
@@ -52,7 +102,12 @@ let
       });
     in
     {
-      hasAspect = ref: pathSet ? ${identity.key ref};
+      hasAspect =
+        ref:
+        let
+          k = identity.key ref;
+        in
+        pathSet ? ${k} && !excludeCheck k;
     }
     // entityStubs;
 
@@ -89,7 +144,10 @@ in
         resume = fx.bind (fx.send "get-path-set" null) (
           pathSet:
           let
-            guardCtx = mkGuardCtx pathSet (condNode.__scopeHandlers or { });
+            guardCtx = mkGuardCtx {
+              inherit pathSet;
+              scopeHandlers = condNode.__scopeHandlers or { };
+            };
             pass = condNode.meta.guard guardCtx;
           in
           if pass then
@@ -114,8 +172,11 @@ in
       };
   };
 
-  # Re-evaluate deferred conditionals against the final pathSet.
-  # Called at entity boundary after the full tree walk completes.
+  # Re-evaluate deferred conditionals against the final pathSet and
+  # constraint registry. Iterates to fixed point: each pass re-reads
+  # state, evaluates remaining guards, and re-enqueues failures.
+  # Convergence: each pass that makes progress resolves ≥1 guard,
+  # strictly shrinking pending. No progress → cross-dependent → tombstone.
   drainConditionalsHandler = {
     "drain-conditionals" =
       { param, state }:
@@ -131,34 +192,86 @@ in
         }
       else
         {
-          resume = fx.bind (fx.send "get-path-set" null) (
-            pathSet:
+          resume =
             let
-              go =
-                idx: acc:
-                if idx >= builtins.length scopeDeferred then
-                  acc
-                else
-                  let
-                    condNode = builtins.elemAt scopeDeferred idx;
-                    guardCtx = mkGuardCtx pathSet (condNode.__scopeHandlers or { });
-                    pass = condNode.meta.guard guardCtx;
-                  in
-                  go (idx + 1) (
-                    fx.bind acc (
-                      prev:
-                      if pass then
-                        fx.bind (emitIncludes {
-                          __parentScopeHandlers = condNode.__scopeHandlers or null;
-                          __parentCtxId = condNode.__ctxId or null;
-                        } condNode.meta.aspects) (results: fx.pure (prev ++ results))
-                      else
-                        fx.bind (tombstoneAll condNode.meta.aspects) (tombstones: fx.pure (prev ++ tombstones))
+              # Single pass: read pathSet + constraints, partition guards.
+              drainPass =
+                pending: prevResults:
+                fx.bind (fx.send "get-path-set" null) (
+                  pathSet:
+                  fx.bind fx.effects.state.get (
+                    currentState:
+                    let
+                      constraintRegistry = currentState.flatConstraintRegistry or { };
+                      includesChain = ((currentState.scopedIncludesChain or (_: { })) null).${scope} or [ ];
+                      len = builtins.length pending;
+                      go =
+                        idx: acc:
+                        if idx >= len then
+                          acc
+                        else
+                          let
+                            condNode = builtins.elemAt pending idx;
+                            guardCtx = mkGuardCtx {
+                              inherit pathSet constraintRegistry includesChain;
+                              scopeHandlers = condNode.__scopeHandlers or { };
+                            };
+                            pass = condNode.meta.guard guardCtx;
+                          in
+                          go (idx + 1) (
+                            fx.bind acc (
+                              prev:
+                              if pass then
+                                fx.bind
+                                  (emitIncludes {
+                                    __parentScopeHandlers = condNode.__scopeHandlers or null;
+                                    __parentCtxId = condNode.__ctxId or null;
+                                  } condNode.meta.aspects)
+                                  (
+                                    results:
+                                    fx.pure {
+                                      emitted = prev.emitted ++ results;
+                                      failed = prev.failed;
+                                      progressed = true;
+                                    }
+                                  )
+                              else
+                                fx.pure {
+                                  inherit (prev) emitted progressed;
+                                  failed = prev.failed ++ [ condNode ];
+                                }
+                            )
+                          );
+                    in
+                    go 0 (
+                      fx.pure {
+                        emitted = prevResults;
+                        failed = [ ];
+                        progressed = false;
+                      }
                     )
-                  );
+                  )
+                );
+
+              # Fixed-point loop: iterate until no progress.
+              # Convergence guaranteed: each pass that makes progress resolves
+              # ≥1 guard, strictly shrinking pending. When no progress is made
+              # the remaining guards are cross-dependent — tombstone them.
+              iterate =
+                pending: prevResults:
+                fx.bind (drainPass pending prevResults) (
+                  result:
+                  if result.failed == [ ] then
+                    fx.pure result.emitted
+                  else if !result.progressed then
+                    fx.bind (tombstoneAll (builtins.concatMap (n: n.meta.aspects) result.failed)) (
+                      tombstones: fx.pure (result.emitted ++ tombstones)
+                    )
+                  else
+                    iterate result.failed result.emitted
+                );
             in
-            go 0 (fx.pure [ ])
-          );
+            iterate scopeDeferred [ ];
           # Clear deferred conditionals for this scope.
           state = state // {
             scopedDeferredConditionals = _: allScoped // { ${scope} = [ ]; };

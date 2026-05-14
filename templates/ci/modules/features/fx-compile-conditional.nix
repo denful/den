@@ -147,7 +147,8 @@
             // handlers.deferConditionalHandler
             // handlers.drainConditionalsHandler
             // identity.pathSetHandler
-            // stubs;
+            // stubs
+            // fx.effects.state.handler;
           inherit state;
         } comp;
         tombstones = result.value;
@@ -203,7 +204,8 @@
             // handlers.deferConditionalHandler
             // handlers.drainConditionalsHandler
             // identity.pathSetHandler
-            // stubs;
+            // stubs
+            // fx.effects.state.handler;
           inherit state;
         } comp;
       in
