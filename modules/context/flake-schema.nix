@@ -8,6 +8,7 @@ let
   flakeKinds = [
     "flake"
     "flake-system"
+    "flake-parts"
     "default"
   ];
 in
