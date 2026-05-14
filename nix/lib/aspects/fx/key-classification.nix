@@ -11,6 +11,7 @@ let
     "description"
     "meta"
     "includes"
+    "excludes"
     "provides"
     "policies"
     "into"
