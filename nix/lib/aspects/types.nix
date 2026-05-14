@@ -93,6 +93,33 @@ let
       # provides-first so direct freeform keys on merged take priority.
       # __providesForwarded tells the pipeline to skip these during classification.
       providesChildren = builtins.removeAttrs (merged.provides or { }) [ "_module" ];
+      # Child aspect keys for synthetic provides: freeform keys that are
+      # not structural, internal, class, pipe, or forwarded-from-provides.
+      classReg = den.classes or { };
+      pipeReg = den.quirks or { };
+      inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+      forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
+      aspectName =
+        merged.name
+          or (lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc));
+      childKeys = builtins.filter (
+        k:
+        !(structuralKeysSet ? ${k})
+        && !(lib.hasPrefix "__" k)
+        && !(classReg ? ${k})
+        && !(pipeReg ? ${k})
+        && !(forwardedSet ? ${k})
+      ) (builtins.attrNames merged);
+      syntheticAspect = {
+        name = "${aspectName}._";
+        includes = map (k: merged.${k}) childKeys;
+      };
+      # __functor hides synthetic keys from attrValues while making _
+      # usable in includes lists. wrapFunctorChild extracts the thunk
+      # and compile-parametric resolves it to syntheticAspect.
+      syntheticProvides = providesChildren // {
+        __functor = _self: _args: syntheticAspect;
+      };
     in
     # __functor makes merged aspects callable (aspect { host = ...; }).
     # Explicit functors (e.g. den.batteries.forward) take priority.
@@ -101,6 +128,8 @@ let
     // {
       __functor = if originalFunctor != null then originalFunctor else resolveAspectWith;
       __providesForwarded = builtins.attrNames providesChildren;
+      provides = syntheticProvides;
+      _ = syntheticProvides;
     };
 
   aspectMeta =
@@ -159,8 +188,33 @@ let
         # aspect.child both work, matching mergeWithAspectMeta behavior.
         let
           providesChildren = builtins.removeAttrs (fn.provides or { }) [ "_module" ];
+          classReg = den.classes or { };
+          pipeReg = den.quirks or { };
+          inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+          forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
+          result = providesChildren // fn;
+          aspectName = fn.name or (lib.last loc);
+          childKeys = builtins.filter (
+            k:
+            !(structuralKeysSet ? ${k})
+            && !(lib.hasPrefix "__" k)
+            && !(classReg ? ${k})
+            && !(pipeReg ? ${k})
+            && !(forwardedSet ? ${k})
+          ) (builtins.attrNames result);
+          syntheticAspect = {
+            name = "${aspectName}._";
+            includes = map (k: result.${k}) childKeys;
+          };
+          syntheticProvides = providesChildren // {
+            __functor = _self: _args: syntheticAspect;
+          };
         in
-        providesChildren // fn // { _ = fn.provides or { }; }
+        result
+        // {
+          provides = syntheticProvides;
+          _ = syntheticProvides;
+        }
       else
         let
           args = lib.functionArgs fn;

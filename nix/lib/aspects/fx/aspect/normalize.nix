@@ -26,6 +26,21 @@ let
     in
     if builtins.isFunction innerFn && isSubmoduleFn innerFn then
       normalizeModuleFn innerFn
+    # Synthetic provides: zero-arg functor returning an aspect-shaped value.
+    # Resolve immediately so the pipeline sees name/includes directly.
+    else if builtins.isFunction innerFn && innerArgs == { } && !(child ? __args) then
+      let
+        resolved = innerFn null;
+      in
+      if builtins.isAttrs resolved && resolved ? name && resolved ? includes then
+        resolved
+      else
+        child
+        // {
+          __fn = innerFn;
+          __args = { };
+          includes = child.includes or [ ];
+        }
     else
       child
       // {
