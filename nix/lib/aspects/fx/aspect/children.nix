@@ -131,10 +131,26 @@ let
           [ rawHandleWith ]
         else
           [ ];
+      # Compute exclude identity, normalizing content wrappers that have
+      # __provider but no name (nested keys without _ prefix).
+      excludeIdentity =
+        ref:
+        if builtins.isAttrs ref && ref.__isPolicy or false then
+          ref.name
+        else if builtins.isAttrs ref && ref ? __provider && !(ref ? name) then
+          let
+            prov = ref.__provider;
+          in
+          identity.key {
+            name = if prov != [ ] then lib.last prov else "<anon>";
+            meta.provider = if prov != [ ] then lib.init prov else [ ];
+          }
+        else
+          identity.key ref;
       excludeList = map (ref: {
         type = "exclude";
         scope = "subtree";
-        identity = if builtins.isAttrs ref && ref.__isPolicy or false then ref.name else identity.key ref;
+        identity = excludeIdentity ref;
       }) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
