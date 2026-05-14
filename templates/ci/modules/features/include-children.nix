@@ -113,6 +113,63 @@
       }
     );
 
+    # ._ does not expose synthetic name/includes to attrNames
+    test-include-children-attrvalues-compat = denTest (
+      {
+        den,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.parent = {
+          provides.a.nixos = { };
+          provides.b.nixos = { };
+          child.nixos = { };
+        };
+
+        # name and includes must not appear — they would break
+        # lib.attrValues patterns that expect only provides children.
+        expr = {
+          hasName = den.aspects.parent._ ? name;
+          hasIncludes = den.aspects.parent._ ? includes;
+        };
+        expected = {
+          hasName = false;
+          hasIncludes = false;
+        };
+      }
+    );
+
+    # ._ only includes immediate children, not grandchildren
+    test-include-children-no-grandchildren = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.top.mid.deep.nixos.services.openssh.enable = true;
+        den.aspects.top.sibling.nixos.services.timesyncd.enable = true;
+
+        den.aspects.igloo.includes = [ den.aspects.top._ ];
+
+        # mid and sibling are included but deep (grandchild) is not —
+        # mid must be explicitly included or have its own ._ for deep to resolve.
+        expr = {
+          time = igloo.services.timesyncd.enable;
+          ssh = igloo.services.openssh.enable or false;
+        };
+        expected = {
+          time = true;
+          ssh = false;
+        };
+      }
+    );
+
     # Parametric children resolve through ._
     test-include-children-parametric = denTest (
       {
