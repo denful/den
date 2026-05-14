@@ -2,12 +2,11 @@
   lib,
   den,
   inputs,
-  options,
   ...
 }:
 let
   no-flake-parts = !inputs ? flake-parts;
-  has-flake-parts = inputs ? flake-parts && options ? perSystem;
+  has-flake-parts = inputs ? flake-parts;
   flakeModule = den.lib.aspects.resolve "flake" (den.lib.resolveEntity "flake" { });
   flake =
     (lib.evalModules {

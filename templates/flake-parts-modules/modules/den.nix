@@ -104,21 +104,9 @@
 
   # --- Pipeline wiring ---
 
-  # Enter flake-parts scope from flake-system (inherits { system }).
-  den.policies.to-flake-parts =
-    { system, ... }:
-    [
-      (den.lib.policy.resolve.to "flake-parts" {
-        flake-parts = {
-          name = "flake-parts-${system}";
-          aspect = { };
-        };
-      })
-    ];
+  # Enter flake-parts scope from flake-system.
   den.schema.flake-system.includes = [ den.policies.to-flake-parts ];
 
-  # Exclude framework packages route — we handle it via flake-parts scope.
+  # Exclude vanilla packages route — handled via flake-parts scope.
   den.schema.flake-system.excludes = [ den.policies.to-packages ];
-
-  den.schema.flake-parts.isEntity = true;
 }
