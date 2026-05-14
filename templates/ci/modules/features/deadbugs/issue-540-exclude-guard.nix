@@ -1,10 +1,11 @@
 { denTest, lib, ... }:
 {
   flake.tests.issue-540-exclude-guard = {
-    # Known limitation: guards that pass eagerly don't see later excludes.
-    # starship is excluded for tux, but the guard fires before the exclude.
-    # Fixing this requires scope-aware drain timing — tracked separately.
-    test-exclude-does-not-suppress-eager-guard = denTest (
+    # Guard respects per-scope excludes: starship is excluded for tux
+    # via policy.exclude, so user.hasAspect starship returns false in
+    # tux's scope. Guards always defer and evaluate at drain time with
+    # scope-specific constraint awareness.
+    test-exclude-suppresses-guard = denTest (
       { den, igloo, ... }:
       let
         inherit (den.lib) policy;
@@ -54,7 +55,7 @@
         expected = {
           tux-starship = false;
           pingu-starship = true;
-          tux-jj = true; # ideally false, but eager guard doesn't see later exclude
+          tux-jj = false;
           pingu-jj = true;
         };
       }

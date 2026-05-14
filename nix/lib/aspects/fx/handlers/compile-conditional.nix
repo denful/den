@@ -1,7 +1,8 @@
 # Effect handler: compile-conditional
-# Evaluates guard against path-set, emits includes or tombstones.
-# Guards that fail are deferred for re-evaluation when the pathSet grows;
-# drain-conditionals resolves them at entity boundary.
+# Evaluates guards with exclude-aware hasAspect. Guards that fail are
+# deferred for re-evaluation when the pathSet grows (drain-conditionals).
+# Constraint registry is read eagerly — emitPolicyEffectsThen registers
+# excludes before processing includes, so guards see per-scope excludes.
 {
   lib,
   den,
@@ -27,25 +28,39 @@ let
       )
     ) (fx.pure [ ]) aspects;
 
-  # Check if an aspect identity is excluded in the current scope.
-  # Mirrors the constraint lookup in check-constraint (constraint.nix)
-  # but only checks for excludes, not substitutes or filters.
+  # Collect constraint registry entries from the current scope and all
+  # ancestor scopes via scopeParent. Normalizes ownerChain to [] so
+  # isExcludedInScope treats all collected entries as in-scope.
+  collectScopeConstraints =
+    scopedRegistry: scopeParentMap:
+    let
+      go =
+        scope: acc:
+        let
+          scopeEntries = scopedRegistry.${scope} or { };
+          # Normalize entries: clear ownerChain since scope ancestry
+          # already establishes relevance.
+          normalized = lib.mapAttrs (_: entries: map (e: e // { ownerChain = [ ]; }) entries) scopeEntries;
+          merged = lib.zipAttrsWith (_: builtins.concatLists) [
+            acc
+            normalized
+          ];
+          parent = scopeParentMap.${scope} or null;
+        in
+        if parent == null then merged else go parent merged;
+    in
+    go;
+
+  # Reuse constraint lookup from constraint.nix to avoid duplicating
+  # the prefix-matching logic (identity path splitting + prefix search).
+  inherit (import ./constraint.nix { inherit lib den; }) lookupEntries;
+
+  # Check if an aspect identity is excluded in a constraint registry.
   isExcludedInScope =
     { constraintRegistry, includesChain }:
     nodeIdentity:
     let
-      parts = lib.splitString "/" nodeIdentity;
-      prefixes = lib.genList (i: lib.concatStringsSep "/" (lib.take (i + 1) parts)) (
-        builtins.length parts - 1
-      );
-      exact = constraintRegistry.${nodeIdentity} or [ ];
-      allEntries =
-        if constraintRegistry == { } then
-          exact
-        else if builtins.length parts > 1 then
-          exact ++ builtins.concatMap (p: constraintRegistry.${p} or [ ]) prefixes
-        else
-          exact;
+      allEntries = lookupEntries constraintRegistry nodeIdentity;
       isAncestor = ownerChain: lib.take (builtins.length ownerChain) includesChain == ownerChain;
       inScope =
         entry:
@@ -81,8 +96,6 @@ let
 
   # Build guard context with entity-shaped stubs so predicates written as
   # ({ host, ... }: host.hasAspect ref) work without touching config.resolved.
-  # Uses scope handler keys to identify entity kinds without evaluating the
-  # handlers (which would force entity config and cycle).
   # Exclude-aware: consults the constraint registry to respect per-scope
   # policy excludes, so hasAspect returns false for excluded aspects.
   mkGuardCtx =
@@ -141,22 +154,33 @@ in
         condNode = param.aspect;
       in
       {
+        # Evaluate guard with exclude awareness. The constraint registry
+        # has already been populated by emitPolicyEffectsThen (which
+        # registers excludes before processing includes).
         resume = fx.bind (fx.send "get-path-set" null) (
           pathSet:
-          let
-            guardCtx = mkGuardCtx {
-              inherit pathSet;
-              scopeHandlers = condNode.__scopeHandlers or { };
-            };
-            pass = condNode.meta.guard guardCtx;
-          in
-          if pass then
-            emitIncludes {
-              __parentScopeHandlers = condNode.__scopeHandlers or null;
-              __parentCtxId = condNode.__ctxId or null;
-            } condNode.meta.aspects
-          else
-            deferConditional condNode
+          fx.bind fx.effects.state.get (
+            currentState:
+            let
+              scopedRegistry = (currentState.scopedConstraintRegistry or (_: { })) null;
+              scopeParentMap = (currentState.scopeParent or (_: { })) null;
+              constraintRegistry =
+                collectScopeConstraints scopedRegistry scopeParentMap currentState.currentScope
+                  { };
+              guardCtx = mkGuardCtx {
+                inherit pathSet constraintRegistry;
+                scopeHandlers = condNode.__scopeHandlers or { };
+              };
+              pass = condNode.meta.guard guardCtx;
+            in
+            if pass then
+              emitIncludes {
+                __parentScopeHandlers = condNode.__scopeHandlers or null;
+                __parentCtxId = condNode.__ctxId or null;
+              } condNode.meta.aspects
+            else
+              deferConditional condNode
+          )
         );
         inherit state;
       };
@@ -172,11 +196,11 @@ in
       };
   };
 
-  # Re-evaluate deferred conditionals against the final pathSet and
-  # constraint registry. Iterates to fixed point: each pass re-reads
-  # state, evaluates remaining guards, and re-enqueues failures.
-  # Convergence: each pass that makes progress resolves ≥1 guard,
-  # strictly shrinking pending. No progress → cross-dependent → tombstone.
+  # Re-evaluate deferred conditionals with exclude-aware hasAspect.
+  # Uses scope-specific constraint registry (not flat) so per-scope
+  # excludes only affect their own scope.
+  # Fixed-point iteration: each pass re-reads state. Convergence
+  # guaranteed — each progressing pass resolves ≥1 guard.
   drainConditionalsHandler = {
     "drain-conditionals" =
       { param, state }:
@@ -194,7 +218,6 @@ in
         {
           resume =
             let
-              # Single pass: read pathSet + constraints, partition guards.
               drainPass =
                 pending: prevResults:
                 fx.bind (fx.send "get-path-set" null) (
@@ -202,8 +225,11 @@ in
                   fx.bind fx.effects.state.get (
                     currentState:
                     let
-                      constraintRegistry = currentState.flatConstraintRegistry or { };
-                      includesChain = ((currentState.scopedIncludesChain or (_: { })) null).${scope} or [ ];
+                      # Build scope-specific constraint registry from current
+                      # scope and ancestors — tux's excludes don't leak to pingu.
+                      scopedRegistry = (currentState.scopedConstraintRegistry or (_: { })) null;
+                      scopeParentMap = (currentState.scopeParent or (_: { })) null;
+                      constraintRegistry = collectScopeConstraints scopedRegistry scopeParentMap scope { };
                       len = builtins.length pending;
                       go =
                         idx: acc:
@@ -213,7 +239,7 @@ in
                           let
                             condNode = builtins.elemAt pending idx;
                             guardCtx = mkGuardCtx {
-                              inherit pathSet constraintRegistry includesChain;
+                              inherit pathSet constraintRegistry;
                               scopeHandlers = condNode.__scopeHandlers or { };
                             };
                             pass = condNode.meta.guard guardCtx;
@@ -253,10 +279,6 @@ in
                   )
                 );
 
-              # Fixed-point loop: iterate until no progress.
-              # Convergence guaranteed: each pass that makes progress resolves
-              # ≥1 guard, strictly shrinking pending. When no progress is made
-              # the remaining guards are cross-dependent — tombstone them.
               iterate =
                 pending: prevResults:
                 fx.bind (drainPass pending prevResults) (
@@ -272,7 +294,6 @@ in
                 );
             in
             iterate scopeDeferred [ ];
-          # Clear deferred conditionals for this scope.
           state = state // {
             scopedDeferredConditionals = _: allScoped // { ${scope} = [ ]; };
           };

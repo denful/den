@@ -149,5 +149,5 @@ let
   };
 in
 {
-  inherit constraintRegistryHandler;
+  inherit constraintRegistryHandler lookupEntries;
 }
