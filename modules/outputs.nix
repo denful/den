@@ -2,10 +2,12 @@
   lib,
   den,
   inputs,
+  options,
   ...
 }:
 let
   no-flake-parts = !inputs ? flake-parts;
+  has-flake-parts = inputs ? flake-parts && options ? perSystem;
   flakeModule = den.lib.aspects.resolve "flake" (den.lib.resolveEntity "flake" { });
   flake =
     (lib.evalModules {
@@ -19,4 +21,13 @@ in
 {
   imports = lib.optional no-flake-parts inputs.den.flakeOutputs.flake;
   inherit flake;
+}
+// lib.optionalAttrs has-flake-parts {
+  systems = den.systems;
+
+  perSystem = {
+    imports = [
+      (den.lib.aspects.resolve "flake-parts" (den.lib.resolveEntity "flake-parts" { }))
+    ];
+  };
 }
