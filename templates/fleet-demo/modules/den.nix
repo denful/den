@@ -21,8 +21,8 @@
 
   # Fleet handles host/home instantiation — exclude default walking policies.
   den.schema.flake-system.excludes = [
-    den.policies.to-os-outputs
-    den.policies.to-hm-outputs
+    den.policies.system-to-os-outputs
+    den.policies.system-to-hm-outputs
   ];
 
   den.hosts.x86_64-linux = {

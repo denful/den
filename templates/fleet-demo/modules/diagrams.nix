@@ -304,7 +304,7 @@ in
             Den's core provides built-in policies for common patterns. This demo
             disables two of them to take full control of the scope tree:
 
-            - **`den.policies.to-os-outputs`** and **`den.policies.to-hm-outputs`** are
+            - **`den.policies.system-to-os-outputs`** and **`den.policies.system-to-hm-outputs`** are
               excluded from `den.schema.flake-system` — the fleet policies handle host
               instantiation explicitly via `den.lib.policy.instantiate`, so the default
               per-system output walk is unnecessary.

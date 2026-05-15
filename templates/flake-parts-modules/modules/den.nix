@@ -108,5 +108,5 @@
   den.schema.flake-system.includes = [ den.policies.system-to-flake-parts ];
 
   # Exclude vanilla packages route — handled via flake-parts scope.
-  den.schema.flake-system.excludes = [ den.policies.to-packages ];
+  den.schema.flake-system.excludes = [ den.policies.packages-to-flake ];
 }

@@ -45,13 +45,12 @@ in
     }) systemOutputs
   );
 
-  # All policies defined as individual attributes.
-  # flake -> flake-system: fan out per system
-  den.policies.to-systems =
+  # flake → flake-system: fan out per system
+  den.policies.flake-to-systems =
     _: map (system: resolve.to "flake-system" { inherit system; }) den.systems;
 
-  # flake-system -> OS/HM outputs
-  den.policies.to-os-outputs =
+  # flake-system → host: resolve OS outputs
+  den.policies.system-to-os-outputs =
     { system, ... }:
     let
       hosts = den.hosts.${system} or { };
@@ -64,7 +63,8 @@ in
       ]
     ) (builtins.attrValues hosts);
 
-  den.policies.to-hm-outputs =
+  # flake-system → home: resolve HM outputs
+  den.policies.system-to-hm-outputs =
     { system, ... }:
     let
       homes = den.homes.${system} or { };
@@ -77,17 +77,17 @@ in
       ]
     ) (builtins.attrValues homes);
 
-  # Per-output route policies
-  den.policies.to-packages = mkOutputPolicy "packages";
-  den.policies.to-apps = mkOutputPolicy "apps";
-  den.policies.to-checks = mkOutputPolicy "checks";
-  den.policies.to-devShells = mkOutputPolicy "devShells";
-  den.policies.to-legacyPackages = mkOutputPolicy "legacyPackages";
+  # Per-output route policies: class → flake
+  den.policies.packages-to-flake = mkOutputPolicy "packages";
+  den.policies.apps-to-flake = mkOutputPolicy "apps";
+  den.policies.checks-to-flake = mkOutputPolicy "checks";
+  den.policies.devShells-to-flake = mkOutputPolicy "devShells";
+  den.policies.legacyPackages-to-flake = mkOutputPolicy "legacyPackages";
 
-  den.schema.flake.includes = [ den.policies.to-systems ];
+  den.schema.flake.includes = [ den.policies.flake-to-systems ];
   den.schema.flake-system.includes = [
-    den.policies.to-os-outputs
-    den.policies.to-hm-outputs
+    den.policies.system-to-os-outputs
+    den.policies.system-to-hm-outputs
   ]
-  ++ map (output: den.policies."to-${output}") systemOutputs;
+  ++ map (output: den.policies."${output}-to-flake") systemOutputs;
 }
