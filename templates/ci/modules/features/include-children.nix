@@ -311,6 +311,43 @@
         };
       }
     );
+
+    # Nested ._ excludes user-defined class keys
+    test-include-children-nested-custom-class = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.classes.os = {
+          description = "Custom OS class";
+          forwardTo = {
+            class = "nixos";
+            path = [ ];
+          };
+        };
+
+        # sub has a custom class key (os) and a child aspect (svc)
+        den.aspects.group.sub.os.networking.hostName = "from-os";
+        den.aspects.group.sub.svc.nixos.services.openssh.enable = true;
+
+        # ._ must include svc but not os
+        den.aspects.igloo.includes = [ den.aspects.group.sub._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          hostName = igloo.networking.hostName;
+        };
+        expected = {
+          ssh = true;
+          hostName = "nixos"; # os class key must not leak through ._
+        };
+      }
+    );
+
     # Nested ._ with parametric child aspects
     test-include-children-nested-parametric = denTest (
       {
