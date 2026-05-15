@@ -28,18 +28,6 @@ let
     bogus.path = ../templates/bogus;
     bogus.description = "For bug reproduction";
   };
-  # Bridge specific keys from den.lib.flakeRouted into top-level config.
-  # Auto-discovery is built into flakeModule.nix; this is for explicit override.
-  #   imports = [ inputs.den.flakeModule (inputs.den.flakeBridge ["flake-file"]) ];
-  flakeBridge =
-    bridgeKeys:
-    { den, lib, ... }:
-    {
-      config = lib.genAttrs bridgeKeys (
-        k: lib.mkIf ((den.lib.flakeRouted or { }) ? ${k}) (den.lib.flakeRouted or { }).${k}
-      );
-    };
-
 in
 {
   __functor = _: den-lib;
@@ -47,7 +35,7 @@ in
   namespace = import ./lib/namespace.nix;
   flakeOutputs = import ./flakeOutputs.nix;
 
-  inherit nixModule templates flakeBridge;
+  inherit nixModule templates;
   inherit (import ./flake-packages.nix) packages devShells;
 
   # flake-parts conventions
