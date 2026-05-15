@@ -5,7 +5,7 @@ in
 {
   imports = [ inputs.devshell.flakeModule ];
   den.classes.devshell = { };
-  den.policies.to-flake-parts-system-devshell = _: [
+  den.policies.devshell-to-flake-parts = _: [
     (route {
       fromClass = "devshell";
       intoClass = "flake-parts";
@@ -16,5 +16,5 @@ in
       adaptArgs = { config, ... }: config.allModuleArgs;
     })
   ];
-  den.schema.flake-parts.includes = [ den.policies.to-flake-parts-system-devshell ];
+  den.schema.flake-parts.includes = [ den.policies.devshell-to-flake-parts ];
 }

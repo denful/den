@@ -1,4 +1,4 @@
 { den, ... }:
 {
-  den.schema.flake-parts.includes = [ den.policies.to-flake-parts-packages ];
+  den.schema.flake-parts.includes = [ den.policies.packages-to-flake-parts ];
 }

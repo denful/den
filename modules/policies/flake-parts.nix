@@ -6,7 +6,7 @@
   ...
 }:
 lib.mkIf (inputs ? flake-parts) {
-  den.policies.to-flake-parts =
+  den.policies.system-to-flake-parts =
     { system, ... }:
     [
       (den.lib.policy.resolve.to "flake-parts" {
@@ -17,7 +17,7 @@ lib.mkIf (inputs ? flake-parts) {
       })
     ];
 
-  den.policies.to-flake-parts-packages = _: [
+  den.policies.packages-to-flake-parts = _: [
     (den.lib.policy.route {
       fromClass = "packages";
       intoClass = "flake-parts";

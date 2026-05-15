@@ -105,7 +105,7 @@
   # --- Pipeline wiring ---
 
   # Enter flake-parts scope from flake-system.
-  den.schema.flake-system.includes = [ den.policies.to-flake-parts ];
+  den.schema.flake-system.includes = [ den.policies.system-to-flake-parts ];
 
   # Exclude vanilla packages route — handled via flake-parts scope.
   den.schema.flake-system.excludes = [ den.policies.to-packages ];

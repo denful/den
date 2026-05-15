@@ -17,7 +17,7 @@ in
     inputs = inputs;
   };
 
-  den.policies.to-flake-parts-system-tests = _: [
+  den.policies.tests-to-flake-parts = _: [
     (route {
       fromClass = "tests";
       intoClass = "flake-parts";
@@ -36,5 +36,5 @@ in
         args.config.allModuleArgs // { inherit igloo tux; };
     })
   ];
-  den.schema.flake-parts.includes = [ den.policies.to-flake-parts-system-tests ];
+  den.schema.flake-parts.includes = [ den.policies.tests-to-flake-parts ];
 }

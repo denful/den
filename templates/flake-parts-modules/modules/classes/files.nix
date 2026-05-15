@@ -5,7 +5,7 @@ in
 {
   imports = [ inputs.files.flakeModules.default ];
   den.classes.files = { };
-  den.policies.to-flake-parts-system-files = _: [
+  den.policies.files-to-flake-parts = _: [
     (route {
       fromClass = "files";
       intoClass = "flake-parts";
@@ -13,5 +13,5 @@ in
       adaptArgs = { config, ... }: config.allModuleArgs;
     })
   ];
-  den.schema.flake-parts.includes = [ den.policies.to-flake-parts-system-files ];
+  den.schema.flake-parts.includes = [ den.policies.files-to-flake-parts ];
 }
