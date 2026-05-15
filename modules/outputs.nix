@@ -2,7 +2,6 @@
   lib,
   den,
   inputs,
-  options,
   ...
 }@args:
 let
