@@ -6,8 +6,6 @@
 }@args:
 let
   no-flake-parts = !inputs ? flake-parts;
-  # __denTest is a specialArg set by the denTest harness — its presence means
-  # we are inside a test evalModules, not a real flake-parts mkFlake context.
   has-flake-parts = !no-flake-parts && !(args ? __denTest);
   flakeModule = den.lib.aspects.resolve "flake" (den.lib.resolveEntity "flake" { });
   flake =
