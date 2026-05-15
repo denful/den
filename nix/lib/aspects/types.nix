@@ -470,11 +470,28 @@ let
           # Without provides, aspectContentType handles the merge, but the
           # wrapper must still be invocable like the providerType path.
           singleFn = builtins.length flatDefs == 1 && lib.isFunction (builtins.head flatDefs).value;
+          # Synthetic ._ for nested aspects — same semantics as root aspects.
+          # Collect forwarded child keys (exclude class, pipe, structural, internal).
+          classReg = den.classes or { };
+          pipeReg = den.quirks or { };
+          inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+          provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
+          childKeys = builtins.filter (
+            k: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k) && !(classReg ? ${k}) && !(pipeReg ? ${k})
+          ) (builtins.attrNames merged);
+          aspectName = lib.concatStringsSep "." provider;
+          syntheticAspect = {
+            name = "${aspectName}._";
+            includes = map (k: merged.${k}) childKeys;
+          };
         in
         merged
         // {
           __contentValues = flatDefs;
-          __provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
+          __provider = provider;
+          _ = {
+            __functor = _self: _args: syntheticAspect;
+          };
         }
         // lib.optionalAttrs singleFn {
           __functor = _self: (builtins.head flatDefs).value;

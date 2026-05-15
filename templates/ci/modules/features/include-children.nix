@@ -199,5 +199,146 @@
         };
       }
     );
+    # ._ works on nested (wrapped) aspects, not just root aspects
+    test-include-children-nested = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.top.mid.deep.nixos.services.openssh.enable = true;
+        den.aspects.top.mid.shallow.nixos.services.timesyncd.enable = true;
+
+        # mid._ should collect deep and shallow
+        den.aspects.igloo.includes = [ den.aspects.top.mid._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          time = igloo.services.timesyncd.enable;
+        };
+        expected = {
+          ssh = true;
+          time = true;
+        };
+      }
+    );
+
+    # Chained ._ at multiple nesting levels
+    test-include-children-nested-chained = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.infra.net.fw.nixos.networking.firewall.enable = true;
+        den.aspects.infra.net.dns.nixos.networking.nameservers = [ "1.1.1.1" ];
+
+        # top-level ._ includes net; net._ includes fw and dns
+        den.aspects.igloo.includes = [ den.aspects.infra.net._ ];
+
+        expr = {
+          fw = igloo.networking.firewall.enable;
+          dns = igloo.networking.nameservers;
+        };
+        expected = {
+          fw = true;
+          dns = [ "1.1.1.1" ];
+        };
+      }
+    );
+
+    # Nested ._ with mixed content: class keys + child aspects on same wrapper
+    test-include-children-nested-mixed = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        # sub has both a class key (nixos) and child aspects (a, b)
+        den.aspects.group.sub.nixos.networking.hostName = "from-sub";
+        den.aspects.group.sub.a.nixos.services.openssh.enable = true;
+        den.aspects.group.sub.b.nixos.services.timesyncd.enable = true;
+
+        # ._ should only include a and b, not the nixos class key
+        den.aspects.igloo.includes = [ den.aspects.group.sub._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          time = igloo.services.timesyncd.enable;
+          hostName = igloo.networking.hostName;
+        };
+        expected = {
+          ssh = true;
+          time = true;
+          hostName = "nixos"; # class key must not leak
+        };
+      }
+    );
+
+    # Nested ._ skips class keys, same as root ._
+    test-include-children-nested-skips-class-keys = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.group.sub = {
+          nixos.networking.hostName = "should-not-leak";
+          child.nixos.services.openssh.enable = true;
+        };
+
+        den.aspects.igloo.includes = [ den.aspects.group.sub._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          hostName = igloo.networking.hostName;
+        };
+        expected = {
+          ssh = true;
+          hostName = "nixos";
+        };
+      }
+    );
+    # Nested ._ with parametric child aspects
+    test-include-children-nested-parametric = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.group.sub.static.nixos.services.timesyncd.enable = true;
+        den.aspects.group.sub.dynamic =
+          { host, ... }:
+          {
+            nixos.services.openssh.enable = true;
+          };
+
+        den.aspects.igloo.includes = [ den.aspects.group.sub._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          time = igloo.services.timesyncd.enable;
+        };
+        expected = {
+          ssh = true;
+          time = true;
+        };
+      }
+    );
   };
 }
