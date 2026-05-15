@@ -475,6 +475,10 @@ let
           classReg = den.classes or { };
           pipeReg = den.quirks or { };
           inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+          # Forward provides children onto the wrapper so
+          # aspect.child.monitoring resolves to aspect.child.provides.monitoring,
+          # matching mergeWithAspectMeta behavior for root aspects.
+          providesChildren = builtins.removeAttrs (merged.provides or { }) [ "_module" ];
           provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
           childKeys = builtins.filter (
             k: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k) && !(classReg ? ${k}) && !(pipeReg ? ${k})
@@ -485,10 +489,12 @@ let
             includes = map (k: merged.${k}) childKeys;
           };
         in
-        merged
+        providesChildren
+        // merged
         // {
           __contentValues = flatDefs;
           __provider = provider;
+          __providesForwarded = builtins.attrNames providesChildren;
           _ = {
             __functor = _self: _args: syntheticAspect;
           };
