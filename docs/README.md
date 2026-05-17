@@ -3,7 +3,7 @@
 [![Built with Starlight](https://astro.badg.es/v2/built-with-starlight/tiny.svg)](https://starlight.astro.build)
 
 ```
-pnpm create astro@latest --  --template starlight
+pnpm create astro@latest -- --template starlight
 ```
 
 > 🧑‍🚀 **Seasoned astronaut?** Delete this file. Have fun!
