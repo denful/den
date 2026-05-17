@@ -22,5 +22,6 @@ pkgs.mkShell {
     nodejs
     hyperfine
     nix-eval-jobs
+    ripgrep
   ];
 }

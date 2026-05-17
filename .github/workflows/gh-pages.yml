@@ -13,6 +13,7 @@ concurrency:
   cancel-in-progress: true
 env:
   GH_TOKEN: ${{ github.token }}
+  NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
   deploy:
     environment:
@@ -20,6 +21,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
     steps:
+      - uses: wimpysworld/nothing-but-nix@v10
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
+      - uses: actions/checkout@v6
       - run: mkdir -p ~/versioned/docs
       - run: gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts" | tee ~/versioned/artifacts.json
       - run: jq -r '.artifacts | map({id,name,expired} | select(.expired == false and (.name | match("docs-")))) | group_by(.name) | map(.[0])' ~/versioned/artifacts.json | tee ~/versioned/docs.json
@@ -28,19 +33,8 @@ jobs:
             gh api "/repos/$GITHUB_REPOSITORY/actions/artifacts/${id}/zip" > ~/versioned/${id}.zip
             unzip -u -d ~/versioned/docs ~/versioned/${id}.zip
           done
-      - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "latest"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
       - name: Build
-        run: |
-          pushd docs
-          pnpm install
-          pnpm run build
-          popd
+        run: nix-shell --run 'just docs-build'
       - run: cp -r ~/versioned/docs/* docs/dist/
       - run: cp ~/versioned/docs.json docs/dist/versions.json
       - name: Setup Pages

@@ -6,23 +6,21 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.number }}
   cancel-in-progress: true
+env:
+  NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: wimpysworld/nothing-but-nix@v10
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "latest"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
       - name: Build
+        run: nix-shell --run 'just docs-build'
+      - name: Version
         run: |
           pushd docs
-          pnpm install
-          pnpm run build
-          sudo apt-get install -y ripgrep
           rg '(src|href)="/' dist -l -0 | xargs -0 -n 1 sed -i 's#\(src\|href\)="/#\1="/${{github.ref_name}}/#g'
           mkdir -p versioned
           mv dist versioned/${{github.ref_name}}

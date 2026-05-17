@@ -11,19 +11,15 @@ on:
 concurrency:
   group: "docs"
   cancel-in-progress: true
+env:
+  NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
+      - uses: wimpysworld/nothing-but-nix@v10
+      - uses: cachix/install-nix-action@v31
+      - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: actions/checkout@v6
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "latest"
-      - uses: pnpm/action-setup@v4
-        with:
-          version: latest
       - name: Build
-        run: |
-          pushd docs
-          pnpm install
-          pnpm run build
+        run: nix-shell --run 'just docs-build'

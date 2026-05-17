@@ -21,6 +21,9 @@ update-nix-effects:
 docs:
   cd docs && pnpm run dev
 
+docs-build:
+  cd docs && pnpm install && pnpm run build
+
 ci test="" *args:
   bash ./ci.bash "{{system}}" "{{test}}" {{args}}
 
