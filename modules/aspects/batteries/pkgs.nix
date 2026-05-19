@@ -69,9 +69,11 @@ let
 in
 {
   den.batteries.pkgs = {
-    inherit description __functor;
-    provides = {
-      inherit to-host to-user to-home;
-    };
+    inherit
+      description
+      __functor
+      to-host
+      to-user
+      to-home;
   };
 }
