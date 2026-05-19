@@ -27,7 +27,7 @@
     test-pkgs-set-on-home-manager = denTest (
       { den, tuxHm, ... }:
       {
-        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
         den.default.homeManager.home.stateVersion = "25.11";
         den.aspects.tux.includes = [ (den.batteries.pkgs (pkgs: [pkgs.hello])) ];
 
@@ -61,7 +61,7 @@
     test-pkgs-to-home-set-on-home-manager = denTest (
       { den, tuxHm, ... }:
       {
-        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
         den.default.homeManager.home.stateVersion = "25.11";
         den.aspects.tux.includes = [ (den.batteries.pkgs.to-home (pkgs: [pkgs.hello])) ];
 
@@ -74,6 +74,18 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.includes = [ (den.batteries.pkgs (pkgs: [pkgs.hello])) ];
+
+        expr = builtins.elem "hello" (builtins.map (pkg: (builtins.head (builtins.splitVersion pkg.name))) igloo.environment.systemPackages);
+        expected = false;
+      }
+    );
+
+    test-pkgs-set-on-home-manager-not-on-user = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
+        den.default.homeManager.home.stateVersion = "25.11";
         den.aspects.tux.includes = [ (den.batteries.pkgs (pkgs: [pkgs.hello])) ];
 
         expr = builtins.elem "hello" (builtins.map (pkg: pkg.pname) igloo.users.users.tux.packages);
