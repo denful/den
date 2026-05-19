@@ -31,10 +31,10 @@ let
     };
 
   userPackages =
-    getPkgs: user:
+    getPkgs:
     let
-      nixos = { pkgs, ... }: {
-        users.users.${user.userName}.packages = getPkgs pkgs;
+      nixos = { user, pkgs, ... }: {
+        users.users.${user.name}.packages = getPkgs pkgs;
       };
       darwin = nixos;
     in
@@ -55,8 +55,8 @@ let
 
   to-host = getPkgs: { host, ... }: hostPackages getPkgs;
   to-host-only = getPkgs: { host }: hostPackages getPkgs;
-  to-user = getPkgs: { host, user }: userPackages getPkgs user;
-  to-home = getPkgs: { home }: homePackages getPkgs;
+  to-user = userPackages;
+  to-home = homePackages;
 
   __functor = _self: getPkgs: {
       includes = [
