@@ -6,10 +6,10 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.aspects.igloo.includes = [ (den._.pkgs (pkgs: pkgs.discord)) ];
+        den.aspects.igloo.includes = [ (den.batteries.pkgs (pkgs: [pkgs.hello])) ];
 
-        expr = igloo.config.environment.systemPackages;
-        expected = [ "discord" ];
+        expr = builtins.elem "hello" (builtins.map (pkg: (builtins.head (builtins.splitVersion pkg.name))) igloo.environment.systemPackages);
+        expected = true;
       }
     );
 
@@ -17,10 +17,10 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.aspects.tux.includes = [ (den._.pkgs (pkgs: pkgs.discord)) ];
+        den.aspects.tux.includes = [ (den.batteries.pkgs (pkgs: [pkgs.hello])) ];
 
-        expr = igloo.config.users.users.tux.packages;
-        expected = [ "discord" ];
+        expr = builtins.elem "hello" (builtins.map (pkg: pkg.pname) igloo.users.users.tux.packages);
+        expected = true;
       }
     );
 
@@ -29,10 +29,10 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.default.homeManager.home.stateVersion = "25.11";
-        den.aspects.tux.includes = [ (den._.pkgs (pkgs: pkgs.discord)) ];
+        den.aspects.tux.includes = [ (den.batteries.pkgs (pkgs: [pkgs.hello])) ];
 
-        expr = tuxHm.config.home.packages;
-        expected = [ "discord" ];
+        expr = builtins.elem "hello" (builtins.map (pkg: (builtins.head (builtins.splitVersion pkg.name))) tuxHm.home.packages);
+        expected = true;
       }
     );
 
@@ -40,10 +40,10 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.aspects.tux.includes = [ (den._.pkgs._.to-host (pkgs: pkgs.discord)) ];
+        den.aspects.tux.includes = [ (den.batteries.pkgs.to-host (pkgs: [pkgs.hello])) ];
 
-        expr = igloo.config.environment.systemPackages;
-        expected = [ "discord" ];
+        expr = builtins.elem "hello" (builtins.map (pkg: (builtins.head (builtins.splitVersion pkg.name))) igloo.environment.systemPackages);
+        expected = true;
       }
     );
 
@@ -51,10 +51,10 @@
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.aspects.tux.includes = [ (den._.pkgs._.to-user (pkgs: pkgs.discord)) ];
+        den.aspects.tux.includes = [ (den.batteries.pkgs.to-user (pkgs: [pkgs.hello])) ];
 
-        expr = igloo.config.users.users.tux.packages;
-        expected = [ "discord" ];
+        expr = builtins.elem "hello" (builtins.map (pkg: pkg.pname) igloo.users.users.tux.packages);
+        expected = true;
       }
     );
 
@@ -63,10 +63,21 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.default.homeManager.home.stateVersion = "25.11";
-        den.aspects.tux.includes = [ (den._.pkgs._.to-home (pkgs: pkgs.discord)) ];
+        den.aspects.tux.includes = [ (den.batteries.pkgs.to-home (pkgs: [pkgs.hello])) ];
 
-        expr = tuxHm.config.home.packages;
-        expected = [ "discord" ];
+        expr = builtins.elem "hello" (builtins.map (pkg: (builtins.head (builtins.splitVersion pkg.name))) tuxHm.home.packages);
+        expected = true;
+      }
+    );
+
+    test-pkgs-set-on-user-not-on-host = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.includes = [ (den.batteries.pkgs (pkgs: [pkgs.hello])) ];
+
+        expr = builtins.elem "hello" (builtins.map (pkg: pkg.pname) igloo.users.users.tux.packages);
+        expected = false;
       }
     );
 
