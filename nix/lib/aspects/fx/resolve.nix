@@ -365,15 +365,62 @@ let
             {
               path = [ "flake" ] ++ spec.intoAttr;
               value = evaluated;
+              system = spec.system or null;
             }
           ]
       ) allInstantiates;
+
+      # Disambiguate instantiate entries targeting the same output path from
+      # different entities. When the same user name appears on multiple systems
+      # (e.g. den.homes.x86_64-linux.ben + den.homes.aarch64-darwin.ben both
+      # producing homeConfigurations.ben), lib.recursiveUpdate would deeply
+      # merge the two independent module-system evaluations, corrupting both.
+      # Fix: qualify each colliding entry's output name with its system so both
+      # are accessible (e.g. homeConfigurations."ben@x86_64-linux").
+      # Same-entity duplicates (e.g. fleet + direct policy) are left as-is
+      # since they produce compatible modules.
+      disambiguatedModules =
+        let
+          pathStr = builtins.concatStringsSep ".";
+          grouped = builtins.foldl' (
+            acc: entry:
+            let
+              key = pathStr entry.path;
+            in
+            acc // { ${key} = (acc.${key} or [ ]) ++ [ entry ]; }
+          ) { } instantiateModules;
+          resolve =
+            _: entries:
+            if builtins.length entries <= 1 then
+              entries
+            else
+              let
+                systems = map (e: e.system or null) entries;
+                uniqueSystems = lib.unique systems;
+                isMultiSystem = builtins.length uniqueSystems > 1;
+              in
+              if isMultiSystem then
+                # Different systems: qualify each output name with @system.
+                map (
+                  e:
+                  let
+                    basePath = lib.init e.path;
+                    baseName = lib.last e.path;
+                  in
+                  e // { path = basePath ++ [ "${baseName}@${e.system}" ]; }
+                ) entries
+              else
+                # Same entity via multiple policy paths: keep last.
+                [ (lib.last entries) ];
+        in
+        lib.concatLists (lib.mapAttrsToList resolve grouped);
+
       # Merge all instantiate outputs into a single module via recursiveUpdate.
-      # This avoids conflicting definitions at intermediate lazyAttrsOf keys
-      # (e.g., multiple instantiates targeting different keys under the same
-      # freeform parent). Leaf values remain lazy — recursiveUpdate only
-      # merges attrset structure, not leaf thunks.
-      instantiateConfigs = map (entry: lib.setAttrByPath entry.path entry.value) instantiateModules;
+      # After disambiguation, each output path appears at most once, so
+      # recursiveUpdate only merges attrset structure across different paths
+      # (e.g., homeConfigurations vs nixosConfigurations), not across
+      # conflicting evaluations of the same entity.
+      instantiateConfigs = map (entry: lib.setAttrByPath entry.path entry.value) disambiguatedModules;
     in
     classImports
     // {
