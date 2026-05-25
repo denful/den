@@ -244,6 +244,11 @@ in
           includes = [ ];
         };
       # Wrap a policy value with predicate gating (dispatch path).
+      # Pre-check the predicate's required args against ctx so the wrapper
+      # does not fire in contexts that would crash the predicate's
+      # destructuring pattern (e.g. { host, ... } in a home-only scope).
+      predicateArgs = if builtins.isFunction predicate then builtins.functionArgs predicate else { };
+      predicateRequiredArgs = builtins.filter (k: !predicateArgs.${k}) (builtins.attrNames predicateArgs);
       wrapAsPolicy =
         p:
         let
@@ -252,7 +257,9 @@ in
         {
           __isPolicy = true;
           inherit (inner) name;
-          fn = ctx: if predicate ctx then inner.fn ctx else [ ];
+          fn =
+            ctx:
+            if builtins.all (k: ctx ? ${k}) predicateRequiredArgs && predicate ctx then inner.fn ctx else [ ];
         };
       wrap =
         p: if p.__isPolicy or false || builtins.isFunction p then wrapAsPolicy p else wrapAsConditional p;

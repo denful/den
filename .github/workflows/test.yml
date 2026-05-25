@@ -47,9 +47,20 @@ jobs:
     needs: [non-draft]
     name: allow-ci
     runs-on: ubuntu-latest
-    if: ${{github.ref == 'refs/heads/main' || contains( github.event.pull_request.labels.*.name, 'allow-ci')}}
+    # Label check kept as fast-path; permission check runs when label is absent.
+    # auto-allow-ci adds the label via GITHUB_TOKEN which does not re-trigger
+    # workflows, so the label may not be present on the first run.
     steps:
-      - run: true
+      - name: Check access
+        if: ${{github.ref != 'refs/heads/main' && !contains( github.event.pull_request.labels.*.name, 'allow-ci')}}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          perm=$(gh api repos/${{ github.repository }}/collaborators/${{ github.event.pull_request.user.login }}/permission --jq '.permission')
+          if [[ "$perm" != "admin" && "$perm" != "write" ]]; then
+            echo "::error::PR author does not have write access and PR is missing allow-ci label"
+            exit 1
+          fi
   noflake:
     needs: [allow-ci]
     name: noflake

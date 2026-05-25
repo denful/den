@@ -68,6 +68,7 @@ let
       optionPath,
       getModule,
       forwardPathFn,
+      schemaIncludes ? [ ],
     }:
     let
       # Keyed module wrapper: the NixOS module system deduplicates imports
@@ -115,10 +116,13 @@ let
           let
             pairs = mkIntoClassUsers className { inherit host; };
             resolves = map (
-              pair: den.lib.policy.resolve.withIncludes [ userForward ] { user = pair.user; }
+              pair:
+              den.lib.policy.resolve.withIncludes ([ userForward ] ++ schemaIncludes) {
+                user = pair.user;
+              }
             ) pairs;
           in
-          resolves ++ classIncludes;
+          resolves ++ classIncludes ++ map (inc: den.lib.policy.include inc) schemaIncludes;
 
       # Complements the host-scope battery which only sees users
       # declared on host.users, not registry or policy-resolved users.
