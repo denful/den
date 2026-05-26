@@ -5,8 +5,7 @@
   ...
 }@args:
 let
-  no-flake-parts = !inputs ? flake-parts;
-  has-flake-parts = !no-flake-parts && !(args ? __denTest);
+  has-flake-parts = args ? flake-parts-lib;
   flakeModule = den.lib.aspects.resolve "flake" (den.lib.resolveEntity "flake" { });
   flake =
     (lib.evalModules {
@@ -18,7 +17,7 @@ let
     }).config.flake;
 in
 {
-  imports = lib.optional no-flake-parts inputs.den.flakeOutputs.flake;
+  imports = lib.optional (!has-flake-parts) inputs.den.flakeOutputs.flake;
   inherit flake;
 }
 // lib.optionalAttrs has-flake-parts {
