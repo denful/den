@@ -17,7 +17,7 @@ let
     }).config.flake;
 in
 {
-  imports = lib.optional (!has-flake-parts) inputs.den.flakeOutputs.flake;
+  imports = lib.optional (!(inputs ? flake-parts)) inputs.den.flakeOutputs.flake;
   inherit flake;
 }
 // lib.optionalAttrs has-flake-parts {
