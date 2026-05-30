@@ -249,15 +249,107 @@ let
     in
     if deduped == [ ] then null else deduped;
 
+  # Build instantiateArgs for a spec without calling spec.instantiate.
+  # Factored out so both applyInstantiates and hostConfigs can reuse it.
+  mkInstantiateArgs =
+    {
+      augmentedScopeContexts,
+      scopedClassImportsRaw,
+      scopedProvides,
+      scopedRoutes,
+      scopeParent,
+      scopeEntityClass ? (_: { }),
+      fxResolveFn,
+      ctx,
+    }:
+    spec:
+    let
+      allScopeIds = builtins.attrNames augmentedScopeContexts;
+      hostClass = spec.class or "nixos";
+      rawHostScopeId = findHostScopeId scopeParent allScopeIds spec;
+      hostScopeId = if rawHostScopeId != null then rawHostScopeId else spec.sourceScopeId;
+      preWalkedModules =
+        if hostScopeId != null then
+          let
+            isInSubtree =
+              sid:
+              sid == hostScopeId
+              || (
+                let
+                  parent = scopeParent.${sid} or null;
+                in
+                parent != null && parent != sid && isInSubtree parent
+              );
+            isAncestor =
+              sid:
+              let
+                parent = scopeParent.${hostScopeId} or null;
+              in
+              sid == parent || (parent != null && parent != hostScopeId && isAncestorOf scopeParent sid parent);
+            isRelevant = sid: isInSubtree sid || isAncestor sid;
+            subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
+            relevantScopeIds = builtins.filter isRelevant allScopeIds;
+            scopeEntityClassMap = scopeEntityClass null;
+            subtreeContexts = lib.genAttrs subtreeScopeIds (
+              sid:
+              let
+                base = augmentedScopeContexts.${sid};
+                entityCls = scopeEntityClassMap.${sid} or null;
+              in
+              if !(base ? class) && entityCls != null then
+                base // { class = entityCls; }
+              else if !(base ? class) then
+                base // { class = hostClass; }
+              else
+                base
+            );
+            subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
+            subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
+            subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
+            relevantContexts = lib.genAttrs relevantScopeIds (sid: augmentedScopeContexts.${sid});
+            subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
+            subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
+            subtreePhase3 =
+              applyRoutes fxResolveFn ctx relevantContexts hostScopeId scopeParent subtreeRoutes
+                subtreePhase2;
+          in
+          extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
+        else
+          null;
+      modules =
+        if preWalkedModules != null then
+          preWalkedModules
+        else
+          lib.optional (spec ? mainModule) spec.mainModule;
+    in
+    if spec ? pkgs then
+      {
+        inherit (spec) pkgs;
+        inherit modules;
+      }
+    else
+      {
+        inherit modules;
+      }
+      // lib.optionalAttrs (spec ? system) {
+        modules = modules ++ [
+          { nixpkgs.hostPlatform = lib.mkDefault spec.system; }
+        ];
+      };
+
   # Phase 4: Apply entity instantiation.
   # When hosts were walked in the flake pipeline (via resolve.to "host"),
   # re-run assembly phases per host subtree with the host as rootScopeId.
   # This produces correct routing (identical to per-host fxResolve) while
   # reusing the walk's scope data — including sibling visibility for pipe.collect.
+  #
+  # Lazy: spec.instantiate is NOT called eagerly. Each output leaf is a thunk
+  # that calls spec.instantiate only when accessed (e.g., when someone reads
+  # config.flake.nixosConfigurations.cortex). This avoids evaluating all hosts
+  # when only one is needed.
   applyInstantiates =
     {
       scopedInstantiates,
-      # Raw walk data for per-host-subtree assembly.
       augmentedScopeContexts,
       scopedClassImportsRaw,
       scopedProvides,
@@ -269,9 +361,24 @@ let
     }:
     classImports:
     let
+      mkArgs = mkInstantiateArgs {
+        inherit
+          augmentedScopeContexts
+          scopedClassImportsRaw
+          scopedProvides
+          scopedRoutes
+          scopeParent
+          scopeEntityClass
+          fxResolveFn
+          ctx
+          ;
+      };
+
       allInstantiates = lib.concatLists (lib.attrValues scopedInstantiates);
-      allScopeIds = builtins.attrNames augmentedScopeContexts;
-      instantiateModules = lib.concatMap (
+
+      # Build spec descriptors: { path, system, spec } without calling instantiate.
+      # concatMap is strict in the list but the instantiate thunk is deferred.
+      specDescriptors = lib.concatMap (
         spec:
         let
           hasOutput = (spec.intoAttr or [ ]) != [ ];
@@ -279,93 +386,11 @@ let
         if !hasOutput then
           [ ]
         else
-          let
-            hostClass = spec.class or "nixos";
-            rawHostScopeId = findHostScopeId scopeParent allScopeIds spec;
-            # Fall back to source scope when no entity scope matches.
-            # This allows policy.instantiate to collect from any scope level
-            # (e.g., flake-system scope for perSystem class collection).
-            hostScopeId = if rawHostScopeId != null then rawHostScopeId else spec.sourceScopeId;
-            # Re-run assembly phases for the host subtree with correct rootScopeId.
-            preWalkedModules =
-              if hostScopeId != null then
-                let
-                  # Filter walk data to this host's subtree + ancestors.
-                  # Subtree: host scope + all descendants (users, etc.)
-                  # Ancestors: parent scopes up to root (flake-system, flake)
-                  # Excludes sibling subtrees (other hosts) to prevent cross-contamination.
-                  isInSubtree =
-                    sid:
-                    sid == hostScopeId
-                    || (
-                      let
-                        parent = scopeParent.${sid} or null;
-                      in
-                      parent != null && parent != sid && isInSubtree parent
-                    );
-                  isAncestor =
-                    sid:
-                    let
-                      parent = scopeParent.${hostScopeId} or null;
-                    in
-                    sid == parent || (parent != null && parent != hostScopeId && isAncestorOf scopeParent sid parent);
-                  isRelevant = sid: isInSubtree sid || isAncestor sid;
-                  subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
-                  relevantScopeIds = builtins.filter isRelevant allScopeIds;
-                  scopeEntityClassMap = scopeEntityClass null;
-                  subtreeContexts = lib.genAttrs subtreeScopeIds (
-                    sid:
-                    let
-                      base = augmentedScopeContexts.${sid};
-                      entityCls = scopeEntityClassMap.${sid} or null;
-                    in
-                    if !(base ? class) && entityCls != null then
-                      base // { class = entityCls; }
-                    else if !(base ? class) then
-                      base // { class = hostClass; }
-                    else
-                      base
-                  );
-                  subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
-                  subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
-                  subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
-                  relevantContexts = lib.genAttrs relevantScopeIds (sid: augmentedScopeContexts.${sid});
-                  subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
-                  subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
-                  subtreePhase3 =
-                    applyRoutes fxResolveFn ctx relevantContexts hostScopeId scopeParent subtreeRoutes
-                      subtreePhase2;
-                in
-                extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass
-              else
-                null;
-            modules =
-              if preWalkedModules != null then
-                preWalkedModules
-              else
-                lib.optional (spec ? mainModule) spec.mainModule;
-            instantiateArgs =
-              if spec ? pkgs then
-                {
-                  inherit (spec) pkgs;
-                  inherit modules;
-                }
-              else
-                {
-                  inherit modules;
-                }
-                // lib.optionalAttrs (spec ? system) {
-                  modules = modules ++ [
-                    { nixpkgs.hostPlatform = lib.mkDefault spec.system; }
-                  ];
-                };
-            evaluated = spec.instantiate instantiateArgs;
-          in
           [
             {
               path = [ "flake" ] ++ spec.intoAttr;
-              value = evaluated;
               system = spec.system or null;
+              inherit spec;
             }
           ]
       ) allInstantiates;
@@ -379,7 +404,9 @@ let
       # are accessible (e.g. homeConfigurations."ben@x86_64-linux").
       # Same-entity duplicates (e.g. fleet + direct policy) are left as-is
       # since they produce compatible modules.
-      disambiguatedModules =
+      #
+      # Only inspects path and system metadata — never touches spec.instantiate.
+      disambiguated =
         let
           pathStr = builtins.concatStringsSep ".";
           grouped = builtins.foldl' (
@@ -388,7 +415,7 @@ let
               key = pathStr entry.path;
             in
             acc // { ${key} = (acc.${key} or [ ]) ++ [ entry ]; }
-          ) { } instantiateModules;
+          ) { } specDescriptors;
           resolve =
             _: entries:
             if builtins.length entries <= 1 then
@@ -411,9 +438,6 @@ let
                 ) entries
               else
                 # Same entity via multiple policy paths: deduplicate.
-                # Warn when more than one distinct instantiate spec targets the
-                # same output path on the same system — this can silently shadow
-                # one entity's configuration with another's.
                 let
                   entry = lib.last entries;
                 in
@@ -425,12 +449,10 @@ let
         in
         lib.concatLists (lib.mapAttrsToList resolve grouped);
 
-      # Merge all instantiate outputs into a single module via recursiveUpdate.
-      # After disambiguation, each output path appears at most once, so
-      # recursiveUpdate only merges attrset structure across different paths
-      # (e.g., homeConfigurations vs nixosConfigurations), not across
-      # conflicting evaluations of the same entity.
-      instantiateConfigs = map (entry: lib.setAttrByPath entry.path entry.value) disambiguatedModules;
+      # Build lazy output tree.  Each leaf calls spec.instantiate on first access.
+      instantiateConfigs = map (
+        entry: lib.setAttrByPath entry.path (entry.spec.instantiate (mkArgs entry.spec))
+      ) disambiguated;
     in
     classImports
     // {
@@ -458,102 +480,69 @@ let
       scopedProvides = result.state.scopedProvides null;
       scopedRoutes = result.state.scopedRoutes null;
 
-      # Pipe-data-free host configs for cross-host config thunk resolution.
-      # Uses original (non-augmented) scope contexts so modules don't receive
-      # pipe data args, breaking the cycle: assemblePipes → hostConfigs → evalModules → pipe data.
-      # Local thunks are marked and resolved inside evalModules via the fixpoint config.
-      hostConfigs =
+      # Scan raw pipe values for config-dependent thunks (functions taking
+      # { config, ... }).  If none exist, hostConfigs stays null and
+      # assemblePipes skips cross-host instantiation entirely.
+      isConfigDependent = val: builtins.isFunction val && (builtins.functionArgs val) ? config;
+      hasAnyConfigThunk =
         let
-          allInstantiates = lib.concatLists (lib.attrValues (result.state.scopedInstantiates null));
-          allScopeIds = builtins.attrNames scopeContexts;
-          specsByHost = builtins.listToAttrs (
-            lib.concatMap (
-              spec:
-              let
-                hasOutput = (spec.intoAttr or [ ]) != [ ];
-                hostScopeId = if hasOutput then findHostScopeId scopeParent allScopeIds spec else null;
-              in
-              if hostScopeId == null then
-                [ ]
-              else
-                [
-                  {
-                    name = hostScopeId;
-                    value = spec;
-                  }
-                ]
-            ) allInstantiates
-          );
+          # Values may be lists of entries, raw functions, or pipe entry
+          # records ({ __isPipeEntry; module = <fn>; ... }).
+          checkVal =
+            v:
+            if builtins.isList v then
+              builtins.any checkVal v
+            else if builtins.isAttrs v && v ? module then
+              isConfigDependent v.module
+            else
+              isConfigDependent v;
         in
-        lib.mapAttrs (
-          hostScopeId: spec:
+        builtins.any (scopeImports: builtins.any checkVal (lib.attrValues scopeImports)) (
+          lib.attrValues scopedClassImportsRaw
+        );
+
+      # Pipe-data-free host configs for cross-host config thunk resolution.
+      # Only computed when config-dependent thunks actually exist in the pipe
+      # data.  When null, resolveThunks in assemblePipes short-circuits.
+      hostConfigs =
+        if !hasAnyConfigThunk then
+          null
+        else
           let
-            hostClass = spec.class or "nixos";
-            isInSubtree =
-              sid:
-              sid == hostScopeId
-              || (
+            allInstantiates = lib.concatLists (lib.attrValues (result.state.scopedInstantiates null));
+            allScopeIds = builtins.attrNames scopeContexts;
+            specsByHost = builtins.listToAttrs (
+              lib.concatMap (
+                spec:
                 let
-                  parent = scopeParent.${sid} or null;
+                  hasOutput = (spec.intoAttr or [ ]) != [ ];
+                  hostScopeId = if hasOutput then findHostScopeId scopeParent allScopeIds spec else null;
                 in
-                parent != null && parent != sid && isInSubtree parent
-              );
-            isAncestor =
-              sid:
-              let
-                parent = scopeParent.${hostScopeId} or null;
-              in
-              sid == parent || (parent != null && parent != hostScopeId && isAncestorOf scopeParent sid parent);
-            isRelevant = sid: isInSubtree sid || isAncestor sid;
-            subtreeScopeIds = builtins.filter isInSubtree allScopeIds;
-            relevantScopeIds = builtins.filter isRelevant allScopeIds;
-            scopeEntityClassMap = (result.state.scopeEntityClass or (_: { })) null;
-            subtreeContexts = lib.genAttrs subtreeScopeIds (
-              sid:
-              let
-                base = scopeContexts.${sid};
-                entityCls = scopeEntityClassMap.${sid} or null;
-              in
-              if !(base ? class) && entityCls != null then
-                base // { class = entityCls; }
-              else if !(base ? class) then
-                base // { class = hostClass; }
-              else
-                base
+                if hostScopeId == null then
+                  [ ]
+                else
+                  [
+                    {
+                      name = hostScopeId;
+                      value = spec;
+                    }
+                  ]
+              ) allInstantiates
             );
-            subtreeClassImports = lib.genAttrs subtreeScopeIds (sid: scopedClassImportsRaw.${sid} or { });
-            subtreeProvides = lib.filterAttrs (sid: _: isRelevant sid) scopedProvides;
-            subtreeRoutes = lib.filterAttrs (sid: _: isRelevant sid) scopedRoutes;
-            relevantContexts = lib.genAttrs relevantScopeIds (sid: scopeContexts.${sid});
-            subtreePhase1 = wrapPerScope ctx subtreeContexts subtreeClassImports;
-            subtreePhase2 = applyProvides ctx relevantContexts subtreeProvides subtreePhase1;
-            subtreePhase3 =
-              applyRoutes (fxResolve mkPipeline) ctx relevantContexts hostScopeId scopeParent subtreeRoutes
-                subtreePhase2;
-            preWalkedModules = extractSubtreeModules subtreePhase3.perScope scopeParent hostScopeId hostClass;
-            modules =
-              if preWalkedModules != null then
-                preWalkedModules
-              else
-                lib.optional (spec ? mainModule) spec.mainModule;
-            instantiateArgs =
-              if spec ? pkgs then
-                {
-                  inherit (spec) pkgs;
-                  inherit modules;
-                }
-              else
-                {
-                  inherit modules;
-                }
-                // lib.optionalAttrs (spec ? system) {
-                  modules = modules ++ [
-                    { nixpkgs.hostPlatform = lib.mkDefault spec.system; }
-                  ];
-                };
+            mkArgs = mkInstantiateArgs {
+              augmentedScopeContexts = scopeContexts;
+              inherit
+                scopedClassImportsRaw
+                scopedProvides
+                scopedRoutes
+                scopeParent
+                ;
+              scopeEntityClass = result.state.scopeEntityClass or (_: { });
+              fxResolveFn = fxResolve mkPipeline;
+              inherit ctx;
+            };
           in
-          (spec.instantiate instantiateArgs).config
-        ) specsByHost;
+          lib.mapAttrs (_: spec: (spec.instantiate (mkArgs spec)).config) specsByHost;
 
       # Assemble pipe data into scope contexts before wrapping.
       # Local config thunks are marked for deferred resolution inside evalModules.

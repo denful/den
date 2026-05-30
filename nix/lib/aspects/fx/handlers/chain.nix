@@ -13,23 +13,21 @@ let
       };
     "chain-pop" =
       { param, state }:
+      let
+        all = state.scopedIncludesChain null;
+        scopeChain = all.${state.currentScope} or [ ];
+        updated = all // {
+          ${state.currentScope} =
+            if scopeChain == [ ] then
+              throw "fx: chain-pop on empty scopedIncludesChain"
+            else
+              lib.init scopeChain;
+        };
+      in
       {
         resume = null;
         state = state // {
-          scopedIncludesChain =
-            _:
-            let
-              all = state.scopedIncludesChain null;
-              scopeChain = all.${state.currentScope} or [ ];
-            in
-            all
-            // {
-              ${state.currentScope} =
-                if scopeChain == [ ] then
-                  throw "fx: chain-pop on empty scopedIncludesChain"
-                else
-                  lib.init scopeChain;
-            };
+          scopedIncludesChain = _: updated;
         };
       };
   };

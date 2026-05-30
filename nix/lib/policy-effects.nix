@@ -101,7 +101,10 @@ in
   # Tier 1 delivery — replaces den.batteries.forward for the common case.
   route = spec: {
     __policyEffect = "route";
-    value = spec;
+    value = {
+      path = [ ];
+    }
+    // spec;
   };
 
   # Request post-pipeline instantiation of an entity's class content.
@@ -166,6 +169,10 @@ in
     };
     collect = pred: {
       __pipeStage = "collect";
+      fn = pred;
+    };
+    collectAll = pred: {
+      __pipeStage = "collectAll";
       fn = pred;
     };
   };

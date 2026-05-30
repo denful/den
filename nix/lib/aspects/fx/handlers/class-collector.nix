@@ -36,20 +36,18 @@ let
           if alreadyEmitted then
             state
           else
+            let
+              allImports = state.scopedClassImports null;
+              scopeImportData = allImports.${scope} or { };
+              updatedImports = allImports // {
+                ${scope} = scopeImportData // {
+                  ${param.class} = (scopeImportData.${param.class} or [ ]) ++ [ mod ];
+                };
+              };
+            in
             state
             // {
-              scopedClassImports =
-                x:
-                let
-                  all = state.scopedClassImports x;
-                  scopeData = all.${scope} or { };
-                in
-                all
-                // {
-                  ${scope} = scopeData // {
-                    ${param.class} = (scopeData.${param.class} or [ ]) ++ [ mod ];
-                  };
-                };
+              scopedClassImports = _: updatedImports;
               scopedEmittedLocs =
                 _:
                 emittedLocs

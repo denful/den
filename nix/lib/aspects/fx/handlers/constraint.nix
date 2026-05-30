@@ -85,24 +85,17 @@ let
         {
           resume = null;
           state =
-            (
-              state
-              // {
-                scopedConstraintRegistry =
-                  _:
-                  let
-                    all = (state.scopedConstraintRegistry or (_: { })) null;
-                    inherit (state) currentScope;
-                    scopeData = all.${currentScope} or { };
-                  in
-                  all
-                  // {
-                    ${currentScope} = scopeData // {
-                      ${param.identity} = (scopeData.${param.identity} or [ ]) ++ [ entry ];
-                    };
-                  };
-              }
-            )
+            let
+              all = (state.scopedConstraintRegistry or (_: { })) null;
+              inherit (state) currentScope;
+              scopeData = all.${currentScope} or { };
+              updatedRegistry = all // {
+                ${currentScope} = scopeData // {
+                  ${param.identity} = (scopeData.${param.identity} or [ ]) ++ [ entry ];
+                };
+              };
+            in
+            (state // { scopedConstraintRegistry = _: updatedRegistry; })
             // {
               flatConstraintRegistry = flatReg // {
                 ${param.identity} = existing ++ [ entry ];

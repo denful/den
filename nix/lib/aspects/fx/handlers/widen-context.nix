@@ -8,10 +8,15 @@ _: {
       let
         enrichedCtx = param.currentCtx // param.enrichment;
       in
+      let
+        updated = (state.scopeContexts null) // {
+          ${state.currentScope} = enrichedCtx;
+        };
+      in
       {
         resume = null;
         state = state // {
-          scopeContexts = _: (state.scopeContexts null) // { ${state.currentScope} = enrichedCtx; };
+          scopeContexts = _: updated;
         };
       };
   };

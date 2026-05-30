@@ -222,5 +222,46 @@
         expected = "no-ports";
       }
     );
+
+    # Parametric pipe values with unsatisfied required args pass through
+    # unresolved instead of crashing (e.g. quirk needing pkgs at a scope
+    # without pkgs).
+    test-pipe-unsatisfied-parametric-passthrough = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.quirks.build-info.description = "Build info requiring system args";
+
+        den.aspects.igloo = {
+          includes = [
+            den.aspects.producer
+            den.aspects.consumer
+          ];
+        };
+
+        den.aspects.producer = {
+          build-info =
+            { pkgs, ... }:
+            {
+              name = pkgs.hello.name;
+            };
+        };
+
+        den.aspects.consumer = {
+          nixos =
+            { build-info, ... }:
+            {
+              networking.hostName =
+                if builtins.length build-info == 1 && builtins.isFunction (builtins.head build-info) then
+                  "passthrough"
+                else
+                  "resolved";
+            };
+        };
+
+        expr = igloo.networking.hostName;
+        expected = "passthrough";
+      }
+    );
   };
 }

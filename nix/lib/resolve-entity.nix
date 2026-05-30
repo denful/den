@@ -51,7 +51,7 @@ let
         else if aspectKindSet ? ${name} then
           [
             {
-              __fn = c: c.${name}.aspect;
+              __fn = c: c.${name}.aspect or { };
               __args = {
                 ${name} = false;
               };
