@@ -282,22 +282,28 @@ let
     routes:
     let
       indexed = lib.imap0 (i: r: { inherit i r; }) routes;
-      # Build producer map: intoClass@scope → [route indices]
+      # Build producer map: intoClass@scope → [route indices].  Both simple
+      # routes and complex forwards are producers: a simple route injecting
+      # into a home-env class (e.g. homeManager) feeds the complex forward that
+      # carries that class to its host output (makeHomeEnv's userForward).
+      # Complex forwards read from the accumulating fold state, so any producer
+      # of their fromClass must fire first or the injected content is lost.
       producerMap = builtins.foldl' (
         acc:
         { i, r }:
-        if r.__complexForward or false then
-          let
-            key = "${r.intoClass}@${r.sourceScopeId}";
-          in
-          acc // { ${key} = (acc.${key} or [ ]) ++ [ i ]; }
-        else
-          acc
+        let
+          key = "${r.intoClass}@${r.sourceScopeId}";
+        in
+        acc // { ${key} = (acc.${key} or [ ]) ++ [ i ]; }
       ) { } indexed;
-      # A complex forward is "depends on producers" when its fromClass@scope
-      # has entries in producerMap (meaning another forward produces into it).
+      # A complex forward "depends on producers" when its fromClass@scope has
+      # producer entries from *other* routes (meaning another route produces
+      # into the class it consumes).  Simple routes read the original per-scope
+      # data, not the fold state, so they never depend on ordering themselves.
       hasDeps =
-        { i, r }: (r.__complexForward or false) && producerMap ? "${r.fromClass}@${r.sourceScopeId}";
+        { i, r }:
+        (r.__complexForward or false)
+        && builtins.any (j: j != i) (producerMap."${r.fromClass}@${r.sourceScopeId}" or [ ]);
       # Partition: routes without deps first, routes with deps last.
       # This is a single-level toposort (sufficient for A→B chains).
       noDeps = builtins.filter (ir: !hasDeps ir) indexed;
