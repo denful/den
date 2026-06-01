@@ -7,8 +7,30 @@
   collectClassMods,
 }:
 let
+  # Root-scope `fromClass` content a child-scope forward may pull in. When
+  # `fromClass` is a class some entity in the chain owns, root content under it
+  # is that entity's own declaration, not aggregation fodder — restrict to
+  # shared `den.default` (host class content reaches users opt-in via
+  # host-aspects). A custom forward-only class (e.g. `atuin`) only exists to
+  # feed forwards, so its root content is a legitimate source; keep it in full.
+  filterRootModules =
+    scopeContexts: spec: rootModules: isDenDefaultModule:
+    let
+      childCtx = scopeContexts.${spec.sourceScopeId} or { };
+      # Classes owned by each entity kind in the chain. Total over kinds so the
+      # filter never falls open for a non-user-owned scope (host, standalone home).
+      ownedClasses =
+        (childCtx.user.classes or [ ])
+        ++ lib.optional (childCtx ? host) childCtx.host.class
+        ++ lib.optional (childCtx ? home) childCtx.home.class;
+    in
+    if builtins.elem spec.fromClass ownedClasses then
+      builtins.filter isDenDefaultModule rootModules
+    else
+      rootModules;
+
   getCollectedSource =
-    acc: spec: rootScopeId: isDenDefaultModule:
+    acc: spec: rootScopeId: isDenDefaultModule: scopeContexts:
     let
       sid = spec.sourceScopeId;
     in
@@ -17,7 +39,7 @@ let
         ownModules = (acc.perScope.${sid} or { }).${spec.fromClass} or [ ];
         rootModules = (acc.perScope.${rootScopeId} or { }).${spec.fromClass} or [ ];
       in
-      builtins.filter isDenDefaultModule rootModules ++ ownModules
+      filterRootModules scopeContexts spec rootModules isDenDefaultModule ++ ownModules
     else
       acc.classImports.${spec.fromClass} or [ ];
 
@@ -61,7 +83,7 @@ let
     }:
     let
       spec = route;
-      collected = getCollectedSource acc spec rootScopeId isDenDefaultModule;
+      collected = getCollectedSource acc spec rootScopeId isDenDefaultModule scopeContexts;
       sourceModules =
         if collected != [ ] then collected else resolveSourceFallback spec fxResolve scopeContexts ctx;
       sourceModule = spec.mapModule { imports = sourceModules; };
