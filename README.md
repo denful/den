@@ -9,67 +9,61 @@
 
 > den and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [dendritic libs](https://denful.dev) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://denful.dev/sponsor)
 
-# den - Aspect-oriented, Context-driven Dendritic Nix configurations.
+# den — Aspect-oriented, Context-driven Dendritic Nix
 
-### Den allows creating parametric configurations by taking the Dendritic pattern to the function-level.
+**Write a feature once. Run it on every host, user, and platform you have — and share it with anyone, flake or not.**
 
-These configurations become specific when applied to your particular infra entities (hosts/users),
-while allowing re-usable aspects to be shared between hosts, users, or across other flakes and non-flake projects.
-
-<table>
-<tr>
-<td>
+Den turns Nix configuration into composable **features** instead of per-host piles of modules. A Den *aspect* is a plain function: give it context (your hosts and users) and it returns configuration for every Nix class it touches — `nixos`, `darwin`, `homeManager`, `hjem`, or a class you invent.
 
 ```nix
-# An aspect is a function taking context and
-# returning modules of different Nix classes
+# An aspect is a function of context that returns
+# configuration for many Nix classes at once.
 den.aspects.gaming = { host, user }: {
-  nixos = { pkgs, ... }: ...;
-  darwin = ...;
-  hjem = ...;
-  homeManager = ...;
+  nixos       = { pkgs, ... }: { programs.steam.enable = true; };
+  darwin      = { pkgs, ... }: { /* ... */ };
+  homeManager = { pkgs, ... }: { /* ... */ };
 
-  # aspects can depend on other aspects
-  includes = [ den.aspects.performance ];
-
-  # aspects can be organized in sub-aspects
-  provides.emulation = {
-    nixos = { pkgs, ... }: ... ;
-  };
-}
-```
-
-</td>
-<td>
-
-```nix
-# These three lines is how Den instantiates a configuration.
-# Other Nix configuration domains outside NixOS/nix-Darwin
-# can use the same pattern. demo: templates/nvf-standalone
-
-# Den resolves entities declared in den.hosts automatically.
-# Policies drive topology (host->[users]->[homes]).
-# The pipeline collects all aspects and produces per-class modules.
-
-# For manual resolution outside the pipeline:
-aspect = den.lib.aspects.resolve "nixos"
-  (den.aspects.my-aspect { host = den.hosts.x86_64-linux.my-laptop; });
-nixosConfigurations.my-laptop = lib.nixosSystem {
-  modules = [ aspect ];
+  includes = [ den.aspects.performance ];   # aspects compose
+  provides.emulation = { nixos = { /* ... */ }; };  # and nest
 };
 ```
 
-</td>
-</tr>
-</table>
+That one idea — **a feature as a function** — is what makes the rest possible.
 
-Den has Zero Dependencies. `den.lib` is domain agnostic, it can be used to configure anything Nix-configurable.
+## What Den makes possible
 
-On top of `den.lib`, Den also provides a [framework](https://den.denful.dev/explanation/context-pipeline/) for the NixOS/nix-Darwin/Home-Manager Nix domains.
+- **One feature, everywhere, in one place.** Stop scattering a single concern across separate `nixos`, `darwin`, and `homeManager` files. An aspect holds all of it together.
+- **Reuse across hosts, users — and across projects.** Share aspects between machines, between people, and between *flake and non-flake* setups, without forcing everyone to download each other's inputs.
+- **No `mkIf` / `enable` clutter.** The shape of the context *is* the condition — a function that asks for `{ host, user }` simply doesn't run where there's no user. Conditionals disappear.
+- **Hosts shape their users, users shape their hosts.** Cross-entity configuration flows both ways, without coupling them together.
+- **Add a capability in one line; remove it by deleting that line.** Hosts just pick the aspects they want.
+- **Bring your own classes and whole pipelines.** Custom Nix classes, machine fleets, MicroVM guests, terranix, standalone neovim — if you can walk it as data, Den can configure it.
 
-Den embraces your Nix choices and does not impose itself. All parts of Den are optional and replaceable. Works with your current setup, with/without flakes, flake-parts or any other Nix module system.
+## Principles
 
-> [Den is a declarative data transformation pipeline](https://github.com/denful/den/discussions/355). Infra entities are traversed via `den.policies` and configurations for them are generated when `den.aspects` are applied at each entity resolution.
+Four concepts, one job each:
+
+- **Entity** — *what exists*: a host, user, or home.
+- **Aspect** — *what it does*: a feature, spanning Nix classes.
+- **Policy** — *how entities relate*: topology and routing between them.
+- **Quirk** — *structured data aspects share*, without coupling.
+
+**Feature-first, not host-first.** Traditional setups start from hosts and push modules down; Den [flips that](https://den.denful.dev/explanation/core-principles/) — features are primary, hosts just select them.
+
+**Den embraces your Nix.** With or without flakes, flake-parts, or home-manager. Zero dependencies. Every part is optional and replaceable — Den works with the setup you already have, and gets out of the way.
+
+## Try it now
+
+```console
+# a MicroVM
+nix run github:denful/den?dir=templates/microvm#runnable-microvm
+
+# a standalone neovim
+nix run github:denful/den?dir=templates/nvf-standalone#my-neovim
+
+# a qemu VM
+nix run github:denful/den
+```
 
 <table>
 <tr>
@@ -80,372 +74,78 @@ Den embraces your Nix choices and does not impose itself. All parts of Den are o
 
 ## [Documentation](https://den.denful.dev)
 
-- [From Zero To Den](https://den.denful.dev/guides/from-zero-to-den/)
-
-- [From Flake To Den](https://den.denful.dev/guides/from-flake-to-den/)
-
+**Start here**
+- [From Zero to Den](https://den.denful.dev/guides/from-zero-to-den/)
+- [From Flake to Den](https://den.denful.dev/guides/from-flake-to-den/)
 - [Core Principles](https://den.denful.dev/explanation/core-principles/)
 
+**Go further**
 - [Custom Nix Classes](https://den.denful.dev/guides/custom-classes/)
-
 - [Homes Integration](https://den.denful.dev/guides/home-manager/)
-
 - [Batteries](https://den.denful.dev/guides/batteries/)
-
 - [Mutual Providers](https://den.denful.dev/guides/mutual/)
-
 - [Sharing Namespaces](https://den.denful.dev/guides/namespaces/)
-
 - [`<angle/brackets>`](https://den.denful.dev/guides/angle-brackets/)
-
 - [Tests as Code Examples](https://den.denful.dev/tutorials/ci/)
 
-## Project
-
-- [Versioning](https://den.denful.dev/releases/)
-
+**Project**
 - [Motivation](https://den.denful.dev/motivation/)
-
+- [Versioning](https://den.denful.dev/releases/)
 - [Community](https://den.denful.dev/community/)
-
 - [Contributing](https://den.denful.dev/contributing/)
 
 </div>
 </td>
 <td>
 
-### Templates:
+### Templates
 
-[default](https://den.denful.dev/tutorials/default/): +flake-file +flake-parts +home-manager
+Pick a starting point and grow from there:
 
-[minimal](https://den.denful.dev/tutorials/minimal): +flakes -flake-parts -home-manager
+- [default](https://den.denful.dev/tutorials/default/) — flake-file + flake-parts + home-manager
+- [minimal](https://den.denful.dev/tutorials/minimal) — flakes, nothing else
+- [noflake](https://den.denful.dev/tutorials/noflake) — npins + `lib.evalModules` + nix-maid
+- [nvf-standalone](https://den.denful.dev/tutorials/nvf-standalone) — neovim apps, no NixOS/Darwin needed
+- [microvm](https://den.denful.dev/tutorials/microvm) — runnable VM + declarative guests
+- [flake-parts-modules](https://den.denful.dev/tutorials/flake-parts-modules) — third-party perSystem classes
+- [example](https://den.denful.dev/tutorials/example) — cross-platform
 
-[noflake](https://den.denful.dev/tutorials/noflake): -flakes +npins +lib.evalModules +nix-maid
+### In the wild
 
-[nvf-standalone](https://den.denful.dev/tutorials/nvf-standalone): Standalone neovim apps, showcasing Den without NixOS/Darwin.
+- [`@vic`](https://github.com/vic/vix) — fleet-sharing config from Den's author
+- [`@quasigod`](https://tangled.org/quasigod.xyz/nixconfig) — custom namespaces + angle brackets
+- [`@Gwenodai`](https://github.com/Gwenodai/nixos) — path-naming conventions, custom guarded/forwarding classes
+- [`@adda`](https://codeberg.org/Adda/nixos-config) — multiple hosts, flake-parts + home-manager
 
-[microvm](https://den.denful.dev/tutorials/microvm): MicroVM runnable-pkg and guests. custom ctx-pipeline.
+> Den is also running on internal infra at **The European Commission**.
 
-[flake-parts-modules](https://den.denful.dev/tutorials/flake-parts-modules): Den forward classes for third-party perSystem submodules: nix-unit on aspects, mightyiam/files generation, devshells, etc.
-
-[example](https://den.denful.dev/tutorials/example): cross-platform
-
-[ci](https://den.denful.dev/tutorials/ci): Each feature tested as code examples
-
-[bogus](https://den.denful.dev/tutorials/bogus): Isolated test for bug reproduction
-
-### Examples:
-
-> Want yours featured? send me a DM via matrix or zulip (links at GH Discussions)
-
-[`@vic`](https://github.com/vic/vix): Fleet sharing user, author spends more time in Den itself. (-flakes +npins +auto-update +ci)
-
-[`@quasigod`](https://tangled.org/quasigod.xyz/nixconfig): Beautiful organization, uses custom Den namespaces and Den angle brackets (+flake-parts)
-
-[`@Gwenodai`](https://github.com/Gwenodai/nixos): Clever organization with path-naming conventions, custom guarded and forwarding classes
-
-[`@adda`](https://codeberg.org/Adda/nixos-config): Multiple hosts (+flake-parts +flake-file +home-manager +files)
-
-> Den is also being used on internal infra at The European Commission.
-
-Growing community adoption: [Usage Search](https://github.com/search?q=den.aspects+language%3ANix&type=code)
-
-**❄️ Try it:**
-
-```console
-# Run virtio MicroVM from templates/microvm
-nix run github:denful/den?dir=templates/microvm#runnable-microvm
-```
-
-```console
-# Run NVF-Standalone neovim from templates/nvf-standalone
-nix run github:denful/den?dir=templates/nvf-standalone#my-neovim
-```
-
-```console
-# Run qemu VM from templates/example
-nix run github:denful/den
-```
+Growing adoption: [usage search](https://github.com/search?q=den.aspects+language%3ANix&type=code)
 
 </td>
-
 </tr>
 </table>
 
-### Testimonials
+## What people say
 
 > Den takes the Dendritic pattern to a whole new level, and I cannot imagine going back.\
-> — `@adda` - Very early Den adopter after using Dendritic flake-parts and Unify.
+> — `@adda`, early Den adopter (after Dendritic flake-parts and Unify)
 
-> I’m super impressed with den so far, I’m excited to try out some new patterns that Unify couldn’t easily do.\
-> — `@quasigod` - Author of [Unify](https://codeberg.org/quasigod/unify) dendritic-framework, on adopting Den.
+> I'm super impressed with den so far, I'm excited to try out some new patterns that Unify couldn't easily do.\
+> — `@quasigod`, author of [Unify](https://codeberg.org/quasigod/unify)
 
 > Massive work you did here!\
-> — `@drupol` - Author of [“Flipping the Configuration Matrix”](https://not-a-number.io/2025/refactoring-my-infrastructure-as-code-configurations/#flipping-the-configuration-matrix) Dendritic blog post.
+> — `@drupol`, author of [“Flipping the Configuration Matrix”](https://not-a-number.io/2025/refactoring-my-infrastructure-as-code-configurations/#flipping-the-configuration-matrix)
 
-> Thanks for the awesome library and the support for non-flakes… it’s positively brilliant!. I really hope this gets wider adoption.\
-> — `@vczf` - At [`#den-lib:matrix.org`](https://matrix.to/#/#den-lib:matrix.org) channel.
+> Thanks for the awesome library and the support for non-flakes… it's positively brilliant! I really hope this gets wider adoption.\
+> — `@vczf`, at [`#den-lib:matrix.org`](https://matrix.to/#/#den-lib:matrix.org)
 
-> Den is a playground for some very advanced concepts. I’m convinced that some of its ideas will play a role in future Nix areas. In my opinion there are some raw diamonds in Den.\
-> — `@Doc-Steve` - Author of [Dendritic Design Guide](https://github.com/Doc-Steve/dendritic-design-with-flake-parts)
+> Den is a playground for some very advanced concepts… some of its ideas will play a role in future Nix areas. There are some raw diamonds in Den.\
+> — `@Doc-Steve`, author of the [Dendritic Design Guide](https://github.com/Doc-Steve/dendritic-design-with-flake-parts)
 
-## Code examples (OS configuration framework)
+---
 
-### Defining hosts, users and homes.
-
-Simplest example, one-liner definitions.
-
-```nix
-den.hosts.x86_64-linux.lap.users.vic = {};
-den.hosts.aarch64-darwin.mac.users.vic = {};
-den.homes.aarch64-darwin."vic@mac" = {};
-```
-
-The `den.aspects.vic` aspect is shared between
-these two hosts and standalone home-manager.
-
-The `vic@mac` homeConfiguration has `osConfig = mac.config`.
-
-Activate with:
-
-```console
-$ nixos-rebuild  switch --flake .#lap
-$ darwin-rebuild switch --flake .#mac
-$ home-manager   switch --flake .#vic
-```
-
-### Extensible Schemas for hosts, users and homes.
-
-These allow meta-configuration on entities, akin to
-what Dendritic flake-parts users do with top-level
-options, but here scoped to each entity type.
-
-People use this for declaring host or user capabilities
-that will later be used by aspects to implement configurations.
-
-```nix
-# extensible base modules for common, typed schemas
-den.schema.user = { user, lib, ... }: {
-  config.classes =
-    if user.userName == "vic" then [ "hjem" "maid" ]
-    else lib.mkDefault [ "homeManager" ];
-
-  options.mainGroup = lib.mkOption { default = user.userName; };
-};
-```
-
-### Dendritic Multi-Platform Hosts
-
-A single aspect like `den.aspects.workstation` can be
-shared between (included-at) NixOS/nix-Darwin/WSL hosts.
-
-Each aspect uses several Nix classes to define behaviour.
-
-```nix
-# modules/workstation.nix
-{ den, inputs, ... }: {
-  den.aspects.workstation = {
-    # re-usable configuration aspects. Den batteries and yours.
-    includes = [ den.batteries.hostname den.aspects.work-vpn ];
-
-    # regular nixos/darwin modules or any other Nix class
-    nixos  = { pkgs, ... }: { imports = [ inputs.disko.nixosModules.disko ]; };
-    darwin = { pkgs, ... }: { imports = [ inputs.nix-homebrew.darwinModules.nix-homebrew ]; };
-
-    # Custom Nix classes. `os` applies to both nixos and darwin.
-    # Contributed by @Risa-G.
-    # See https://den.denful.dev/guides/custom-classes/#user-contributed-examples
-    os = { pkgs, ... }: {
-      environment.systemPackages = [ pkgs.direnv ];
-    };
-
-    # host can contribute default home environments
-    # to all its users.
-    provides.to-users = {
-      homeManager = { pkgs, ... }: {
-        programs.vim.enable = true;
-        home.packages = [ pkgs.neovide ];
-      };
-    };
-  };
-}
-```
-
-### Multiple User Home Environments
-
-Each user can define configurations for different
-home environments, aiding with migration from
-homeManager to hjem or others.
-
-```nix
-# modules/vic.nix
-{ den, ... }: {
-
-  den.aspects.vic = {
-    # supports multiple home environments
-    homeManager = { pkgs, ... }: { };
-    hjem.files.".envrc".text = "use flake ~/hk/home";
-    maid.kconfig.settings.kwinrc.Desktops.Number = 3;
-
-    # user can contribute OS-configurations
-    # to all hosts it lives on
-    darwin.services.karabiner-elements.enable = true;
-
-    # user can specify config for specific host
-    provides.rog-tower = {
-      nixos = ...; # enable CUDA and gaming profile
-    };
-
-    # user class forwards into
-    # {nixos/darwin}.users.users.<userName>
-    user = { pkgs, ... }: {
-      packages = [ pkgs.helix ];
-      description = "oeiuwq";
-    };
-
-    includes = [
-      den.batteries.primary-user        # re-usable batteries
-      (den.batteries.user-shell "fish") # parametric aspects
-      den.aspects.tiling-wm            # your own aspects
-      den.aspects.gaming.provides.emulators
-    ];
-  };
-}
-```
-
-### Custom Dendritic Nix Classes
-
-[Custom classes](https://den.denful.dev/guides/custom-classes) is how Den implements `user`, `homeManager`, `hjem`, `wsl`, `microvm` support. You can use the very same mechanism to create your own Nix classes.
-
-The `den.batteries.forward` battery is the core of it.
-
-```nix
-# Example: A class for role-based configuration between users and hosts
-
-roleClass =
-  { host, user }:
-  { class, aspect-chain }:
-  den.batteries.forward {
-    each = lib.intersectLists (host.roles or []) (user.roles or []);
-    fromClass = lib.id;
-    intoClass = _: host.class;
-    intoPath = _: [ ];
-    fromAspect = _: lib.head aspect-chain;
-  };
-
-den.schema.user.includes = [ roleClass ];
-
-den.hosts.x86_64-linux.igloo = {
-  roles = [ "devops" "gaming" ];
-  users = {
-    alice.roles = [ "gaming" ];
-    bob.roles = [ "devops" ];
-  };
-};
-
-den.aspects.alice = {
-  # enabled when both support gaming role
-  gaming = { pkgs, ... }: { programs.steam.enable = true; };
-};
-
-den.aspects.bob = {
-  # enabled when both support devops role
-  devops = { pkgs, ... }: { virtualisation.podman.enable = true; };
-
-  # not enabled at igloo host (bob missing gaming role on that host)
-  gaming = {};
-};
-```
-
-### Guarded Forwarding Classes
-
-Any module/file can contribute to any aspects directly
-into their feature-concern Nix classes, without
-having to deal with feature-detection or having
-`mkIf`/`mkMerge` clutterring on all the codebase.
-
-The logic (guard) for conditional inclusion of a
-forwarded-class configuration is defined at a
-single place.
-
-#### Example: Platform Aware `homeManager` classes
-
-This uses `pkgs.stdenv.isXYZ` to define `hmXYZ` classes,
-because some hm configurations might be only available
-on specific platforms.
-
-```nix
-# aspect `tux` is used on both platforms
-den.hosts.x86_64-linux.igloo.users.tux = { };
-den.hosts.aarch64-darwin.apple.users.tux = { };
-
-den.aspects.hmPlatforms =
-  { class, aspect-chain }:
-  den.batteries.forward {
-    each = [ "Linux" "Darwin" ];
-    fromClass = platform: "hm${platform}";
-    intoClass = _: "homeManager";
-    intoPath = _: [ ];
-    fromAspect = _: lib.head aspect-chain;
-    guard = { pkgs, ... }: platform: lib.mkIf pkgs.stdenv."is${platform}";
-    adaptArgs = { config, ... }: { osConfig = config; };
-  };
-
-den.aspects.tux = {
-  includes = [ den.aspects.hmPlatforms ];
-
-  hmDarwin = { pkgs, ... }: { home.packages = [ pkgs.iterm2 ]; };
-
-  hmLinux = { pkgs, ... }: { home.packages = [ pkgs.wl-clipboard-rs ]; };
-};
-```
-
-#### Example: Class for Impermanence Capability
-
-Modules define configurations at aspects using the
-`persys` class directly, without any conditional.
-
-The guard guarantees they are applied **only**
-when impermanence module is enabled at host.
-
-> Inspired by @Doc-Steve
-
-```nix
-persys = { host }: den.batteries.forward {
-  each = lib.singleton true;
-  fromClass = _: "persys";
-  intoClass = _: host.class;
-  intoPath = _: [ "environment" "persistence" "/nix/persist/system" ];
-  fromAspect = _: den.aspects.${host.aspect};
-  guard = { options, config, ... }: options ? environment.persistence;
-};
-
-# enable on all hosts
-den.schema.host.includes = [ persys ];
-
-# aspects just attach config to custom class
-den.aspects.my-laptop.persys.hideMounts = true;
-```
-
-### User-defined Extensions to Den context pipeline.
-
-See example [`template/microvm`](https://den.denful.dev/tutorials/microvm) for an example
-of custom `den.schema` and `den.policies` extensions for supporting
-Declarative [MicroVM](https://microvm-nix.github.io/microvm.nix/declarative.html) guests with automatic host-shared `/nix/store`.
-
-```nix
-den.hosts.x86_64-linux.guest = {};
-den.hosts.x86_64-linux.host = {
-  microvm.guests = [ den.hosts.x86_64-linux.guest ];
-};
-
-den.aspects.guest = {
-  # propagated into host.nixos.microvm.vms.<name>;
-  microvm.autostart = true;
-
-  # guest supports all Den features.
-  includes = [ den.batteries.hostname ];
-  # As MicroVM guest propagated into host.nixos.microvm.vms.<name>.config;
-  nixos = { pkgs, ... }: { environment.systemPackages = [ pkgs.hello ]; };
-};
-```
+<p align="center">
+  <a href="https://den.denful.dev"><b>Read the docs →</b></a> ·
+  <a href="https://denful.dev/sponsor">Sponsor</a> ·
+  <a href="LICENSE">License</a>
+</p>
