@@ -91,7 +91,7 @@ Den batteries like `den.batteries.define-user` and `den.batteries.primary-user` 
 {
   inputs.nixpkgs = "github:nixos/nixpkgs/nixpkgs-unstable";
   inputs.darwin = "github:nix-darwin/nix-darwin";
-+  inputs.import-tree.url = "github:vic/import-tree";
++  inputs.import-tree.url = "github:denful/import-tree";
 +  inputs.den.url = "github:denful/den";
   
   outputs = inputs: 
@@ -153,7 +153,7 @@ you can have a flake like this:
 {
   inputs.nixpkgs = "github:nixos/nixpkgs/nixpkgs-unstable";
   inputs.darwin = "github:nix-darwin/nix-darwin";
-  inputs.import-tree.url = "github:vic/import-tree";
+  inputs.import-tree.url = "github:denful/import-tree";
   inputs.den.url = "github:denful/den";
   
   outputs = inputs: 
@@ -173,7 +173,7 @@ you can have a flake like this:
 
 ## Den-only flake outputs
 
-Even more, if you have defined all flake outputs as Dendritic
+Even more, if you have defined all flake outputs as aspect-oriented
 `flake` outputs inside `modules/` your final `flake.nix` becomes:
 
 ```nix "config.flake"
@@ -181,7 +181,7 @@ Even more, if you have defined all flake outputs as Dendritic
 {
   inputs.nixpkgs = "github:nixos/nixpkgs/nixpkgs-unstable";
   inputs.darwin = "github:nix-darwin/nix-darwin";
-  inputs.import-tree.url = "github:vic/import-tree";
+  inputs.import-tree.url = "github:denful/import-tree";
   inputs.den.url = "github:denful/den";
   
   outputs = inputs: 

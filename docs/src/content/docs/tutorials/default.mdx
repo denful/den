@@ -34,7 +34,7 @@ modules/
   nh.nix               # per-host/home build apps via nh
 ```
 
-The tree is loaded with [import-tree](https://github.com/vic/import-tree): every
+The tree is loaded with [import-tree](https://github.com/denful/import-tree): every
 `.nix` file under `modules/` is imported automatically, so you add configuration
 by dropping in new files.
 
@@ -194,7 +194,7 @@ nix run .#igloo -- switch
   # other inputs may be defined at a module using them.
   flake-file.inputs = {
     den.url = "github:denful/den";
-    flake-file.url = "github:vic/flake-file";
+    flake-file.url = "github:denful/flake-file";
     home-manager = {
       url = "github:nix-community/home-manager";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -203,7 +203,7 @@ nix run .#igloo -- switch
 }
 ```
 
-This uses [flake-file](https://github.com/vic/flake-file) so inputs can be defined close to where they are used. Run `nix run .#write-flake` to regenerate `flake.nix` after changing inputs.
+This uses [flake-file](https://github.com/denful/flake-file) so inputs can be defined close to where they are used. Run `nix run .#write-flake` to regenerate `flake.nix` after changing inputs.
 
 ## Data Flow
 

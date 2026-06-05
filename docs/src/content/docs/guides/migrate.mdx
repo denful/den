@@ -18,7 +18,7 @@ Migration to Den is incremental. You do not need to rewrite everything at once.
     ```nix
     {
       inputs.den.url = "github:denful/den";
-      inputs.import-tree.url = "github:vic/import-tree";
+      inputs.import-tree.url = "github:denful/import-tree";
 
       outputs = inputs: inputs.flake-parts.lib.mkFlake { inherit inputs; }
         (inputs.import-tree ./modules);
@@ -44,7 +44,7 @@ Migration to Den is incremental. You do not need to rewrite everything at once.
 
 3. Import Existing Modules
 
-    Use `den.batteries.import-tree` to load your existing non-dendritic modules:
+    Use `den.batteries.import-tree` to load your existing plain modules:
 
     ```nix
     # modules/legacy.nix

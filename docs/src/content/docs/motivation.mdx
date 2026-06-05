@@ -9,7 +9,7 @@ import { Aside } from '@astrojs/starlight/components';
 This section is about how and why Den came to be.
 You can safely skip this unless you are interested in how Den was shaped.
 
-However you might need to already be familiar with what [Dendritic](https://github.com/mightyiam/dendritic) means
+However you might need to already be familiar with what an *aspect* (a single concern configured across multiple Nix classes) means
 you might also want to read the [FAQ](https://github.com/Doc-Steve/dendritic-design-with-flake-parts/wiki/FAQ)
 </Aside>
 
@@ -25,7 +25,7 @@ The purpose of Den is *social* more than purely _technical_.
 
 Den can be used with/without flakes, with/without flake-parts, because it is an
 exploration on how to take nix module sharing to a higher-level, literaly, since
-*dendritic* modules contain one or more of other classic _non-dendritic_ modules.
+*aspect* modules contain one or more classic _plain_ modules.
 
 ## The history of Den
 
@@ -41,7 +41,7 @@ However, before adopting `unify`, I realized that my re-usability problem was no
 
 Being an fan of functional programming, the most composable things I know are functions.
 
-## **A dendritic aspect in Den is a function**
+## **An aspect in Den is a function**
 
 ```nix
 # Just like any nixos module can be a function: 
@@ -105,7 +105,7 @@ So, `dendrix` became something like an index of browsable aspects found in GitHu
 Den is more about giving to others (creating useful Nix software/configurations), not just about make things work locally.
 
 <Aside type="tip" title="Support Den development" icon="heart">
-I've been working over a year on these [dendritic libs](https://denful.github.io/dendrix/Dendritic-Ecosystem.html#vics-dendritic-libraries), but time is our most scarce resource. If you like my work, consider [sponsoring](https://github.com/sponsors/vic)
+I've been working over a year on these [aspect libs](https://denful.github.io/dendrix/Dendritic-Ecosystem.html#vics-dendritic-libraries), but time is our most scarce resource. If you like my work, consider [sponsoring](https://github.com/sponsors/vic)
 </Aside>
 
 

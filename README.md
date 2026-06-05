@@ -2,14 +2,14 @@
   <a href="https://denful.dev/sponsor"><img src="https://img.shields.io/badge/sponsor-vic-white?logo=githubsponsors&logoColor=white&labelColor=%23FF0000" alt="Sponsor Vic"/></a>
   <a href="https://deepwiki.com/denful/den"><img src="https://deepwiki.com/badge.svg" alt="Ask DeepWiki"></a>
   <a href="https://github.com/denful/den/releases"><img src="https://img.shields.io/github/v/release/denful/den?style=plastic&logo=github&color=purple"/></a>
-  <a href="https://denful.dev"><img src="https://img.shields.io/badge/Dendritic-Nix-informational?logo=nixos&logoColor=white" alt="Dendritic Nix"/></a>
+  <a href="https://denful.dev"><img src="https://img.shields.io/badge/Aspect_oriented-Nix-informational?logo=nixos&logoColor=white" alt="Aspect-oriented Nix"/></a>
   <a href="LICENSE"><img src="https://img.shields.io/github/license/denful/den" alt="License"/></a>
   <a href="https://github.com/denful/den/actions"><img src="https://github.com/denful/den/actions/workflows/test.yml/badge.svg" alt="CI Status"/></a>
 </p>
 
-> den and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [dendritic libs](https://denful.dev) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://denful.dev/sponsor)
+> den and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [aspect libs](https://denful.dev) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://denful.dev/sponsor)
 
-# den — Aspect-oriented, Context-driven Dendritic Nix
+# den — Aspect-oriented, Context-driven Nix
 
 **Write a feature once. Run it on every host, user, and platform you have — and share it with anyone, flake or not.**
 

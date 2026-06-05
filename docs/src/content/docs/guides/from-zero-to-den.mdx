@@ -38,15 +38,15 @@ This guide assumes you have familiarity with:
 Our first step is creating a directory layout for your Den.
 
 ```console "_nixos"
-mkdir ./modules                     # Dendritic modules directory
+mkdir ./modules                     # aspect modules directory
 cp -r /etc/nixos ./modules/_nixos  # OPTIONAL existing NixOS modules
 ```
 
 <Steps>
-1. All your **Dendritic Nix modules** will be loaded by [`import-tree`](https://github.com/vic/import-tree) automatically from `./modules`
+1. All your **aspect modules** will be loaded by [`import-tree`](https://github.com/denful/import-tree) automatically from `./modules`
 2. _(optional)_ Copy your existing _NixOS modules_ into `modules/_nixos`. 
 
-   The `_` is **important** for import-tree to **ignore** and _NOT_ auto-load `_nixos/configuration.nix` nor `_nixos/hardware-configuration.nix` since they are regular NixOS modules and not Dendritic ones.
+   The `_` is **important** for import-tree to **ignore** and _NOT_ auto-load `_nixos/configuration.nix` nor `_nixos/hardware-configuration.nix` since they are regular NixOS modules and not aspects.
 </Steps>
 
 ### Step 2. Pinning Den and dependencies
@@ -56,9 +56,9 @@ will integrate all together:
 
 ```console "import-tree" "den" "with-inputs"
 npins init                                  # adds nixpkgs channel
-npins add github vic import-tree      -b main  # for auto-importing ./modules
+npins add github denful import-tree      -b main  # for auto-importing ./modules
 npins add github denful den           -b main  # Den itself, of course
-npins add github vic with-inputs      -b main  # flake-like inputs without Nix flakes.
+npins add github denful with-inputs      -b main  # flake-like inputs without Nix flakes.
 npins add github nix-community home-manager --branch master # OPTIONAL home integration
 ```
 
@@ -87,7 +87,7 @@ A tiny file, but a lot of things happening on it:
 
 2. Flake like input follows and overrides via [with-inputs](https://github.com/denful/with-inputs). 
 
-    This ensures full compatibility between flakes and non-flakes worlds. You can share and re-use Dendritic modules from other people independently if they use flakes or not. Also in case you later move into flakes, nothing in your modules changes, just the entrypoint.
+    This ensures full compatibility between flakes and non-flakes worlds. You can share and re-use aspect modules from other people independently if they use flakes or not. Also in case you later move into flakes, nothing in your modules changes, just the entrypoint.
 
 3. Merges all imported modules into an actual unified config.
 
@@ -104,7 +104,7 @@ A tiny file, but a lot of things happening on it:
 ### Step 4. Host configuration in Den
 
 <Aside title="No Monoliths" icon="nix">
-For brevity and teaching purposes, this guide uses a single `modules/den.nix` file. But Dendritic setups are not monolithic unlike most flake examples in the wild.
+For brevity and teaching purposes, this guide uses a single `modules/den.nix` file. But aspect-oriented setups are not monolithic unlike most flake examples in the wild.
 
 The recommendation is to split your modules as they make sense to you. Any file can contribute to any Den aspects and hosts/users can be defined anywhere.
 
@@ -163,7 +163,7 @@ This is all that is happening at `modules/den.nix`.
     gaming = { nixos = ...; homeManager = ...; hjem = ...; }
     ```
 
-    Such an attrset is said to be **Dendritic** because it allows configuring a single cross-cutting concern (`gaming`) over different Nix classes.
+    Such an attrset is an **aspect** because it lets you configure a single cross-cutting concern (`gaming`) over different Nix classes.
 
     Nix classes are NOT an artificial concept created by Den. There are [many nix classes in the wild](https://github.com/search?q=language%3ANix+%28%22+class+%3D+%22+AND+%22evalModules%22%29&type=code), the most common are [`nixos`](https://github.com/search?q=repo%3ANixOS%2Fnixpkgs+%22class+%3D+%5C%22nixos%5C%22%22&type=code), [`darwin`](https://github.com/nix-darwin/nix-darwin/blob/da529ac9e46f25ed5616fd634079a5f3c579135f/eval-config.nix#L81), [`homeManager`](https://github.com/nix-community/home-manager/blob/5be5d8245cbc7bc0c09fbb5f38f23f223c543f85/nixos/common.nix#L27).
     </Aside>
@@ -236,7 +236,7 @@ This is all that is happening at `modules/den.nix`.
     };
     ```
 
-8. _optional if you copied `/etc/nixos` into `modules/_nixos`)_ Import Non-Dendritic **NixOS modules**.
+8. _optional if you copied `/etc/nixos` into `modules/_nixos`)_ Import plain **NixOS modules**.
 
     The `nixos` attribute value is just a regular NixOS module. Because of this, it can import your previous `./_nixos/configuration.nix` module or any other NixOS module from Nix libraries.
 

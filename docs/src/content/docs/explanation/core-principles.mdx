@@ -57,15 +57,15 @@ Anything that you can describe via a data structure that can be traversed, can b
 
 ### Den is Aspect-oriented
 
-<Aside icon="nix" title="Dendritic Aspects">
+<Aside icon="nix" title="Aspects">
 
-A Dendritic aspect is an attrset that contains modules of different Nix `class`.
+An aspect is an attrset that contains modules of different Nix `class`.
 
 ```nix
 gaming = { host, user }: { nixos = ...; homeManager = ...; hjem = ...; darwin = ... ; }
 ```
 
-Such an attrset is said to be [**Dendritic**](https://dendrix.denful.dev/Dendritic.html) because it allows configuring a single cross-cutting concern (`gaming`) over different configuration domains.
+Such an attrset is an [**aspect**](https://dendrix.denful.dev/Dendritic.html) because it lets you configure a single cross-cutting concern (`gaming`) over different configuration domains.
 
 Nix classes are NOT an artificial concept created by Den. There are [many nix classes in the wild](https://github.com/search?q=language%3ANix+%28%22+class+%3D+%22+AND+%22evalModules%22%29&type=code), the most common are [`nixos`](https://github.com/search?q=repo%3ANixOS%2Fnixpkgs+%22class+%3D+%5C%22nixos%5C%22%22&type=code), [`darwin`](https://github.com/nix-darwin/nix-darwin/blob/da529ac9e46f25ed5616fd634079a5f3c579135f/eval-config.nix#L81), [`homeManager`](https://github.com/nix-community/home-manager/blob/5be5d8245cbc7bc0c09fbb5f38f23f223c543f85/nixos/common.nix#L27).
 </Aside>
@@ -151,11 +151,11 @@ Minimal real-life example: [wsl support](https://github.com/denful/den/blob/main
 <Aside title="Recommended Read">
 [Flipping the Configuration Matrix](https://not-a-number.io/2025/refactoring-my-infrastructure-as-code-configurations/#flipping-the-configuration-matrix) by [Pol Dellaiera](https://github.com/drupol) was very influential in Den design and is a very recommended read.
 
-See also my [dendrix article](https://dendrix.denful.dev/Dendritic.html) about the advantages of Dendritic Nix.
+See also my [dendrix article](https://dendrix.denful.dev/Dendritic.html) about the advantages of aspect-oriented Nix.
 </Aside>
 
 Traditional Nix configurations start from hosts and push modules downward.
-Den follows a Dendritic model that inverts this: **aspects** (features) are the primary organizational unit.
+Den follows an aspect-oriented model that inverts this: **aspects** (features) are the primary organizational unit.
 Each aspect declares its behavior per Nix class, and hosts simply select which
 aspects apply to them.
 
