@@ -35,8 +35,8 @@ jobs:
           done
       - name: Build
         run: nix-shell --run 'just docs-build'
-      - run: cp -r ~/versioned/docs/* docs/dist/
-      - run: cp ~/versioned/docs.json docs/dist/versions.json
+      - run: cp -r ~/versioned/docs/* docs/dist/ || true
+      - run: cp ~/versioned/docs.json docs/dist/versions.json || true
       - name: Setup Pages
         uses: actions/configure-pages@v5
       - name: Upload artifact
