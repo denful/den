@@ -74,8 +74,9 @@ Most importantly, the context `{host,user}` here are **not** `_module.args` **no
 
 <Aside type="caution" title="Den context ≠ NixOS module args">
 When Den docs say "context" they mean the pipeline parameters (`{ host }`, `{ host, user }`,
-`{ home }`, or any combination) — real Nix function arguments. Context is freeform: `{ host, user }` is equivalent to
-`{ host }: { user }:`, and you can request any subset you need (e.g., `{ user }` alone, or `{ user, class }`).
+`{ home }`, or any combination) — a single attrset argument to a real Nix function. Context is
+freeform: you can request any subset you need (e.g., `{ user }` alone, or `{ user, class }`), and
+the pipeline introspects the argument pattern to decide where the function applies.
 This is distinct from NixOS module arguments (`{ config, pkgs, lib, ... }`) which live inside the module system.
 Den context is evaluated _before_ module evaluation, which is why it cannot cause infinite recursion.
 </Aside>
@@ -88,6 +89,7 @@ configuration is applied to data at a given point in the pipeline.
 Say you have an entity kind `foo` with data shape `{ x }`:
 
 ```nix
+# inherit (den.lib) policy;  # brings `policy.resolve.to` shorthand into scope
 # This policy fans out from entity kind `foo` to entity kind `bar`
 den.policies.foo-to-bar = { x, ... }:
   [ (policy.resolve.to "bar" { y = x; }) ];
@@ -109,6 +111,7 @@ This is how everything works in Den. Policies drive entity topology,
 and schema includes activate aspects at each entity kind:
 
 ```nix
+# inherit (den.lib) policy;  # brings `policy.resolve.to` shorthand into scope
 # Activate the host's own aspect for all hosts
 den.schema.host.includes = [ ({ host }: den.aspects.${host.aspect}) ];
 
@@ -138,7 +141,7 @@ Minimal real-life example: [wsl support](https://github.com/denful/den/blob/main
 
 [home-env](https://github.com/denful/den/blob/main/nix/lib/home-env.nix#L97) is how Den implements homeManager/hjem/maid support
 
-[flake-parts perSystem classes](https://github.com/denful/den/blob/main/templates/flake-parts-modules/modules/custom-classes.nix)
+[flake-parts perSystem classes](https://github.com/denful/den/blob/main/templates/flake-parts-modules/modules/classes/files.nix)
 
 [microvm guests support](https://github.com/denful/den/blob/main/templates/microvm/modules/microvm-integration.nix#L46)
 </Aside>

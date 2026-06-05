@@ -6,8 +6,8 @@ description: Context-aware aspects that receive pipeline data based on their arg
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`nix/lib/default.nix`](https://github.com/denful/den/blob/main/nix/lib/default.nix) --
-[`nix/lib/can-take.nix`](https://github.com/denful/den/blob/main/nix/lib/can-take.nix)
+[`nix/lib/aspects/fx/handlers/compile-parametric.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/handlers/compile-parametric.nix) --
+[`nix/lib/aspects/fx/aspect/normalize.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/aspect/normalize.nix)
 </Aside>
 
 ## What is a Parametric Aspect
@@ -104,5 +104,5 @@ den.aspects.my-laptop.includes = [
 - [Aspects & Functors](/explanation/aspects/) — aspect structure and resolution
 - [Class Modules](/explanation/class-modules/) — flat-form context injection inside class modules
 - [Resolution Pipeline](/explanation/context-pipeline/) — how parametric dispatch fits the pipeline
-- [den.lib reference](/reference/lib/) — `canTake` and other library functions
-- [Migrating from den.ctx](/guides/migrate-ctx/) — if upgrading from deprecated wrapper APIs (`den.lib.parametric`, `perHost`, etc.)
+- [Deprecated den.lib functions](/reference/lib-deprecated/) — the old `den.lib.parametric` / `canTake` / `perHost` helpers the pipeline now replaces
+- [Migrating from den.ctx](/guides/migrate-ctx/) — if upgrading from deprecated wrapper APIs

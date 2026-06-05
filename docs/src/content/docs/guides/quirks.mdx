@@ -6,9 +6,9 @@ description: Hands-on guide to structured data flow between aspects using quirks
 import { Aside, Steps } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`templates/ci/modules/features/pipes.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipes.nix) --
-[`templates/ci/modules/features/pipe-policy.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipe-policy.nix) --
-[`templates/ci/modules/features/pipe-scope.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipe-scope.nix)
+[`templates/ci/modules/public-api/pipes.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/pipes.nix) --
+[`templates/ci/modules/public-api/pipe-policy.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/pipe-policy.nix) --
+[`templates/ci/modules/public-api/pipe-scope.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/pipe-scope.nix)
 </Aside>
 
 ## Quick start: firewall ports
@@ -422,4 +422,4 @@ Local thunks are resolved lazily inside `evalModules`. Cross-host thunks
 
 - [Quirks & Pipes explanation](/explanation/quirks-and-pipes/) — conceptual overview
 - [den.quirks reference](/reference/quirks/) — option types and pipe builder API
-- [Tests as examples](https://github.com/denful/den/tree/main/templates/ci/modules/features) — `pipes.nix`, `pipe-policy.nix`, `pipe-scope.nix`
+- [Tests as examples](https://github.com/denful/den/tree/main/templates/ci/modules/public-api) — `pipes.nix`, `pipe-policy.nix`, `pipe-scope.nix`

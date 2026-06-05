@@ -72,9 +72,28 @@ den.schema.host = { ... }: {
 };
 ```
 
+A schema entry also accepts two list attributes, stripped before the module
+merge and consumed by the resolution pipeline:
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `includes` | `listOf raw` | Aspects/policies activated for every entity of this kind |
+| `excludes` | `listOf raw` | Aspects/policies suppressed for every entity of this kind |
+
+```nix
+# Activate a policy for every host
+den.schema.host.includes = [ den.policies.host-to-peers ];
+```
+
+See [Policy Activation](/explanation/policy-activation/) for how `includes`
+drives activation.
+
 ### Entity Kinds
 
-Entity kinds (`host`, `user`, `home`) are derived from the keys of `den.schema`. The pipeline uses the kind name to dispatch policies and resolve entities. Adding a key to `den.schema` registers a new entity kind.
+Entity kinds (`host`, `user`, `home`) are derived from the keys of `den.schema`.
+The pipeline uses the kind name to dispatch policies and resolve entities. Adding
+a key to `den.schema` registers a new entity kind. Den pre-registers `fleet` as an
+empty kind used by the [diagram](/reference/diag/) and fleet-view machinery.
 
 ## `den.hosts`
 
@@ -101,7 +120,6 @@ den.hosts.x86_64-linux.myhost = {
 | `description` | `str` | auto | `class.hostName@system` |
 | `resolved` | `raw` | auto | Resolved aspect from context pipeline (see below) |
 | `users` | `attrsOf userType` | `{}` | User accounts on this host |
-| `policies` | `listOf str` | `[]` | Additional policies activated for this host. Core policies are always active. |
 | `collisionPolicy` | `null \| enum` | `null` | Class module collision policy for this entity: `"error"`, `"den-wins"`, or `"class-wins"`. See [Class Modules](/explanation/class-modules/). |
 | `instantiate` | `raw` | auto | OS builder function |
 | `intoAttr` | `listOf str` | auto | Flake output path |
@@ -136,7 +154,7 @@ Type: `attrsOf userType`
 | `userName` | `str` | `name` | System account name |
 | `classes` | `listOf str` | `[ "user" ]` | Nix classes this user participates in |
 | `aspect` | `raw` | `den.aspects.<name>` | Resolved aspect attrset |
-| `policies` | `listOf str` | `[]` | Additional policies activated for this user. Core policies are always active. |
+| `host` | `raw` | parent host | The host this user belongs to |
 | `collisionPolicy` | `null \| enum` | `null` | Class module collision policy: `"error"`, `"den-wins"`, or `"class-wins"`. See [Class Modules](/explanation/class-modules/). |
 | `resolved` | `raw` | auto | Resolved aspect from context pipeline (see below) |
 | `*` | `den.schema.user` options | | Options from base module |
@@ -148,7 +166,9 @@ Freeform: additional attributes pass through to the user module.
 
 Type: `attrsOf homeSystemType`
 
-Standalone home-manager configurations, keyed by system string.
+Standalone home-manager configurations, keyed by system string. A key of the
+form `user@host` binds the home to an existing host's user; a bare key declares
+an unbound standalone home.
 
 ```nix
 den.homes.x86_64-linux.vic = {};
@@ -158,15 +178,17 @@ den.homes.x86_64-linux.vic = {};
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `name` | `str` | attr name | Home configuration name |
-| `userName` | `str` | `name` | User account name |
+| `name` | `str` | parsed name | Home configuration name (the part before `@` in a `user@host` key) |
+| `userName` | `str` | parsed name | User account name |
+| `hostName` | `null \| str` | parsed host | Bound host name, or `null` for unbound standalone homes (the part after `@`) |
+| `host` | `raw` | resolved host | Bound host entity, or `null` when standalone |
+| `user` | `raw` | resolved user | Bound user entity, or `null` when standalone |
 | `system` | `str` | parent key | Platform system |
 | `class` | `str` | `"homeManager"` | Home management class |
 | `aspect` | `raw` | `den.aspects.<name>` | Resolved aspect attrset |
-| `description` | `str` | auto | `home.userName@system` |
+| `description` | `str` | auto | `home.name@system` |
 | `pkgs` | `raw` | `inputs.nixpkgs.legacyPackages.$sys` | Nixpkgs instance |
 | `instantiate` | `raw` | `inputs.home-manager.lib.homeManagerConfiguration` | Builder |
-| `policies` | `listOf str` | `[]` | Additional policies activated for this home. Core policies are always active. |
 | `collisionPolicy` | `null \| enum` | `null` | Class module collision policy: `"error"`, `"den-wins"`, or `"class-wins"`. See [Class Modules](/explanation/class-modules/). |
 | `resolved` | `raw` | auto | Resolved aspect from context pipeline (see below) |
 | `intoAttr` | `listOf str` | `[ "homeConfigurations" name ]` | Output path |
@@ -179,4 +201,3 @@ Every entity (host, user, home) has a `resolved` attribute — the aspect
 produced by running the entity through the resolution pipeline. This is
 auto-derived and used internally by `mainModule` to produce the entity's
 final configuration.
-

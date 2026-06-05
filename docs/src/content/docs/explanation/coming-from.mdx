@@ -47,7 +47,7 @@ a home, it extracts the `homeManager` attrs. You write the concern once.
 |---|---|
 | `perSystem` | `den.schema.flake-system` -- flake-level [policies](/explanation/policies/) fan out per system |
 | `flake.nixosConfigurations` | `den.hosts` -- Den generates flake outputs from entity declarations |
-| `mkFlake` | `inputs.den.flakeModule` or `inputs.den.denModule` -- Den is a flake-parts module |
+| `mkFlake` | `inputs.den.flakeModule` (alias of `inputs.den.flakeModules.default`) -- Den is a flake-parts module |
 | `flakeModules` for sharing | `den.ful` namespaces -- shareable aspect libraries |
 
 Den integrates with flake-parts, so the two are complementary. You can use `perSystem`

@@ -3,7 +3,7 @@ title: Templates Overview
 description: All available Den templates and when to use each one.
 ---
 
-Den ships six templates that cover progressively complex setups. Use `nix flake init` to scaffold a new project:
+Den ships several templates that cover progressively complex setups. Use `nix flake init` to scaffold a new project:
 
 ```console
 nix flake init -t github:denful/den#<template>
@@ -20,10 +20,21 @@ nix flake init -t github:denful/den#<template>
 | [**nvf-standalone**](/tutorials/nvf-standalone/) | Den based NVF without NixOS | ✓ | ✗ | ✗ |
 | [**microvm**](/tutorials/microvm/) | MicroVM host and guests | ✓ | ✗ | ✗ |
 | [**flake-parts-modules**](/tutorials/flake-parts-modules/) | flake-parts perSystem submodules | ✓ | ✓ | ✗ |
-| [**fleet-demo**](/tutorials/fleet-demo/) | Multi-host fleet with environments | ✓ | ✓ | ✓ |
-| [**terranix-demo**](/tutorials/terranix-demo/) | Terraform config from den hosts | ✓ | ✓ | ✗ |
 | [**bogus**](/tutorials/bogus/) | Bug reproduction | ✓ | ✓ | ✓ |
 | [**ci**](/tutorials/ci/) | Den's own test suite | ✓ | ✓ | ✓ |
+
+## Demo Directories
+
+The following are **not** `nix flake init` templates — they are demo directories
+that live in the Den repository. Their `flake.nix` references Den via a relative
+`path:../..`, so they only resolve from inside a checkout of the repo. To explore
+one, clone the repo and copy `templates/<demo>/` out as your starting point, or run
+the commands on its page from the repo root.
+
+| Demo | Use case | Flakes | flake-parts | Home-Manager |
+|------|----------|:------:|:-----------:|:------------:|
+| [**fleet-demo**](/tutorials/fleet-demo/) | Multi-host fleet with environments | ✓ | ✓ | ✓ |
+| [**terranix-demo**](/tutorials/terranix-demo/) | Terraform config from den hosts | ✓ | ✓ | ✗ |
 
 ## Quick Start
 
@@ -50,7 +61,7 @@ modules/
   *.nix            # aspect definitions, one concern per file
 ```
 
-Den uses [import-tree](https://github.com/denful/import-tree) to recursively load all `.nix` files under `modules/`. You never need to manually list imports — just create files.
+Den uses [import-tree](https://github.com/vic/import-tree) to recursively load all `.nix` files under `modules/`. You never need to manually list imports — just create files.
 
 ## What Each Template Demonstrates
 
@@ -62,7 +73,7 @@ Den uses [import-tree](https://github.com/denful/import-tree) to recursively loa
 - **nvf-standalone** — Demostrates Den outside the NixOS/nix-Darwin framework.
 - **flake-parts-modules** — Integrate Den aspects with third-party flake-parts perSystem submodules.
 - **fleet-demo** — Multi-host fleet with environments, cross-host `pipe.collect`, haproxy load balancing
-- **terranix-demo** — Generate Terraform config from den hosts using `route.instantiate`
+- **terranix-demo** — Generate Terraform config from den hosts using `policy.instantiate`
 - **bogus** — Creating minimal reproductions for bug reports with nix-unit
 - **ci** — Comprehensive tests covering every Den feature (your best learning resource)
 

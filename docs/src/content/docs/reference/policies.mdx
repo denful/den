@@ -94,6 +94,18 @@ Request post-pipeline instantiation of an entity:
 policy.instantiate den.hosts.x86_64-linux.igloo
 ```
 
+### `policy.spawn`
+
+Request a deferred node spawn, resolved post-walk over the parent
+pipeline's full scope-tree state (host + siblings) so projected content
+sees fleet-wide pipe values. `classes` defaults to the spawning entity's
+classes at the drain site when `null`:
+
+```nix
+policy.spawn { }
+policy.spawn { classes = [ "homeManager" ]; }
+```
+
 ### `policy.pipe`
 
 See [den.quirks reference](/reference/quirks/) for the pipe builder API.
@@ -207,14 +219,14 @@ den.lib.policy.when (ctx: ctx.flag or false)
 
 | Policy | From | To | Behavior |
 |---|---|---|---|
-| `to-systems` | `flake` | `flake-system` | One `{ system }` per `den.systems` entry |
-| `to-os-outputs` | `flake-system` | `host` | One `{ host }` per host + instantiate |
-| `to-hm-outputs` | `flake-system` | `home` | One `{ home }` per home + instantiate |
-| `to-packages` | `flake-system` | — | Route `packages` class to flake output |
-| `to-apps` | `flake-system` | — | Route `apps` class to flake output |
-| `to-checks` | `flake-system` | — | Route `checks` class to flake output |
-| `to-devShells` | `flake-system` | — | Route `devShells` class to flake output |
-| `to-legacyPackages` | `flake-system` | — | Route `legacyPackages` class to flake output |
+| `flake-to-systems` | `flake` | `flake-system` | One `{ system }` per `den.systems` entry |
+| `system-to-os-outputs` | `flake-system` | `host` | One `{ host }` per host + instantiate |
+| `system-to-hm-outputs` | `flake-system` | `home` | One `{ home }` per home + instantiate |
+| `packages-to-flake` | `flake-system` | — | Route `packages` class to flake output |
+| `apps-to-flake` | `flake-system` | — | Route `apps` class to flake output |
+| `checks-to-flake` | `flake-system` | — | Route `checks` class to flake output |
+| `devShells-to-flake` | `flake-system` | — | Route `devShells` class to flake output |
+| `legacyPackages-to-flake` | `flake-system` | — | Route `legacyPackages` class to flake output |
 
 ---
 

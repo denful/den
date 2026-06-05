@@ -40,7 +40,7 @@ modules/
 
   inputs = {
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
-    import-tree.url = "github:denful/import-tree";
+    import-tree.url = "github:vic/import-tree";
     den.url = "github:denful/den";
   };
 }
@@ -78,21 +78,21 @@ Key points:
 
 1. **One host** named `igloo` on `x86_64-linux` with **one user** named `tux`
 2. **Host aspect** `den.aspects.igloo` — provides NixOS config (a package + boot/fs stubs)
-3. **User aspect** `den.aspects.tux` — includes the [`primary-user`](/reference/batteries/#primary-user) battery
+3. **User aspect** `den.aspects.tux` — includes the [`primary-user`](/reference/batteries/#den-batteries-primary-user) battery
 
 ### How It Works
 
 ```mermaid
 graph TD
-  H["den.hosts.x86_64-linux.igloo"] -->|"ctx.host"| A["den.aspects.igloo"]
-  H -->|"ctx.user"| U["den.aspects.tux"]
+  H["den.hosts.x86_64-linux.igloo"] -->|"host scope"| A["den.aspects.igloo"]
+  H -->|"user scope"| U["den.aspects.tux"]
   U -->|"includes"| PU["den.batteries.primary-user"]
   A -->|"resolve nixos"| NixOS["nixosConfigurations.igloo"]
 ```
 
-1. Den reads `den.hosts` and creates a `ctx.host { host = igloo }` context
+1. Den reads `den.hosts` and creates a **host scope** for `igloo`
 2. The host aspect `igloo` is activated with its NixOS config
-3. For each user, a `ctx.user { host, user }` context is created
+3. For each user, a **user scope** (carrying both host and user) is created
 4. The user aspect `tux` includes `primary-user` (adds wheel/networkmanager groups)
 5. Everything resolves into `nixosConfigurations.igloo`
 

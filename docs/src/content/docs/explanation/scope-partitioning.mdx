@@ -35,7 +35,8 @@ The format is comma-separated `key=value` pairs, sorted lexicographically:
 **Value extraction:**
 - Attrsets with `name`: use `v.name`
 - Strings: use directly
-- Anything else: `<type:key>` (e.g., `<int:priority>`)
+- Ints / floats: `toString` (e.g., `priority=5`)
+- Anything else: `<type:key>` (e.g., `<list:order>`)
 
 **Injectivity:** separator characters (`=`, `,`, `<`, `>`) cannot appear in
 Nix identifiers, so distinct contexts always produce distinct scope IDs.
@@ -128,8 +129,10 @@ via `resolve-schema-entity`:
 
 1. **Enrich context** — merge the resolve effect's bindings into current context
 2. **Compute scope ID** — `childScopeId = mkScopeId enrichedCtx`
-3. **Dedup check** — skip if `childScopeId` already exists in `scopeContexts`
-4. **Record tree** — set `scopeParent`, `scopeContexts`, and `currentScope`
+3. **Dedup check** — the `ctx-seen` effect gates on the `seen` map
+   (`${scopeId}/${ctxKey}`); entity resolution fires only the first time a
+   given context key is encountered in the parent scope
+4. **Record tree** — `push-scope` sets `scopeParent`, `scopeContexts`, and `currentScope`
 5. **Install handlers** — `scope.provide` installs entity context handlers
    for the child scope
 6. **Walk entity** — resolve the entity's aspect tree; all emissions write

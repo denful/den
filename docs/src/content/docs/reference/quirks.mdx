@@ -38,18 +38,23 @@ den.quirks.firewall = {
 
 ## Key classification
 
-When the pipeline encounters a key on an aspect, `classifyKeys` dispatches
-to one of three branches:
+When the pipeline encounters a key on an aspect, `classifyKeys`
+(`nix/lib/aspects/fx/key-classification.nix`) sorts it into one of four
+categories:
 
 | Key matches | Category | What happens |
 |---|---|---|
-| `den.classes` | Class key | Emitted as class module |
 | `den.quirks` | Pipe key | Collected as pipe data |
-| Neither | Unregistered class key | Falls through to class (backwards compat) |
+| `den.classes` (or the target class) | Class key | Emitted as class module |
+| A nested aspect (its value carries a class/pipe/structural key) | Nested key | Walked as a sub-aspect |
+| None of the above | Unregistered class key | Falls through to class (backwards compat) |
+
+Pipe keys are checked first, so a quirk name always wins over a same-named
+class key — but the registries assert they never collide (see above).
 
 Pipe keys flow through the same `emit-class` → `scopedClassImports`
 infrastructure as class keys, but `assemblePipes` consumes them
-post-pipeline instead of `wrapClassModule`.
+post-pipeline instead of `wrapCollectedClasses` wrapping them as modules.
 
 ## Producing quirk data
 
@@ -230,6 +235,19 @@ pipe.from "http-backends" [
   (pipe.filter (b: b.port != 8080))
 ]
 ```
+
+### `pipe.collectAll predicate`
+
+Like `pipe.collect`, but harvests from every scope matching the predicate
+regardless of parent — not just siblings. Use it to aggregate fleet-wide
+data (e.g. every host's address) from a single scope.
+
+```nix
+pipe.collectAll ({ host, ... }: true)
+```
+
+Entity kind filtering and non-terminal chaining work the same as
+`pipe.collect`. Both stages also compose with `pipe.withProvenance`.
 
 ### `pipe.to aspects`
 

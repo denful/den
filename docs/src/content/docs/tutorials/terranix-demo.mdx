@@ -9,6 +9,24 @@ import { Aside } from '@astrojs/starlight/components';
 [`templates/terranix-demo`](https://github.com/denful/den/tree/main/templates/terranix-demo)
 </Aside>
 
+<Aside type="caution" title="This is a demo directory, not a template">
+`terranix-demo` is **not** registered with `nix flake init -t` — there is no
+`github:denful/den#terranix-demo` template. It is a demo directory inside the Den
+repository whose `flake.nix` references Den via a relative `path:../..`, so it only
+resolves from within a checkout. To use it, clone the repo and copy
+`templates/terranix-demo/` out as your starting point:
+
+```console
+git clone https://github.com/denful/den
+cp -r den/templates/terranix-demo my-infra && cd my-infra
+# point den at a real revision instead of the in-repo relative path:
+# edit flake.nix → den.url = "github:denful/den";
+```
+
+The `nix run .#…` / `nix develop .#…` commands below assume you are inside that copy
+(or inside `templates/terranix-demo/` in a clone of the repo).
+</Aside>
+
 The terranix demo shows how to generate Terraform/OpenTofu configuration directly
 from den host definitions. Each host aspect contributes NixOS config **and**
 Terraform resources in a single declaration. The pipeline collects per-host
@@ -113,7 +131,16 @@ provider for all hosts:
 # modules/aspects/provider.nix
 den.aspects.hcloud-provider = {
   terranix = {
-    terraform.required_providers.hcloud = { source = "hetznercloud/hcloud"; };
+    terraform.required_providers.hcloud = {
+      source = "hetznercloud/hcloud";
+      version = "~> 1.45";
+    };
+
+    variable.hcloud_token = {
+      type = "string";
+      sensitive = true;
+    };
+
     provider.hcloud.token = "\${var.hcloud_token}";
   };
 };
@@ -170,8 +197,7 @@ nix develop .#web-1
 nix build .#web-1.config && cat result
 
 # Verify NixOS configs still work
-nix eval --override-input den . \
-  ./templates/terranix-demo#nixosConfigurations.web-1.config.services.nginx.enable
+nix eval .#nixosConfigurations.web-1.config.services.nginx.enable
 ```
 
 ## Using with Terraform/OpenTofu

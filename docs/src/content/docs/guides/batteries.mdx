@@ -12,8 +12,8 @@ import { Aside } from '@astrojs/starlight/components';
 ## What are Batteries
 
 Batteries are reusable aspects shipped with Den under `den.batteries.*`
-(aliased as `den.batteries.*`). They handle common cross-platform configuration
-patterns so you do not have to rewrite them.
+(the option is also aliased as `den.provides.*` and `den._.*`). They handle
+common cross-platform configuration patterns so you do not have to rewrite them.
 
 ## Available Batteries
 
@@ -36,42 +36,44 @@ Sets the system hostname as defined in `den.hosts.<name>.hostName`:
 den.default.includes = [ den.batteries.hostname ];
 ```
 
-### `den.batteries.mutual-provider`
+### Mutual providers (hosts and users configuring each other)
 
-Allows hosts and users to contribute configuration **to each other** through `.`:
-
-```nix
-den.hosts.x86_64-linux.igloo.users.tux = { };
-den.schema.user.includes = [ den.batteries.mutual-provider ];
-```
+Hosts and users can contribute configuration **to each other** through the
+aspect's `provides` namespace (aliased `_`). This routing is built into the
+pipeline — no battery is required.
 
 ```nix
-# contributes to ALL users of this host
-den.aspects.my-host.to-users.homeManager = { ... }
+# host contributes to ALL its users
+den.aspects.my-host.provides.to-users.homeManager = { ... };
 
-# contributes to ALL hosts of where my-user exist
-den.aspects.my-user.to-hosts.nixos = { ... }
+# user contributes to ALL hosts it lives on
+den.aspects.my-user.provides.to-hosts.nixos = { ... };
 ```
 
-A `tux` user providing config to **specific host** `igloo`:
+A `tux` user providing config to the **specific host** `igloo`:
 
 ```nix
 den.aspects.tux = {
-  provides.igloo = { host, ... }: {
-    nixos.programs.nh.enable = host.name == "igloo";
-  };
+  provides.igloo.nixos.programs.nh.enable = true;
 };
 ```
 
-A host providing config to **specific user** `tux`:
+A host providing config to the **specific user** `alice`:
 
 ```nix
 den.aspects.igloo = {
-  provides.tux = { user, ... }: {
-    homeManager.programs.helix.enable = user.name == "alice";
-  };
+  provides.alice.homeManager.programs.helix.enable = true;
 };
 ```
+
+A named target (`provides.igloo`, `provides.alice`) only fires when the matching
+host or user is in scope, so the value can be a plain attrset. See
+[Host&lt;-&gt;User Mutual Providers](/guides/mutual/) for the full mechanism.
+
+<Aside>
+`den.batteries.mutual-provider` is an inert compatibility shim — cross-entity
+routing is now built in, so including it has no effect.
+</Aside>
 
 ### `den.batteries.primary-user`
 
@@ -107,11 +109,11 @@ Recursively imports non-dendritic `.nix` files, auto-detecting class from
 directory names (`_nixos/`, `_darwin/`, `_homeManager/`):
 
 ```nix
-# Import per host
-den.schema.host.includes = [ (den.batteries.import-tree.host ./hosts) ];
+# Import per host (loads ./hosts/<host>/_nixos, etc.)
+den.schema.host.includes = [ (den.batteries.import-tree.provides.host ./hosts) ];
 
-# Import per user
-den.schema.user.includes = [ (den.batteries.import-tree.user ./users) ];
+# Import per user (loads ./users/<user>/_homeManager, etc.)
+den.schema.user.includes = [ (den.batteries.import-tree.provides.user ./users) ];
 
 # Import for a specific aspect
 den.aspects.laptop.includes = [ (den.batteries.import-tree ./disko) ];
@@ -211,7 +213,6 @@ den.aspects.alice.includes = [
 Batteries compose with regular aspects:
 
 ```nix
-# den.lib.parametric is deprecated — bare attrsets work directly:
 den.aspects.my-admin = {
   includes = [
     den.batteries.primary-user

@@ -51,7 +51,7 @@ diag.toMermaid (diag.graph.classSlice "nixos" (diag.hostContext { inherit host; 
 
 ## Convenience wrappers
 
-Three wrappers build graph IR from common entity kinds without manually calling `den.lib.resolveStage`:
+Three wrappers build graph IR from common entity kinds without manually calling `den.lib.resolveEntity`:
 
 - **`hostContext { host; classes?; direction?; }`** -- resolves from the host root. Defaults to `["nixos" "homeManager" "user"]` plus any user-declared classes.
 - **`userContext { host; user; classes?; direction?; }`** -- resolves from the user root. Defaults to `["homeManager" "user"]`.
@@ -60,42 +60,31 @@ Three wrappers build graph IR from common entity kinds without manually calling 
 For fully custom entities, use the generic `context` directly:
 
 ```nix
-root = den.lib.resolveStage "user" { inherit host user; };
+root = den.lib.resolveEntity "user" { inherit host user; };
 g = diag.context { inherit root; name = user.name; classes = [ "homeManager" ]; };
 ```
 
 ## Filters and views
 
-The graph IR is purely structural -- all visual decisions happen at filter and render time. Filters compose: pipe one into another to narrow the view.
+The graph IR is purely structural -- all visual decisions happen at filter and render time. This separation is why filters exist: the same captured graph can answer many different questions depending on which nodes you keep. Filters compose, so you pipe one into another to narrow the view.
 
-Key filters under `diag.graph`:
+A few representative filters under `diag.graph` give the flavour:
 
-| Filter | Effect |
-|---|---|
-| `simplified` | Coarse overview: folds providers and flattens stages |
-| `userDeclaredOnly` | Only aspects with a class assignment |
-| `filterUserAspects` | Removes wrapper/internal nodes |
-| `classSlice "nixos"` | Ancestor closure of aspects in one class |
-| `adaptersOnly` | Adapter nodes and their neighbors |
-| `aspectsOnly` | Aspect-include edges only (no context/provider nodes) |
-| `providersOnly` | Provider tree |
-| `contextOnly` | Context hierarchy |
+- **`simplified`** -- coarse overview that folds providers and entity-kind subgraphs away, leaving aspect edges only.
+- **`classSlice "nixos"`** -- the ancestor closure of aspects active in a single class, for answering "what contributes to my NixOS config?".
+- **`flattenEntityKinds`** -- a fold that removes entity-kind subgraph grouping when the boxes get noisy.
+
+These are illustrative, not the full set. See the [`den.lib.diag` reference](/reference/diag/) for the complete catalogue of predicate, closure, reshape, fold, and composite filters.
 
 ## Renderers
 
-| Renderer | Format | Use case |
-|---|---|---|
-| `toMermaid` | Mermaid flowchart | Embed in docs, GitHub |
-| `toDot` | GraphViz DOT | Large graphs, PDF export |
-| `toPlantUML` | PlantUML | UML-style diagrams |
-| `toSequenceMermaid` | Mermaid sequence | Stage resolution order |
-| `toC4Context` | C4 model (PlantUML) | Architecture overviews |
-| `toC4ComponentMermaid` | C4 model (Mermaid) | Architecture overviews in Mermaid |
-| `toSankeyMermaid` | Mermaid sankey | Inclusion depth flow |
-| `toTreemapMermaid` | Mermaid treemap | Aspect tree structure |
-| `toMindmapMermaid` | Mermaid mindmap | Inclusion hierarchy |
-| `toStateMermaid` | Mermaid state diagram | Stage state transitions |
-| `toJSON` | JSON | Machine consumption |
+A renderer turns the filtered IR into a diagram string in some target format. Because the IR is format-agnostic, the same graph drives every renderer -- the choice of renderer is purely a presentation decision. A few representative ones:
+
+- **`toMermaid`** -- Mermaid flowchart, for embedding in docs and GitHub.
+- **`toDot`** -- GraphViz DOT, better suited to large graphs and PDF export.
+- **`toScopeEdgesMermaid`** -- a sequence-family renderer that draws scope topology edges.
+
+Den ships many more (C4, sankey, treemap, mindmap, state, JSON, and fleet-wide variants). See the [`den.lib.diag` reference](/reference/diag/) for the full list grouped by family.
 
 Every renderer has a `*With` variant (e.g. `toMermaidWith`) that accepts theme and config overrides. The `renderers` constructor builds a complete set with shared settings:
 
@@ -126,17 +115,23 @@ Fleet graphs feed into fleet-specific renderers like `toFleetSankeyMermaid`, `to
 
 ## Export pipeline
 
-For generating SVG derivations (e.g. for a docs site), use `renderContext` and `export`:
+For generating SVG derivations (e.g. for a docs site), use `renderContext` together with the `export` helpers:
 
 ```nix
 rc = diag.renderContext { inherit pkgs theme; mermaidConfig = elkCfg; };
-entries = diag.export.ofViews { inherit pkgs rc; } allHosts hostViewDefs fleetData fleetViewDefs;
+entries = diag.export.entityEntries { inherit pkgs rc diag; } {
+  entity = diag.hostContext { inherit host; };
+  name = host.name;
+  dir = "hosts/${host.name}";
+  viewDefs = rc.views.host;
+};
 ```
 
-The `renderContext` bundles pre-configured renderers, SVG builder functions, and standard view definitions (`rc.views.host`, `rc.views.fleet`, etc.) into a single record that templates consume.
+The `renderContext` bundles pre-configured renderers (`rc.render`, `rc.renderDense`), SVG builder functions, and standard view definitions (`rc.views.host`, `rc.views.fleet`, etc.) into a single record. `export.entityEntries` turns those view definitions into per-view derivation entries for one entity; `export.fleetEntries` does the same for fleet-wide views. Entries then flow through `entriesToPackages` / `entriesToFiles` / `mkWriteScript`.
 
 ## See also
 
+- [`den.lib.diag` reference](/reference/diag) -- complete list of wrappers, filters, renderers, themes, and export helpers
 - [Aspects](/explanation/aspects) -- how aspects compose
 - [Entities](/explanation/entities) -- the entity kinds that diagrams trace
 - [Policies](/explanation/policies) -- policy fan-out visible in diagram views

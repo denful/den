@@ -24,6 +24,7 @@ A policy is a function from context to a list of effects. The pipeline
 calls it when all required context args are present:
 
 ```nix
+let inherit (den.lib) policy; in
 den.policies.host-to-users = { host, ... }:
   map (user: policy.resolve.to "user" { inherit host user; })
     (lib.attrValues host.users);
@@ -36,12 +37,11 @@ registry, and are **activated** by including them in `includes` lists.
 
 ```mermaid
 flowchart TD
-  flake["flake"] -->|to-systems| system["flake-system"]
-  system -->|to-os-outputs| host["host"]
-  system -->|to-hm-outputs| home["home"]
+  flake["flake"] -->|flake-to-systems| system["flake-system"]
+  system -->|system-to-os-outputs| host["host"]
+  system -->|system-to-hm-outputs| home["home"]
   host -->|host-to-users| user["user"]
-  host -->|host-to-hm-host| hmhost["hm-host"]
-  hmhost -->|hm-host-to-hm-user| hmuser["hm-user"]
+  host -->|host-to-hm-users| hmuser["home-manager users"]
 ```
 
 Each arrow is a policy. The pipeline walks this graph at evaluation time:
@@ -68,18 +68,17 @@ The `{ host, ... }:` pattern means this policy fires only when `host` is
 in context. Den introspects the function args and checks satisfaction
 automatically.
 
-### Common effect types
+### Effects, conceptually
 
-| Effect | What it does |
-|---|---|
-| `policy.resolve bindings` | Enrich current scope or create a child entity (see below) |
-| `policy.resolve.to kind bindings` | Create a child scope for a specific entity kind |
-| `policy.include aspect` | Inject an aspect into current resolution (walks the tree) |
-| `policy.exclude aspect` | Remove an aspect via constraint registry |
-| `policy.route spec` | Route class content between scopes |
-| `policy.provide spec` | Deliver a module directly to a class (bypasses tree walk) |
-| `policy.instantiate entity` | Request post-pipeline instantiation |
-| `pipe.from name stages` | Quirk data routing (see [Quirks](/explanation/quirks-and-pipes/)) |
+Effects are the vocabulary a policy speaks. A few families cover most uses:
+`resolve` (enrich the current scope or fan out a child entity), `include`
+(inject an aspect to walk through the tree), `route` (move class content
+between scopes), and `provide` (deliver a module straight to a class). There
+are more — `exclude`, `instantiate`, `spawn`, and the `pipe` builder for
+[quirks](/explanation/quirks-and-pipes/).
+
+For the complete effect catalog — every constructor, variant, and its
+`spec` shape — see the [policy effects reference](/reference/policies/#policy-effects).
 
 ### Enrichment vs entity resolution
 
@@ -93,6 +92,7 @@ automatically.
   that needed the new bindings are drained.
 
 ```nix
+let inherit (den.lib) policy; in
 # Enrichment — adds myFlag to current context, no new scope
 policy.resolve { myFlag = true; }
 
@@ -122,24 +122,21 @@ policy.include den.aspects.monitoring
 policy.provide { class = "nixos"; module = { services.foo.enable = true; }; }
 ```
 
-## Activating policies
+## Activation, in brief
 
-Declaring a policy in `den.policies` only **registers** it. To activate,
-include it in an `includes` list:
+Declaring a policy in `den.policies` only **registers** it. A policy fires
+only once it appears in an `includes` list — globally
+(`den.default.includes`), per entity kind (`den.schema.host.includes`), or
+on a single aspect's subtree (`den.aspects.igloo.includes`). Symmetrically,
+`excludes` prevents a policy from firing in a subtree, and parent excludes
+are authoritative over child includes. The `policy.for` and `policy.when`
+combinators gate a policy on a specific entity or a context predicate.
 
 ```nix
-# Activate for all hosts
+# register, then activate for all hosts
+den.policies.my-enrichment = { host, ... }: [ /* effects */ ];
 den.schema.host.includes = [ den.policies.my-enrichment ];
-
-# Activate for a specific aspect
-den.aspects.igloo.includes = [ den.policies.my-enrichment ];
-
-# Activate globally
-den.default.includes = [ den.policies.my-enrichment ];
 ```
-
-Policies and aspects mix freely in `includes` — the pipeline distinguishes
-them by the `__isPolicy` tag.
 
 <Aside>
 Built-in core policies are always active — they're activated via
@@ -147,37 +144,13 @@ Built-in core policies are always active — they're activated via
 `modules/policies/flake.nix`.
 </Aside>
 
-## Deactivating policies
+### Conditional policies
 
-Use `excludes` on an aspect to prevent a policy from firing in its subtree:
+Two combinators gate *when* a policy fires, each preserving the inner
+policy's identity (so `excludes` still matches the wrapped policy):
 
-```nix
-den.aspects.igloo = {
-  includes = [ den.policies.add-marker ];
-  excludes = [ den.policies.add-marker ];
-};
-```
-
-Excludes are **authoritative** — a parent scope's exclude cannot be
-overridden by a child `includes`. This prevents downstream aspects from
-re-enabling policies that a parent explicitly blocked.
-
-## Conditional policies
-
-### `policy.for entity policy`
-
-Fire only when a specific entity is in context (matched by `id_hash`):
-
-```nix
-den.schema.host.includes = [
-  (den.lib.policy.for den.hosts.x86_64-linux.igloo
-    den.policies.igloo-specific)
-];
-```
-
-### `policy.when predicate policy`
-
-Fire only when a predicate over context returns true:
+- `policy.for entity` — fire only when a specific entity is in context.
+- `policy.when predicate` — fire only when a context predicate is true.
 
 ```nix
 den.schema.host.includes = [
@@ -186,10 +159,11 @@ den.schema.host.includes = [
 ];
 ```
 
-Both wrappers preserve the inner policy's identity — `excludes`
-still works against the wrapped policy.
-
-Both accept a single policy or a list of policies.
+This page covers the *concept*. For the full activation model — the
+registry/value distinction, cascading across scopes, authoritative
+exclude semantics, the `for`/`when` combinators, and the dispatch
+fixed-point loop — see the
+[Policy Activation Deep Dive](/explanation/policy-activation/).
 
 ## Relation to other concerns
 

@@ -6,7 +6,7 @@ description: Publish and consume aspect libraries across flakes.
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`nix/namespace.nix`](https://github.com/denful/den/blob/main/nix/namespace.nix)
+[`nix/lib/namespace.nix`](https://github.com/denful/den/blob/main/nix/lib/namespace.nix)
 </Aside>
 
 ## What are Namespaces
@@ -83,26 +83,24 @@ Merge aspects from other flakes:
 }
 ```
 
-The namespace function accepts:
-- A **boolean** (`true`/`false`) for local/exported namespaces.
-- A **list of sources** to merge from upstream flakes.
-  Each source's `flake.denful.<name>` is merged into `den.ful.<name>`.
+The second argument to `inputs.den.namespace` accepts:
+- A **boolean** (`true`/`false`) -- export to `flake.denful.<name>` or keep local.
+- A **list of sources** to merge from upstream flakes. Each source's
+  `flake.denful.<name>` is merged into `den.ful.<name>`. Include `true` in the
+  list to also export the merged result, e.g. `[ inputs.team-config true ]`.
 
-## Enabling Angle Brackets
+## Terser References with Angle Brackets
 
-When using namespaces, enable angle bracket syntax for terser references:
+Once `__findFile` is enabled, a namespace path resolves through `<namespace/path>`:
 
 ```nix
-{ den, ... }: {
-  _module.args.__findFile = den.lib.__findFile;
+{ __findFile, ... }: {
+  den.aspects.laptop.includes = [ <eg/desktop> ];
 }
 ```
 
-Then reference deep aspects with `<namespace/path>`:
-
-```nix
-den.aspects.laptop.includes = [ <eg/desktop> ];
-```
+See [Angle Brackets Syntax](/guides/angle-brackets/) for how to enable
+`__findFile` and the full resolution rules.
 
 ## Architecture
 

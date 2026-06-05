@@ -8,7 +8,7 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 <Aside title="Source" icon="github">
 [`modules/outputs/*.nix`](https://github.com/denful/den/blob/main/modules/outputs) --
 [`modules/outputs.nix`](https://github.com/denful/den/blob/main/modules/outputs.nix) --
-[`per system tests`](https://github.com/denful/den/blob/main/templates/ci/modules/features/forward-flake-level.nix)
+[`per system tests`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/packages-merge.nix)
 </Aside>
 
 ## Build pipeline
@@ -113,7 +113,7 @@ The following example are for `packages` but same applies for `checks`, `devShel
 
      ```nix
      # ANY Host or User aspect can produce outputs:
-     # The flake-system-to-flake-os policy handles host fan-out.
+     # The system-to-os-outputs policy handles per-host fan-out.
      # To include aspects in flake outputs:
      den.schema.flake-system.includes = [ den.aspects.foo ];
      ```
@@ -128,4 +128,4 @@ The following example are for `packages` but same applies for `checks`, `devShel
 
 </Steps>
 
-See [`forward-flake-level.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/forward-flake-level.nix) for all examples.
+See [`packages-merge.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/packages-merge.nix) for worked examples.

@@ -8,9 +8,9 @@ import { Aside } from '@astrojs/starlight/components';
 <Aside title="Source" icon="github">
 [`forward.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/forward.nix) --
 [`os-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-user.nix) --
-[`forward-alias-class.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/forward-alias-class.nix) --
-[`forward-from-custom-class.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/forward-from-custom-class.nix) --
-[`guarded-forward.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/guarded-forward.nix)
+[`forward-alias-class.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/forward-alias-class.nix) --
+[`forward-from-custom-class.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/forward-from-custom-class.nix) --
+[`guarded-forward.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/guarded-forward.nix)
 </Aside>
 
 ## What is a Custom Class
@@ -49,15 +49,42 @@ den.batteries.forward {
 | `intoPath = item: path or args: path` | Target attribute path in the target class |
 | `fromAspect = item: aspect` | The aspect to read the custom class from |
 
+<Aside title="Lower-level alternative: den.classes + route">
+
+The `forward` battery is the ergonomic way to build a custom class. Under the
+hood, Den's own built-in classes (`os`, `user`, `homeManager`, `hjem`, `maid`)
+register the class name with `den.classes.<name>` and move its content with a
+`den.lib.policy.route` policy. You can do the same directly:
+
+```nix
+{ den, ... }:
+{
+  den.classes.files = { };
+  den.policies.files-to-flake-parts = _: [
+    (den.lib.policy.route {
+      fromClass = "files";
+      intoClass = "flake-parts";
+      path = [ "files" ];
+    })
+  ];
+  den.schema.flake-parts.includes = [ den.policies.files-to-flake-parts ];
+}
+```
+
+Note the route spec uses `path` (not `intoPath`). See the
+[policy reference](/reference/policies/) for the full `route` spec.
+
+</Aside>
+
 
 ## Example: The Built-in `user` Class
 
-The `user` class ([`provides/os-user.nix`](https://github.com/denful/den/tree/main/modules/aspects/batteries/os-user.nix)) 
+The `user` class ([`os-user.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-user.nix))
 forwards OS-level user settings to NixOS/nix-Darwin lightweight user-environment.
 
 ```nix
 # Instead of:
-den.aspects.alice.nixos = { pkgs, ... } {
+den.aspects.alice.nixos = { pkgs, ... }: {
   users.users.alice = {
     packages = [ pkgs.hello ];
     extraGroups = [ "wheel" ];
@@ -230,7 +257,9 @@ The `os` forward class ([provided by Den](https://github.com/denful/den/blob/mai
 > Requested by @Risa-G at [#222](https://github.com/denful/den/discussions/222)
 
 ```nix
-# Note: this is already provided by Den at provides/os-class.nix
+# The os class ships enabled by default. Den's built-in implementation
+# (modules/aspects/batteries/os-class.nix) uses den.classes + a route policy
+# rather than the forward battery, but this is an equivalent re-implementation.
 os-class = { class, aspect-chain }: den.batteries.forward {
   each = [ "nixos" "darwin" ];
   fromClass = _: "os";
@@ -239,7 +268,7 @@ os-class = { class, aspect-chain }: den.batteries.forward {
   fromAspect = _: lib.head aspect-chain;
 };
 
-# Note: already enabled by Den
+# Built-ins wire themselves; for a custom class you would add:
 # den.schema.host.includes = [ os-class ];
 
 den.aspects.my-laptop = {

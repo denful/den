@@ -96,7 +96,7 @@ Under the hood, Den uses a pure [algebraic effects](/explanation/effects/) pipel
 ```mermaid
 graph LR
   H["host stage {host}"] --> U["user stage {host, user} (for each user)"]
-  U --> HM["aspect provides homeManager/hjeim class"]
+  U --> HM["aspect provides homeManager/home class"]
   H --> OS["aspect provides nixos/darwin class"]
 ```
 </div>

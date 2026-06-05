@@ -34,10 +34,10 @@ Build a home-scoped graph. Defaults to `[ "homeManager" ]` plus the home's own c
 
 ### `context { root, name, classes, direction? }`
 
-Generic entry point for any entity kind. `root` is a resolved stage (from `den.lib.resolveStage`), `name` is used as the graph root label, and `classes` lists the aspect classes to trace. `direction` defaults to `"LR"`.
+Generic entry point for any entity kind. `root` is a resolved entity (from `den.lib.resolveEntity`), `name` is used as the graph root label, and `classes` lists the aspect classes to trace. `direction` defaults to `"LR"`.
 
 ```nix
-root = den.lib.resolveStage "user" { inherit host user; };
+root = den.lib.resolveEntity "user" { inherit host user; };
 g = diag.context { inherit root; name = user.name; classes = [ "homeManager" ]; };
 ```
 
@@ -45,7 +45,7 @@ g = diag.context { inherit root; name = user.name; classes = [ "homeManager" ]; 
 
 ### `graph.build { entries, rootName, ctxTrace?, direction? }`
 
-Core IR builder. Transforms a list of structured trace entries into a graph record containing `nodes`, `edges`, `stages`, `stageEdges`, `rootId`, `rootName`, and `direction`. This is the lowest-level constructor -- convenience wrappers call it internally.
+Core IR builder. Transforms a list of structured trace entries into a graph record containing `nodes`, `edges`, `entityKinds`, `entityEdges`, `entityInstances`, `rootId`, `rootName`, and `direction`. This is the lowest-level constructor -- convenience wrappers call it internally.
 
 ### `graph.ofHost args`
 
@@ -93,7 +93,7 @@ All filters are available on the `graph` attrset (e.g., `diag.graph.aspectsOnly`
 |---|---|---|
 | `foldWrappers` | `graph -> graph` | Remove wrapper/context nodes, rewire edges to their children |
 | `foldProviders` | `graph -> graph` | Collapse provider chains into single edges |
-| `flattenStages` | `graph -> graph` | Remove stage subgraph grouping |
+| `flattenEntityKinds` | `graph -> graph` | Remove entity-kind subgraph grouping |
 
 ### Composite filters
 
@@ -101,7 +101,7 @@ All filters are available on the `graph` attrset (e.g., `diag.graph.aspectsOnly`
 |---|---|---|
 | `filterMeaningful` | `graph -> graph` | Drop anonymous and definition-stub nodes |
 | `filterUserAspects` | `graph -> graph` | `foldWrappers` composed with `filterMeaningful` |
-| `simplified` | `graph -> graph` | `foldProviders` + `flattenStages` + `aspectsOnly` |
+| `simplified` | `graph -> graph` | `foldProviders` + `flattenEntityKinds` + `aspectsOnly` |
 
 ### Structural
 
@@ -136,7 +136,7 @@ Every renderer has two forms: `toFoo` uses the default theme and `toFooWith { th
 | `toSequenceMermaid` / `toSequenceMermaidWith` | Mermaid sequence | Stage sequence diagram |
 | `toSequenceMermaidExpanded` / `toSequenceMermaidExpandedWith` | Mermaid sequence | Expanded with per-aspect detail |
 | `toPolicySequenceMermaid` / `toPolicySequenceMermaidWith` | Mermaid sequence | Policy-level sequence |
-| `toStageEdgesMermaid` / `toStageEdgesMermaidWith` | Mermaid | Stage topology edges |
+| `toScopeEdgesMermaid` / `toScopeEdgesMermaidWith` | Mermaid | Scope topology edges |
 
 ### C4 renderers
 
@@ -172,6 +172,19 @@ Every renderer has two forms: `toFoo` uses the default theme and `toFooWith { th
 | `toMindmapMermaid` / `toMindmapMermaidWith` | Mermaid mindmap | Aspect mindmap |
 | `toStateMermaid` / `toStateMermaidWith` | Mermaid state | State diagram |
 | `toJSON` | JSON | Graph IR serialized to JSON (no theme) |
+
+### Fleet flow renderers
+
+These consume fleet capture data (from `captureFleet`) rather than a graph IR. The fleet capture walks the entire flake scope tree (flake → environment → host → user).
+
+| Renderer | Format | Notes |
+|---|---|---|
+| `toPipeFlowMermaid` / `toPipeFlowMermaidWith` | Mermaid flowchart | Cross-host quirk/pipe data flows with environment subgraphs |
+| `toScopeTopologyMermaid` / `toScopeTopologyMermaidWith` | Mermaid flowchart | Fleet scope tree (fleet → environment → host → user) |
+| `toAspectMatrixMermaid` / `toAspectMatrixMermaidWith` | Mermaid | Aspect coverage matrix -- which aspects land on which hosts |
+| `toPolicyResolutionMapMermaid` / `toPolicyResolutionMapMermaidWith` | Mermaid | Policy entity resolution map |
+| `toPipeSequenceMermaid` / `toPipeSequenceMermaidWith` | Mermaid sequence | Pipe emit -> collect flow per pipe |
+| `toFleetDagMermaid` / `toFleetDagMermaidWith` | Mermaid flowchart | Fleet-wide DAG composing all hosts' aspect trees |
 
 ### `renderers { theme?, mermaidConfig? }`
 
@@ -275,11 +288,11 @@ View definitions describe what to compute from a graph IR and how to present it.
 
 ### `views.core rc`
 
-Essential views shared by all entity kinds: aspect hierarchy, stage sequence, expanded stage sequence, policy sequence, provider tree, and IR JSON.
+Essential views shared by all entity kinds: aspect hierarchy, scope sequence, expanded scope sequence, policy sequence, provider tree, and IR JSON.
 
 ### `views.extended rc`
 
-Optional extra views: context hierarchy, simplified, stage topology, providers resolved, adapter impact, structural decisions, and user-declared aspects.
+Optional extra views: context hierarchy, simplified, scope topology, providers resolved, adapter impact, structural decisions, user-declared aspects, and class diff.
 
 ### `views.host rc` / `views.user rc` / `views.home rc`
 
@@ -287,7 +300,7 @@ Entity-specific view sets. Currently all return `views.core rc`.
 
 ### `views.fleet rc`
 
-Fleet-wide views: aspect namespace, fleet C4 context (PlantUML), and fleet provider matrix.
+Fleet-wide views: aspect namespace (from `graph.ofNamespace`) and fleet provider matrix.
 
 ### `views.classViews rc classes`
 
@@ -309,6 +322,10 @@ Capture entries for multiple classes, concatenated.
 
 Returns `{ entries, pathsByClass, ctxTrace }` -- entries plus per-class path sets needed by presence filters.
 
-### `captureWithPathsWith { classes, root, extraHandlers? }`
+### `captureWithPathsWith { classes, root, ctx?, extraHandlers? }`
 
-Extended form accepting additional trace handlers.
+Extended form accepting a scope context and additional trace handlers.
+
+### `captureFleet { class?, extraHandlers? }`
+
+Fleet-level capture. Runs the full pipeline from the flake root, walking the entire flake scope tree (flake → environment → host → user). `class` defaults to `"nixos"`. Returns a record with `entries`, `ctxTrace`, and post-pipeline scope/pipe-flow data (`scopeParent`, `scopeContexts`, `scopeEntityKind`, `scopedPipeEffects`, `scopedClassImports`, `pipeProducers`, `pipeConsumers`) consumed by the fleet flow renderers.

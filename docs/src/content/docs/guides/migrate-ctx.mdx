@@ -26,14 +26,10 @@ forwarded as `den.schema.<name>.includes`. Only `into` transitions and direct
 `ctxApply` calls require manual migration.
 </Aside>
 
-## Compatibility shim
-
-The shim (`modules/compat/ctx-shim.nix`) is always imported. At evaluation time
-it forwards `den.ctx.<name>` values into `den.schema.<name>.includes` with
-`lib.warn` deprecation messages. The shim handles flat entries only — `den.ctx`
-never supported nested namespaces.
-
-The shim will be removed after the first stable release.
+A compatibility shim keeps existing `den.ctx` configs evaluating during the
+transition, emitting deprecation warnings as it forwards them. For how the shim
+forwards internally and why it is scheduled for removal, see
+[den.ctx compat shim](/explanation/context-system/).
 
 ## Migration steps
 
@@ -81,7 +77,7 @@ The shim will be removed after the first stable release.
 
     # After
     den.policies.host-to-users = { host, ... }:
-      map (user: policy.resolve.to "user" { inherit host user; })
+      map (user: den.lib.policy.resolve.to "user" { inherit host user; })
         (lib.attrValues host.users);
     ```
 

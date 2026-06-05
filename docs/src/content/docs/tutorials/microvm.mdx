@@ -79,15 +79,17 @@ flake.packages = {
 
 ### Schema Extensions for MicroVM Options
 
-`microvm-integration.nix` extends `den.schema.host` with MicroVM-specific options:
+`microvm-integration.nix` extends `den.schema.host` with MicroVM-specific options
+via `den.schema.host.imports`:
 
 ```nix
 options.microvm.guests = lib.mkOption {
   type = lib.types.listOf lib.types.raw;
-  description = "List of Den hosts to run as guest VMs";
+  default = [ ];
+  description = "Guest MicroVMs. A list of Den hosts: [ den.hosts.x86_64-linux.foo-microvm ]";
 };
 
-options.microvm.sharedNixStore = lib.mkEnableOption "Auto share nix store";
+options.microvm.sharedNixStore = lib.mkEnableOption "Auto share nix store from host";
 ```
 
 ### Host with Declarative Guests
@@ -121,36 +123,76 @@ den.aspects.guest-microvm = {
 
 ### Custom Context Pipeline
 
-Two-stage pipeline for MicroVM host and guests:
+The guest integration registers a custom `microvm` class and wires three policies
+into the schema. Effect constructors come from `den.lib.policy`:
 
 ```nix
-# Stage 1: host → microvm-host (only if guests is non-empty)
-den.policies.host-to-microvm-host = { host }:
-  lib.optional (host.microvm.guests != []) { inherit host; };
+inherit (den.lib.policy) resolve include provide;
 
-# microvm-host aspect provides Host configuration
-den.aspects.microvm-host-config = { host }: {
-  ${host.class}.imports = [ host.microvm.hostModule ];
-};
-den.schema.microvm-host.includes = [ den.aspects.microvm-host-config ];
+# Register the microvm class so guest aspects can emit `microvm` keys.
+den.classes.microvm.description = "MicroVM guest configuration (microvm.nix options)";
+```
 
-# microvm-host → microvm-guest policy
-den.policies.microvm-host-to-microvm-guest = { host, ... }:
-  map (vm: policy.resolve.to "microvm-guest" { inherit host vm; }) host.microvm.guests;
+Stage 1 — when a host declares guests, branch into a `microvm-host` context and
+import the host.nix module inline:
 
-# Guest configuration forwarded to host
-den.aspects.microvm-guest-config = { host, vm }: {
-  includes = [
-    # Auto-share nix store if enabled
-    sharedNixStore
-
-    # Den resolved NixOS module forwarded to <host>.nixos.microvm.vms.${vm.name}.config
-    (den.batteries.forward { ... })
-
-    # Forward guest `microvm` class directly to <host>.nixos.microvm.vms.${vm.name}
-    (den.batteries.forward { ... })
+```nix
+den.policies.host-to-microvm-host =
+  { host, ... }:
+  lib.optionals (host.microvm.guests != [ ]) [
+    (resolve.to "microvm-host" { inherit host; })
+    (include (
+      { host }:
+      {
+        ${host.class}.imports = [ host.microvm.hostModule ];
+      }
+    ))
   ];
-};
+```
+
+Stage 2 — fan out one `microvm-guest` context per declared guest:
+
+```nix
+den.policies.microvm-host-to-microvm-guest =
+  { host, ... }:
+  lib.concatMap (vm: [
+    (resolve.to "microvm-guest" { inherit host vm; })
+  ]) host.microvm.guests;
+```
+
+Stage 3 — resolve each guest as an isolated host pipeline, then `provide` its
+modules to the server at the right `microvm.vms.<name>` paths:
+
+```nix
+den.policies.microvm-guest-resolve-vm =
+  { host, vm, ... }:
+  let
+    # Resolve VM as an isolated host pipeline — its modules stay external.
+    vmResolved = den.lib.aspects.resolve vm.class (den.lib.resolveEntity "host" { host = vm; });
+    microvmResolved = den.lib.aspects.resolve "microvm" vm.aspect;
+  in
+  [
+    # Deliver VM's OS class modules to server at microvm.vms.<name>.config
+    (provide {
+      class = host.class;
+      path = [ "microvm" "vms" vm.name "config" ];
+      module = _: vmResolved;
+    })
+    # Deliver VM's microvm class modules to server at microvm.vms.<name>
+    (provide {
+      class = host.class;
+      path = [ "microvm" "vms" vm.name ];
+      module = _: microvmResolved;
+    })
+  ];
+```
+
+The policies are attached to their stages through the schema:
+
+```nix
+den.schema.host.includes = [ den.policies.host-to-microvm-host ];
+den.schema.microvm-host.includes = [ den.policies.microvm-host-to-microvm-guest ];
+den.schema.microvm-guest.includes = [ den.policies.microvm-guest-resolve-vm ];
 ```
 
 ## Data Flow

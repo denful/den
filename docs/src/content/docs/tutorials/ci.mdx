@@ -12,130 +12,110 @@ import { Aside } from '@astrojs/starlight/components';
 
 The CI template is Den's comprehensive test suite. It tests every feature using [nix-unit](https://github.com/nix-community/nix-unit). This is the **best learning resource** for understanding exactly how Den behaves.
 
+Every `.nix` file under `modules/` is auto-imported by [import-tree](https://github.com/vic/import-tree) — the flake just hands `./modules` to it. To add a test, drop a new file in; there is no central list to edit.
+
 ## Structure
 
+Test files are grouped into four buckets by **what surface they exercise**:
+
 ```
-flake.nix
+flake.nix                  # evalModules + (import-tree ./modules)
 modules/
-  empty.nix                              # example test skeleton
+  new-test.nix             # copy-me skeleton for a new test
   test-support/
-    eval-den.nix                         # denTest + evalDen helpers
-    nix-unit.nix                         # nix-unit integration
-  features/
-    angle-brackets.nix                   # <den/...> syntax
-    conditional-config.nix               # conditional imports/configs
-    default-includes.nix                 # den.default behavior
-    forward.nix                          # den.batteries.forward
-    homes.nix                            # standalone HM
-    host-options.nix                     # host/user schema options
-    namespaces.nix                       # namespace define/merge/export
-    os-user-class.nix                    # user class forwarding
-    parametric.nix                       # parametric functors
-    schema-base-modules.nix              # den.schema modules
-    special-args-custom-instantiate.nix  # custom instantiation
-    top-level-parametric.nix             # top-level context aspects
-    user-host-mutual-config.nix   # mutual providers
-    batteries/
-      define-user.nix                    # define-user battery
-      flake-parts.nix                    # inputs' and self'
-      import-tree.nix                    # import-tree battery
-      primary-user.nix                   # primary-user battery
-      tty-autologin.nix                  # tty-autologin battery
-      vm-autologin.nix                   # vm-autologin battery
-      unfree.nix                         # unfree packages
-      user-shell.nix                     # user-shell battery
-    context/
-      apply.nix                          # ctx application
-      apply-non-exact.nix               # non-exact matching
-      cross-provider.nix                 # cross-provider mechanism
-      custom-ctx.nix                     # custom context types
-      den-default.nix                    # den.default as context
-      host-propagation.nix              # full host pipeline
-      named-provider.nix                # self-named providers
-    deadbugs/
-      _external-namespace-deep-aspect.nix
-      static-include-dup-package.nix
-    home-manager/
-      home-managed-home.nix
-      use-global-pkgs.nix
-  non-dendritic/                         # non-den files for import-tree tests
-  provider/                              # external namespace provider flake
+    eval-den.nix           # wires denTest + the den fixture into the flake
+  public-api/              # tests using ONLY the documented public surface
+  internal-api/            # tests poking pipeline internals (not for users)
+  deprecated/              # tests pinning legacy/compat behavior
+  deadbugs/                # one regression test per fixed bug
+non-dendritic/             # plain files consumed by import-tree tests
+provider/                  # a separate flake exporting a namespace
 ```
+
+When you want to learn the recommended way to do something, read `public-api/`. The other buckets exist to keep the suite honest: `internal-api/` and `deprecated/` are not patterns to copy.
 
 ## Test Categories
 
+The tables below point at representative files in `public-api/`. Each file declares one `flake.tests.<suite>` and holds several `test-*` cases.
+
 ### Core Features
 
-| Test File | What It Tests |
-|-----------|---------------|
-| [conditional-config.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/conditional-config.nix) | Conditional imports using host/user attributes |
-| [default-includes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/default-includes.nix) | `den.default` applying to all hosts/users |
-| [host-options.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/host-options.nix) | Custom host attributes, hostName, aspect names |
-| [top-level-parametric.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/top-level-parametric.nix) | Context-aware top-level aspects |
-| [parametric.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/parametric.nix) | All parametric functors (atLeast, fixedTo, expands) |
+| Test File | Suite | What It Tests |
+|-----------|-------|---------------|
+| [conditional-config.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/conditional-config.nix) | `conditional-config` | Conditional imports using host/user attributes |
+| [default-includes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/default-includes.nix) | `default-includes` | `den.default` applying to all hosts/users |
+| [host-options.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/host-options.nix) | `host-options` | Custom host attributes, hostName, aspect names |
+| [top-level-parametric.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/top-level-parametric.nix) | `top-level-parametric` | Context-aware top-level aspects |
+| [auto-parametric.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/auto-parametric.nix) | `auto-parametric` | Parametric aspects auto-dispatched by the pipeline |
 
 ### Bidirectional & Providers
 
-| Test File | What It Tests |
-|-----------|---------------|
-| [user-host-mutual-config.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/user-host-mutual-config.nix) | Host→user and user→host config flow |
-| [context/cross-provider.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/context/cross-provider.nix) | Source providing config to target context |
-| [context/named-provider.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/context/named-provider.nix) | Self-named provider mechanism |
+| Test File | Suite | What It Tests |
+|-----------|-------|---------------|
+| [user-host-mutual-config.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/user-host-mutual-config.nix) | `user-host-mutual-config` | Host→user and user→host config flow |
+| [mutual-provider.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/mutual-provider.nix) | `mutual-provider` | Mutual provider mechanism |
+| [policy-provide.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policy-provide.nix) | `policy-provide` | Policy-driven `provide` effects |
 
-### Context System
+### Policies
 
-| Test File | What It Tests |
-|-----------|---------------|
-| [context/apply.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/context/apply.nix) | Context application mechanics |
-| [context/apply-non-exact.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/context/apply-non-exact.nix) | Non-exact context matching |
-| [context/custom-ctx.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/context/custom-ctx.nix) | User-defined context types with `into` |
-| [context/den-default.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/context/den-default.nix) | `den.default` as a context type |
-| [context/host-propagation.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/context/host-propagation.nix) | Full host pipeline with all contributions |
+| Test File | Suite | What It Tests |
+|-----------|-------|---------------|
+| [policies.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policies.nix) | `policies` | Policy declaration and activation |
+| [policy-excludes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policy-excludes.nix) | `policy-excludes` | Policies excluding includes |
+| [route.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/route.nix) | `route` | Route effects |
 
 ### Batteries
 
-| Test File | What It Tests |
-|-----------|---------------|
-| [batteries/define-user.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/define-user.nix) | User definition across contexts |
-| [batteries/primary-user.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/primary-user.nix) | Primary user groups |
-| [batteries/user-shell.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/user-shell.nix) | Shell configuration |
-| [batteries/unfree.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/unfree.nix) | Unfree package predicates |
-| [batteries/tty-autologin.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/tty-autologin.nix) | TTY autologin service |
-| [batteries/vm-autologin.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/vm-autologin.nix) | TTY autologin service |
-| [batteries/import-tree.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/import-tree.nix) | Auto-importing class dirs |
-| [batteries/flake-parts.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/batteries/flake-parts.nix) | `inputs'` and `self'` providers |
+| Test File | Suite | What It Tests |
+|-----------|-------|---------------|
+| [define-user.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/define-user.nix) | `define-user` | User definition across contexts |
+| [primary-user.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/primary-user.nix) | `primary-user` | Primary user groups |
+| [user-shell.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/user-shell.nix) | `user-shell` | Shell configuration |
+| [unfree.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/unfree.nix) | `unfree` | Unfree package predicates |
+| [tty-autologin.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/tty-autologin.nix) | `tty-autologin` | TTY autologin service |
+| [vm-autologin.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/vm-autologin.nix) | `vm-autologin` | VM autologin service |
+| [import-tree.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/import-tree.nix) | (import-tree) | Auto-importing class dirs |
+| [flake-parts.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/flake-parts.nix) | `flake-parts` | `inputs'` and `self'` providers |
 
 ### Advanced
 
-| Test File | What It Tests |
-|-----------|---------------|
-| [angle-brackets.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/angle-brackets.nix) | All bracket resolution paths |
-| [namespaces.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/namespaces.nix) | Local, remote, merged namespaces |
-| [forward-from-custom-class.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/forward-from-custom-class.nix) | Custom class forwarding |
-| [homes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/homes.nix) | Standalone Home-Manager configs |
-| [schema-base-modules.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/schema-base-modules.nix) | `den.schema.{host,user,home,conf}` |
+| Test File | Suite | What It Tests |
+|-----------|-------|---------------|
+| [angle-brackets.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/angle-brackets.nix) | `angle-brackets` | All bracket resolution paths |
+| [namespaces.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/namespaces.nix) | `namespaces` | Local, remote, merged namespaces |
+| [forward-from-custom-class.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/forward-from-custom-class.nix) | `forward-custom-class` | Custom class forwarding |
+| [homes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/homes.nix) | `standalone-homes` | Standalone Home-Manager configs |
+| [schema-base-modules.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/schema-base-modules.nix) | `schema-base-modules` | `den.schema.{host,user,home,conf}` |
 
 ### Bug Regressions
 
+Every fixed bug gets a pinned regression test in `deadbugs/`, named after its issue. A couple of examples:
+
 | Test File | What It Tests |
 |-----------|---------------|
-| [deadbugs/static-include-dup-package.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/deadbugs/static-include-dup-package.nix) | Duplicate deduplication for packages/lists |
-| [deadbugs/_external-namespace-deep-aspect.nix](https://github.com/denful/den/blob/main/templates/ci/modules/features/deadbugs/_external-namespace-deep-aspect.nix) | Deep aspect access from external flakes |
+| [deadbugs/static-include-dup-package.nix](https://github.com/denful/den/blob/main/templates/ci/modules/deadbugs/static-include-dup-package.nix) | Deduplication for packages/lists |
+| [deadbugs/external-namespace-deep-aspect.nix](https://github.com/denful/den/blob/main/templates/ci/modules/deadbugs/external-namespace-deep-aspect.nix) | Deep aspect access from external flakes |
 
-### External Provider
+## External Provider
 
-The `provider/` subdirectory is a **separate flake** that defines a namespace `provider` with aspects. It's used by the deadbugs test to verify cross-flake namespace consumption:
+The `provider/` subdirectory is a **separate flake** that exports a namespace called `provider`. It is consumed by namespace tests to verify cross-flake aspect consumption. The exporting flake imports `den.flakeModule` and registers the namespace as an output with `den.namespace "provider" true`:
 
 ```nix
 # provider/modules/den.nix
 { inputs, ... }:
 {
-  imports = [ inputs.den.flakeModule  (inputs.den.namespace "provider" true) ];
-  provider.tools.dev.editors = {
+  imports = [
+    inputs.den.flakeModule
+    (inputs.den.namespace "provider" true)
+  ];
+
+  provider.tools.provides.dev.provides.editors = {
     nixos.programs.vim.enable = true;
   };
 }
 ```
+
+The second argument to `den.namespace` (`true`) marks the namespace as a flake output so other flakes can import it.
 
 ## Running CI Tests
 
@@ -145,33 +125,49 @@ From the Den root against your local checkout:
 just ci
 ```
 
-You can also run a single or a subset of tests using:
+You can run a single suite (or a sub-path below `flake.tests`) by passing its name:
 
 ```console
-# You can use any attr-path bellow flake.tests after system-agnositc to run those specific tests:
+# Any attr-path below flake.tests works, e.g. a whole suite:
+just ci wsl-class
+
+# …or a single case within it:
+just ci wsl-class.test-wsl-forwards
+```
+
+The default `just ci` is fast but cannot show error diffs and skips tests that assert via nix-unit `expectedError`. Use `just ci-deep` for full nix-unit output with diffs:
+
+```console
 just ci-deep wsl-class
 ```
 
-The default `just ci` is fast but cannot show error diffs and ignores tests using nix-unit `expectedError`.
-Use `just ci-deep` for full nix-unit output with diffs.
-
-
 ## Writing New Tests
 
-Copy `modules/empty.nix` as a starting point:
+Copy `modules/new-test.nix` as a starting point, rename the suite and case, then assert with `expr` / `expected`:
 
 ```nix
 { denTest, ... }:
 {
-  flake.tests.my-feature = {
-    test-name = denTest (
+  flake.tests.new = {
+    test-something = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        expr = /* what you get */;
-        expected = /* what you expect */;
+
+        den.aspects.base =
+          { host, ... }:
+          {
+            nixos.networking.hostName = host.hostName;
+          };
+
+        den.aspects.igloo.includes = [ den.aspects.base ];
+
+        expr = igloo.networking.hostName;
+        expected = "igloo";
       }
     );
   };
 }
 ```
+
+`denTest` provides handy fixtures as function arguments: `den` (the live `den` config), `igloo` (`nixosConfigurations.igloo.config`), `tuxHm` (`igloo.home-manager.users.tux`), plus `iceberg`, `apple`, `pinguHm`, and a `trace` helper. Drop your new file under `modules/` and `git add` it before running nix — import-tree only sees tracked files.

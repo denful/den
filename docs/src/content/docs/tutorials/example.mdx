@@ -29,16 +29,16 @@ modules/
   dendritic.nix        # flake-file + den wiring
   inputs.nix           # flake inputs
   namespace.nix        # creates the "eg" namespace
+  nh.nix               # exposes per-host/home build apps
   tests.nix            # CI checks
   vm.nix               # VM runner
   aspects/
     defaults.nix       # global config + angle brackets demo
-    alice.nix           # user aspect
-    igloo.nix           # host aspect
-    eg/                 # namespace aspects
+    alice.nix          # user aspect
+    igloo.nix          # host aspect
+    eg/                # namespace aspects
       autologin.nix
       ci-no-boot.nix
-      routes.nix
       vm.nix
       vm-bootable.nix
       xfce-desktop.nix
@@ -80,57 +80,72 @@ The `eg/` directory defines reusable aspects under the `eg` namespace:
 # modules/aspects/eg/vm.nix
 { eg, ... }:
 {
-  eg.vm.provides = {
+  eg.vm = {
     gui.includes = [ eg.vm  eg.vm-bootable.gui  eg.xfce-desktop ];
     tui.includes = [ eg.vm  eg.vm-bootable.tui ];
   };
 }
 ```
 
-Aspects can have nested **provides** — `eg.vm.gui` and `eg.vm.tui` are sub-aspects accessed via the `_.` provider syntax.
+Aspects can have nested sub-aspects — `eg.vm.gui` and `eg.vm.tui` are children of `eg.vm`, selected by referencing them directly (e.g. `eg.vm.gui` in an `includes` list).
 
 ### Angle Brackets
 
 ```nix
 # modules/aspects/defaults.nix
-{ den, __findFile ? __findFile, ... }:
+{ config, __findFile ? __findFile, den, ... }:
 {
   den.default.includes = [
-    <eg/routes>          # resolves to eg.routes
+    <den/hostname>       # resolves to den.batteries.hostname
     <den/define-user>    # resolves to den.batteries.define-user
+    # only on CI hosts:
+    (if config ? _module.args.CI then <eg/ci-no-boot> else { })
   ];
 }
 ```
 
-The `<name>` syntax is shorthand for aspect lookup. `<den/define-user>` resolves to `den.batteries.define-user`. See [Angle Brackets](/guides/angle-brackets/).
+The `<name>` syntax is shorthand for aspect lookup. `<den/define-user>` resolves to the `den.batteries.define-user` battery; `<eg/ci-no-boot>` resolves to the `ci-no-boot` aspect in the `eg` namespace. See [Angle Brackets](/guides/angle-brackets/).
 
 ### Mutual Providers
 
+Hosts and users can contribute configuration **to each other** through aspect-included policies that emit `den.lib.policy` effects:
+
 ```nix
-# modules/aspects/alice.nix — user provides config TO the host
+# modules/aspects/alice.nix — user delivers NixOS config TO the host
 den.aspects.alice = {
-  provides.igloo = { host, ... }: {
-    nixos.programs.nh.enable = host.name == "igloo";
-  };
+  includes = [ den.aspects.alice.policies.to-igloo ];
+  policies.to-igloo =
+    { host, user, ... }:
+    lib.optional (host.name == "igloo") (
+      den.lib.policy.provide {
+        class = "nixos";
+        module.programs.nh.enable = true;
+      }
+    );
 };
 
-# modules/aspects/igloo.nix — host provides config TO the user
+# modules/aspects/igloo.nix — host delivers Home-Manager config TO the user
 den.aspects.igloo = {
-  provides.alice = { user, ... }: {
-    homeManager.programs.helix.enable = user.name == "alice";
-  };
+  includes = [ den.aspects.igloo.policies.to-alice ];
+  policies.to-alice =
+    { host, user, ... }:
+    lib.optional (user.name == "alice") (
+      den.lib.policy.include {
+        homeManager.programs.tmux.enable = user.name == "alice";
+      }
+    );
 };
 ```
 
-Hosts and users can contribute configuration **to each other** through `provides`. Alice enables `nh` on igloo, and igloo enables `helix` for alice. These are cross-providers activated during context transformation.
+A `policies.<name>` entry is a context-aware function that fires once its argument signature (here `{ host, user, ... }`) is satisfied by scope context. `den.lib.policy.provide` delivers a typed module into a named class on the *other* entity, while `den.lib.policy.include` pulls config into the current scope. Alice enables `nh` on igloo (NixOS), and igloo enables `tmux` for alice (Home-Manager).
 
 ### Tests
 
 ```nix
 # modules/tests.nix — verifies the template works
 {
-  checks."alice enabled igloo nh" = checkCond "..." igloo.programs.nh.enable;
-  checks."igloo enabled alice helix" = checkCond "..." alice-at-igloo.programs.helix.enable;
+  checks."alice enabled igloo nh" = checkCond "alice.igloo" igloo.programs.nh.enable;
+  checks."igloo enabled alice tmux" = checkCond "igloo.alice" alice-at-igloo.programs.tmux.enable;
 }
 ```
 
@@ -138,13 +153,13 @@ Hosts and users can contribute configuration **to each other** through `provides
 
 ```mermaid
 graph TD
-  D["den.nix: igloo/apple + alice"] --> CH["ctx.host"]
-  CH --> AI["aspects.igloo<br/>nixos + provides.alice"]
-  CH --> CU["ctx.user"]
-  CU --> AA["aspects.alice<br/>includes + provides.igloo"]
-  AA -->|"routes: mutual"| AI
-  AI -->|"routes: mutual"| AA
-  CH --> HM["ctx.hm-host"]
+  D["den.nix: igloo/apple + alice"] --> CH["host scope"]
+  CH --> AI["aspects.igloo<br/>nixos + policies.to-alice"]
+  CH --> CU["user scope"]
+  CU --> AA["aspects.alice<br/>includes + policies.to-igloo"]
+  AA -->|"policy.provide: nh"| AI
+  AI -->|"policy.include: tmux"| AA
+  CH --> HM["hm scope"]
   AI --> NixOS["nixosConfigurations.igloo"]
   AA --> NixOS
   AI --> Darwin["darwinConfigurations.apple"]

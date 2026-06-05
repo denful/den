@@ -71,7 +71,7 @@ Each user has:
 | `name` | attrset key | User configuration name |
 | `userName` | `name` | System account name |
 | `aspect` | `name` | Primary aspect name |
-| `classes` | `[ "homeManager" ]` | Nix classes this user participates in |
+| `classes` | `[ "user" ]` | Nix classes this user participates in |
 | `*` | from `den.schema.user` | Any option defined by base module |
 | `*` |  | Any other free-form attribute |
 
@@ -106,7 +106,7 @@ Home schema:
 
 `den.schema.{host,user,home}` provides shared configuration applied to all entities of each kind.
 
-Some batteries also extend base modules [see `home-env.nix`](https://github.com/denful/den/blob/main/nix/home-env.nix)
+Some batteries also extend base modules [see `home-env.nix`](https://github.com/denful/den/blob/main/nix/lib/home-env.nix)
 that is used by home-manager/hjem/maid to extend the Host schema with options like `hjem.module`/`home-manager.module`.
 
 Another more advanced examples is our [templates/microvm](https://github.com/denful/den/tree/main/templates/microvm/modules/microvm-integration.nix)

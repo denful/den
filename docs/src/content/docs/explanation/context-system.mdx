@@ -39,37 +39,8 @@ what to change.
 ## What replaced it
 
 The `den.ctx` namespace was split into three independent concerns:
+`den.aspects` for aspect definitions, `den.policies` for entity topology,
+and `den.schema.<kind>.includes` for explicit activation.
 
-| Old (`den.ctx`)  | New | Purpose |
-|---|---|---|
-| `den.ctx.<name> = { ... }` | `den.aspects.<name> = { ... }` | Aspect definitions |
-| `den.ctx.<name>.into.<other>` | `den.policies.<name>` | Entity topology (fan-out, routing) |
-| `den.ctx.<name>.<other>` | `den.schema.<kind>.includes` | Cross-entity inclusion |
-| Implicit activation | `den.schema.<kind>.includes = [ ... ]` | Explicit activation via includes |
-
-## Example migration
-
-Before:
-```nix
-den.ctx.host = {
-  provides.host = { host }: den.aspects.${host.aspect};
-  into.user = { host }:
-    map (user: { inherit host user; }) (lib.attrValues host.users);
-};
-```
-
-After:
-```nix
-# Aspect definition
-den.aspects.my-aspect = { host }: {
-  nixos.services.foo.enable = true;
-};
-
-# Entity topology via policy
-den.policies.host-to-users = { host, ... }:
-  map (user: policy.resolve.to "user" { inherit host user; })
-    (lib.attrValues host.users);
-
-# Activation
-den.schema.host.includes = [ den.aspects.my-aspect ];
-```
+For the full old→new mapping and step-by-step migration instructions, see
+[Migrating from den.ctx](/guides/migrate-ctx/).

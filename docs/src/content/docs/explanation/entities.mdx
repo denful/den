@@ -116,23 +116,24 @@ first-class **entity kind**. Entity kinds automatically receive:
 This is how the Data concern feeds into the resolution pipeline — entities
 declare what they are, and policies determine where behavior binds.
 
-## Per-entity policy activation
+## Activating policies for a kind
 
-Every entity (host, user, home) has a `policies` option — a list of policy names
-to activate when that entity is resolved. Core policies (those marked `_core = true`)
-are always active regardless.
+Policies are declared in the `den.policies` registry and *activated* by placing
+them into an `includes` list. To activate a policy for every entity of a kind,
+add it to that kind's schema `includes`:
 
 ```nix
 {
-  # Activate a policy for all hosts of this kind
-  den.schema.host.policies = [ "host-to-peers" ];
-
-  # Activate a policy for a specific host
-  den.hosts.x86_64-linux.igloo.policies = [ "microvm-guests" ];
+  # Activate a policy for every host
+  den.schema.host.includes = [ den.policies.host-to-peers ];
 }
 ```
 
-See [Policies](/explanation/policies/) for how activation is used during resolution.
+This is the same `includes` mechanism aspects use — schema `includes` simply
+attaches the policy to every entity of that kind. See
+[Policies](/explanation/policies/) and
+[Policy Activation](/explanation/policy-activation/) for how activation is used
+during resolution.
 
 ## Freeform attributes
 
@@ -150,9 +151,12 @@ These attributes are accessible in aspects via the entity's context argument:
 
 ```nix
 den.aspects.igloo.includes = [
-  ({ host }: lib.optionalAttrs (host ? gpu) {
-    nixos.hardware.nvidia.enable = true;
-  })
+  (
+    { host, ... }:
+    lib.optionalAttrs (host ? gpu) {
+      nixos.hardware.nvidia.enable = true;
+    }
+  )
 ];
 ```
 
@@ -163,19 +167,20 @@ list, or the [Declare Hosts & Users](/guides/declare-hosts/) guide for practical
 
 ## Strict mode
 
-By default, Den allows freeform attributes on entities. Enable `strict` mode to
-require that all entity attributes be declared via schema options:
+By default, Den allows freeform attributes on entities. Enable strict mode by
+importing the `strict` flake module, which requires that all entity attributes be
+declared via schema options:
 
 ```nix
 {
-  # Enable strict mode for all hosts
-  den.schema.host.strict = true;
+  imports = [ inputs.den.flakeModules.strict ];
 
   # Now this would be an error — gpu is not a declared option:
   # den.hosts.x86_64-linux.igloo.gpu = "nvidia";
 }
 ```
 
-Strict mode is useful for larger configurations where you want to catch typos and
-enforce a consistent entity interface. Undeclared attributes produce an eval error
-with a message indicating which option is missing.
+The module applies strict typing to the `host`, `user`, `home`, `aspect`, and
+`flake` schema kinds. Strict mode is useful for larger configurations where you
+want to catch typos and enforce a consistent entity interface. Setting an
+undeclared attribute throws a `STRICT MODE` error naming the missing option.

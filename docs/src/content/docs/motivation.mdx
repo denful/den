@@ -60,7 +60,7 @@ The result of that exploration was [flake-aspects](https://github.com/denful/fla
 
 `flake-aspects` allows for aspects to be parametric by using the Nix [`__functor` pattern](/explanation/aspects/#the-__functor-pattern), it also allows aspects to be nested unlike the flat-structure we had in `flake.modules` which caused people to use weird-named modules `flake.modules.nixos."host/desktop"` or similar for string-based-semantics. It also allows declaring dependencies between aspects themselves, not using **stringly-typed** references like `.modules = [ "base" "gaming" ]` which was one of the shortcomings early-days unify had.
 
-An important point is that parametric aspect's context **are not** _module.args, they do not depend on config. This allows using them for [conditional](https://github.com/denful/den/blob/main/templates/ci/modules/features/conditional-config.nix) imports.
+An important point is that parametric aspect's context **are not** _module.args, they do not depend on config. This allows using them for [conditional](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/conditional-config.nix) imports.
 
 
 <Aside>

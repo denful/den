@@ -8,9 +8,10 @@ import { Aside } from '@astrojs/starlight/components';
 <Aside title="Source" icon="github">
 [`nix/lib/aspects/policy-type.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/policy-type.nix) --
 [`nix/lib/policy-effects.nix`](https://github.com/denful/den/blob/main/nix/lib/policy-effects.nix) --
+[`nix/lib/aspects/fx/policy/`](https://github.com/denful/den/tree/main/nix/lib/aspects/fx/policy) --
 [`nix/lib/aspects/fx/aspect/children.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/aspect/children.nix) --
-[`templates/ci/modules/features/policy-excludes.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/policy-excludes.nix) --
-[`templates/ci/modules/features/policy-combinators.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/policy-combinators.nix)
+[`templates/ci/modules/public-api/policy-excludes.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policy-excludes.nix) --
+[`templates/ci/modules/public-api/policy-for-include.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policy-for-include.nix)
 </Aside>
 
 ## Registry vs activation
@@ -143,8 +144,9 @@ den.schema.host.includes = [
 ];
 ```
 
-The wrapper checks whether any entity kind key in the current context
-has a matching `id_hash`. If not, the policy returns `[]`.
+The wrapper reads the current scope's entity (the entity under the
+context's `__entityKind` key) and compares its `id_hash` against the
+target entities' hashes. If it doesn't match, the policy returns `[]`.
 
 Accepts a single policy value or a list:
 
@@ -196,13 +198,17 @@ fixed-point iteration:
 4. **Enrich** — if any effects add new context bindings
    (`policy.resolve` with enrichment), merge them via `scope.provide`
    and drain deferred includes.
-5. **Iterate** — check if new bindings satisfy previously-unsatisfied
-   policies. If so, fire them and repeat from step 4.
-6. **Converge** — when no new policies fire, emit all collected effects.
+5. **Iterate** — if enrichment introduced new context keys, repeat from
+   step 2. The new bindings may now satisfy previously-unsatisfied
+   policies. Convergence is key-monotonic: only newly-added keys drive
+   another round; changing an existing key's value does not.
+6. **Converge** — when a round adds no new enrichment keys, emit all
+   collected effects.
 
 This fixed-point iteration means policies can depend on context that
-other policies provide. The iteration is capped at 10 rounds to prevent
-infinite loops.
+other policies provide. The loop is capped at 10 iterations; if new keys
+are still appearing past that, the pipeline throws a `den: enrichment
+cycle` error rather than looping forever.
 
 ### Self-exclusion invariant
 
@@ -213,13 +219,16 @@ satisfy its own firing condition.
 
 ## Policy include dedup
 
-Policy includes are deduplicated via identity tags. Each policy include
-gets a `<policy:name:idx>` identity key. Anonymous policy includes get
-global dedup keys. This prevents the same policy from being registered
-multiple times when included from multiple scopes.
+Aspects injected by a policy's `include` effect are tagged with the
+source policy's name — `<policy:name>` — so the gate can dedup them. When
+one policy emits several includes, an `[idx]` suffix
+(`<policy:name>[0]`, `<policy:name>[1]`, ...) keeps them distinct instead
+of collapsing into a single entry. This prevents the same policy-supplied
+content from being emitted twice when the policy fires under multiple
+scopes.
 
 ## See also
 
 - [Policies](/explanation/policies/) — conceptual overview
 - [den.policies reference](/reference/policies/) — effect types and built-in policies
-- [CI tests](https://github.com/denful/den/tree/main/templates/ci/modules/features) — `policy-excludes.nix`, `policy-combinators.nix`, `policy-include-routing.nix`
+- [CI tests](https://github.com/denful/den/tree/main/templates/ci/modules/public-api) — `policy-excludes.nix`, `policy-for-include.nix`, `policy-context-enrichment.nix`

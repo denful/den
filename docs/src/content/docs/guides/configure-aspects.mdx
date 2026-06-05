@@ -39,22 +39,27 @@ den.hosts.x86_64-linux.igloo.users = {
 };
 ```
 
-Den will create the following **parametric** aspects for you:
+Den will create the following aspects for you, each with empty owned-config
+keys for the entity's classes:
 
 ```nix "nixos" "homeManager" "hjem" "maid"
- den.aspects.igloo = parametric {
+ den.aspects.igloo = {
    nixos = {}; # `host.class` was derived from the host platform
  };
 
- den.aspects.tux = parametric {
+ den.aspects.tux = {
    homeManager = {};
    hjem = {};
  };
 
- den.aspects.pingu = parametric {
+ den.aspects.pingu = {
   maid = {};
  };
 ```
+
+These are plain attrsets — the pipeline makes them context-aware
+automatically. See [Parametric Aspects](/explanation/parametric/) for how
+aspects receive `host`/`user`/`home` context.
 
 ## Aspect Basics
 
@@ -84,7 +89,7 @@ In addition to per-class modules, an aspect has an `includes` list referencing o
       darwin = ...;
       nixos = ...;
     };
-  }
+  };
 }
 ```
 
@@ -142,7 +147,7 @@ configuration accordingly.
 ## Provides
 
 `provides` creates named sub-aspects accessible via `den.aspects.<name>.<sub>`
-or `den.aspects.<name>.<sub>`:
+(the `provides.` prefix is optional on access; `_` is an alias for `provides`):
 
 ```nix
 den.aspects.tools.editors = {
@@ -259,8 +264,8 @@ den.aspects.foo =
     __functor = self: ctx:
       if config.meta.foo == "bar"
       then { } # do nothing, skip.
-      {
-        includes = filter (i: someCondition i) self.includes;
+      else {
+        includes = lib.filter (i: someCondition i) self.includes;
       };
   }
 ```
@@ -345,9 +350,9 @@ Aspects are fixed-point, meaning that they can reference themselves, as such:
           git = {
             enable = true;
             settings.signing.key = config.meta.default-key;
-          }
+          };
         };
       };
-  };
+    };
 }
 ```

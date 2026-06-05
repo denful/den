@@ -10,11 +10,17 @@ import { Aside } from '@astrojs/starlight/components';
 [`templates/noflake`](https://github.com/denful/den/tree/main/templates/noflake)
 </Aside>
 
-The noflake template shows that Den works perfectly without Nix flakes. It uses [npins](https://github.com/andir/npins) for dependency management and works with stable Nix.
+The noflake template shows that Den works perfectly without Nix flakes (and without flake-parts). It uses [npins](https://github.com/andir/npins) to lock dependencies and [with-inputs](https://github.com/vic/with-inputs) to provide flake-like input resolution, all on stable Nix. It configures a single NixOS host with two users, using [nix-maid](https://github.com/viperML/nix-maid) and [hjem](https://github.com/feel-co/hjem) as lightweight Home-Manager alternatives.
 
 ## Initialize
 
-Since this template doesn't use flakes, clone it manually:
+If you have flakes enabled, use `nix flake init` to scaffold the template:
+
+```console
+nix flake init -t github:denful/den#noflake
+```
+
+Otherwise copy the template contents into a fresh directory, then refresh the pinned Den source:
 
 ```console
 mkdir my-nix && cd my-nix
@@ -22,22 +28,16 @@ cp -r $(nix eval --raw 'github:denful/den#templates.noflake.path')/* .
 npins update den
 ```
 
-Or use `nix flake init` if you have flakes enabled:
-
-```console
-nix flake init -t github:denful/den#noflake
-```
-
 ## Project Structure
 
 ```
 default.nix        # entry point (replaces flake.nix)
-with-inputs.nix    # input resolver (replaces flake.lock)
 npins/
   default.nix      # npins fetcher
-  sources.json     # pinned dependencies
+  sources.json     # pinned dependencies (den, nixpkgs, import-tree, with-inputs, nix-maid, hjem, …)
 modules/
   den.nix          # host/user declarations + aspects
+  nh.nix           # den.sh shell apps for building each host/home with nh
 ```
 
 ## File by File
@@ -46,7 +46,14 @@ modules/
 
 ```nix
 let
-  outputs = inputs:
+  sources = import ./npins;
+  with-inputs = import sources.with-inputs sources {
+    # uncomment for local checkout on CI
+    den.outPath = ./../..;
+  };
+
+  outputs =
+    inputs:
     (inputs.nixpkgs.lib.evalModules {
       modules = [ (inputs.import-tree ./modules) ];
       specialArgs = {
@@ -54,70 +61,126 @@ let
         inherit (inputs) self;
       };
     }).config;
+
 in
-import ./with-inputs.nix outputs
+with-inputs outputs
 ```
 
 This is the noflake equivalent of `flake.nix`. It uses `lib.evalModules` directly — the same mechanism Den uses internally.
 
-### with-inputs.nix — Input Resolution
-
-This file resolves npins sources into a flake-compatible `inputs` attrset. It reads `flake.nix` from each dependency to discover transitive inputs and wires them together.
+`sources` comes from npins. `with-inputs` (itself a pinned source) reads the `flake.nix` of each dependency to discover transitive inputs and wires them into a flake-like `inputs` attrset, then hands them to `outputs`. The `den.outPath` line points `den` at the local checkout; in your own project you can drop it so `den` resolves from npins.
 
 ### modules/den.nix — Configuration
 
 ```nix
-{ inputs, ... }:
+{ den, inputs, ... }:
 {
+  # we can import this flakeModule even if we dont have flake-parts as input!
   imports = [ inputs.den.flakeModule ];
 
   den.default.nixos = {
+    # remove for real host
     fileSystems."/".device = "/dev/fake";
+    fileSystems."/".fsType = "auto";
     boot.loader.grub.enable = false;
   };
 
-  den.hosts.x86_64-linux.igloo.users.tux = { };
-
-  den.aspects.igloo = {
-    nixos = { pkgs, ... }: {
-      environment.systemPackages = [ pkgs.vim ];
-    };
+  # tux user on igloo host, using nix-maid
+  den.hosts.x86_64-linux.igloo.users = {
+    tux.classes = [ "maid" ];
+    pingu.classes = [ "hjem" ];
   };
 
-  den.aspects.tux = {
-    nixos = {
-      imports = [ inputs.nix-maid.nixosModules.default ];
-      users.users.tux = {
-        isNormalUser = true;
-        maid.file.home.".gitconfig".text = ''
-          [user]
-            name=Tux
-        '';
+  # host aspect
+  den.aspects.igloo = {
+    nixos =
+      { pkgs, ... }:
+      {
+        environment.systemPackages = [ pkgs.vim ];
       };
-    };
+  };
+
+  # include den batteries or your own re-usable aspects
+  # this affects all users, could also be done per user
+  den.schema.user.includes = [ den.batteries.define-user ];
+
+  # user aspect
+  den.aspects.tux = {
+    # user configures host <nixos/darwin>.users.users.tux.description
+    user.description = "Cute Penguin";
+
+    # user contributes nixos and darwin common config
+    os =
+      { pkgs, ... }:
+      {
+        environment.systemPackages = [ pkgs.hello ];
+      };
+
+    # maid class
+    maid.file.home.".gitconfig".text = ''
+      [user]
+        name=Tux
+    '';
+  };
+
+  den.aspects.pingu = {
+    hjem.files.".foo".text = "bar";
   };
 }
 ```
 
 Notable differences from the flake templates:
-- Uses [nix-maid](https://github.com/viperML/nix-maid) instead of Home-Manager (lighter alternative)
-- User config is done directly in `nixos` class (no HM class needed)
+- Uses [nix-maid](https://github.com/viperML/nix-maid) (`maid` class) and [hjem](https://github.com/feel-co/hjem) (`hjem` class) instead of Home-Manager — lighter alternatives. The class is selected per user via `users.<name>.classes`.
+- The `os` class forwards content into both `nixos` and `darwin`; the `user` class forwards into `users.users.<name>`. Both are built-in.
+- `den.batteries.define-user` declares each user at the OS (and Home) level so the chosen class has a user to attach to.
+
+### modules/nh.nix — Build Shell
+
+```nix
+{ lib, den, inputs, ... }:
+{
+  options.den.sh = lib.mkOption {
+    description = "Non-flake Den shell environment";
+    default = den.lib.nh.denShell {
+      fromFlake = false;
+      outPrefix = [ "flake" ];
+    } (import inputs.nixpkgs { });
+  };
+}
+```
+
+`den.lib.nh.denShell` builds a `mkShell` containing one [nh](https://github.com/viperML/nh) wrapper app per declared host and home. `fromFlake = false` makes the apps use `--file .` (stable Nix) instead of flake refs, and `outPrefix = [ "flake" ]` matches where Den places its outputs (see the note under Build).
 
 ## Build
 
+First make sure Den is current:
+
 ```console
 npins update den
-nixos-rebuild build --file . -A flake.nixosConfigurations.igloo
 ```
 
-Or with `nix-build`:
+The template exposes runnable apps under `den.sh` (one per host/home). The default action is `build`:
+
+```console
+# build the igloo host
+nix-run . -A den.sh --run igloo
+
+# or pass any nh action: switch, repl, build, --help
+nix-run . -A den.sh --run 'igloo build'
+```
+
+You can also build with plain `nixos-rebuild` or `nix-build`:
+
+```console
+nixos-rebuild build --file . -A flake.nixosConfigurations.igloo
+```
 
 ```console
 nix-build -A flake.nixosConfigurations.igloo.config.system.build.toplevel
 ```
 
 :::note
-Den places configurations under the `flake` attribute following the flake outputs schema, even without flakes. This is the default top-level attribute for Den output.
+Den needs a top-level attribute to place configurations. For convenience it uses the `flake` attribute, following the flake outputs schema — even though Den needs neither flakes nor flake-parts.
 :::
 
 ## What It Provides
@@ -126,10 +189,12 @@ Den places configurations under the `flake` attribute following the flake output
 |---------|:--------:|
 | NixOS host configuration | ✓ |
 | No flakes required | ✓ |
+| No flake-parts required | ✓ |
 | npins dependency pinning | ✓ |
-| nix-maid (HM alternative) | ✓ |
-| Home-Manager | ✗ (use nix-maid) |
-| flake-parts | ✗ |
+| nix-maid (`maid` class) | ✓ |
+| hjem (`hjem` class) | ✓ |
+| `nh` build apps via `den.sh` | ✓ |
+| Home-Manager | ✗ (uses nix-maid / hjem instead) |
 
 ## Next Steps
 

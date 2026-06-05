@@ -5,15 +5,19 @@ description: How to configure mutual configs in Den.
 
 import { Aside } from '@astrojs/starlight/components';
 
-<Aside title="Source" icon="github">
-[`mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix)
-</Aside>
-
 ## What Mutual-Config Mean
 
 __Mutual Configs__ means that not only a User contributes
 configuration to a Host, but **also** that a Host contributes
 configurations to a User.
+
+<Aside title="No battery required" type="tip">
+Cross-entity routing is built into the pipeline — you do **not** need to enable
+any battery. The `provides` keys below are translated into cross-entity policy
+effects automatically. (`den.batteries.mutual-provider` still exists as an inert
+compatibility shim so older configs that include it keep evaluating, but it
+produces no effects.)
+</Aside>
 
 
 ## Default, *unidirectional* OS configuration
@@ -60,16 +64,18 @@ sequenceDiagram
 This is the normal host resolution pipeline. All OS contributions come from the host itself and from each of its users.
 
 
-## `den.batteries.mutual-provider`
+## Providing across entities
 
-The [`den.batteries.mutual-provider`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix) battery allows you to define mutual configurations by letting you define named aspects under `.` to create explicit relationships between users and hosts.
+To define mutual configurations, declare named aspects under an aspect's
+`provides` namespace. Each `provides.<target>` key creates an explicit
+relationship between a user and a host:
+
+- `provides.<name>` delivers to the host or user named `<name>`.
+- `provides.to-hosts` delivers to every host the user lives on.
+- `provides.to-users` delivers to every user on the host.
 
 ```nix
-# mutual-provider is activated at a {host,user} context
-# either per-user or for all of them.
-den.schema.user.includes = [ den.batteries.mutual-provider ];
-
-# user aspect provides to specific host or to all where it lives
+# user aspect provides to a specific host or to all hosts where it lives
 den.aspects.tux = {
   provides.igloo.nixos.programs.emacs.enable = true;
   provides.to-hosts = { host, ... }: {
@@ -77,7 +83,7 @@ den.aspects.tux = {
   };
 };
 
-# host aspect provides to specific user or to all its users
+# host aspect provides to a specific user or to all its users
 den.aspects.igloo = {
   provides.alice.homeManager.programs.vim.enable = true;
   provides.to-users = { user, ... }: {
@@ -140,19 +146,21 @@ sequenceDiagram
 
 ```
 
-### User Peers Configuration
+### Configuring peers from the host
 
-A user `alice` can provide configurations for other users in the same system,
-either by name or for all of them (excluding alice itself).
+A `provides` key registered on a *user* aspect is subtree-scoped: it reaches that
+user (and the hosts it lives on), but **never** sibling users on the same host.
+To configure several users — or to select per-user — register the `provides` on
+the **host** aspect, whose subtree spans every user on it:
 
 ```nix
-den.schema.user.includes = [ den.batteries.mutual-provider ];
-
-den.aspects.alice = {
-  provides.bob = { homeManager.programs.vim.enable = true; };
+den.aspects.igloo = {
+  # all users except tux get vim
   provides.to-users = { user, ... }: {
-    homeManager.programs.tmux.enable = lib.elem user.userName [ "carl" "david" ];
+    homeManager.programs.vim.enable = user.name != "tux";
   };
+  # only alice gets tmux
+  provides.alice.homeManager.programs.tmux.enable = true;
 };
 ```
 
@@ -162,8 +170,6 @@ If you have two standalone homes sharing same user aspect, you can provide host 
 configuration even if the Host is not a NixOS system managed by you.
 
 ```nix
-den.schema.home.includes = [ den.batteries.mutual-provider ];
-
 den.homes.x86_64-linux."tux@igloo" = {};
 den.homes.x86_64-linux."tux@iceberg" = {};
 

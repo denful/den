@@ -19,8 +19,9 @@ Use it for:
 - Sharing code that exposes an unknown bug.
 - Contributing bug fixes to Den core.
 
-All PRs modifying this template are run by Den CI on the following
-Den versions: `PR_HEAD`, `main`, `latest`.
+Every PR modifying this template runs `nix flake check` against Den,
+by default the `main` branch. The CI version matrix can be extended to
+other releases (such as `latest`) or specific commits.
 
 Feel free to send any PR even if you don't know if it is an
 actual bug or if you don't know the solution.
@@ -65,15 +66,16 @@ Edit `modules/bug.nix` with a minimal test case:
     test-something = denTest (
       { den, lib, igloo, tuxHm, ... }:
       {
+        # replace <system> if you are reporting a bug on macOS
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         # set up the scenario
-        den.aspects.igloo.nixos.environment.sessionVariables.FOO = ["foo" "bar"];
+        den.aspects.tux.user.description = "The Penguin";
 
         # what you get
-        expr = igloo.environment.sessionVariables.FOO;
+        expr = igloo.users.users.tux.description;
         # what you expect
-        expected = "foo:bar";
+        expected = "The Penguin";
       }
     );
   };
@@ -93,6 +95,7 @@ Available test helpers (from `test-base.nix`):
 |--------|-------------|
 | `igloo` | `nixosConfigurations.igloo.config` |
 | `iceberg` | `nixosConfigurations.iceberg.config` |
+| `apple` | `darwinConfigurations.apple.config` |
 | `tuxHm` | `igloo.home-manager.users.tux` |
 | `pinguHm` | `igloo.home-manager.users.pingu` |
 | `funnyNames` | Resolves an aspect for class `"funny"` and collects `.names` |
@@ -101,7 +104,7 @@ Available test helpers (from `test-base.nix`):
 If you want to see some examples, take a look at other bogus reports that are now part of Den repository at:
 
 ```console
-ls den/templates/ci/modules/features/deadbugs/*.nix
+ls den/templates/ci/modules/deadbugs/*.nix
 ```
 
 ## Run Tests
@@ -125,8 +128,8 @@ Edit Den `/nix` or `/modules` code and run:
 just bogus
 ```
 
-When your changes to Den have fixed the bug, be sure to 
-move `bug.nix` into the `templates/ci/modules/feautres/deadbugs/` directory, following naming conventions for both the file and test-suite name.
+When your changes to Den have fixed the bug, be sure to
+move `bug.nix` into the `templates/ci/modules/deadbugs/` directory, following naming conventions for both the file and test-suite name.
 
 ## What It Provides
 

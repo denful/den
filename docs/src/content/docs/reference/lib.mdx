@@ -32,12 +32,39 @@ module with `imports`. Runs the full pipeline including entity instantiation.
 Use for nested resolution where only class imports are needed, such as
 extracting `homeManager` modules from a host's aspect tree.
 
+## `den.lib.resolveEntity name ctx`
+
+<Aside title="Source" icon="github">
+[`nix/lib/resolve-entity.nix`](https://github.com/denful/den/blob/main/nix/lib/resolve-entity.nix)
+</Aside>
+
+Resolves an entity by kind into an aspect-like record that feeds
+[`den.lib.aspects.resolve`](#denlibaspectsresolve-class-aspect). `name` is the
+entity kind (e.g. `"host"`, `"home"`, `"flake"`); `ctx` is the context attrset,
+typically carrying the entity's config under its own kind key.
+
+The returned record reads `den.schema.<name>` for `includes`, `excludes`, and
+`collisionPolicy`, augments `ctx` with derived bindings for related entity kinds
+(e.g. a `home`'s `host`/`user`) and any schema-level collision policies, and
+installs those as `__scopeHandlers`. For aspect-bearing kinds it prepends a
+parametric self-provide entry so the entity's root `.aspect` is resolved once its
+scope is established. The record carries `name`, `meta`, `includes`, `excludes`,
+`__entityKind`, and `__scopeHandlers`.
+
+```nix
+# Resolve an entity record, then run the pipeline for a class.
+den.lib.aspects.resolve "flake" (den.lib.resolveEntity "flake" { });
+```
+
+This is the public resolver used by [`den.hosts`/`den.homes`](/reference/options/)
+(`config.resolved`) and by the flake outputs.
+
 ## `den.lib.policy`
 
 Policy effect constructors. See [den.policies reference](/reference/policies/)
 for the full API.
 
-### `den.lib.policy.resolve`, `.include`, `.exclude`, `.route`, `.provide`, `.instantiate`
+### `den.lib.policy.resolve`, `.include`, `.exclude`, `.route`, `.provide`, `.instantiate`, `.spawn`, `.pipelineOnly`
 
 Policy effect constructors used inside policy functions. See
 [den.policies reference](/reference/policies/#policy-effects).
@@ -130,8 +157,8 @@ All functions take an `args` attrset:
 | `fromFlake` | `bool` | `true` | Use flake ref (`path#attr`) or file ref (`--file path attr`) |
 | `fromPath` | `str` | `"."` | Flake path or file path |
 | `outPrefix` | `list` | `[]` | Prefix prepended to the output attribute path |
-| `defaultAction` | `build` | `str` | The default action to perform if no args are provided |
-| `defaultArgs` | `[]` | `[str]` | Additional default args to add to each invocation, e.g., `--print-build-logs` |
+| `defaultAction` | `str` | `"build"` | The default action to perform if no args are provided |
+| `defaultArgs` | `[str]` | `[]` | Additional default args to add to each invocation, e.g., `--print-build-logs` |
 
 ### Usage
 

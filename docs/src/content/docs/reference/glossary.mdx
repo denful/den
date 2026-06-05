@@ -15,7 +15,7 @@ See: [Aspects](/explanation/aspects/)
 
 ### battery
 
-A reusable aspect provider shipped with Den under `den.batteries` (aliased `den.batteries`). Batteries solve common configuration tasks like user creation, hostname setting, and home environment integration.
+A reusable aspect provider shipped with Den under `den.batteries` (aliased `den.provides` and `den._`). Batteries solve common configuration tasks like user creation, hostname setting, and home environment integration.
 
 See: [Batteries](/reference/batteries/)
 
@@ -75,13 +75,13 @@ See: [Parametric aspects](/explanation/parametric/)
 
 ### policy
 
-A directed edge between entity kinds declaring how entities relate. Each policy has `from`, `to`, and a `resolve` function that fans out contexts. Policies are about entity topology, not stages.
+A context-driven function that declares a directed edge between entity kinds. A policy takes a context (`{ host, ... }`, `{ host, user, ... }`, etc.) and returns a list of effects (includes, routes, provides); it fires when its argument signature is satisfied by the scope context. Policies are about entity topology, not stages.
 
 See: [Policies](/explanation/policies/)
 
 ### provides
 
-Overloaded term with two distinct meanings. On an aspect, `provides` defines named sub-aspects that dependents can include. As a battery namespace (`den.batteries`), these are reusable aspect providers shipped with Den.
+Overloaded term with two distinct meanings. On an aspect, `provides` defines named sub-aspects that dependents can include (aliased `_`). At the top level, `den.provides` is an alias for `den.batteries`, the reusable aspect providers shipped with Den.
 
 See: [Aspects](/explanation/aspects/), [Batteries](/reference/batteries/)
 
@@ -96,9 +96,3 @@ See: [Batteries](/reference/batteries/)
 The process of walking an entity's aspect graph, applying parametric dispatch, collecting per-class modules, and producing a final NixOS/HM/Darwin module. Driven by the fx pipeline.
 
 See: [Context pipeline](/explanation/context-pipeline/)
-
-### entity kind
-
-A named scope in `den.schema` that defines a type of entity in the resolution pipeline. Entity kinds are the "where" — they define what happens at each pipeline step. Built-in kinds: `host`, `user`, `home`. Custom kinds are registered by adding keys to `den.schema`.
-
-See: [Entities](/explanation/entities/)

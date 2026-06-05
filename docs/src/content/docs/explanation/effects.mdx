@@ -74,7 +74,7 @@ fx.handle { handlers = {}; } (fx.pure 22)
 You just ran your first effect! `fx.pure 22` already has its answer. Pure values do not depend on the external world, so they need no handlers.
 
 <Aside title="Explore nix-effects">
-If you want to explore all that `nix-effects` has to offer—beware of scary words, but an awesome open world of future-Nix posibilities—take a look at the [docs website](https://docs.kleisli.io/nix-effects).
+If you want to explore all that `nix-effects` has to offer—beware of scary words, but an awesome open world of future-Nix possibilities—take a look at the [docs website](https://docs.kleisli.io/nix-effects).
 </Aside>
 
 ## Computations and _Effect Requests_
@@ -139,7 +139,7 @@ Remember our initial `myPackage = { stdenv, jq }: ...` function? And how `callPa
 
 We can turn *any* pure-Nix function into an effectful Computation automatically by using `fx.bind.fn`. 
 
-It [works](https://github.com/kleisli-io/nix-effects/pull/12/changes#diff-017d9d683e5fee10699fd9ba2f084783199442cd6ebc0c67e186e9b8f90ed410R134) like this: 
+It works like this: 
 - it takes a plain Nix function
 - uses each argument name to generate effect-requests automatically (e.g., `fx.send "hostName"`)
 - binds all handler responses into a single attrset

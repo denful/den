@@ -17,6 +17,7 @@ For demo purposes, the example showcases:
 
 - `perSystem.packages`: How to expose flake-parts packages.
 - `numtide/devshell`: A default devshell extensible by any aspect.
+- `numtide/treefmt-nix`: A shared formatter configured across aspects.
 - `mightyiam/files`: Generates README from nix code.
 - `nix-community/nix-unit`: Write tests directly on aspects.
 
@@ -35,13 +36,26 @@ nix flake check -L
 ```
 flake.nix
 modules/
-  perSystem-forward.nix # Custom den.schema and perSystem forwarding class.
-  custom-classes.nix # Registers several classes for each third-party
-  den.nix   # Example of aspects using those classes
+  den.nix                # Hosts, aspects using the classes, and pipeline wiring.
+  perSystem-from-hosts.nix # Reads flake-parts classes from each host.
+  pkgs-by-name.nix       # Wires drupol/pkgs-by-name-for-flake-parts.
+  classes/
+    packages.nix         # perSystem.packages.
+    devshell.nix         # numtide/devshell.
+    treefmt.nix          # numtide/treefmt-nix.
+    files.nix            # mightyiam/files.
+    nix-unit.nix         # nix-community/nix-unit.
+packages/
+  hola.nix
 ```
 
 Key points:
-- New `perSystem` classes are registered via a context transition, from any module.
+- A custom class file under `modules/classes/` registers its class with
+  `den.classes.<name> = { };`, imports the third-party `flakeModule`, then forwards
+  content into the `flake-parts` scope with a `route` policy from `den.lib.policy`.
+  (`packages.nix` reuses Den's built-in `packages` class instead.)
+- Classes are wired into the `flake-parts` scope via `den.schema.flake-parts.includes`,
+  so any module can contribute new `perSystem` classes.
 
 ## Next Steps
 

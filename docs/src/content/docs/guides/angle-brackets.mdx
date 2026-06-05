@@ -6,7 +6,7 @@ description: <aspect/path> shorthand via __findFile.
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`nix/den-brackets.nix`](https://github.com/denful/den/blob/main/nix/den-brackets.nix)
+[`nix/lib/den-brackets.nix`](https://github.com/denful/den/blob/main/nix/lib/den-brackets.nix)
 </Aside>
 
 ## What it Does
@@ -40,12 +40,23 @@ lexical scope.
 
 The `<name>` expression resolves through these paths in order:
 
-1. **`<den.x.y>`** -- resolves to `config.den.x.y`
-2. **`<aspect>`** -- resolves to `config.den.aspects.aspect` (if `aspect` exists in `den.aspects`)
-3. **`<aspect/sub>`** -- resolves to `config.den.aspects.aspect.sub`
-4. **`<namespace>`** -- resolves to `config.den.ful.namespace` (if it is a denful)
+1. **`<den/battery>`** -- resolves to the battery `config.den.batteries.battery`
+   (when the segment after `den` names a registered battery), e.g.
+   `<den/primary-user>`.
+2. **`<den.x.y>`** -- otherwise resolves to `config.den.x.y` (any `den.*` path),
+   e.g. `<den.lib.parametric>`.
+3. **`<aspect>`** -- resolves to `config.den.aspects.aspect` (when `aspect` exists in `den.aspects`).
+4. **`<aspect/sub>`** -- resolves to the `sub` key of that aspect.
+5. **`<namespace/aspect>`** -- resolves into a namespace, `config.den.ful.namespace.aspect`.
 
-The `/` separator is translated to `.` in the lookup path.
+The `/` separator is translated to `.` in the lookup path, so `<den/primary-user>`
+and `<den.primary-user>` are equivalent.
+
+<Aside type="caution" title="provides fallback">
+When `<aspect/sub>` does not match a direct key, resolution falls back to
+`aspect.provides.sub` and emits a deprecation warning. Prefer direct nesting
+(define `sub` as a key on the aspect) so brackets resolve without the fallback.
+</Aside>
 
 ## Examples
 
@@ -61,7 +72,7 @@ den.aspects.laptop.includes = [
 den.aspects.laptop.includes = [
   <tools/editors>
   <alice/work-vpn>
-  <den.batteries.primary-user>
+  <den/primary-user>
 ];
 ```
 

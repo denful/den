@@ -7,50 +7,52 @@ import { Aside } from '@astrojs/starlight/components';
 
 ## Den as a Library
 
-Den's core (`/default.nix`) is domain-agnostic. It provides:
+Den's core (`nix/default.nix`) is domain-agnostic. `den.lib` exposes the
+resolution pipeline (`aspects.resolve`/`aspects.resolveImports`), the typed
+policy-effect constructors (`policy.*`), and `__findFile` for angle-bracket
+(`<den/...>`) aspect paths. Nothing here assumes NixOS, Darwin, or Home Manager.
 
-| Function | Purpose |
-|---|---|
-| `parametric` | *(deprecated)* Context dispatch now happens automatically |
-| `parametric.atLeast` | *(deprecated)* Use bare functions — dispatch is automatic |
-| `parametric.exactly` | *(deprecated)* Use bare functions — dispatch is automatic |
-| `parametric.fixedTo` | Apply an aspect with a fixed context |
-| `parametric.expands` | Extend context before dispatch |
-| `canTake` | Check if a function accepts given arguments |
-| `take.atLeast` / `take.exactly` | *(deprecated)* Dispatch is now handled by the pipeline |
-| `owned` | Extract only owned configs (no includes, no functor) |
-| `__findFile` | Angle bracket resolution for deep aspect paths |
-| `aspects` | Den aspects API (resolve, types) |
+```nix
+# `policy.*` is the shorthand; bring it into scope first.
+inherit (den.lib) policy;
 
-These primitives compose into context transformation pipelines for any domain.
+effects = [
+  (policy.resolve.to "terranix" { env = "prod"; })
+  (policy.include den.aspects.web-server)
+];
+```
+
+See [`reference/lib`](/reference/lib/) for the full surface and signatures.
+
+<Aside type="caution" title="Older helpers are deprecated">
+Earlier releases exposed `den.lib.parametric` (`.atLeast`/`.exactly`/`.fixedTo`/`.expands`),
+`den.lib.take`, and `den.lib.canTake` for manual context dispatch. The pipeline
+now dispatches [parametric aspects](/explanation/parametric/) and wraps
+[class modules](/explanation/class-modules/) automatically, so these are
+deprecated. See [`reference/lib-deprecated`](/reference/lib-deprecated/).
+</Aside>
 
 ## Using Den for Non-OS Domains
 
 <Aside title="Source" icon="github">
-[default.nix](https://github.com/denful/den/tree/main/default.nix) - [CI test: den-as-lib.nix](https://github.com/denful/den/tree/main/templates/ci/modules/features/den-as-lib.nix)
+[nix/default.nix](https://github.com/denful/den/tree/main/nix/default.nix)
 </Aside>
 
-Nothing about `den.lib` assumes NixOS, Darwin, or Home Manager. You can build
-context pipelines for any Nix module system:
+Define aspects for any custom class, then resolve them into a module for that
+class with `den.lib.aspects.resolve class aspect`:
 
 ```nix
-# see den-as-lib.nix CI test for working example
-
-# Define aspects for a custom domain
-# den.lib.parametric is deprecated — bare attrsets work directly:
-den.aspects = {
-  web-server = {
-    terranix.resource.aws_instance.web = { ami = "..."; };
-    includes = [
-      # configures using the terranix Nix class
-      ({ env, ... }: { terranix.resource.aws_instance.web.tags.Env = env; })
-    ];
-  };
+# Aspects are plain attrsets; includes are bare functions that receive
+# context. Dispatch is automatic — no parametric wrappers needed.
+den.aspects.web-server = {
+  terranix.resource.aws_instance.web.ami = "...";
+  includes = [
+    ({ env, ... }: { terranix.resource.aws_instance.web.tags.Env = env; })
+  ];
 };
 
-# Resolve for your custom class
-aspect = den.aspects.web-server { env = "production"; };
-module = den.lib.aspects.resolve "terranix" [] aspect;
+# Resolve for your custom "terranix" class.
+module = den.lib.aspects.resolve "terranix" den.aspects.web-server;
 ```
 
 ## Den as a Framework
@@ -60,7 +62,7 @@ On top of the library, Den provides `modules/` which implement:
 - **Schema types** (`den.hosts`, `den.homes`) for declaring NixOS/Darwin/HM entities
 - **Aspects & Policies** (`den.aspects`, `den.policies`) for the resolution pipeline
 - **Batteries** (`den.batteries.*`) for common OS configuration patterns
-- **Output generation** (`modules/config.nix`) instantiating configurations into flake outputs
+- **Output generation** instantiating configurations into flake outputs (`nixosConfigurations`, `darwinConfigurations`, …)
 
 The framework is entirely optional. You can use `den.lib` directly without
 any of the `den.hosts`/`den.aspects` machinery.
@@ -68,9 +70,9 @@ any of the `den.hosts`/`den.aspects` machinery.
 ```mermaid
 flowchart TD
   subgraph "Den Library (domain-agnostic)"
-    parametric["parametric dispatch"]
-    canTake["canTake / take"]
-    aspects["aspects API"]
+    resolve["aspects.resolve"]
+    policy["policy effects"]
+    findFile["__findFile"]
   end
   subgraph "Den Framework (OS-specific)"
     schema["den.hosts / den.homes"]
@@ -78,9 +80,9 @@ flowchart TD
     batteries["den.batteries"]
     output["flake output generation"]
   end
-  parametric --> ctx
-  canTake --> parametric
-  aspects --> parametric
+  resolve --> ctx
+  policy --> ctx
+  findFile --> resolve
   schema --> ctx
   batteries --> ctx
   ctx --> output

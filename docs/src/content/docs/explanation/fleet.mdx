@@ -8,7 +8,7 @@ import { Aside } from '@astrojs/starlight/components';
 <Aside title="Source" icon="github">
 [`modules/policies/flake.nix`](https://github.com/denful/den/blob/main/modules/policies/flake.nix) --
 [`nix/lib/aspects/fx/resolve.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/resolve.nix) --
-[`templates/ci/modules/features/pipe-scope.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/features/pipe-scope.nix)
+[`templates/ci/modules/public-api/pipe-scope.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/pipe-scope.nix)
 </Aside>
 
 ## What is a fleet?
@@ -37,9 +37,9 @@ The built-in flake policies drive this tree:
 
 | Policy | Effect |
 |---|---|
-| `to-systems` | Creates a `flake-system` scope per system in `den.systems` |
-| `to-os-outputs` | Creates a `host` scope per host, plus an instantiate request |
-| `to-hm-outputs` | Creates a `home` scope per standalone home |
+| `flake-to-systems` | Creates a `flake-system` scope per system in `den.systems` |
+| `system-to-os-outputs` | Creates a `host` scope per host, plus an instantiate request |
+| `system-to-hm-outputs` | Creates a `home` scope per standalone home |
 | `host-to-users` | Creates a `user` scope per user on each host |
 
 All hosts of the same system are **siblings** — they share the same

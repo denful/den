@@ -6,7 +6,7 @@ description: Flat-form class modules with automatic den context injection.
 import { Aside } from '@astrojs/starlight/components';
 
 <Aside title="Source" icon="github">
-[`nix/lib/aspects/fx/aspect.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/aspect.nix)
+[`nix/lib/aspects/fx/class-module.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/class-module.nix)
 </Aside>
 
 ## Context args in class modules
@@ -124,45 +124,24 @@ Note that for aspect-level context functions (the outer wrapper), `...` is not n
 
 ## Collision Handling
 
-A collision occurs when den wants to inject an arg (e.g., `host`) but the module system also provides a value for the same name -- via `specialArgs` or `_module.args`. By default, this throws an error to force an explicit resolution.
+A collision occurs when den wants to inject an arg (e.g., `host`) but the
+module system also provides a value for the same name -- via `specialArgs`
+or `_module.args`. By default this throws an error, forcing an explicit
+resolution. You can instead opt into letting one side win (`"den-wins"` or
+`"class-wins"`), set per aspect, per entity kind, or globally.
 
-### Resolution levels
-
-Collision strategy is resolved from three levels (first match wins):
-
-| Level | Where to set | Scope |
-|---|---|---|
-| Aspect | `meta.collisionPolicy` on the aspect | All class modules in that aspect |
-| Entity | `collisionPolicy` on the entity schema (`den.schema.host`) | All uses of that entity kind |
-| Global | `den.config.classModuleCollisionPolicy` | Entire flake (default: `"error"`) |
-
-### Strategy values
-
-| Value | Behavior |
-|---|---|
-| `"error"` | Throw an eval error (default) |
-| `"den-wins"` | Den value takes precedence; `lib.warn` emitted |
-| `"class-wins"` | Module-system value takes precedence; `lib.warn` emitted |
-
-### Setting collision strategy
-
-```nix
-# Aspect level
-den.aspects.my-aspect.meta.collisionPolicy = "den-wins";
-
-# Entity level (all hosts)
-den.schema.host.collisionPolicy = "den-wins";
-
-# Global
-den.config.classModuleCollisionPolicy = "den-wins";
-```
+For the full policy tables — resolution levels, strategy values, and where
+to set each — see [Class module collision policy](/reference/aspects/) in
+the `den.aspects` reference.
 
 ## Unsatisfied args
 
 When a class module requires an entity arg that isn't in the current
 context (e.g., `{ user, config, ... }` at a host scope where no `user`
-exists), the module is **silently skipped**. A trace message is emitted
-but no error is raised.
+exists), the module is **skipped**. A `lib.warn` is emitted but no error
+is raised. Only missing *entity* args (the schema kinds — `host`, `user`,
+`home`, …) trigger this skip; ordinary module-system args with no default
+are left for the module system to resolve.
 
 This is by design — it lets you write a single aspect with class modules
 that target different scopes:
@@ -187,6 +166,6 @@ args are in context at the scope where it's being resolved.
 ## See Also
 
 - [Aspects & Functors](/explanation/aspects) -- how aspects work and the `__functor` pattern
-- [Context-Aware Aspects](/explanation/parametric) -- shape-based dispatch and the `canTake` mechanism
+- [Context-Aware Aspects](/explanation/parametric) -- shape-based dispatch and parametric aspects
 - [Context Pipeline](/explanation/context-pipeline) -- how context flows through the resolution pipeline
 - [Entity Policies](/explanation/policies) -- how policies dispatch context to entity kinds

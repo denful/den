@@ -14,20 +14,25 @@ See [Class Modules](/explanation/class-modules/) and
 
 ## `den.lib.parametric`
 
-Wraps an aspect with a `__functor` that filters `includes` by argument
-compatibility. Default uses `atLeast` matching.
+Historically wrapped an aspect to filter `includes` by argument compatibility.
+The fx pipeline now resolves parametric dispatch directly, so `parametric` and
+`parametric.atLeast` / `parametric.exactly` are identity passthroughs that emit a
+deprecation warning. Each call logs `den.lib.parametric: … is deprecated`.
 
 ```nix
+# Deprecated — pass the plain attrset directly instead.
 den.lib.parametric { nixos.x = 1; includes = [ ... ]; }
 ```
 
 ### `den.lib.parametric.atLeast`
 
-Same as `parametric`. Functions match if all required params are present.
+Identity passthrough (warns). Previously: match when all required params are
+present.
 
 ### `den.lib.parametric.exactly`
 
-Functions match only if required params exactly equal provided params.
+Identity passthrough (warns). Previously: match only when required params exactly
+equal provided params.
 
 ```nix
 den.lib.parametric.exactly { includes = [ ({ host }: ...) ]; }
@@ -35,7 +40,9 @@ den.lib.parametric.exactly { includes = [ ({ host }: ...) ]; }
 
 ### `den.lib.parametric.fixedTo`
 
-Calls the aspect with a fixed context, ignoring the actual context:
+Pins context values for the aspect via scope handlers (`constantHandler`), so the
+aspect resolves as if those values were in scope. Returns a parametric wrapper and
+warns. Variants `.exactly`, `.atLeast`, and `.upTo` behave the same.
 
 ```nix
 den.lib.parametric.fixedTo { host = myHost; } someAspect
@@ -43,7 +50,8 @@ den.lib.parametric.fixedTo { host = myHost; } someAspect
 
 ### `den.lib.parametric.expands`
 
-Extends the received context with additional attributes before dispatch:
+Merges additional attributes into the aspect's scope handlers before dispatch.
+Returns a parametric wrapper and warns.
 
 ```nix
 den.lib.parametric.expands { extra = true; } someAspect
@@ -51,7 +59,8 @@ den.lib.parametric.expands { extra = true; } someAspect
 
 ## `den.lib.canTake`
 
-Function argument introspection.
+Function argument introspection. A pure predicate (it does not warn), still used
+internally by the type system; prefer plain parametric functions in new code.
 
 ### `den.lib.canTake params fn`
 
@@ -65,26 +74,41 @@ Same as `canTake`.
 
 Returns `true` only if `fn`'s required arguments exactly match `params`.
 
+### `den.lib.canTake.upTo params fn`
+
+Returns `true` if `fn` is satisfied by `params` and at least one of `params`
+overlaps `fn`'s arguments.
+
 ## `den.lib.take`
 
-Conditional function application.
+Context-level guards. Under handler-based resolution the pipeline resolves
+function arguments automatically, so most of these now warn.
 
-### `den.lib.take.atLeast fn ctx`
+### `den.lib.take.exactly fn`
 
-Calls `fn ctx` if `canTake.atLeast ctx fn`, otherwise returns `{}`.
+Returns a parametric wrapper that calls `fn` only when the resolved context
+matches `fn`'s declared arguments exactly (no extra context keys). Warns.
 
-### `den.lib.take.exactly fn ctx`
+### `den.lib.take.atLeast fn`
 
-Calls `fn ctx` if `canTake.exactly ctx fn`, otherwise returns `{}`.
+Identity passthrough (warns). The pipeline's deferral already provides
+`atLeast` semantics.
+
+### `den.lib.take.upTo fn`
+
+Identity passthrough (warns).
 
 ### `den.lib.take.unused`
 
-`_unused: used: used` — ignores first argument, returns second. Used for
-discarding `aspect-chain` in `import-tree`.
+`_unused: used: used` — ignores the first argument, returns the second. A plain
+helper (does not warn).
 
 ## Context shortcuts
 
-Shortcuts built with `den.lib.take.exactly` and `den.lib.parametric.fixedTo`.
+Run an aspect only at a specific context level. Each returns a parametric wrapper
+(declaring deeper context keys as optional) that yields `{}` when resolved at a
+deeper level, and warns. Prefer a plain function with the level's keys, e.g.
+`({ host, user, ... }: { ... })`.
 
 ### `den.lib.perHost aspect`
 
@@ -100,8 +124,8 @@ Run `aspect` only in `{ home }` contexts.
 
 ## `den.lib.resolveStage`
 
-### `den.lib.resolveStage name ctx`
-
-Resolves a stage by name with a given context attrset. Returns an aspect-like
-record. Used internally by the pipeline and by `den.lib.diag` convenience
-wrappers.
+<Aside type="note" title="Renamed, not deprecated">
+There is no `den.lib.resolveStage`. The resolver is now `den.lib.resolveEntity name ctx`
+— current, non-deprecated API. It resolves an entity kind by name with a context
+attrset and returns an aspect-like record. See [Diagrams](/explanation/diagrams/).
+</Aside>

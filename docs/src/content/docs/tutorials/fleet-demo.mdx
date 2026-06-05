@@ -9,6 +9,25 @@ import { Aside } from '@astrojs/starlight/components';
 [`templates/fleet-demo`](https://github.com/denful/den/tree/main/templates/fleet-demo)
 </Aside>
 
+<Aside type="caution" title="This is a demo directory, not a template">
+`fleet-demo` is **not** registered with `nix flake init -t` — there is no
+`github:denful/den#fleet-demo` template. It is a demo directory inside the Den
+repository whose `flake.nix` references Den via a relative `path:../..`, so it only
+resolves from within a checkout. To use it, clone the repo and copy
+`templates/fleet-demo/` out as your starting point:
+
+```console
+git clone https://github.com/denful/den
+cp -r den/templates/fleet-demo my-fleet && cd my-fleet
+# point den at a real revision instead of the in-repo relative path:
+# edit flake.nix → den.url = "github:denful/den";
+```
+
+The `nix eval`/`nix run` commands in [Try It](#try-it) are written to run from the
+root of a clone of the repo (they pass `--override-input den .` and target
+`./templates/fleet-demo#…`).
+</Aside>
+
 The fleet demo demonstrates Den's multi-host capabilities: custom entity types, environment scoping, quirk-based data flow, and cross-host collection.
 
 ## Topology
@@ -64,16 +83,16 @@ den.policies.fleet-to-envs = { fleet, ... }:
 
 # environment -> hosts (hosts whose environment matches)
 den.policies.env-to-hosts = { environment, ... }:
-  lib.concatMap (...) # resolve.to "host" + policy.instantiate per host
+  lib.concatMap (...) # resolve.to "host" + den.lib.policy.instantiate per host
 ```
 
-The default host-walking policies (`to-os-outputs`, `to-hm-outputs`) are excluded
-so the fleet topology controls the scope tree:
+The default per-system output policies (`system-to-os-outputs`, `system-to-hm-outputs`)
+are excluded so the fleet topology controls the scope tree:
 
 ```nix
 den.schema.flake-system.excludes = [
-  den.policies.to-os-outputs
-  den.policies.to-hm-outputs
+  den.policies.system-to-os-outputs
+  den.policies.system-to-hm-outputs
 ];
 ```
 
@@ -133,9 +152,11 @@ templates/fleet-demo/
   modules/
     den.nix                      # hosts, defaults, systems
     environments.nix             # environment entity type + host schema extensions
+    users.nix                    # user registry, schema extension, group access
     flake-parts.nix              # standard wiring
+    diagrams.nix                 # fleet diagram gallery (write-diagrams package)
     policies/
-      fleet.nix                  # fleet -> env -> host scope tree
+      fleet.nix                  # fleet -> env -> host -> user scope tree
       pipes.nix                  # quirk declarations + collection policies
     aspects/
       features/
@@ -148,7 +169,7 @@ templates/fleet-demo/
         web-prod-2.nix           # includes nginx + hostfile
         web-staging.nix          # includes nginx + hostfile
       users/
-        deploy.nix               # deploy user (all hosts)
+        ssh-keys.nix             # provisions authorized SSH keys per user scope
 ```
 
 ## Try It
@@ -163,6 +184,14 @@ nix eval --override-input den . \
   ./templates/fleet-demo#nixosConfigurations.web-prod-1.config.networking.extraHosts
 ```
 
+The template also ships a fleet diagram gallery (`modules/diagrams.nix`) built
+from the resolved pipeline — scope topology, policy resolution, and pipe flow.
+Regenerate it into the template's `README.md` and `diagrams/fleet/`:
+
+```bash
+nix run ./templates/fleet-demo#write-diagrams
+```
+
 ## What It Demonstrates
 
 | Feature | Shown |
@@ -174,9 +203,13 @@ nix eval --override-input den . \
 | Environment-scoped isolation | ✓ |
 | Parametric quirk values (`{ host, ... }:`) | ✓ |
 | Schema policy excludes | ✓ |
+| Registry users with group-based access | ✓ |
+| Fleet diagram gallery (`diag.fleet.of`) | ✓ |
 
 ## See Also
 
 - [Quirks & Pipes](/explanation/quirks-and-pipes/) — how quirks flow through the pipeline
 - [Fleets & Multi-Host](/explanation/fleet/) — scope partitioning and entity resolution
+- [Diagrams](/explanation/diagrams/) — fleet-level visualization concepts
 - [Policies reference](/reference/policies/) — policy effect types
+- [Diagram reference](/reference/diag/) — `diag.fleet.of`, `captureFleet`, renderers

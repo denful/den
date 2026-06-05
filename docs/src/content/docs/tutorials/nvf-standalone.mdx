@@ -25,15 +25,19 @@ nix run .#my-neovim
 ## Project Structure
 
 ```
-flake.nix   # dependencies including NVF
+flake.nix                  # dependencies including NVF
 modules/
-  den.nix   # uses Den to expose a standalone neovim app.
+  den.nix                  # exposes the standalone neovim package + aspects
+  nvf-integration.nix      # the den.lib.nvf helper: forward class + resolve
+  header.txt               # dashboard header used by the `mine` variant
 ```
 
 Key points:
-- **Runnable app** — exposes `.#my-neovim` app
-- **Custom forward class** — uses a `vim` class that forwards to `nvf.config.vim`
-- **Custom ctx** — shows how to use Den with custom context to resolve `nvf` module.
+- **Runnable app** — exposes `.#my-neovim` (and `.#your-neovim`)
+- **Custom forward class** — a `vim` class that forwards into `nvf.vim`
+- **Aspect-to-module** — `den.lib.aspects.resolve "nvf" aspect` turns an
+  aspect tree into a plain NixOS-style module for `nvf`'s
+  `neovimConfiguration`.
 
 ## Next Steps
 
