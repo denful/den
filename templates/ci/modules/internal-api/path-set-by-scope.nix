@@ -48,6 +48,36 @@
       }
     );
 
+    test-mkProjectedHasAspect = denTest (
+      { den, ... }:
+      let
+        mk = den.lib.aspects.mkProjectedHasAspect;
+        h = mk {
+          pathSetByScope = {
+            "host=x,user=y" = {
+              "foo" = true;
+            };
+          };
+          scopeId = "host=x,user=y";
+        };
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.foo.nixos = { };
+        den.aspects.bar.nixos = { };
+        expr = {
+          hasFoo = h den.aspects.foo;
+          hasBar = h den.aspects.bar;
+          any = h.forAnyClass den.aspects.foo;
+        };
+        expected = {
+          hasFoo = true;
+          hasBar = false;
+          any = true;
+        };
+      }
+    );
+
     test-entity-exposes-psbs = denTest (
       { den, ... }:
       {

@@ -112,7 +112,12 @@ in
   resolveWithPaths = fxResolveTreeWithPaths;
   resolveImports = fxResolveTreeImports;
   resolveWithState = fxResolveTreeFull;
-  inherit (hasAspect) hasAspectIn collectPathSet mkEntityHasAspect;
+  inherit (hasAspect)
+    hasAspectIn
+    collectPathSet
+    mkEntityHasAspect
+    mkProjectedHasAspect
+    ;
   mkAspectsType = typeCfg: lib.mapAttrs (_: v: v typeCfg) rawTypes;
   # Predicates exported directly (not through types mapAttrs which applies { } to each value).
   inherit (rawTypes)
