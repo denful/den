@@ -22,18 +22,50 @@ let
     else
       lib.warn "den.aspects.${config.name} not defined — entity gets empty aspect" { };
 
-  # Shared mainModule option — identical across host and home entities.
-  mainModuleOption =
+  # Single shared production run: imports + per-scope path set from ONE fx.handle.
+  # Declared as an option so the module fixpoint memoizes it — every consumer
+  # (mainModule, __pathSetByScope) reads the same value, guaranteeing one resolve.
+  resolveResultOption =
     den: config:
     lib.mkOption {
       internal = true;
       visible = false;
       readOnly = true;
+      type = lib.types.raw;
+      defaultText = "den.lib.aspects.resolveWithPaths config.class config.resolved";
+      default = den.lib.aspects.resolveWithPaths config.class config.resolved;
+    };
+
+  # mainModule now derives imports from the shared result (no second run).
+  mainModuleOption =
+    _den: config:
+    lib.mkOption {
+      internal = true;
+      visible = false;
+      readOnly = true;
       type = lib.types.deferredModule;
-      defaultText = "den.lib.aspects.resolve config.class config.resolved";
-      default = den.lib.aspects.resolve config.class config.resolved;
+      defaultText = "{ inherit (config.__resolveResult) imports; }";
+      default = { inherit (config.__resolveResult) imports; };
+    };
+
+  # Per-scope path set, surfaced for the projected (in-context) hasAspect.
+  pathSetByScopeOption =
+    _den: config:
+    lib.mkOption {
+      internal = true;
+      visible = false;
+      readOnly = true;
+      type = lib.types.raw;
+      defaultText = "config.__resolveResult.pathSetByScope";
+      default = config.__resolveResult.pathSetByScope;
     };
 in
 {
-  inherit strOpt lookupAspect mainModuleOption;
+  inherit
+    strOpt
+    lookupAspect
+    mainModuleOption
+    resolveResultOption
+    pathSetByScopeOption
+    ;
 }

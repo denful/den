@@ -47,5 +47,21 @@
         };
       }
     );
+
+    test-entity-exposes-psbs = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.aspect1.homeManager.programs.atuin.enable = true;
+        den.aspects.igloo.provides.tux.includes = [ den.aspects.aspect1 ];
+
+        expr =
+          let
+            psbs = den.hosts.x86_64-linux.igloo.__pathSetByScope;
+          in
+          builtins.isAttrs psbs && builtins.any (s: (psbs.${s} or { }) ? "aspect1") (builtins.attrNames psbs);
+        expected = true;
+      }
+    );
   };
 }

@@ -6,7 +6,13 @@
   ...
 }@top:
 let
-  inherit (import ./_types.nix { inherit lib; }) strOpt lookupAspect mainModuleOption;
+  inherit (import ./_types.nix { inherit lib; })
+    strOpt
+    lookupAspect
+    mainModuleOption
+    resolveResultOption
+    pathSetByScopeOption
+    ;
 
   homesOption = lib.mkOption {
     description = "den standalone home-manager configurations";
@@ -127,6 +133,8 @@ let
               .${config.class};
           };
           mainModule = mainModuleOption den config;
+          __resolveResult = resolveResultOption den config;
+          __pathSetByScope = pathSetByScopeOption den config;
         };
       }
     );

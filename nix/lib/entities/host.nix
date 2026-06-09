@@ -6,7 +6,13 @@
   ...
 }:
 let
-  inherit (import ./_types.nix { inherit lib; }) strOpt lookupAspect mainModuleOption;
+  inherit (import ./_types.nix { inherit lib; })
+    strOpt
+    lookupAspect
+    mainModuleOption
+    resolveResultOption
+    pathSetByScopeOption
+    ;
 
   hostsOption = lib.mkOption {
     description = "den hosts definition";
@@ -106,6 +112,8 @@ let
               .${config.class};
           };
           mainModule = mainModuleOption den config;
+          __resolveResult = resolveResultOption den config;
+          __pathSetByScope = pathSetByScopeOption den config;
         };
       }
     );
