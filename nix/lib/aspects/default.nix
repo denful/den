@@ -62,6 +62,18 @@ let
       self = wrapped;
     };
 
+  # Like resolve but also surfaces the per-scope path set, from one fx.handle.
+  fxResolveTreeWithPaths =
+    class: resolved:
+    let
+      wrapped = normalizeRoot resolved;
+      ctx = fx.aspect.ctxFromHandlers (resolved.__scopeHandlers or { });
+    in
+    fx.pipeline.fxResolveWithPaths {
+      inherit class ctx;
+      self = wrapped;
+    };
+
   # Like resolve but skips entity instantiation.
   # Use for nested resolution (e.g., extracting homeManager modules from a host tree).
   fxResolveTreeImports =
@@ -97,6 +109,7 @@ in
     policyTypes
     ;
   resolve = fxResolveTree;
+  resolveWithPaths = fxResolveTreeWithPaths;
   resolveImports = fxResolveTreeImports;
   resolveWithState = fxResolveTreeFull;
   inherit (hasAspect) hasAspectIn collectPathSet mkEntityHasAspect;

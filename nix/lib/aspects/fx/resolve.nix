@@ -468,7 +468,9 @@ let
     };
 
   # Full resolution: run pipeline, then assemble output through all phases.
-  fxResolve =
+  # Shared body — returns both `imports` and the per-scope path set so a single
+  # fx.handle backs `resolve` and `resolveWithPaths` (no second pipeline run).
+  fxResolveFull =
     mkPipeline:
     {
       class,
@@ -747,7 +749,16 @@ let
     in
     {
       imports = phase4.${class} or [ ];
+      # Surfaced from the SAME result.state — Task 1 thunked this onto state.
+      pathSetByScope = result.state.pathSetByScope null;
     };
+
+  # Back-compatible projection: imports only. Protects deferredModule consumers
+  # that assert resolve's output is exactly { imports = …; }.
+  fxResolve = mkPipeline: args: { inherit (fxResolveFull mkPipeline args) imports; };
+
+  # imports + per-scope path set, from the SAME fx.handle as fxResolve.
+  fxResolveWithPaths = fxResolveFull;
 
   # Like fxResolve but skips instantiation (phase 4).
   # Returns only class imports from phases 1-3 (wrap, provides, routes).
@@ -805,5 +816,10 @@ let
     };
 in
 {
-  inherit fxResolve fxResolveImports wrapCollectedClasses;
+  inherit
+    fxResolve
+    fxResolveWithPaths
+    fxResolveImports
+    wrapCollectedClasses
+    ;
 }

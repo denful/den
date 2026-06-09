@@ -24,5 +24,28 @@
         expected = true;
       }
     );
+
+    test-resolveWithPaths-shape = denTest (
+      { den, ... }:
+      let
+        hostRoot = den.lib.resolveEntity "host" { host = den.hosts.x86_64-linux.igloo; };
+        r = den.lib.aspects.resolveWithPaths "nixos" hostRoot;
+        plain = den.lib.aspects.resolve "nixos" hostRoot;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo.nixos.networking.hostName = "igloo";
+        expr = {
+          hasImports = r ? imports;
+          hasPaths = r ? pathSetByScope;
+          plainCleanlyImportsOnly = builtins.attrNames plain == [ "imports" ];
+        };
+        expected = {
+          hasImports = true;
+          hasPaths = true;
+          plainCleanlyImportsOnly = true;
+        };
+      }
+    );
   };
 }
