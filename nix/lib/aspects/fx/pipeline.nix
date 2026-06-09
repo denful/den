@@ -135,6 +135,10 @@ let
     # --- Flat state (global by design, not scoped) ---
     seen = _: { };
     pathSet = _: { };
+    # Per-scope path set: scopeId → { basePathKey → true }. Byproduct of the
+    # structural walk, bucketed by the scope that owns each node. Powers the
+    # projected (in-context) hasAspect. Thunked to survive per-step deepSeq.
+    pathSetByScope = _: { };
 
     # --- Scope-partitioned output state (handlers write here) ---
     scopedClassImports = _: { };

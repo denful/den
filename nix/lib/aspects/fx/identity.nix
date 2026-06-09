@@ -68,6 +68,19 @@ let
               // lib.optionalAttrs (baseKey != key) {
                 ${baseKey} = true;
               };
+            pathSetByScope =
+              _:
+              let
+                prev = (state.pathSetByScope or (_: { })) null;
+                scope = state.currentScope;
+                scopeSet = prev.${scope} or { };
+              in
+              prev
+              // {
+                ${scope} = scopeSet // {
+                  ${baseKey} = true;
+                };
+              };
           };
       };
   };
