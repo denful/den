@@ -51,8 +51,45 @@ let
     let
       targetKind = resolveTargetKind entityKind schemaEffect;
       resolveBindings = schemaEffect.schema.value;
-      scopedCtx = enrichedCtx // resolveBindings;
+      rawScopedCtx = enrichedCtx // resolveBindings;
       entityClass = resolveEntityClass targetKind resolveBindings;
+
+      # In-context hasAspect answers PROJECTED membership: what is actually
+      # delivered into THIS scope, not the structural registry tree. The owning
+      # host's production run already bucketed every user scope's path set under
+      # `__pathSetByScope`; a self-scoped entity (no host) uses its own. The
+      # lookup is pure and forced lazily (e.g. at a class-module `mkIf`), so it
+      # never re-enters the resolve that produced the path set. Reading it from an
+      # `includes` position is the one cyclic case (same in-flight run): it forces
+      # the host's own `__resolveResult` and recurses — don't decide includes from
+      # projected membership.
+      #
+      # Only `.hasAspect` is replaced. `mkScopeId` keys off `.name`, so the
+      # derived `ctxNames`/`currentScope` are unperturbed by this wrapping.
+      overrideKinds = builtins.filter (
+        k: schemaEntityKindsSet ? ${k} && builtins.isAttrs (rawScopedCtx.${k} or null)
+      ) (builtins.attrNames rawScopedCtx);
+      # The path set is bucketed by the SCOPE id, which is built from entity-kind
+      # bindings ONLY (host/user/home). Policy enrichment can later sprinkle
+      # non-entity keys (e.g. `system`) into the resolve ctx; including those here
+      # would desync this lookup's key from the bucket key. Restrict to entity
+      # kinds so the projected id matches `currentScope` regardless of enrichment.
+      scopeId = mkScopeId (lib.getAttrs overrideKinds rawScopedCtx);
+      owner = rawScopedCtx.host or rawScopedCtx.${targetKind} or null;
+      ownerPathSet = if owner != null then owner.__pathSetByScope or { } else { };
+      projected = den.lib.aspects.mkProjectedHasAspect {
+        pathSetByScope = ownerPathSet;
+        inherit scopeId;
+      };
+      scopedCtx = builtins.foldl' (
+        acc: k:
+        acc
+        // {
+          ${k} = acc.${k} // {
+            hasAspect = projected;
+          };
+        }
+      ) rawScopedCtx overrideKinds;
     in
     {
       inherit
