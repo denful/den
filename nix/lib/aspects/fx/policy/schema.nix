@@ -75,21 +75,16 @@ let
       # would desync this lookup's key from the bucket key. Restrict to entity
       # kinds so the projected id matches `currentScope` regardless of enrichment.
       scopeId = mkScopeId (lib.getAttrs overrideKinds rawScopedCtx);
-      owner = rawScopedCtx.host or rawScopedCtx.${targetKind} or null;
-      ownerPathSet = if owner != null then owner.__pathSetByScope or { } else { };
+      # The host run buckets every user scope; a self-scoped entity (no host)
+      # uses its own. `or { }` covers an entity without a path set.
+      ownerPathSet =
+        rawScopedCtx.host.__pathSetByScope or rawScopedCtx.${targetKind}.__pathSetByScope or { };
       projected = den.lib.aspects.mkProjectedHasAspect {
         pathSetByScope = ownerPathSet;
         inherit scopeId;
       };
-      scopedCtx = builtins.foldl' (
-        acc: k:
-        acc
-        // {
-          ${k} = acc.${k} // {
-            hasAspect = projected;
-          };
-        }
-      ) rawScopedCtx overrideKinds;
+      scopedCtx =
+        rawScopedCtx // lib.genAttrs overrideKinds (k: rawScopedCtx.${k} // { hasAspect = projected; });
     in
     {
       inherit
