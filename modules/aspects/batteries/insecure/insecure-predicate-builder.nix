@@ -31,6 +31,11 @@ let
     { host }:
     {
       name = "insecure-predicate/os";
+    }
+    # A synthetic host identity (from a `user@host` home with no declared host)
+    # has no class output, so there is nothing to import into. Guard like
+    # homeAspect already does.
+    // lib.optionalAttrs (host ? class) {
       ${host.class}.imports = [ insecureModule ];
     };
 

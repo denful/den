@@ -28,11 +28,25 @@ let
           )
         else
           (
-            { host, user, ... }:
+            # Deliver to a user or home scope matching `key` by host- or
+            # user-name. All entity args are optional so this fires at every
+            # sibling kind (user AND home) — leaving any required entity arg
+            # would restrict late-dispatch to that kind only, missing standalone
+            # homes. `atDeliverableScope` keeps it inert at a bare host scope
+            # (which fans out to its user scopes), and lets a standalone
+            # `user@host` home match on its synthetic host identity.
+            {
+              host ? null,
+              user ? null,
+              home ? null,
+              ...
+            }:
             let
               result = applyProvide value { inherit host user; };
+              atDeliverableScope = user != null || home != null;
+              matches = (host != null && host.name == key) || (user != null && user.name == key);
             in
-            lib.optionals (host.name == key || user.name == key) [
+            lib.optionals (atDeliverableScope && matches) [
               (policy.include result)
             ]
           );

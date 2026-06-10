@@ -39,6 +39,27 @@ let
         hostByName = if hostName != null then den.hosts.${system}.${hostName} or null else null;
         userByName = if hostByName != null then hostByName.users.${userName} or null else null;
 
+        # A home named `user@host` carries a host identity even when that host
+        # isn't declared in `den.hosts`. Synthesize a minimal `{ name = ...; }`
+        # so host-keyed provides/policies (which match on `host.name`) resolve
+        # for an otherwise-standalone home — without instantiating a real host
+        # entity, which would pull in its platform builder (e.g. nix-darwin).
+        # A declared host always wins and remains the only thing that wires
+        # `osConfig`.
+        #
+        # Only `host` is synthesized, never `user`: a synthetic host alone fires
+        # `{ host }`-keyed policies (gated on `host ? class` so OS-class routing
+        # stays inert for a classless synthetic host), while `{ host, user }`-keyed
+        # OS batteries (define-user, user-to-host, …) keep their existing
+        # null-user gating and fall back to their home-scope path.
+        hostCtx =
+          if hostByName != null then
+            hostByName
+          else if nameWithHost then
+            { name = hostName; }
+          else
+            null;
+
         homeManagerConfiguration =
           if nameWithHost && hostByName != null then
             { pkgs, modules }:
@@ -55,7 +76,7 @@ let
         freeformType = lib.types.attrsOf lib.types.anything;
         imports = [ den.schema.home ];
         config._module.args.home = config;
-        config._module.args.host = hostByName;
+        config._module.args.host = hostCtx;
         config._module.args.user = userByName;
         options = {
           name = strOpt "home configuration name" userName;
@@ -70,7 +91,7 @@ let
             defaultText = lib.literalExpression "user";
           };
           host = lib.mkOption {
-            default = hostByName;
+            default = hostCtx;
             defaultText = lib.literalExpression "host";
           };
           system = strOpt "platform system" system;

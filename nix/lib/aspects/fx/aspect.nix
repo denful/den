@@ -69,6 +69,26 @@ let
           __fn = resolved;
           __args = lib.functionArgs resolved;
         }
+    else if builtins.isList resolved then
+      # A parametric/conditional include may return a list of effects, e.g.
+      # `({ host, ... }: lib.optional cond (policy.include {...}))`. Normalize
+      # each entry into an include the re-resolve will walk: include-effect
+      # descriptors contribute their `.value`; bare aspects pass through. Other
+      # effect kinds can't be expressed as a parametric merge here.
+      let
+        toInclude =
+          e:
+          if builtins.isAttrs e && (e.__policyEffect or null) == "include" then
+            e.value
+          else if builtins.isAttrs e && e ? __policyEffect then
+            throw "den: includes function at '${aspect.name or "<anon>"}' returned a '${e.__policyEffect}' effect in a list; only include effects (or bare aspects) are supported here"
+          else
+            e;
+        # Flatten nested lists (e.g. `[ (lib.optional …) … ]`) so every effect is
+        # reached rather than silently dropped as an unwalked includes entry.
+        entries = builtins.filter (e: e != null) (lib.flatten resolved);
+      in
+      base // { includes = (base.includes or [ ]) ++ map toInclude entries; }
     else
       base // builtins.removeAttrs resolved [ "meta" ];
 

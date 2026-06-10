@@ -25,11 +25,16 @@ in
 
   den.policies.os-to-host =
     { host, ... }:
+    # A synthetic host identity (a `user@host` home with no declared host) has
+    # no OS class to route into; `host ? class` gates OS routing to real hosts.
     lib.optional
-      (builtins.elem host.class [
-        "nixos"
-        "darwin"
-      ])
+      (
+        host ? class
+        && builtins.elem host.class [
+          "nixos"
+          "darwin"
+        ]
+      )
       (
         den.lib.policy.route {
           fromClass = "os";

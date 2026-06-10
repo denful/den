@@ -54,7 +54,13 @@
           homeSchema.name = "tux";
           homeSchema.userName = "tux";
           homeSchema.hostName = "igloo";
-          homeSchema.host = null;
+          # A `user@host` home with no declared host now carries a synthetic
+          # host identity (name only) so host-keyed provides/policies resolve
+          # without instantiating a real host. `user` stays null — only the
+          # host is synthesized. See deadbugs/standalone-home-host-context.nix.
+          homeSchema.host = {
+            name = "igloo";
+          };
           homeSchema.user = null;
           configuredUserName = "tux";
           keyboard.model = "standalone";

@@ -39,7 +39,9 @@ let
     {
       name = "self'/os";
     }
-    // mkAspect host.class host.system;
+    # Guard a synthetic host identity (classless `user@host` home) the same way
+    # homeAspect already guards `home ? class`.
+    // lib.optionalAttrs (host ? class) (mkAspect host.class host.system);
 
   userAspect =
     {
