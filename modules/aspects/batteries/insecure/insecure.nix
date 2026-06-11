@@ -38,7 +38,7 @@ let
         # nixpkgs.config.permittedInsecurePackages covers these packages.
         hostModule = lib.optionalAttrs (
           (class == "homeManager" || !builtins.elem class validClasses)
-          && host != null
+          && host ? class
           && builtins.elem host.class validClasses
         ) { ${host.class}.permittedInsecurePackages.packages = allowed-names; };
       in
