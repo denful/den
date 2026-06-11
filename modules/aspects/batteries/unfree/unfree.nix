@@ -40,7 +40,7 @@ let
         #   - "user" class (no HM) → only the host's OS config exists
         hostModule = lib.optionalAttrs (
           (class == "homeManager" || !builtins.elem class validClasses)
-          && host != null
+          && host ? class
           && builtins.elem host.class validClasses
         ) { ${host.class}.unfree.packages = allowed-names; };
       in
