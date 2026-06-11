@@ -1,7 +1,9 @@
 name: bogus
 on:
   push:
-    branches: ["!main"]
+    # branches: ["!main"] never matched anything: a filter with only negative
+    # patterns matches no branch at all
+    branches-ignore: [main]
     paths: ["templates/bogus/**/*.nix"]
   pull_request:
     types: [labeled, opened, synchronize, reopened, review_requested, ready_for_review]
@@ -19,7 +21,7 @@ jobs:
     name: Bogus (den ${{matrix.rev}})
     runs-on: ${{matrix.os}}
     steps:
-      - uses: wimpysworld/nothing-but-nix@main
+      - uses: wimpysworld/nothing-but-nix@v10
       - uses: cachix/install-nix-action@v31
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - run: nix flake init -t "github:${GITHUB_REPOSITORY}/${GITHUB_SHA}#bogus"

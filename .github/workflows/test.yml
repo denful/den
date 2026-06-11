@@ -11,58 +11,88 @@ on:
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  # never cancel main builds: back-to-back merges would leave main untested
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 env:
   NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
   non-draft:
     runs-on: ubuntu-latest
-    if: ${{github.ref == 'refs/heads/main' || github.event.pull_request.draft == false}}
+    # review events: only approvals re-trigger CI; comment reviews would
+    # otherwise produce skipped check runs that overwrite real test results
+    if: ${{github.ref == 'refs/heads/main' || (github.event.pull_request.draft == false && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved'))}}
+    outputs:
+      nix-changed: ${{ steps.diff.outputs.nix-changed }}
     steps:
       - uses: actions/checkout@v6
-      - run: |
-          git fetch --depth 1 origin refs/heads/main
-          test "refs/heads/main" == "${{github.ref}}" || (git diff --name-only origin/main..${{ github.sha }} -- | grep '.nix')
-  ci-deep:
+      - id: diff
+        # pull_request_review has no paths filter, so docs-only PRs reach here;
+        # downstream jobs skip on nix-changed=false (skipped required checks
+        # count as passing, which is what lets docs-only PRs merge)
+        run: |
+          if [[ "${{github.ref}}" == "refs/heads/main" ]]; then
+            echo "nix-changed=true" >> "$GITHUB_OUTPUT"
+          else
+            git fetch --depth 1 origin refs/heads/main
+            if git diff --name-only origin/main..${{github.sha}} -- | grep -q '\.nix$'; then
+              echo "nix-changed=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "nix-changed=false" >> "$GITHUB_OUTPUT"
+            fi
+          fi
+  allow-ci:
     needs: [non-draft]
+    name: allow-ci
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check access
+        if: ${{github.event_name == 'pull_request' || github.event_name == 'pull_request_review'}}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # labels are queried live, not from github.event: re-runs reuse the
+        # payload frozen at trigger time, so a label added after a failure
+        # would never be seen. auto-allow-ci's GITHUB_TOKEN labeling also does
+        # not re-trigger workflows, hence the permission-check fallback.
+        run: |
+          if gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels --jq '.[].name' | grep -qx 'allow-ci'; then
+            exit 0
+          fi
+          perm=$(gh api repos/${{ github.repository }}/collaborators/${{ github.event.pull_request.user.login }}/permission --jq '.permission') || perm=none
+          if [[ "$perm" != "admin" && "$perm" != "write" ]]; then
+            echo "::error::PR author does not have write access and PR is missing allow-ci label"
+            exit 1
+          fi
+  ci-deep:
+    needs: [non-draft, allow-ci]
+    # runs even when allow-ci fails so the required check goes red instead of
+    # skipped (skipped required checks count as passing and would allow merge)
+    if: ${{!cancelled() && needs.non-draft.result == 'success' && needs.non-draft.outputs.nix-changed == 'true'}}
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
     name: Tests ${{matrix.os}}
     runs-on: ${{matrix.os}}
     steps:
+      - name: Require allow-ci
+        run: test "${{needs.allow-ci.result}}" == "success"
       - uses: wimpysworld/nothing-but-nix@v10
       - uses: cachix/install-nix-action@v31
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: actions/checkout@v6
       - run: nix-shell --run 'just ci-deep'
   flake-check:
-    needs: [non-draft]
+    needs: [non-draft, allow-ci]
+    if: ${{!cancelled() && needs.non-draft.result == 'success' && needs.non-draft.outputs.nix-changed == 'true'}}
     name: nix flake check
     runs-on: ubuntu-latest
     steps:
+      - name: Require allow-ci
+        run: test "${{needs.allow-ci.result}}" == "success"
       - uses: cachix/install-nix-action@v31
       - run: nix flake check -L github:vic/checkmate --override-input target github:$GITHUB_REPOSITORY/$GITHUB_SHA
-  allow-ci:
-    needs: [non-draft]
-    name: allow-ci
-    runs-on: ubuntu-latest
-    # Label check kept as fast-path; permission check runs when label is absent.
-    # auto-allow-ci adds the label via GITHUB_TOKEN which does not re-trigger
-    # workflows, so the label may not be present on the first run.
-    steps:
-      - name: Check access
-        if: ${{github.ref != 'refs/heads/main' && !contains( github.event.pull_request.labels.*.name, 'allow-ci')}}
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          perm=$(gh api repos/${{ github.repository }}/collaborators/${{ github.event.pull_request.user.login }}/permission --jq '.permission')
-          if [[ "$perm" != "admin" && "$perm" != "write" ]]; then
-            echo "::error::PR author does not have write access and PR is missing allow-ci label"
-            exit 1
-          fi
   noflake:
-    needs: [allow-ci]
+    needs: [non-draft, allow-ci]
+    if: ${{needs.non-draft.outputs.nix-changed == 'true'}}
     name: noflake
     runs-on: ubuntu-latest
     steps:
@@ -81,7 +111,8 @@ jobs:
       - run: (cd templates/noflake && nix-build ./default.nix -A flake.nixosConfigurations.igloo.config.system.build.toplevel)
       - run: (cd templates/noflake && nix-shell ./default.nix -A den.sh --run 'igloo build --offline')
   template:
-    needs: [allow-ci]
+    needs: [non-draft, allow-ci]
+    if: ${{needs.non-draft.outputs.nix-changed == 'true'}}
     # max-parallel: 2
     strategy:
       matrix:
@@ -115,7 +146,8 @@ jobs:
       - run: (cd templates/flake-parts-modules && nix develop .# --override-input den github:$GITHUB_REPOSITORY/$GITHUB_SHA --command cowsay)
         if: matrix.template == 'flake-parts-modules'
   flake-file-template:
-    needs: [allow-ci]
+    needs: [non-draft, allow-ci]
+    if: ${{needs.non-draft.outputs.nix-changed == 'true'}}
     strategy:
       matrix:
         os: [ubuntu-latest]

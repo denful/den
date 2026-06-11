@@ -13,11 +13,23 @@ jobs:
   allow-bench:
     name: allow-bench
     runs-on: ubuntu-latest
-    if: ${{contains(github.event.pull_request.labels.*.name, 'allow-bench')}}
+    outputs:
+      allowed: ${{ steps.check.outputs.allowed }}
     steps:
-      - run: true
+      # labels queried live, not from github.event: re-runs reuse the payload
+      # frozen at trigger time and would never see a label added afterwards
+      - id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels --jq '.[].name' | grep -qx 'allow-bench'; then
+            echo "allowed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "allowed=false" >> "$GITHUB_OUTPUT"
+          fi
   benchmark:
     needs: [allow-bench]
+    if: ${{needs.allow-bench.outputs.allowed == 'true'}}
     runs-on: ubuntu-latest
     steps:
       - uses: wimpysworld/nothing-but-nix@v10
@@ -26,5 +38,10 @@ jobs:
       - uses: actions/checkout@v6
       - run: git fetch origin ${{github.base_ref}} --depth 1
       - run: nix develop -c just -- bench --head HEAD --base origin/${{github.base_ref}} --warm "$WARM" --runs "$RUNS" -- --show-output 2>&1 | tee "$GITHUB_STEP_SUMMARY" /tmp/den-bench.log
-      - run: grep "faster than base" "/tmp/den-bench.log"
-        if: ${{!contains(github.event.pull_request.labels.*.name, 'bench-skip')}}
+      - env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh api repos/${{ github.repository }}/issues/${{ github.event.pull_request.number }}/labels --jq '.[].name' | grep -qx 'bench-skip'; then
+            exit 0
+          fi
+          grep "faster than base" "/tmp/den-bench.log"

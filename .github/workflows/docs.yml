@@ -1,20 +1,25 @@
 name: Docs
 on:
   push:
-    branches: ["!main"]
+    # branches: ["!main"] never matched anything: a filter with only negative
+    # patterns matches no branch at all
+    branches-ignore: [main]
     paths: ["docs/**"]
   pull_request:
     types: [labeled, opened, synchronize, reopened, review_requested, ready_for_review]
     paths: ["docs/**"]
   pull_request_review:
     types: [submitted]
+# group per ref so concurrent PRs don't cancel each other's docs builds
 concurrency:
-  group: "docs"
+  group: docs-${{ github.ref }}
   cancel-in-progress: true
 env:
   NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
   build:
+    # review events: only approvals re-trigger; comment reviews shouldn't burn a build
+    if: ${{github.event_name != 'pull_request_review' || github.event.review.state == 'approved'}}
     runs-on: ubuntu-latest
     steps:
       - uses: wimpysworld/nothing-but-nix@v10
