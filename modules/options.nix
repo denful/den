@@ -120,13 +120,11 @@ in
         || throw "den.classes and den.quirks must not share keys, but found: ${builtins.concatStringsSep ", " overlap}";
       lib.mapAttrs (name: v: v // { inherit name; }) quirks;
   };
-  config.den.schema = {
-    conf = { };
-    fleet = { };
-    host.imports = [ den.schema.conf ];
-    user.imports = [ den.schema.conf ];
-    home.imports = [ den.schema.conf ];
-  };
+  config.den.schema.conf = { };
+  config.den.schema.fleet = { };
+  config.den.schema.host.imports = [ den.schema.conf ];
+  config.den.schema.user.imports = [ den.schema.conf ];
+  config.den.schema.home.imports = [ den.schema.conf ];
   config.den.classes = {
     nixos.description = "NixOS system configuration";
     darwin.description = "nix-darwin system configuration";
