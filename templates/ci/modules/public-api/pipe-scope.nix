@@ -990,5 +990,123 @@
         expected = "2";
       }
     );
+
+    # CLAIM UNDER TEST (syncthing replicateHome §3): a USER-scope emit,
+    # pipe.expose'd up to its host, then visible to a FLEET collectAll on a PEER
+    # host — expose (user→host) THEN host rebroadcast THEN fleet collect.
+    # TRUE  → igloo's host consumer sees its OWN exposed user (tux@igloo) AND
+    #         iceberg's exposed user (alice@iceberg).
+    # FALSE (adversarial-review claim) → igloo sees only tux@igloo.
+    test-expose-then-fleet-collect = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.quirks.peer-dev = {
+          description = "per-user device records";
+        };
+
+        # ONLY user aspects emit — isolates the user→host→fleet path (no host emit).
+        den.aspects.tux = {
+          peer-dev = [ { who = "tux@igloo"; } ];
+        };
+        den.aspects.alice = {
+          peer-dev = [ { who = "alice@iceberg"; } ];
+        };
+
+        # user scope: expose each user's emit up to its host.
+        den.policies.expose-peer-dev =
+          { host, user, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "peer-dev" [ pipe.expose ]) ];
+        den.default.includes = [ den.policies.expose-peer-dev ];
+
+        # host scope: fleet-collect peer-dev across all hosts.
+        den.policies.collect-peer-dev =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "peer-dev" [ (pipe.collectAll ({ host, ... }: true)) ]) ];
+        den.schema.host.includes = [ den.policies.collect-peer-dev ];
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.peer-consumer ];
+        };
+        den.aspects.peer-consumer = {
+          nixos =
+            { peer-dev, lib, ... }:
+            {
+              networking.domain = lib.concatStringsSep "," (lib.sort (a: b: a < b) (map (p: p.who) peer-dev));
+            };
+        };
+
+        expr = igloo.networking.domain;
+        # rebroadcast WORKS → both; FAILS → "tux@igloo" only.
+        expected = "alice@iceberg,tux@igloo";
+      }
+    );
+
+    # ALTERNATIVE shape: a HOST-scope emit that maps over host.users, one record
+    # per user (entity context only — no expose). If host emits are fleet-collectable
+    # (they are: see test-pipe-collect / test-pipe-collect-fleet), each member sees
+    # every host's every user.
+    test-host-peruser-emit-fleet-collect = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.quirks.peer-dev = {
+          description = "per-user device records, emitted at host scope";
+        };
+
+        # HOST-scope emit: iterate the host's own users, emit one record each.
+        den.aspects.emit-peers = {
+          peer-dev =
+            { host, ... }:
+            lib.mapAttrsToList (uname: _u: { who = "${uname}@${host.name}"; }) (host.users or { });
+        };
+
+        den.policies.collect-peer-dev =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "peer-dev" [ (pipe.collectAll ({ host, ... }: true)) ]) ];
+
+        den.schema.host.includes = [
+          den.aspects.emit-peers
+          den.policies.collect-peer-dev
+        ];
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.peer-consumer ];
+        };
+        den.aspects.peer-consumer = {
+          nixos =
+            { peer-dev, lib, ... }:
+            {
+              networking.domain = lib.concatStringsSep "," (lib.sort (a: b: a < b) (map (p: p.who) peer-dev));
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "alice@iceberg,tux@igloo";
+      }
+    );
   };
 }

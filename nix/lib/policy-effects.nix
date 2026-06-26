@@ -335,6 +335,10 @@ in
     expose = {
       __pipeStage = "expose";
     };
+    broadcast = pred: {
+      __pipeStage = "broadcast";
+      fn = pred;
+    };
     collect = pred: {
       __pipeStage = "collect";
       fn = pred;

@@ -292,6 +292,7 @@ let
       scopeParent,
       scopeEntityKind ? { },
       scopedClassImports,
+      allExposed ? { },
       currentScopeId,
       pipeName,
       hostConfigs ? null,
@@ -325,8 +326,13 @@ let
             entries = (scopedClassImports.${sid} or { }).${pipeName} or [ ];
             rawValues = flattenAndExtract entries;
             resolved = resolveThunks hostConfigs scopeContexts sid rawValues;
+            # Also collect data that sid's children exposed UP into sid (pipe.expose).
+            # collectAllExposed already resolved these at the exposing node, so they
+            # cross as concrete data — a peer's collect sees a host's exposed-up
+            # user data, not just its raw host-scope emits.
+            exposed = (allExposed.${sid} or { }).${pipeName} or [ ];
           in
-          map (functor.seed sid) resolved
+          map (functor.seed sid) (resolved ++ exposed)
         ) matchingScopes;
     in
     builtins.foldl' (
@@ -411,6 +417,7 @@ let
       scopeParent,
       scopeEntityKind ? { },
       scopedClassImports,
+      allExposed ? { },
       currentScopeId,
       pipeName,
       hostConfigs ? null,
@@ -432,6 +439,7 @@ let
           scopeParent
           scopeEntityKind
           scopedClassImports
+          allExposed
           currentScopeId
           pipeName
           hostConfigs
@@ -448,6 +456,7 @@ let
       scopeParent,
       scopeEntityKind ? { },
       scopedClassImports,
+      allExposed ? { },
       hostConfigs ? null,
     }:
     pipeName: scopeId: baseValues: effects:
@@ -470,6 +479,7 @@ let
           scopeParent
           scopeEntityKind
           scopedClassImports
+          allExposed
           hostConfigs
           ;
         currentScopeId = scopeId;
@@ -492,6 +502,7 @@ let
       scopeParent,
       scopeEntityKind ? { },
       scopedClassImports,
+      allExposed ? { },
       currentScopeId,
       hostConfigs ? null,
     }:
@@ -507,6 +518,7 @@ let
               scopeContexts
               scopeParent
               scopedClassImports
+              allExposed
               currentScopeId
               hostConfigs
               ;
@@ -532,6 +544,17 @@ let
 
   # Check whether a pipe effect has a pipe.expose routing stage.
   hasExposeStage = e: builtins.any (s: (s.__pipeStage or "") == "expose") (e.stages or [ ]);
+
+  # Check whether a pipe effect has a pipe.broadcast routing stage.
+  hasBroadcastStage = e: builtins.any (s: (s.__pipeStage or "") == "broadcast") (e.stages or [ ]);
+
+  # Extract the receiver predicate from a pipe.broadcast stage.
+  getBroadcastPred =
+    e:
+    let
+      bStage = lib.findFirst (s: (s.__pipeStage or "") == "broadcast") null (e.stages or [ ]);
+    in
+    if bStage == null then null else bStage.fn;
 
   # Collect exposed data bottom-up from child scopes.
   # Returns: { parentScopeId → { pipeName → [values] } }
@@ -631,6 +654,86 @@ let
     in
     builtins.foldl' processTree { } rootScopes;
 
+  # Distribute broadcast data laterally: each broadcaster S pushes its
+  # (source-transformed) pipe value to every OTHER scope whose context matches
+  # the broadcast predicate. The push dual of pipe.expose (which routes to the
+  # parent); mechanically a fan-out gather, so it reuses findMatchingAll's
+  # entity-kind filtering and resolveThunks' cross-host config resolution.
+  # Source values are the broadcaster's RAW emits (user scopes are leaves with
+  # no children to expose) — not the post-expose assembled value.
+  # Returns: { receiverScopeId → { pipeName → [values] } }
+  collectAllBroadcast =
+    {
+      scopeContexts,
+      scopedClassImports,
+      scopedPipeEffects,
+      scopeEntityKind ? { },
+      hostConfigs ? null,
+    }:
+    let
+      allScopeIds = builtins.attrNames scopeContexts;
+      perBroadcaster =
+        sourceId:
+        let
+          scopeEffects = scopedPipeEffects.${sourceId} or [ ];
+          rawBroadcast = builtins.filter hasBroadcastStage scopeEffects;
+          # Dedup by (pipeName, policyName) — a policy may fire for multiple
+          # entity kinds in the same scope, producing duplicate effects.
+          broadcastEffects =
+            let
+              go =
+                seen: effs:
+                if effs == [ ] then
+                  [ ]
+                else
+                  let
+                    e = builtins.head effs;
+                    rest = builtins.tail effs;
+                    key = "${e.pipeName}/${e.__pipePolicyName or "<anon>"}";
+                  in
+                  if seen ? ${key} then go seen rest else [ e ] ++ go (seen // { ${key} = true; }) rest;
+            in
+            go { } rawBroadcast;
+          scopeImports = scopedClassImports.${sourceId} or { };
+        in
+        lib.concatMap (
+          effect:
+          let
+            inherit (effect) pipeName;
+            rawEntries = scopeImports.${pipeName} or [ ];
+            baseValues = flattenAndExtract rawEntries;
+            # Resolve the source value to data as it crosses to the receiver:
+            # pipeline-parametric eagerly, config-dependent against the SOURCE
+            # host's config (hostConfigs) — NOT deferred, since the receiver may
+            # be on another host. Then apply the source-side transform stages
+            # (the broadcast routing stage is ignored by applyTransformStages).
+            resolvedBase = resolveThunks hostConfigs scopeContexts sourceId baseValues;
+            transformed = applyTransformStages resolvedBase (effect.stages or [ ]);
+            receivers = findMatchingAll {
+              inherit scopeContexts scopeEntityKind;
+              currentScopeId = sourceId;
+            } (getBroadcastPred effect);
+          in
+          map (receiverId: {
+            inherit receiverId pipeName;
+            values = transformed;
+          }) receivers
+        ) broadcastEffects;
+      allEntries = builtins.concatMap perBroadcaster allScopeIds;
+    in
+    builtins.foldl' (
+      acc: entry:
+      let
+        existing = acc.${entry.receiverId} or { };
+      in
+      acc
+      // {
+        ${entry.receiverId} = existing // {
+          ${entry.pipeName} = (existing.${entry.pipeName} or [ ]) ++ entry.values;
+        };
+      }
+    ) { } allEntries;
+
   assemblePipes =
     {
       scopeContexts,
@@ -654,14 +757,28 @@ let
             ;
         };
 
+        # Pass 1b: Distribute broadcast data laterally (push, fleet-wide).
+        allBroadcast = collectAllBroadcast {
+          inherit
+            scopeContexts
+            scopedClassImports
+            scopedPipeEffects
+            scopeEntityKind
+            hostConfigs
+            ;
+        };
+
         # A scope binds pipe `pn` locally when it emits it, receives it via
-        # pipe.expose, or runs a pipe policy effect for it. A pure-consumer
-        # scope binds nothing and inherits `pn` from the nearest ancestor whose
-        # policy bound it (the source) — see pipeData below.
+        # pipe.expose, receives a pipe.broadcast targeting it, or runs a pipe
+        # policy effect for it. A pure-consumer scope binds nothing and inherits
+        # `pn` from the nearest ancestor whose policy bound it — see pipeData
+        # below. The broadcast clause keeps a pure-receiver scope (no local emit
+        # or effect) from falling through to ancestor inheritance.
         bindsPipeLocally =
           sid: pn:
           ((scopedClassImports.${sid} or { }).${pn} or [ ]) != [ ]
           || ((allExposed.${sid} or { }).${pn} or [ ]) != [ ]
+          || ((allBroadcast.${sid} or { }).${pn} or [ ]) != [ ]
           || builtins.any (e: e.pipeName == pn) (scopedPipeEffects.${sid} or [ ]);
 
         # Nearest ancestor (walking scopeParent) whose pipe policy bound `pn`.
@@ -741,6 +858,7 @@ let
                       scopeParent
                       scopeEntityKind
                       scopedClassImports
+                      allExposed
                       hostConfigs
                       ;
                     currentScopeId = scopeId;
@@ -761,11 +879,17 @@ let
                         scopeParent
                         scopeEntityKind
                         scopedClassImports
+                        allExposed
                         hostConfigs
                         ;
                     } pipeName scopeId combinedBase untargetedEffects;
+
+                # Values pushed to this scope by peers' pipe.broadcast (S≠R).
+                # The source already applied its transform stages, so these are
+                # concrete data — appended alongside the scope's own base.
+                broadcastReceived = (allBroadcast.${scopeId} or { }).${pipeName} or [ ];
               in
-              normalResult ++ asResults
+              normalResult ++ asResults ++ broadcastReceived
             );
 
             # Pure-consumer scopes inherit a pipe's assembled value from the
@@ -816,6 +940,7 @@ let
                             scopeParent
                             scopeEntityKind
                             scopedClassImports
+                            allExposed
                             hostConfigs
                             ;
                           currentScopeId = scopeId;
@@ -832,6 +957,7 @@ let
                             scopeParent
                             scopeEntityKind
                             scopedClassImports
+                            allExposed
                             hostConfigs
                             ;
                           currentScopeId = scopeId;
