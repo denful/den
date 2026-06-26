@@ -353,5 +353,148 @@
         };
       }
     );
+
+    # Config-dependent emit broadcast from a HOST source resolves against the
+    # producer's class config — the host's own nixos config.
+    test-broadcast-config-thunk-host = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.quirks.peer-dev.description = "per-user device records";
+
+        den.aspects.set-hostname.nixos =
+          { host, ... }:
+          {
+            networking.hostName = host.name;
+          };
+
+        # iceberg HOST emits a config-dependent record and broadcasts to hosts.
+        den.aspects.iceberg.peer-dev = { config, ... }: [ { who = "h-${config.networking.hostName}"; } ];
+        den.policies.broadcast-to-hosts =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "peer-dev" [ (pipe.broadcast ({ host, ... }: true)) ]) ];
+        den.schema.host.includes = [
+          den.aspects.set-hostname
+          den.policies.broadcast-to-hosts
+        ];
+
+        den.aspects.igloo.includes = [ den.aspects.peer-consumer ];
+        den.aspects.peer-consumer.nixos =
+          { peer-dev, ... }:
+          {
+            networking.domain = lib.concatStringsSep "," (map (p: p.who) peer-dev);
+          };
+
+        expr = igloo.networking.domain;
+        expected = "h-iceberg";
+      }
+    );
+
+    # A config-dependent emit broadcast from a USER source resolves against the
+    # PRODUCER's class config — the user's home-manager config (not the cross-
+    # host nixos config, which has no entry for a user scope). alice reads her
+    # own home field; the resolved value reaches a peer host's consumer.
+    test-broadcast-config-thunk-user = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.quirks.peer-dev.description = "per-user device records";
+
+        # alice (USER) emits a config-dependent record reading her HOME config,
+        # broadcast to hosts. Resolves against alice's home-manager config.
+        den.aspects.alice.peer-dev = { config, ... }: [ { who = "u-${config.home.username}"; } ];
+        den.policies.broadcast-to-hosts =
+          { host, user, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "peer-dev" [ (pipe.broadcast ({ host, ... }: true)) ]) ];
+        den.schema.user.includes = [ den.policies.broadcast-to-hosts ];
+
+        den.aspects.igloo.includes = [ den.aspects.peer-consumer ];
+        den.aspects.peer-consumer.nixos =
+          { peer-dev, ... }:
+          {
+            networking.domain = lib.concatStringsSep "," (map (p: p.who) peer-dev);
+          };
+
+        expr = igloo.networking.domain;
+        expected = "u-alice";
+      }
+    );
+
+    # Pure-receiver binding: a user with NO own emit/effect, on a host that runs
+    # a peer-dev policy (so its policyBoundAncestor is non-null), receives a
+    # peer's broadcast. The bindsPipeLocally broadcast clause makes tux read the
+    # broadcast ("alice"); WITHOUT it tux would fall through to ancestor
+    # inheritance and read igloo host's collected value ("igloo-host").
+    test-broadcast-pure-receiver-binds = denTest (
+      {
+        den,
+        tuxHm,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.quirks.peer-dev.description = "per-user device records";
+
+        # alice-specific broadcast (NOT schema.user — so tux has no peer-dev policy).
+        den.policies.broadcast-peer-dev =
+          { user, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "peer-dev" [ (pipe.broadcast ({ user, ... }: true)) ]) ];
+        den.aspects.alice = {
+          peer-dev = [ { who = "alice"; } ];
+          includes = [ den.policies.broadcast-peer-dev ];
+        };
+
+        # igloo host binds peer-dev (policy effect → tux's policyBoundAncestor)
+        # with a DISTINCT value, so inheritance is observable.
+        den.policies.host-collect =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "peer-dev" [ (pipe.collectAll ({ host, ... }: true)) ]) ];
+        den.aspects.igloo = {
+          peer-dev = [ { who = "igloo-host"; } ];
+          includes = [ den.policies.host-collect ];
+        };
+
+        # tux: pure receiver — only a home consumer.
+        den.aspects.tux.homeManager =
+          { peer-dev, ... }:
+          {
+            home.sessionVariables.PEERS = lib.concatStringsSep "," (
+              lib.sort (a: b: a < b) (map (p: p.who) peer-dev)
+            );
+          };
+
+        expr = tuxHm.home.sessionVariables.PEERS;
+        expected = "alice";
+      }
+    );
   };
 }

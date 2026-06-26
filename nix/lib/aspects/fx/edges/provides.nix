@@ -66,6 +66,7 @@ let
       rawModule = if path == [ ] then spec.module else lib.setAttrByPath path spec.module;
       wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
         inherit ctx;
+        class = targetClass;
         module = rawModule;
         aspectPolicy = null;
         globalPolicy = null;

@@ -110,6 +110,7 @@ let
       ctx,
       aspectPolicy,
       globalPolicy,
+      class ? null,
     }:
     let
       allArgs = builtins.functionArgs module;
@@ -147,25 +148,71 @@ let
         denArgsWithThunks = builtins.filter (k: pipeThunks ? ${k}) denArgNames;
         hasConfigThunks = denArgsWithThunks != [ ];
 
-        # If any den args have config thunks, we need `config` from the module
-        # system to resolve them — force wrapper path even if no other remaining args.
-        effectiveRemainingArgs =
-          if hasConfigThunks then remainingArgs // { config = true; } else remainingArgs;
+        # The consuming scope's own user/home name — a producer marker whose name
+        # matches resolves against `config` directly (same home; standalone-safe).
+        consumerName = ctx.user.name or ctx.home.name or null;
 
-        # Resolve config thunk markers using both the scope context (for pipeline
-        # args like host/user) and the evalModules fixpoint config.
+        # Each deferred thunk is handed `config` (its PRODUCER class config) and
+        # `osConfig` (the enclosing host config), mirroring home-manager. In a
+        # home module `osConfig` comes from the module system; it is requested
+        # only when a marker needs the host config to resolve (host producer, or
+        # a different home) OR the thunk reads osConfig itself — never for a
+        # pure same-home thunk, so standalone homes (no osConfig) keep working.
+        allMarkers = builtins.filter (v: v ? __configThunk) (
+          lib.concatMap (k: ctx.${k} or [ ]) denArgsWithThunks
+        );
+        markerNeedsOsConfig =
+          m:
+          (m.__producerKind or null) == "host"
+          || (m.__producerName or null) != consumerName
+          || (builtins.functionArgs (m.__fn or (_: { }))) ? osConfig;
+        needsOsConfig =
+          class == "homeManager" && hasConfigThunks && builtins.any markerNeedsOsConfig allMarkers;
+
+        # If any den args have config thunks, we need `config` (and possibly
+        # `osConfig`) from the module system to resolve them — force the wrapper
+        # path even if no other remaining args.
+        effectiveRemainingArgs =
+          if hasConfigThunks then
+            remainingArgs // { config = true; } // lib.optionalAttrs needsOsConfig { osConfig = true; }
+          else
+            remainingArgs;
+
+        # Resolve config thunk markers against the PRODUCING class+scope's config
+        # (not the consuming module's): a host producer → the host config (the
+        # consumer's `config` for a non-home class, else `osConfig`); a user/home
+        # producer → its home-manager config, reached from that host config.
         resolveMarkers =
-          config: values:
+          config: osConfig: values:
+          let
+            hostCfg = if class == "homeManager" then osConfig else config;
+          in
           builtins.concatMap (
             v:
             if v ? __configThunk then
               let
-                # Provide scope context args (host, user, etc.) plus config from fixpoint.
                 thunkArgs = builtins.functionArgs v.__fn;
                 ctxArgs = lib.genAttrs (builtins.filter (k: ctx ? ${k}) (builtins.attrNames thunkArgs)) (
                   k: ctx.${k}
                 );
-                result = v.__fn (ctxArgs // { inherit config lib; });
+                pk = v.__producerKind or null;
+                producerConfig =
+                  if pk == null then
+                    config
+                  else if pk == "host" then
+                    hostCfg
+                  else if class == "homeManager" && (v.__producerName or null) == consumerName then
+                    config
+                  else
+                    (hostCfg.home-manager.users.${v.__producerName} or { });
+                result = v.__fn (
+                  ctxArgs
+                  // {
+                    config = producerConfig;
+                    osConfig = hostCfg;
+                    inherit lib;
+                  }
+                );
               in
               if builtins.isList result then result else [ result ]
             else
@@ -191,7 +238,7 @@ let
                   lib.mapAttrs (
                     k: v:
                     if builtins.elem k denArgsWithThunks && builtins.isList v then
-                      resolveMarkers (moduleArgs.config or { }) v
+                      resolveMarkers (moduleArgs.config or { }) (moduleArgs.osConfig or { }) v
                     else
                       v
                   ) denWinsDen
@@ -218,9 +265,17 @@ let
       ctx,
       aspectPolicy,
       globalPolicy,
+      class ? null,
     }:
     let
-      result = wrapDeferredImports { inherit ctx aspectPolicy globalPolicy; } module.imports;
+      result = wrapDeferredImports {
+        inherit
+          ctx
+          aspectPolicy
+          globalPolicy
+          class
+          ;
+      } module.imports;
       policy = resolveCollisionPolicy { inherit ctx aspectPolicy globalPolicy; };
       denArgNames = builtins.attrNames ctx;
       validator = mkCollisionValidator policy denArgNames;

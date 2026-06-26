@@ -161,8 +161,10 @@
         den.schema.host.includes = [ den.aspects.set-hostname ];
 
         # Config-dependent emit at the user node: must defer (marked
-        # __configThunk) and resolve against the host's evalModules config.
-        den.aspects.tux.host-marks = { config, ... }: [ "mark-${config.networking.hostName}" ];
+        # __configThunk). Under producer-class resolution the user's `config` is
+        # its home-manager config, so a HOST-derived mark reads the enclosing
+        # host via `osConfig` (home-manager convention).
+        den.aspects.tux.host-marks = { osConfig, ... }: [ "mark-${osConfig.networking.hostName}" ];
 
         den.aspects.igloo.nixos =
           { host-marks, lib, ... }:

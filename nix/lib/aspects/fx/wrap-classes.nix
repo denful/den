@@ -133,7 +133,7 @@ let
       enrichment = mergeEnrichment (applyPipeTargeting enrichedCtx entry) entry.ctx;
       inherit (enrichment) enrichmentKeys ctx;
       result = den.lib.aspects.fx.aspect.wrapClassModule {
-        inherit ctx;
+        inherit ctx class;
         inherit (entry) module aspectPolicy globalPolicy;
       };
       # Don't strip den arg keys that the wrapper intentionally advertises
