@@ -32,15 +32,26 @@ let
         type = lib.types.nullOr lib.types.raw;
         default = null;
       };
-      options.hostPath = lib.mkOption {
+      options.parentPath = lib.mkOption {
         description = ''
-          For a class whose members nest inside an enclosing host config (e.g.
-          home-manager), a function `name -> path` locating a named member within
-          that host config — the same route the class's content is delivered to.
-          The pipe layer uses it to resolve a producer's config at its producing
-          class + scope. null for host-level classes (nixos, darwin).
+          For a class whose members nest inside an enclosing config-owner (e.g.
+          home-manager inside a host), a function `name -> path` locating a named
+          member within that owner's config — the same route the class's content
+          is delivered to. The pipe layer uses it to resolve a producer's config
+          at its producing class + scope. null for root classes that own a
+          top-level config (nixos, darwin, terranix, …).
         '';
         type = lib.types.nullOr lib.types.raw;
+        default = null;
+      };
+      options.parentArg = lib.mkOption {
+        description = ''
+          For a nested class, the module argument by which a member reaches the
+          enclosing config-owner (home-manager exposes the host config as
+          `osConfig`). The pipe layer hands a deferred config-thunk the owner
+          config under this name. null for root classes.
+        '';
+        type = lib.types.nullOr lib.types.str;
         default = null;
       };
     }

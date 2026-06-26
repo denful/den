@@ -26,9 +26,17 @@ let
       if builtins.isList val then val else [ val ]
     ) entries;
 
+  # Parent-config arg names registered by nested classes (home-manager exposes
+  # the owner config as `osConfig`). A thunk reading `config` or any of these
+  # binds to the evalModules fixpoint.
+  parentArgNames = builtins.filter (a: a != null) (
+    map (c: c.parentArg or null) (builtins.attrValues (den.classes or { }))
+  );
+  readsParentArg = a: builtins.any (k: a ? ${k}) parentArgNames;
+
   # Detect config-dependent thunks: functions taking `config` (the producer's
-  # class config) and/or `osConfig` (the enclosing host config). Both bind to
-  # the evalModules fixpoint, so such thunks are deferred/resolved against it.
+  # class config) and/or a registered parent-config arg (the enclosing owner
+  # config). Both bind to the evalModules fixpoint, so they are deferred there.
   isConfigDependent =
     val:
     builtins.isFunction val
@@ -36,11 +44,11 @@ let
       let
         a = builtins.functionArgs val;
       in
-      a ? config || a ? osConfig
+      a ? config || readsParentArg a
     );
 
   # Pipeline-parametric values require pipeline context args (host, user, etc.)
-  # but neither config nor osConfig. These are resolved eagerly using scope context.
+  # but neither config nor a parent-config arg. Resolved eagerly via scope context.
   isPipelineParametric =
     val:
     builtins.isFunction val
@@ -48,7 +56,7 @@ let
       let
         a = builtins.functionArgs val;
       in
-      !(a ? config) && !(a ? osConfig)
+      !(a ? config) && !(readsParentArg a)
     );
 
   # Resolve a local pipeline-parametric value eagerly using scope context.
@@ -102,7 +110,7 @@ let
   markConfigThunks = producer: map (markConfigThunk producer);
 
   # Producer tag (class + name) for a scope, read from pipeline state. The class
-  # selects the producer's config-resolution route via den.classes.<class>.hostPath.
+  # selects the producer's config-resolution route via den.classes.<class>.parentPath.
   producerOf =
     scopeEntityClass: scopeContexts: sid:
     let
@@ -113,16 +121,15 @@ let
       name = ctx.user.name or ctx.home.name or null;
     };
 
-  # The PRODUCER's `config` (class config) and `osConfig` (enclosing host
-  # config) for a scope, used to resolve cross-scope config-dependent emits at
-  # their SOURCE (not the consumer). A host scope owns a host config directly (a
-  # hostConfigs key), where config == osConfig. A nested scope (user/home) reads
-  # its config from the enclosing host config at its class's registered
-  # `den.classes.<class>.hostPath` — the same route its content is delivered to —
-  # with osConfig the enclosing host config. This keeps a user emit reading
-  # `config.home.*` (or `osConfig.networking.*`) correct and matches the
-  # "producing class + scope" rule. Cross-host can't reach a remote real
-  # fixpoint, so it leans on the precomputed hostConfigs.
+  # The PRODUCER's `config` (class config), the enclosing config-`owner` config,
+  # and the class's `parentArg` name, used to resolve cross-scope config-
+  # dependent emits at their SOURCE (not the consumer). A scope that owns a
+  # config directly (a hostConfigs key — e.g. a host) has config == owner and a
+  # null parentArg. A nested scope (e.g. a home) reads its config from the
+  # owner config at its class's registered `den.classes.<class>.parentPath` —
+  # the same route its content is delivered to — and reaches the owner via
+  # `parentArg`. This matches the "producing class + scope" rule. Cross-host
+  # can't reach a remote real fixpoint, so it leans on the precomputed hostConfigs.
   producerConfigs =
     {
       hostConfigs,
@@ -131,47 +138,54 @@ let
       scopeEntityClass ? { },
     }:
     scopeId:
+    let
+      cls = scopeEntityClass.${scopeId} or null;
+      classDef = if cls != null && den.classes ? ${cls} then den.classes.${cls} else { };
+      parentArg = classDef.parentArg or null;
+    in
     if hostConfigs == null then
       {
         config = { };
-        osConfig = { };
+        owner = { };
+        inherit parentArg;
       }
     else if hostConfigs ? ${scopeId} then
       {
         config = hostConfigs.${scopeId};
-        osConfig = hostConfigs.${scopeId};
+        owner = hostConfigs.${scopeId};
+        inherit parentArg;
       }
     else
       let
-        # Nearest enclosing scope that owns a host config.
-        findHost =
+        # Nearest enclosing scope that owns a config.
+        findOwner =
           sid:
           if sid == null then
             null
           else if hostConfigs ? ${sid} then
             sid
           else
-            findHost (scopeParent.${sid} or null);
-        hostScope = findHost (scopeParent.${scopeId} or null);
-        hostCfg = if hostScope == null then { } else hostConfigs.${hostScope};
-        # The producer's class hostPath (registered by its battery, e.g.
-        # home-manager) locates its config within the enclosing host config —
-        # the same route its content is delivered to. No path → not host-nested.
-        cls = scopeEntityClass.${scopeId} or null;
-        pathFn = if cls != null && den.classes ? ${cls} then den.classes.${cls}.hostPath else null;
+            findOwner (scopeParent.${sid} or null);
+        ownerScope = findOwner (scopeParent.${scopeId} or null);
+        ownerCfg = if ownerScope == null then { } else hostConfigs.${ownerScope};
+        # The producer's class parentPath locates its config within the owner
+        # config — the same route its content is delivered to. No path → it owns
+        # its config (but isn't a hostConfigs key here, so resolves to empty).
+        pathFn = classDef.parentPath or null;
         ctx = scopeContexts.${scopeId} or { };
         name = ctx.user.name or ctx.home.name or null;
       in
       {
-        config = if pathFn != null && name != null then lib.attrByPath (pathFn name) { } hostCfg else { };
-        osConfig = hostCfg;
+        config = if pathFn != null && name != null then lib.attrByPath (pathFn name) { } ownerCfg else { };
+        owner = ownerCfg;
+        inherit parentArg;
       };
 
   # Resolve a config-dependent thunk against the producer's class config.
   # Used for COLLECTED / BROADCAST entries (cross-scope) where the SOURCE
   # scope's config is needed. Provides scope context args (host, user, etc.)
-  # alongside `config` (producer class) and `osConfig` (enclosing host). Returns
-  # a list (auto-flattens list-valued results).
+  # alongside `config` (producer class) and, for a nested producer, the owner
+  # config under the class's parentArg. Returns a list (auto-flattens lists).
   resolveEntry =
     hostConfigs: producerConfigFor: scopeContexts: sourceScopeId: entry:
     if isConfigDependent entry then
@@ -191,7 +205,10 @@ let
           result = entry (
             ctxArgs
             // {
-              inherit (pc) config osConfig;
+              config = pc.config;
+            }
+            // lib.optionalAttrs (pc.parentArg != null) { ${pc.parentArg} = pc.owner; }
+            // {
               inherit lib;
             }
           );

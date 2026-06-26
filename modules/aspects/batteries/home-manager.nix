@@ -31,5 +31,7 @@ in
   den.schema.user.includes = [ result.userDetect ];
 
   den.classes.homeManager.description = "Home Manager user environment";
-  den.classes.homeManager.hostPath = userHostPath;
+  # home-manager nests under its host; a member reaches the host config via osConfig.
+  den.classes.homeManager.parentPath = userHostPath;
+  den.classes.homeManager.parentArg = "osConfig";
 }
