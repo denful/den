@@ -6,18 +6,20 @@
   ...
 }:
 let
+  # Where a home-manager user's config nests inside the enclosing host config.
+  # Single source of truth for both the forward delivery target and the
+  # den.classes.homeManager.hostPath the pipe layer resolves producers against.
+  userHostPath = userName: [
+    "home-manager"
+    "users"
+    userName
+  ];
   result = den.lib.home-env.makeHomeEnv {
     className = "homeManager";
     ctxName = "hm";
     optionPath = "home-manager";
     getModule = { host, ... }: inputs.home-manager."${host.class}Modules".home-manager;
-    forwardPathFn =
-      { user, ... }:
-      [
-        "home-manager"
-        "users"
-        user.userName
-      ];
+    forwardPathFn = { user, ... }: userHostPath user.userName;
     schemaIncludes = config.den.schema.hm-host.includes or [ ];
   };
 
@@ -29,4 +31,5 @@ in
   den.schema.user.includes = [ result.userDetect ];
 
   den.classes.homeManager.description = "Home Manager user environment";
+  den.classes.homeManager.hostPath = userHostPath;
 }

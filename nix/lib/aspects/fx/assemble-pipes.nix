@@ -82,18 +82,17 @@ let
       [ val ];
 
   # Mark a config-dependent value for deferred resolution inside evalModules.
-  # `producer` tags the marker with the PRODUCING scope's class (entity kind)
-  # and name so the module wrapper resolves it against the producing class +
-  # scope's config — not the consuming module's. Already-marked values (re-mark
-  # on an exposed/inherited path) pass through unchanged, keeping their original
-  # producer tag.
+  # `producer` tags the marker with the PRODUCING scope's class and name so the
+  # module wrapper resolves it against the producing class + scope's config —
+  # not the consuming module's. Already-marked values (re-mark on an exposed/
+  # inherited path) pass through unchanged, keeping their original producer tag.
   markConfigThunk =
     producer: v:
     if isConfigDependent v then
       {
         __configThunk = true;
         __fn = v;
-        __producerKind = producer.kind or null;
+        __producerClass = producer.class or null;
         __producerName = producer.name or null;
       }
     else
@@ -102,31 +101,34 @@ let
   # Mark all config-dependent entries in a value list with their producer.
   markConfigThunks = producer: map (markConfigThunk producer);
 
-  # Producer tag (class/kind + name) for a scope, read from pipeline state.
+  # Producer tag (class + name) for a scope, read from pipeline state. The class
+  # selects the producer's config-resolution route via den.classes.<class>.hostPath.
   producerOf =
-    scopeEntityKind: scopeContexts: sid:
+    scopeEntityClass: scopeContexts: sid:
     let
       ctx = scopeContexts.${sid} or { };
     in
     {
-      kind = scopeEntityKind.${sid} or null;
+      class = scopeEntityClass.${sid} or null;
       name = ctx.user.name or ctx.home.name or null;
     };
 
   # The PRODUCER's `config` (class config) and `osConfig` (enclosing host
   # config) for a scope, used to resolve cross-scope config-dependent emits at
-  # their SOURCE (not the consumer). A host scope's producing class is nixos —
-  # its own host config (a hostConfigs key), where config == osConfig. A user/
-  # home scope's is home-manager — its config nested under the enclosing host at
-  # `home-manager.users.<name>`, with osConfig the enclosing host config. This
-  # keeps a user emit reading `config.home.*` (or `osConfig.networking.*`)
-  # correct and matches the "producing class + scope" rule. Cross-host can't
-  # reach a remote real fixpoint, so it leans on the precomputed hostConfigs.
+  # their SOURCE (not the consumer). A host scope owns a host config directly (a
+  # hostConfigs key), where config == osConfig. A nested scope (user/home) reads
+  # its config from the enclosing host config at its class's registered
+  # `den.classes.<class>.hostPath` — the same route its content is delivered to —
+  # with osConfig the enclosing host config. This keeps a user emit reading
+  # `config.home.*` (or `osConfig.networking.*`) correct and matches the
+  # "producing class + scope" rule. Cross-host can't reach a remote real
+  # fixpoint, so it leans on the precomputed hostConfigs.
   producerConfigs =
     {
       hostConfigs,
       scopeContexts,
       scopeParent ? { },
+      scopeEntityClass ? { },
     }:
     scopeId:
     if hostConfigs == null then
@@ -152,12 +154,16 @@ let
             findHost (scopeParent.${sid} or null);
         hostScope = findHost (scopeParent.${scopeId} or null);
         hostCfg = if hostScope == null then { } else hostConfigs.${hostScope};
+        # The producer's class hostPath (registered by its battery, e.g.
+        # home-manager) locates its config within the enclosing host config —
+        # the same route its content is delivered to. No path → not host-nested.
+        cls = scopeEntityClass.${scopeId} or null;
+        pathFn = if cls != null && den.classes ? ${cls} then den.classes.${cls}.hostPath else null;
         ctx = scopeContexts.${scopeId} or { };
         name = ctx.user.name or ctx.home.name or null;
-        hmUsers = hostCfg.home-manager.users or { };
       in
       {
-        config = if name != null && hmUsers ? ${name} then hmUsers.${name} else { };
+        config = if pathFn != null && name != null then lib.attrByPath (pathFn name) { } hostCfg else { };
         osConfig = hostCfg;
       };
 
@@ -375,6 +381,7 @@ let
       scopeEntityKind ? { },
       scopedClassImports,
       allExposed ? { },
+      scopeEntityClass ? { },
       currentScopeId,
       pipeName,
       hostConfigs ? null,
@@ -398,7 +405,14 @@ let
       ) stages;
       # Tag initial values at the current scope (identity for the plain path).
       taggedInitial = map (functor.seed currentScopeId) initialValues;
-      producerConfigFor = producerConfigs { inherit hostConfigs scopeContexts scopeParent; };
+      producerConfigFor = producerConfigs {
+        inherit
+          hostConfigs
+          scopeContexts
+          scopeParent
+          scopeEntityClass
+          ;
+      };
       # Resolve a list of matching scopes into collected values, each tagged with
       # its SOURCE scope id (not currentScopeId).
       collectTagged =
@@ -501,6 +515,7 @@ let
       scopeEntityKind ? { },
       scopedClassImports,
       allExposed ? { },
+      scopeEntityClass ? { },
       currentScopeId,
       pipeName,
       hostConfigs ? null,
@@ -523,6 +538,7 @@ let
           scopeEntityKind
           scopedClassImports
           allExposed
+          scopeEntityClass
           currentScopeId
           pipeName
           hostConfigs
@@ -540,6 +556,7 @@ let
       scopeEntityKind ? { },
       scopedClassImports,
       allExposed ? { },
+      scopeEntityClass ? { },
       hostConfigs ? null,
     }:
     pipeName: scopeId: baseValues: effects:
@@ -563,6 +580,7 @@ let
           scopeEntityKind
           scopedClassImports
           allExposed
+          scopeEntityClass
           hostConfigs
           ;
         currentScopeId = scopeId;
@@ -586,6 +604,7 @@ let
       scopeEntityKind ? { },
       scopedClassImports,
       allExposed ? { },
+      scopeEntityClass ? { },
       currentScopeId,
       hostConfigs ? null,
     }:
@@ -602,6 +621,7 @@ let
               scopeParent
               scopedClassImports
               allExposed
+              scopeEntityClass
               currentScopeId
               hostConfigs
               ;
@@ -667,7 +687,7 @@ let
       scopedClassImports,
       scopedPipeEffects,
       scopeParent,
-      scopeEntityKind ? { },
+      scopeEntityClass ? { },
     }:
     let
       allScopeIds = builtins.attrNames scopeContexts;
@@ -711,7 +731,7 @@ let
                 # idempotently via mkCombinedBase, but marking at the source keeps
                 # multi-level expose chains correct without relying on every consumer
                 # to re-mark). Mirrors mkCombinedBase on the local path.
-                resolvedBase = markConfigThunks (producerOf scopeEntityKind scopeContexts scopeId) (
+                resolvedBase = markConfigThunks (producerOf scopeEntityClass scopeContexts scopeId) (
                   builtins.concatMap (resolveLocalParametric scopeCtx) baseValues
                 );
                 # Child-exposed data is already concrete — each child resolved its
@@ -761,11 +781,19 @@ let
       scopedPipeEffects,
       scopeParent ? { },
       scopeEntityKind ? { },
+      scopeEntityClass ? { },
       hostConfigs ? null,
     }:
     let
       allScopeIds = builtins.attrNames scopeContexts;
-      producerConfigFor = producerConfigs { inherit hostConfigs scopeContexts scopeParent; };
+      producerConfigFor = producerConfigs {
+        inherit
+          hostConfigs
+          scopeContexts
+          scopeParent
+          scopeEntityClass
+          ;
+      };
       perBroadcaster =
         sourceId:
         let
@@ -819,6 +847,7 @@ let
       scopedPipeEffects ? { },
       scopeParent ? { },
       scopeEntityKind ? { },
+      scopeEntityClass ? { },
       hostConfigs ? null,
     }:
     if pipeNames == [ ] then
@@ -832,7 +861,7 @@ let
             scopedClassImports
             scopedPipeEffects
             scopeParent
-            scopeEntityKind
+            scopeEntityClass
             ;
         };
 
@@ -844,6 +873,7 @@ let
             scopedPipeEffects
             scopeParent
             scopeEntityKind
+            scopeEntityClass
             hostConfigs
             ;
         };
@@ -893,7 +923,7 @@ let
                 resolvedBase = builtins.concatMap (resolveLocalParametric scopeCtx) baseValues;
                 # Own emits are produced at THIS scope; exposed values keep the
                 # producer tag set at their exposing node (re-mark is a no-op).
-                producer = producerOf scopeEntityKind scopeContexts scopeId;
+                producer = producerOf scopeEntityClass scopeContexts scopeId;
                 markedBase = markConfigThunks producer resolvedBase;
                 exposedValues = exposedForScope.${pn} or [ ];
                 markedExposed = markConfigThunks producer exposedValues;
@@ -942,6 +972,7 @@ let
                       scopeEntityKind
                       scopedClassImports
                       allExposed
+                      scopeEntityClass
                       hostConfigs
                       ;
                     currentScopeId = scopeId;
@@ -963,6 +994,7 @@ let
                         scopeEntityKind
                         scopedClassImports
                         allExposed
+                        scopeEntityClass
                         hostConfigs
                         ;
                     } pipeName scopeId combinedBase untargetedEffects;
@@ -1024,6 +1056,7 @@ let
                             scopeEntityKind
                             scopedClassImports
                             allExposed
+                            scopeEntityClass
                             hostConfigs
                             ;
                           currentScopeId = scopeId;
@@ -1041,6 +1074,7 @@ let
                             scopeEntityKind
                             scopedClassImports
                             allExposed
+                            scopeEntityClass
                             hostConfigs
                             ;
                           currentScopeId = scopeId;

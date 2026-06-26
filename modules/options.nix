@@ -32,6 +32,17 @@ let
         type = lib.types.nullOr lib.types.raw;
         default = null;
       };
+      options.hostPath = lib.mkOption {
+        description = ''
+          For a class whose members nest inside an enclosing host config (e.g.
+          home-manager), a function `name -> path` locating a named member within
+          that host config — the same route the class's content is delivered to.
+          The pipe layer uses it to resolve a producer's config at its producing
+          class + scope. null for host-level classes (nixos, darwin).
+        '';
+        type = lib.types.nullOr lib.types.raw;
+        default = null;
+      };
     }
   );
 

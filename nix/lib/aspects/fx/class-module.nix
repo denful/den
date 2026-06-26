@@ -148,26 +148,31 @@ let
         denArgsWithThunks = builtins.filter (k: pipeThunks ? ${k}) denArgNames;
         hasConfigThunks = denArgsWithThunks != [ ];
 
-        # The consuming scope's own user/home name — a producer marker whose name
-        # matches resolves against `config` directly (same home; standalone-safe).
+        # The consuming scope's own user/home name — a producer marker for the
+        # same member resolves against `config` directly (standalone-safe).
         consumerName = ctx.user.name or ctx.home.name or null;
 
+        # A class's hostPath (registered by its battery) is the route its members
+        # nest into the enclosing host config — null for host-level classes
+        # (nixos, darwin). This is the single signal for "does this class nest".
+        classHostPath = c: if c != null && den.classes ? ${c} then den.classes.${c}.hostPath else null;
+        consumerNested = (classHostPath class) != null;
+
         # Each deferred thunk is handed `config` (its PRODUCER class config) and
-        # `osConfig` (the enclosing host config), mirroring home-manager. In a
-        # home module `osConfig` comes from the module system; it is requested
-        # only when a marker needs the host config to resolve (host producer, or
-        # a different home) OR the thunk reads osConfig itself — never for a
-        # pure same-home thunk, so standalone homes (no osConfig) keep working.
+        # `osConfig` (the enclosing host config). In a nested (e.g. home) module
+        # `osConfig` comes from the module system; it is requested only when a
+        # marker needs the host config to resolve — a host-level producer, a
+        # different member, or a thunk reading osConfig — never for a pure same-
+        # member thunk, so standalone homes (no osConfig) keep working.
         allMarkers = builtins.filter (v: v ? __configThunk) (
           lib.concatMap (k: ctx.${k} or [ ]) denArgsWithThunks
         );
         markerNeedsOsConfig =
           m:
-          (m.__producerKind or null) == "host"
+          (classHostPath (m.__producerClass or null)) == null
           || (m.__producerName or null) != consumerName
           || (builtins.functionArgs (m.__fn or (_: { }))) ? osConfig;
-        needsOsConfig =
-          class == "homeManager" && hasConfigThunks && builtins.any markerNeedsOsConfig allMarkers;
+        needsOsConfig = consumerNested && hasConfigThunks && builtins.any markerNeedsOsConfig allMarkers;
 
         # If any den args have config thunks, we need `config` (and possibly
         # `osConfig`) from the module system to resolve them — force the wrapper
@@ -179,13 +184,13 @@ let
             remainingArgs;
 
         # Resolve config thunk markers against the PRODUCING class+scope's config
-        # (not the consuming module's): a host producer → the host config (the
-        # consumer's `config` for a non-home class, else `osConfig`); a user/home
-        # producer → its home-manager config, reached from that host config.
+        # (not the consuming module's): a host-level producer → the host config
+        # (the consumer's `config` for a host-level class, else `osConfig`); a
+        # nested producer → its config at the registered hostPath of the host config.
         resolveMarkers =
           config: osConfig: values:
           let
-            hostCfg = if class == "homeManager" then osConfig else config;
+            hostCfg = if consumerNested then osConfig else config;
           in
           builtins.concatMap (
             v:
@@ -195,16 +200,17 @@ let
                 ctxArgs = lib.genAttrs (builtins.filter (k: ctx ? ${k}) (builtins.attrNames thunkArgs)) (
                   k: ctx.${k}
                 );
-                pk = v.__producerKind or null;
+                pcls = v.__producerClass or null;
+                pPath = classHostPath pcls;
                 producerConfig =
-                  if pk == null then
+                  if pcls == null then
                     config
-                  else if pk == "host" then
+                  else if pPath == null then
                     hostCfg
-                  else if class == "homeManager" && (v.__producerName or null) == consumerName then
+                  else if consumerNested && pcls == class && (v.__producerName or null) == consumerName then
                     config
                   else
-                    (hostCfg.home-manager.users.${v.__producerName} or { });
+                    lib.attrByPath (pPath v.__producerName) { } hostCfg;
                 result = v.__fn (
                   ctxArgs
                   // {
