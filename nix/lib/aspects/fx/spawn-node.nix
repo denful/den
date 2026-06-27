@@ -192,5 +192,17 @@ in
       scopeEntityKind = parentState.scopeEntityKind // ((result.state.scopeEntityKind or (_: { })) null);
       ownProvides = result.state.scopedProvides null;
       allScopeIds = spawnAllScopeIds;
+    }
+    // {
+      # The aspect is processed in BOTH the requesting (user) scope and this
+      # spawned home node, so its quirks must materialize in both. The spawn root
+      # holds the home-side emits; surface the NON-host-bound ones (host-bound
+      # quirks were stripped above and inherited from the host instead) so the
+      # caller (resolve.nix) can also fold them into the requesting scope's quirk
+      # buckets — letting a user-scope broadcast/collect/expose of a
+      # host-aspects-projected quirk behave as if the user included the aspect.
+      quirkEmits = lib.filterAttrs (k: v: (pipeNamesSet ? ${k}) && v != [ ]) (
+        spawnedClassImports.${spawnRoot} or { }
+      );
     };
 }

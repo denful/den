@@ -476,7 +476,7 @@ let
       augmentedScopeContexts = assemblePipes {
         inherit scopeContexts hostConfigs scopeEntityKind;
         scopeEntityClass = scopeEntityClassMap;
-        scopedClassImports = scopedClassImportsRaw;
+        scopedClassImports = importsForPipes;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         inherit scopeParent;
       };
@@ -509,7 +509,7 @@ let
         inherit scopeContexts scopeEntityKind;
         scopeEntityClass = scopeEntityClassMap;
         hostConfigs = null;
-        scopedClassImports = scopedClassImportsRaw;
+        scopedClassImports = importsForPipes;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         inherit scopeParent;
       };
@@ -550,6 +550,95 @@ let
         inherit (den.lib.aspects.fx.aspect) ctxFromHandlers;
         selfRef = spawnNode;
       } mkPipeline parentState;
+
+      # Materialize the deferred node spawns (policy.spawn) ONCE over RAW parent
+      # state — shared by both the pre-assembly quirk surfacing (importsForPipes,
+      # below) and mkDrained's class-content fold. `spawnNode` reads only
+      # `parentState` (raw contexts/imports/parent/kind/effects/routes) and runs its
+      # internal assembly with hostConfigs=null, so this binding never touches the
+      # augmented/hostConfigs maps and is invariant across mkDrained's
+      # `augmentedContexts` param. Per requesting scope it carries the resolved
+      # `classes` and the per-class spawn return ({ imports; edges; quirkEmits }).
+      allHomeNodes = (result.state.scopedSpawns or (_: { })) null;
+      homeNodeSpawns = builtins.foldl' (
+        acc: scopeId:
+        let
+          sctx = scopeContexts.${scopeId} or { };
+          ownKind = scopeEntityKind.${scopeId} or null;
+          ownRecord = if ownKind == null then null else sctx.${ownKind} or null;
+          from = scopeParent.${scopeId} or null;
+          parentKind = if from == null then null else scopeEntityKind.${from} or null;
+          parentRecord =
+            if parentKind == null then null else (scopeContexts.${from} or { }).${parentKind} or null;
+          specs = allHomeNodes.${scopeId};
+          defaultClasses = if ownRecord == null then [ ] else ownRecord.classes or [ ];
+          classes = lib.unique (
+            lib.concatMap (s: if s.classes != null then s.classes else defaultClasses) specs
+          );
+        in
+        if parentRecord == null || ownRecord == null then
+          acc
+        else
+          acc
+          // {
+            ${scopeId} = {
+              inherit classes;
+              spawned = lib.genAttrs classes (
+                cls:
+                spawnNode {
+                  inherit from;
+                  class = cls;
+                  aspect = parentRecord.aspect;
+                  bindings = {
+                    ${ownKind} = ownRecord;
+                  };
+                }
+              );
+            };
+          }
+      ) { } (builtins.attrNames allHomeNodes);
+
+      # THE FIX: a projected aspect is processed in BOTH the requesting scope and
+      # its spawned node, so its non-host-bound quirk emits must also materialize at
+      # the requesting scope — else a pipe policy there (broadcast/collect/expose/
+      # local) reads `[]`, because every pipe reader takes the source straight from
+      # the imports map and pipe assembly (assemblePipes) runs PRE-drain while the
+      # spawn materializes post-drain. Surface the spawn roots' `quirkEmits` into a
+      # SEPARATE map layered over the raw imports. It must NOT mutate
+      # `scopedClassImportsRaw` itself: `parentState` reads that raw map, so folding
+      # the quirk there would make the spawn's own internal assembly re-read it (a
+      # cycle + internal double-count). The spawn root is absent from the pre-drain
+      # scope universe, so the quirk lands EXACTLY ONCE at the requesting scope —
+      # as if that scope had included the aspect directly.
+      importsForPipes = builtins.foldl' (
+        acc: scopeId:
+        let
+          inherit (homeNodeSpawns.${scopeId}) classes spawned;
+          quirkNames = lib.unique (
+            lib.concatMap (cls: lib.attrNames (spawned.${cls}.quirkEmits or { })) classes
+          );
+          base = acc.${scopeId} or { };
+          # A quirk key is classified class-agnostically, so EVERY class's spawn
+          # walk yields the identical emit set — surface it from the FIRST class
+          # that carries it, NOT concatMap'd across classes (which would land the
+          # same emit once per spawned class, a multi-class double-count).
+          quirkEmitFor =
+            qn:
+            let
+              firstCls = lib.findFirst (
+                cls: ((spawned.${cls}.quirkEmits or { }).${qn} or [ ]) != [ ]
+              ) null classes;
+            in
+            lib.optionals (firstCls != null) ((spawned.${firstCls}.quirkEmits or { }).${qn} or [ ]);
+        in
+        if quirkNames == [ ] then
+          acc
+        else
+          acc
+          // {
+            ${scopeId} = base // lib.genAttrs quirkNames (qn: (base.${qn} or [ ]) ++ quirkEmitFor qn);
+          }
+      ) scopedClassImportsRaw (builtins.attrNames homeNodeSpawns);
 
       # Post-assembly drain: resolve deferred includes. Parameterized by the
       # augmented contexts the deferred-include resolution reads, so the SAME
@@ -661,66 +750,37 @@ let
           # scope's ancestor-bound `host`. Default classes fall back to the own
           # record's `classes` (e.g. user type defaults `["homeManager"]`); in
           # practice batteries pass `spec.classes` explicitly so this is unused.
-          allHomeNodes = (result.state.scopedSpawns or (_: { })) null;
         in
-        # Accumulate BOTH the class-imports map AND the spawn nodes' SURFACED edge
-        # sets. Each spawnNode {…} returns { imports; edges; }: `.imports` folds
-        # into the class buckets as before; `.edges` is the spawn's real delivered
-        # edge set (its default fold + provides + re-applied routes), collected so
-        # the host-own invocation can feed unifiedEdges (the oracle's rewalk arm
-        # undercounts these). The B′ invocation discards spawnEdges (its delivery
-        # is covered by the per-host mkInstantiateEdges, see call sites below).
+        # Fold the (hoisted) `homeNodeSpawns` into the drain: each spawn's
+        # `.imports` adds to the requesting scope's class buckets (so BOTH phase1
+        # and the phase4 per-host re-walk deliver the projected class content) and
+        # `.edges` is collected for unifiedEdges (the host-own invocation feeds it;
+        # the B′ invocation discards it). The materialization is computed ONCE in
+        # `homeNodeSpawns` over raw state (invariant of `augmentedContexts`); the
+        # non-host-bound quirk emits it also carries are surfaced at the requesting
+        # scope by `importsForPipes` (pre-assembly), not here.
         lib.foldl'
           (
             acc: scopeId:
             let
-              sctx = scopeContexts.${scopeId} or { };
-              ownKind = scopeEntityKind.${scopeId} or null;
-              ownRecord = if ownKind == null then null else sctx.${ownKind} or null;
-              from = scopeParent.${scopeId} or null;
-              parentKind = if from == null then null else scopeEntityKind.${from} or null;
-              parentRecord =
-                if parentKind == null then null else (scopeContexts.${from} or { }).${parentKind} or null;
-              specs = allHomeNodes.${scopeId};
-              defaultClasses = if ownRecord == null then [ ] else ownRecord.classes or [ ];
-              classes = lib.unique (
-                lib.concatMap (s: if s.classes != null then s.classes else defaultClasses) specs
-              );
+              inherit (homeNodeSpawns.${scopeId}) classes spawned;
             in
-            if parentRecord == null || ownRecord == null then
-              acc
-            else
-              let
-                # Materialize each class once; capture the FULL spawn return so both
-                # `.imports` (class fold) and `.edges` (surfaced set) are available.
-                spawned = lib.genAttrs classes (
-                  cls:
-                  spawnNode {
-                    inherit from;
-                    class = cls;
-                    aspect = parentRecord.aspect;
-                    bindings = {
-                      ${ownKind} = ownRecord;
-                    };
-                  }
-                );
-              in
-              {
-                classImports = acc.classImports // {
-                  ${scopeId} =
-                    (acc.classImports.${scopeId} or { })
-                    // lib.genAttrs classes (
-                      cls: ((acc.classImports.${scopeId} or { }).${cls} or [ ]) ++ spawned.${cls}.imports
-                    );
-                };
-                spawnEdges = acc.spawnEdges ++ lib.concatMap (cls: spawned.${cls}.edges) classes;
-              }
+            {
+              classImports = acc.classImports // {
+                ${scopeId} =
+                  (acc.classImports.${scopeId} or { })
+                  // lib.genAttrs classes (
+                    cls: ((acc.classImports.${scopeId} or { }).${cls} or [ ]) ++ spawned.${cls}.imports
+                  );
+              };
+              spawnEdges = acc.spawnEdges ++ lib.concatMap (cls: spawned.${cls}.edges) classes;
+            }
           )
           {
             classImports = baseDrain;
             spawnEdges = [ ];
           }
-          (builtins.attrNames allHomeNodes);
+          (builtins.attrNames homeNodeSpawns);
 
       # The host's OWN phase1–4 drain, over the hostConfigs-augmented contexts.
       # Surfaces drained.classImports for phases + drained.spawnEdges for unifiedEdges.

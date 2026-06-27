@@ -496,5 +496,68 @@
         expected = "alice";
       }
     );
+
+    # REPRO (nix-config replicateHome → hub shortfall): a HOME-POOL quirk —
+    # emitted by a named aspect that also carries homeManager content and is
+    # consumed in homeManager — broadcast from the USER scope to a remote host.
+    # Identical in shape to test-broadcast-to-remote-host (which passes), except
+    # the quirk is home-pool. The remote host should receive the broadcast.
+    test-broadcast-home-pool-to-host = denTest (
+      {
+        den,
+        igloo,
+        lib,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.alice = { };
+
+        den.quirks.replicateHome.description = "home dirs to replicate";
+
+        # claude-like: a HOST aspect that emits replicateHome AND consumes it in
+        # homeManager. nix-config projects such host aspects onto the user's home
+        # via the host-aspects battery (a deferred node SPAWN), so replicateHome
+        # lands in the spawned home node — NOT the user-entity scope.
+        den.aspects.claude = {
+          replicateHome = [ { directories = [ ".claude/memory" ]; } ];
+          homeManager =
+            { replicateHome, ... }:
+            {
+              home.sessionVariables.DIRS = lib.concatStringsSep "," (
+                lib.concatMap (e: e.directories or [ ]) replicateHome
+              );
+            };
+        };
+        # iceberg (host) carries claude; alice projects it onto her home via the
+        # host-aspects spawn — exactly nix-config's sini.includes = [host-aspects].
+        den.aspects.iceberg.includes = [ den.aspects.claude ];
+        den.aspects.alice.includes = [ den.batteries.host-aspects ];
+
+        # USER scope: broadcast replicateHome to all hosts.
+        den.policies.broadcast-rh =
+          { user, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "replicateHome" [ (pipe.broadcast ({ host, ... }: true)) ]) ];
+        den.schema.user.includes = [ den.policies.broadcast-rh ];
+
+        # igloo (remote relative to alice) consumes the broadcast at host scope.
+        den.aspects.igloo.includes = [ den.aspects.rh-consumer ];
+        den.aspects.rh-consumer = {
+          nixos =
+            { replicateHome, lib, ... }:
+            {
+              networking.domain = lib.concatStringsSep "," (
+                lib.concatMap (e: e.directories or [ ]) replicateHome
+              );
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = ".claude/memory";
+      }
+    );
   };
 }
