@@ -390,7 +390,17 @@ let
       # Scan raw pipe values for config-dependent thunks (functions taking
       # { config, ... }).  If none exist, hostConfigs stays null and
       # assemblePipes skips cross-host instantiation entirely.
-      isConfigDependent = val: builtins.isFunction val && (builtins.functionArgs val) ? config;
+      parentArgNames = lib.catAttrs "parentArg" (builtins.attrValues (den.classes or { }));
+      readsParentArg = a: builtins.any (k: a ? ${k}) parentArgNames;
+      isConfigDependent =
+        val:
+        builtins.isFunction val
+        && (
+          let
+            a = builtins.functionArgs val;
+          in
+          a ? config || readsParentArg a || a ? pkgs || a ? inputs' || a ? osConfig
+        );
       hasAnyConfigThunk =
         let
           # Values may be lists of entries, raw functions, or pipe entry
@@ -473,13 +483,16 @@ let
       # Cross-host config thunks (from pipe.collect) are resolved using hostConfigs.
       scopeEntityKind = (result.state.scopeEntityKind or (_: { })) null;
       scopeEntityClassMap = (result.state.scopeEntityClass or (_: { })) null;
-      augmentedScopeContexts = assemblePipes {
-        inherit scopeContexts hostConfigs scopeEntityKind;
+      tempAugmentedNoCfg = assemblePipes {
+        inherit scopeContexts scopeEntityKind;
         scopeEntityClass = scopeEntityClassMap;
+        hostConfigs = null;
         scopedClassImports = importsForPipes;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         inherit scopeParent;
       };
+
+      drainedForHostConfigs = (mkDrained tempAugmentedNoCfg).classImports;
 
       # §A #8/#2/#7 B′ raw-context ACCIDENT fix (option b: augmented-context build).
       #
@@ -509,14 +522,29 @@ let
         inherit scopeContexts scopeEntityKind;
         scopeEntityClass = scopeEntityClassMap;
         hostConfigs = null;
+        scopedClassImports = drainedForHostConfigs;
+        scopedPipeEffects = result.state.scopedPipeEffects null;
+        inherit scopeParent;
+      };
+
+      tempAugmented = assemblePipes {
+        inherit scopeContexts hostConfigs scopeEntityKind;
+        scopeEntityClass = scopeEntityClassMap;
         scopedClassImports = importsForPipes;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         inherit scopeParent;
       };
-      # B′ peer-config drain: only its class-imports map is consumed (the cross-
-      # host config build); its spawn edges are NOT collected — B′'s delivery is
-      # covered by the per-host mkInstantiateEdges in the unifiedEdges union.
-      drainedForHostConfigs = (mkDrained augmentedScopeContextsNoCfg).classImports;
+
+      drained = mkDrained tempAugmented;
+      drainedClassImportsRaw = drained.classImports;
+
+      augmentedScopeContexts = assemblePipes {
+        inherit scopeContexts hostConfigs scopeEntityKind;
+        scopeEntityClass = scopeEntityClassMap;
+        scopedClassImports = drainedClassImportsRaw;
+        scopedPipeEffects = result.state.scopedPipeEffects null;
+        inherit scopeParent;
+      };
 
       # Parent-state bundle for node spawns. Uses the RAW scopeContexts and
       # scopedClassImports (not the augmented/drained maps): the spawned node
@@ -710,18 +738,23 @@ let
                     k:
                     let
                       modules = unwrapContentValuesList child.${k};
+                      isPipe = den.quirks ? ${k};
                     in
-                    map (module: {
-                      __rawEntry = true;
-                      class = k;
-                      inherit module;
-                      ctx = scopeCtx;
-                      identity = child.name or "<deferred>";
-                      aspectPolicy = child.meta.collisionPolicy or null;
-                      globalPolicy = den.config.classModuleCollisionPolicy or "error";
-                      isContextDependent = false;
-                    }) modules
-                  ) classified.classKeys
+                    map (
+                      module:
+                      {
+                        __rawEntry = true;
+                        class = k;
+                        inherit module;
+                        ctx = scopeCtx;
+                        identity = child.name or "<deferred>";
+                        aspectPolicy = child.meta.collisionPolicy or null;
+                        globalPolicy = den.config.classModuleCollisionPolicy or "error";
+                        isContextDependent = false;
+                      }
+                      // lib.optionalAttrs isPipe { __isPipeEntry = true; }
+                    ) modules
+                  ) (classified.classKeys ++ classified.pipeKeys)
                 ) drainable;
               in
               builtins.foldl' (
@@ -733,7 +766,7 @@ let
                   };
                 }
               ) accImports newEntries
-          ) scopedClassImportsRaw (builtins.attrNames allDeferred);
+          ) importsForPipes (builtins.attrNames allDeferred);
 
           # Materialize deferred node spawn markers (policy.spawn) over the
           # parent scope-tree state, kind-generically. Each marker lives at some
@@ -782,10 +815,8 @@ let
           }
           (builtins.attrNames homeNodeSpawns);
 
-      # The host's OWN phase1–4 drain, over the hostConfigs-augmented contexts.
-      # Surfaces drained.classImports for phases + drained.spawnEdges for unifiedEdges.
-      drained = mkDrained augmentedScopeContexts;
-      drainedClassImportsRaw = drained.classImports;
+      # The host's OWN phase1–4 drain. (drained and drainedClassImportsRaw are
+      # pre-calculated to build augmentedScopeContexts cycle-free).
 
       phase1 = wrapPerScope ctx augmentedScopeContexts drainedClassImportsRaw;
       # Production delivery (Task 17): one ordered-dispatch fold over the unified

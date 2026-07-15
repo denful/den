@@ -36,7 +36,7 @@ let
         prevIsolated = (state.scopeIsolated or (_: { })) null;
         prevScopeByEntity = (state.scopeByEntity or (_: { })) null;
         updatedContexts = prevContexts // {
-          ${newScopeId} = scopedCtx;
+          ${newScopeId} = prevContexts.${newScopeId} or scopedCtx;
         };
         # Spec→scope link: record the entity scope this push created, keyed by
         # (parentScope, id_hash). The instantiate spec — registered at the same

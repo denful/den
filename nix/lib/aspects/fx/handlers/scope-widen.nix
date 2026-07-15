@@ -14,6 +14,9 @@ in
       { param, state }:
       let
         ctx = param.ctx;
+        updated = (state.scopeContexts null) // {
+          ${state.currentScope} = (state.scopeContexts null).${state.currentScope} or { } // ctx;
+        };
       in
       {
         resume = fx.bind (fx.send "drain" ctx) (
@@ -31,7 +34,9 @@ in
             )
           ) (fx.pure null) satisfiable
         );
-        inherit state;
+        state = state // {
+          scopeContexts = _: updated;
+        };
       };
   };
 }

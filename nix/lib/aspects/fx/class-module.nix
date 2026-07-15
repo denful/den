@@ -181,9 +181,26 @@ let
           || (pa != null && (builtins.functionArgs (m.__fn or (_: { }))) ? ${pa});
         needsOwner = consumerNested && hasConfigThunks && builtins.any markerNeedsOwner allMarkers;
 
+        # Extract arguments requested by config thunks that cannot be fulfilled from context.
+        thunkArgs = lib.foldl' (
+          acc: m:
+          let
+            args = builtins.functionArgs (m.__fn or (_: { }));
+            pcls = m.__producerClass or null;
+            pArg = classParentArg pcls;
+            filteredArgs = removeAttrs args (
+              [ "config" ]
+              ++ lib.optional (pArg != null) pArg
+              ++ builtins.filter (k: ctx ? ${k}) (builtins.attrNames args)
+            );
+          in
+          acc // filteredArgs
+        ) { } allMarkers;
+
         # If any den args have config thunks, we need `config` (and possibly the
         # owner config, via the consumer's parentArg) from the module system to
         # resolve them — force the wrapper path even if no other remaining args.
+        # We also need any specialArgs requested by the thunks themselves.
         effectiveRemainingArgs =
           if hasConfigThunks then
             remainingArgs
@@ -191,6 +208,7 @@ let
               config = true;
             }
             // lib.optionalAttrs (needsOwner && consumerParentArg != null) { ${consumerParentArg} = true; }
+            // thunkArgs
           else
             remainingArgs;
 
@@ -199,7 +217,7 @@ let
         # (the consumer's `config` for a root class, else the fetched owner); a
         # nested producer → its config at the registered parentPath of the owner.
         resolveMarkers =
-          config: owner: values:
+          moduleArgs: config: owner: values:
           let
             ownerCfg = if consumerNested then owner else config;
           in
@@ -225,6 +243,7 @@ let
                     lib.attrByPath (pPath v.__producerName) { } ownerCfg;
                 result = v.__fn (
                   ctxArgs
+                  // moduleArgs
                   // {
                     config = producerConfig;
                   }
@@ -265,7 +284,7 @@ let
                   lib.mapAttrs (
                     k: v:
                     if builtins.elem k denArgsWithThunks && builtins.isList v then
-                      resolveMarkers (moduleArgs.config or { }) ownerCfg v
+                      resolveMarkers moduleArgs (moduleArgs.config or { }) ownerCfg v
                     else
                       v
                   ) denWinsDen
@@ -277,7 +296,7 @@ let
             config = true;
           };
           validator = mkCollisionValidator policy denArgNames;
-          advertisedArgs = effectiveRemainingArgs // lib.genAttrs denArgNames (_: true);
+          advertisedArgs = effectiveRemainingArgs // lib.genAttrs classWinsNames (_: true);
         in
         {
           module = lib.setFunctionArgs wrapper advertisedArgs;

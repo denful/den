@@ -223,10 +223,9 @@
       }
     );
 
-    # Parametric pipe values with unsatisfied required args pass through
-    # unresolved instead of crashing (e.g. quirk needing pkgs at a scope
-    # without pkgs).
-    test-pipe-unsatisfied-parametric-passthrough = denTest (
+    # Parametric pipe values with unsatisfied required args are deferred as
+    # config thunks and correctly resolved when passed to a module system consumer.
+    test-pipe-parametric-resolved-in-consumer = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
@@ -252,15 +251,18 @@
             { build-info, ... }:
             {
               networking.hostName =
-                if builtins.length build-info == 1 && builtins.isFunction (builtins.head build-info) then
-                  "passthrough"
+                let
+                  head = builtins.head build-info;
+                in
+                if builtins.length build-info == 1 && builtins.isAttrs head && head ? name then
+                  "resolved"
                 else
-                  "resolved";
+                  "failed";
             };
         };
 
         expr = igloo.networking.hostName;
-        expected = "passthrough";
+        expected = "resolved";
       }
     );
   };

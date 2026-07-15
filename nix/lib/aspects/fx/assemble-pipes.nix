@@ -44,20 +44,12 @@ let
       let
         a = builtins.functionArgs val;
       in
-      a ? config || readsParentArg a
+      a ? config || readsParentArg a || a ? pkgs || a ? inputs' || a ? osConfig
     );
 
   # Pipeline-parametric values require pipeline context args (host, user, etc.)
   # but neither config nor a parent-config arg. Resolved eagerly via scope context.
-  isPipelineParametric =
-    val:
-    builtins.isFunction val
-    && (
-      let
-        a = builtins.functionArgs val;
-      in
-      !(a ? config) && !(readsParentArg a)
-    );
+  isPipelineParametric = val: builtins.isFunction val && !isConfigDependent val;
 
   # Resolve a local pipeline-parametric value eagerly using scope context.
   # These are quirk values like `{ host, ... }: { addr = host.addr; }` that
@@ -867,14 +859,32 @@ let
       scopeEntityClass ? { },
       hostConfigs ? null,
     }:
+    let
+      # Inherit parent scope contexts recursively
+      enrichedScopeContexts = lib.genAttrs (builtins.attrNames scopeContexts) (
+        scopeId:
+        let
+          ownCtx = scopeContexts.${scopeId} or { };
+          pid = scopeParent.${scopeId} or null;
+        in
+        if pid == null || pid == scopeId then
+          ownCtx
+        else
+          let
+            parentCtx = enrichedScopeContexts.${pid} or { };
+            inherited = lib.filterAttrs (k: _: !(ownCtx ? ${k})) parentCtx;
+          in
+          ownCtx // inherited
+      );
+    in
     if pipeNames == [ ] then
-      scopeContexts
+      enrichedScopeContexts
     else
       let
         # Pass 1: Collect all exposed data bottom-up.
         allExposed = collectAllExposed {
+          scopeContexts = enrichedScopeContexts;
           inherit
-            scopeContexts
             scopedClassImports
             scopedPipeEffects
             scopeParent
@@ -884,8 +894,8 @@ let
 
         # Pass 1b: Distribute broadcast data laterally (push, fleet-wide).
         allBroadcast = collectAllBroadcast {
+          scopeContexts = enrichedScopeContexts;
           inherit
-            scopeContexts
             scopedClassImports
             scopedPipeEffects
             scopeParent
@@ -940,7 +950,7 @@ let
                 resolvedBase = builtins.concatMap (resolveLocalParametric scopeCtx) baseValues;
                 # Own emits are produced at THIS scope; exposed values keep the
                 # producer tag set at their exposing node (re-mark is a no-op).
-                producer = producerOf scopeEntityClass scopeContexts scopeId;
+                producer = producerOf scopeEntityClass enrichedScopeContexts scopeId;
                 markedBase = markConfigThunks producer resolvedBase;
                 exposedValues = exposedForScope.${pn} or [ ];
                 markedExposed = markConfigThunks producer exposedValues;
@@ -1135,7 +1145,7 @@ let
           // pipeData
           // lib.optionalAttrs hasTargeted { __pipeTargeted = pipeTargeted; }
           // lib.optionalAttrs hasConfigThunks { __pipeConfigThunks = pipeConfigThunks; }
-        ) scopeContexts;
+        ) enrichedScopeContexts;
       in
       assembled;
 in

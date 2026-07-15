@@ -195,14 +195,18 @@ in
     }
     // {
       # The aspect is processed in BOTH the requesting (user) scope and this
-      # spawned home node, so its quirks must materialize in both. The spawn root
-      # holds the home-side emits; surface the NON-host-bound ones (host-bound
-      # quirks were stripped above and inherited from the host instead) so the
+      # spawned home node, so its quirks must materialize in both. Surface the
+      # NON-host-bound ones (host-bound quirks were stripped above and inherited
+      # from the host instead) across ALL scopes in the spawned subtree, so the
       # caller (resolve.nix) can also fold them into the requesting scope's quirk
       # buckets — letting a user-scope broadcast/collect/expose of a
       # host-aspects-projected quirk behave as if the user included the aspect.
-      quirkEmits = lib.filterAttrs (k: v: (pipeNamesSet ? ${k}) && v != [ ]) (
-        spawnedClassImports.${spawnRoot} or { }
-      );
+      quirkEmits =
+        let
+          allEmits = lib.mapAttrsToList (
+            sid: scopeClasses: lib.filterAttrs (k: v: (pipeNamesSet ? ${k}) && v != [ ]) scopeClasses
+          ) spawnedClassImports;
+        in
+        lib.zipAttrsWith (name: values: lib.concatLists values) allEmits;
     };
 }
