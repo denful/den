@@ -241,19 +241,27 @@ let
                     config
                   else
                     lib.attrByPath (pPath v.__producerName) { } ownerCfg;
-                result = v.__fn (
-                  ctxArgs
-                  // moduleArgs
-                  // {
-                    config = producerConfig;
-                  }
-                  // lib.optionalAttrs (pArg != null) { ${pArg} = ownerCfg; }
-                  // {
-                    inherit lib;
-                  }
-                );
+                # Defer evaluation if cross-host config is required but not yet available.
+                # Only defer if the consuming module system actually provides an identity
+                # (otherwise assume we're in a single-host context like Nixidy and evaluate).
               in
-              if builtins.isList result then result else [ result ]
+              if v.__producerName != null && (ownerCfg.identity or null) != null && v.__producerName != ownerCfg.identity then
+                [ v ]
+              else
+                let
+                  result = v.__fn (
+                    ctxArgs
+                    // moduleArgs
+                    // {
+                      config = producerConfig;
+                    }
+                    // lib.optionalAttrs (pArg != null) { ${pArg} = ownerCfg; }
+                    // {
+                      inherit lib;
+                    }
+                  );
+                in
+                if builtins.isList result then result else [ result ]
             else
               [ v ]
           ) values;

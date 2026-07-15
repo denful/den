@@ -34,22 +34,23 @@ let
   );
   readsParentArg = a: builtins.any (k: a ? ${k}) parentArgNames;
 
-  # Detect config-dependent thunks: functions taking `config` (the producer's
-  # class config) and/or a registered parent-config arg (the enclosing owner
-  # config). Both bind to the evalModules fixpoint, so they are deferred there.
+  # Detect config-dependent thunks: functions taking arguments not provided by the
+  # current evaluation scope context (e.g., config, pkgs, inputs, system). These
+  # are deferred to the NixOS/Home-Manager module system via __configThunk.
   isConfigDependent =
-    val:
+    scopeCtx: val:
     builtins.isFunction val
     && (
       let
         a = builtins.functionArgs val;
+        allowedKeys = [ "lib" ] ++ builtins.attrNames scopeCtx;
       in
-      a ? config || readsParentArg a || a ? pkgs || a ? inputs' || a ? osConfig
+      builtins.any (k: !(builtins.elem k allowedKeys)) (builtins.attrNames a)
     );
 
   # Pipeline-parametric values require pipeline context args (host, user, etc.)
   # but neither config nor a parent-config arg. Resolved eagerly via scope context.
-  isPipelineParametric = val: builtins.isFunction val && !isConfigDependent val;
+  isPipelineParametric = scopeCtx: val: builtins.isFunction val && !(isConfigDependent scopeCtx val);
 
   # Resolve a local pipeline-parametric value eagerly using scope context.
   # These are quirk values like `{ host, ... }: { addr = host.addr; }` that
@@ -60,7 +61,7 @@ let
   # providing the missing args (e.g., perSystem CRD build pipeline provides pkgs).
   resolveLocalParametric =
     scopeCtx: val:
-    if isPipelineParametric val then
+    if isPipelineParametric scopeCtx val then
       let
         thunkArgs = builtins.functionArgs val;
         requiredArgs = builtins.filter (k: !(thunkArgs.${k} or false) && k != "lib") (
@@ -86,20 +87,20 @@ let
   # module wrapper resolves it against the producing class + scope's config —
   # not the consuming module's. Already-marked values (re-mark on an exposed/
   # inherited path) pass through unchanged, keeping their original producer tag.
-  markConfigThunk =
-    producer: v:
-    if isConfigDependent v then
-      {
-        __configThunk = true;
-        __fn = v;
-        __producerClass = producer.class or null;
-        __producerName = producer.name or null;
-      }
-    else
-      v;
-
-  # Mark all config-dependent entries in a value list with their producer.
-  markConfigThunks = producer: map (markConfigThunk producer);
+  markConfigThunks =
+    scopeCtx: producer: values:
+    builtins.map (
+      v:
+      if isConfigDependent scopeCtx v then
+        {
+          __configThunk = true;
+          __fn = v;
+          __producerClass = producer.class or null;
+          __producerName = producer.name or null;
+        }
+      else
+        v
+    ) values;
 
   # Producer tag (class + name) for a scope, read from pipeline state. The class
   # selects the producer's config-resolution route via den.classes.<class>.parentPath.
@@ -180,7 +181,10 @@ let
   # config under the class's parentArg. Returns a list (auto-flattens lists).
   resolveEntry =
     hostConfigs: producerConfigFor: scopeContexts: sourceScopeId: entry:
-    if isConfigDependent entry then
+    let
+      scopeCtx = scopeContexts.${sourceScopeId} or { };
+    in
+    if isConfigDependent scopeCtx entry then
       if hostConfigs == null then
         # No host configs on this crossing path: defer the config-dependent emit.
         # The local evalModules fixpoint resolves it (via __configThunk). Collected
@@ -206,7 +210,7 @@ let
           );
         in
         if builtins.isList result then result else [ result ]
-    else if isPipelineParametric entry then
+    else if isPipelineParametric scopeCtx entry then
       let
         thunkArgs = builtins.functionArgs entry;
         scopeCtx = scopeContexts.${sourceScopeId} or { };
@@ -740,7 +744,7 @@ let
                 # idempotently via mkCombinedBase, but marking at the source keeps
                 # multi-level expose chains correct without relying on every consumer
                 # to re-mark). Mirrors mkCombinedBase on the local path.
-                resolvedBase = markConfigThunks (producerOf scopeEntityClass scopeContexts scopeId) (
+                resolvedBase = markConfigThunks scopeCtx (producerOf scopeEntityClass scopeContexts scopeId) (
                   builtins.concatMap (resolveLocalParametric scopeCtx) baseValues
                 );
                 # Child-exposed data is already concrete — each child resolved its
@@ -951,9 +955,9 @@ let
                 # Own emits are produced at THIS scope; exposed values keep the
                 # producer tag set at their exposing node (re-mark is a no-op).
                 producer = producerOf scopeEntityClass enrichedScopeContexts scopeId;
-                markedBase = markConfigThunks producer resolvedBase;
+                markedBase = markConfigThunks scopeCtx producer resolvedBase;
                 exposedValues = exposedForScope.${pn} or [ ];
-                markedExposed = markConfigThunks producer exposedValues;
+                markedExposed = markConfigThunks scopeCtx producer exposedValues;
               in
               markedBase ++ markedExposed;
 

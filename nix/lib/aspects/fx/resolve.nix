@@ -390,16 +390,17 @@ let
       # Scan raw pipe values for config-dependent thunks (functions taking
       # { config, ... }).  If none exist, hostConfigs stays null and
       # assemblePipes skips cross-host instantiation entirely.
-      parentArgNames = lib.catAttrs "parentArg" (builtins.attrValues (den.classes or { }));
+      parentArgNames = builtins.filter (a: a != null) (lib.catAttrs "parentArg" (builtins.attrValues (den.classes or { })));
       readsParentArg = a: builtins.any (k: a ? ${k}) parentArgNames;
       isConfigDependent =
-        val:
+        scopeCtx: val:
         builtins.isFunction val
         && (
           let
             a = builtins.functionArgs val;
+            allowedKeys = [ "lib" ] ++ builtins.attrNames scopeCtx;
           in
-          a ? config || readsParentArg a || a ? pkgs || a ? inputs' || a ? osConfig
+          builtins.any (k: !(builtins.elem k allowedKeys)) (builtins.attrNames a)
         );
       hasAnyConfigThunk =
         let
@@ -410,9 +411,9 @@ let
             if builtins.isList v then
               builtins.any checkVal v
             else if builtins.isAttrs v && v ? module then
-              isConfigDependent v.module
+              isConfigDependent (v.ctx or {}) v.module
             else
-              isConfigDependent v;
+              isConfigDependent {} v; # Fallback, shouldn't happen for pipe entries
         in
         builtins.any (scopeImports: builtins.any checkVal (lib.attrValues scopeImports)) (
           lib.attrValues scopedClassImportsRaw
