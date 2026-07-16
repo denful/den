@@ -44,18 +44,26 @@ let
                   ${param.class} = (scopeImportData.${param.class} or [ ]) ++ [ mod ];
                 };
               };
+              updatedEmittedLocs = emittedLocs // {
+                ${scope} = scopeLocs // {
+                  ${loc} = true;
+                };
+              };
+              # These two maps are threaded as `_: value` closures so the effect loop's state
+              # deepSeq cannot reach the module bodies inside them (den's lazy-state discipline).
+              # The shield is total, so each emit-class layered a fresh lazy `prev // { ... }`;
+              # forcing the final map then chained through every prior closure — depth ∝ emit
+              # count, a C-stack overflow on large fleets. Force just the TOP-LEVEL spine (the
+              # scope key set — bounded by fleet size, never the module lists) at each step so
+              # the closure captures an already-evaluated head: the chain collapses to O(1) depth
+              # per force while the bodies stay unforced. `seq (attrNames m)` is O(scopes), so the
+              # accumulation stays linear.
+              forceHead = m: builtins.seq (builtins.attrNames m) m;
             in
             state
             // {
-              scopedClassImports = _: updatedImports;
-              scopedEmittedLocs =
-                _:
-                emittedLocs
-                // {
-                  ${scope} = scopeLocs // {
-                    ${loc} = true;
-                  };
-                };
+              scopedClassImports = builtins.seq (forceHead updatedImports) (_: updatedImports);
+              scopedEmittedLocs = builtins.seq (forceHead updatedEmittedLocs) (_: updatedEmittedLocs);
             };
       };
   };
