@@ -19,7 +19,7 @@ let
   inherit (import ./edges/materialize.nix { inherit lib den; }) assembleSubtree;
   inherit (import ./edges/pi.nix { inherit lib; }) mkStaticPi;
   inherit (import ./edges/instantiate-edges.nix { inherit lib den; }) mkInstantiateEdges;
-  inherit (import ./edges/edge.nix { inherit lib; }) scopeName;
+  inherit (import ./edges/edge.nix { inherit lib; }) scopeName edgeSortKey;
   inherit (import ./edges/provides.nix { inherit lib den; })
     applyProvidesEdges
     dedupProvides
@@ -993,8 +993,16 @@ let
         scopeEntityClass = result.state.scopeEntityClass or (_: { });
         spawnNodeFn = spawnNode;
       };
+      # The B′ pass re-runs the FULL per-host projection, so when its scopes overlap
+      # the host-own pass it re-emits identical edges. `sortEdges` only sorts (it does
+      # NOT dedup), so that overlap would double the host-own folds. Keep only the B′
+      # edges the host-own pass did NOT already produce (its cross-host delta); the
+      # overlap is inert, as intended.
+      perHostEdgeKeys = lib.genAttrs (map edgeSortKey perHostEdges) (_: true);
       bprimeEdges = lib.optionals (hostConfigs != null) (
-        lib.concatMap (perHostEdgesFor bprimeArgBundle) allInstantiateSpecs
+        lib.filter (e: !(perHostEdgeKeys ? ${edgeSortKey e})) (
+          lib.concatMap (perHostEdgesFor bprimeArgBundle) allInstantiateSpecs
+        )
       );
 
       # The PRODUCTION delivery-edge object (Task 18.2). The fold-ordered
