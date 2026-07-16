@@ -387,11 +387,8 @@ let
       # (phase4 + the B′ hostConfigs build) use the link.
       scopeByEntity = (result.state.scopeByEntity or (_: { })) null;
 
-      # Scan raw pipe values for config-dependent thunks (functions taking
-      # { config, ... }).  If none exist, hostConfigs stays null and
-      # assemblePipes skips cross-host instantiation entirely.
-      parentArgNames = builtins.filter (a: a != null) (lib.catAttrs "parentArg" (builtins.attrValues (den.classes or { })));
-      readsParentArg = a: builtins.any (k: a ? ${k}) parentArgNames;
+      # Scan raw pipe values for config-dependent thunks. If none exist, hostConfigs
+      # stays null and assemblePipes skips cross-host instantiation entirely.
       isConfigDependent =
         scopeCtx: val:
         builtins.isFunction val
@@ -411,9 +408,12 @@ let
             if builtins.isList v then
               builtins.any checkVal v
             else if builtins.isAttrs v && v ? module then
-              isConfigDependent (v.ctx or {}) v.module
+              isConfigDependent (v.ctx or { }) v.module
             else
-              isConfigDependent {} v; # Fallback, shouldn't happen for pipe entries
+              # Bare-function fallback (no ctx): treats any non-`lib` arg as
+              # config-dependent. Only gates whether hostConfigs is built (a
+              # conservative over-trigger is perf-only, never a correctness change).
+              isConfigDependent { } v;
         in
         builtins.any (scopeImports: builtins.any checkVal (lib.attrValues scopeImports)) (
           lib.attrValues scopedClassImportsRaw
@@ -816,9 +816,9 @@ let
           }
           (builtins.attrNames homeNodeSpawns);
 
-      # The host's OWN phase1–4 drain. (drained and drainedClassImportsRaw are
-      # pre-calculated to build augmentedScopeContexts cycle-free).
-
+      # Phase 1 of the host's OWN drain: wrap the drained class imports per scope.
+      # `drained`/`drainedClassImportsRaw` are computed above (lines ~538-539), ahead
+      # of `augmentedScopeContexts`, to keep that build cycle-free.
       phase1 = wrapPerScope ctx augmentedScopeContexts drainedClassImportsRaw;
       # Production delivery (Task 17): one ordered-dispatch fold over the unified
       # provides+routes edge set, replacing the phase2 (provides) ∘ phase3 (routes)

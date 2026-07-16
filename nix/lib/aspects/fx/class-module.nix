@@ -242,10 +242,20 @@ let
                   else
                     lib.attrByPath (pPath v.__producerName) { } ownerCfg;
                 # Defer evaluation if cross-host config is required but not yet available.
-                # Only defer if the consuming module system actually provides an identity
-                # (otherwise assume we're in a single-host context like Nixidy and evaluate).
+                # Only defer if the consuming module system exposes its own identity
+                # (`config.identity`) AND it differs from the producer — i.e. the producer
+                # config lives on another host and cannot be resolved here. Otherwise
+                # (single-host, e.g. Nixidy) evaluate eagerly.
+                #
+                # NOTE: no consumer wires `config.identity` yet, so this guard is currently
+                # INERT (the eager branch always runs). It is the forward hook for the
+                # cross-host case; wiring + a covering fixture is a follow-up. See PR #625.
               in
-              if v.__producerName != null && (ownerCfg.identity or null) != null && v.__producerName != ownerCfg.identity then
+              if
+                v.__producerName != null
+                && (ownerCfg.identity or null) != null
+                && v.__producerName != ownerCfg.identity
+              then
                 [ v ]
               else
                 let
