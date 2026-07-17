@@ -33,6 +33,7 @@ in
       class,
       aspect,
       bindings ? { },
+      requestingImports ? { },
     }:
     let
       normalized = normalizeRoot aspect;
@@ -90,11 +91,33 @@ in
         _: scopeClasses: builtins.removeAttrs scopeClasses strippableNames
       ) (result.state.scopedClassImports null);
 
+      # The requesting (user) scope's OWN quirk emits — the DOWNWARD dual of the
+      # `quirkEmits` surfacing at the return below. The projected consumer sits
+      # under this spawn root, whose parent chain is `from` (the host), so it never
+      # traverses the requesting user scope; its collection of the user's own
+      # directly-included quirk emits (e.g. a user aspect's homeManager overlay)
+      # would otherwise read []. Merge them into the spawn root's imports for
+      # assembly ONLY — never into `spawnedClassImports`, which feeds the upward
+      # `quirkEmits` return (folding them there double-counts the emit back at the
+      # requesting scope). Host-bound quirks are excluded: they inherit the host's
+      # policy-assembled value, matching the strip above.
+      requestingQuirkEmits = lib.filterAttrs (
+        k: v: (pipeNamesSet ? ${k}) && v != [ ] && !(builtins.elem k strippableNames)
+      ) requestingImports;
+      spawnRootImports = spawnedClassImports.${spawnRoot} or { };
+      spawnRootWithRequesting =
+        spawnRootImports // lib.mapAttrs (k: v: (spawnRootImports.${k} or [ ]) ++ v) requestingQuirkEmits;
+
       # 2. Merge parent state (host + siblings) under the spawned subtree, linking
       #    the spawn root up to `from` so scopeParent walks reach the host's
       #    policy-bound pipes and collectAll scans the fleet siblings.
       mergedScopeContexts = parentState.scopeContexts // (result.state.scopeContexts null);
-      mergedClassImports = parentState.scopedClassImports // spawnedClassImports;
+      mergedClassImports =
+        parentState.scopedClassImports
+        // spawnedClassImports
+        // {
+          ${spawnRoot} = spawnRootWithRequesting;
+        };
       mergedScopeParent =
         parentState.scopeParent
         // (result.state.scopeParent null)

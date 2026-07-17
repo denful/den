@@ -621,6 +621,12 @@ let
                   bindings = {
                     ${ownKind} = ownRecord;
                   };
+                  # The requesting scope's OWN raw imports — spawnNode surfaces its
+                  # quirk emits DOWN into the projected consumer (dual of the
+                  # `quirkEmits` surfacing UP into importsForPipes below), so a
+                  # user's directly-included quirk reaches its host-aspects-projected
+                  # homeManager consumer.
+                  requestingImports = scopedClassImportsRaw.${scopeId} or { };
                 }
               );
             };
