@@ -118,6 +118,19 @@ let
     kind:
     { config, ... }:
     {
+      # Injective scope identity, consumed by fx.pipeline's mkScopeId. Defaults
+      # to `name`, which is the registry key for most kinds. A kind that rewrites
+      # `name` into something non-unique (home forces it to the bare user name)
+      # MUST override this with its registry key, or two such entities collapse
+      # onto one pipeline scope and merge each other's content.
+      options.__scopeName = lib.mkOption {
+        description = "Registry key of this ${kind}, used as its internal identity.";
+        internal = true;
+        visible = false;
+        type = lib.types.str;
+        default = config.name;
+        defaultText = "config.name";
+      };
       options.resolved = lib.mkOption {
         description = "The resolved aspect for this ${kind}.";
         readOnly = true;

@@ -101,7 +101,15 @@ let
           {
             # mkInstanceType defaults name to the registry key (e.g. "tux@igloo");
             # den's name is the bare user name, so identity/description stay stable.
+            # That also makes `name` non-unique across homes (two `user@host` homes
+            # on one system share it), so the registry key is kept as the scope
+            # identity — see __scopeName in ./_types.nix.
             config.name = lib.mkForce userName;
+            config.__scopeName = name;
+            config._identity.keys = [
+              "__scopeName"
+              "system"
+            ];
             config._module.args.host = hostCtx;
             config._module.args.user = userByName;
             options = {
