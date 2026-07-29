@@ -107,6 +107,17 @@ let
 
   # mkScopeId: injective scope identity from a context attrset.
   # Produces a canonical comma-separated "key=value" string, sorted by key.
+  #
+  # An entity's `name` is NOT always injective across entities of one kind: a
+  # home's `name` is force-set to the bare user name
+  # (nix/lib/entities/home.nix), so two standalone homes `user@hostA` /
+  # `user@hostB` both rendered `home=user` and collapsed onto ONE scope — their
+  # collected class content merged and each flake output yielded the other's
+  # configuration. Entities therefore expose `__scopeName`, their registry key
+  # (see nix/lib/entities/_types.nix), which is unique per kind per system.
+  # It defaults to `name`, so only kinds that rewrite `name` differ here.
+  # Synthetic context values (e.g. a bare `{ name = ...; }` host) carry no
+  # `__scopeName` and fall back to `name`.
   mkScopeId =
     ctx:
     lib.concatStringsSep "," (
@@ -117,7 +128,9 @@ let
             v = ctx.${k};
           in
           "${k}=${
-            if builtins.isAttrs v && v ? name then
+            if builtins.isAttrs v && v ? __scopeName then
+              v.__scopeName
+            else if builtins.isAttrs v && v ? name then
               v.name
             else if builtins.isString v then
               v
