@@ -73,18 +73,42 @@ let
             # A declared host always wins and remains the only thing that wires
             # `osConfig`.
             #
-            # Only `host` is synthesized, never `user`: a synthetic host alone fires
-            # `{ host }`-keyed policies (gated on `host ? class` so OS-class routing
-            # stays inert for a classless synthetic host), while `{ host, user }`-keyed
-            # OS batteries (define-user, user-to-host, …) keep their existing
-            # null-user gating and fall back to their home-scope path.
+            # The synthetic host stays classless: `host ? class` is what keeps
+            # OS-class routing (os-to-host, user-to-host, hostname, unfree, …)
+            # inert for a host that was never declared. It does carry `system`,
+            # which the home knows for certain and which host-keyed content needs
+            # to compute platform-dependent values (e.g. define-user's home dir).
             hostCtx =
               if hostByName != null then
                 hostByName
               else if nameWithHost then
-                { name = hostName; }
+                {
+                  name = hostName;
+                  inherit system;
+                }
               else
                 null;
+
+            # A standalone home always names its user, whether or not a declared
+            # host can resolve one. Binding it from the home is what lets a
+            # `{ user, ... }` class module resolve at all: without it
+            # wrapFunctionModule takes the missingDenArgNames path and the whole
+            # class block is dropped — silently, since the lib.warn it attaches
+            # rides on the discarded module and is never forced.
+            #
+            # A declared host still wins, so a real user keeps its full record
+            # (classes, aspect, host). The synthetic one is identity-only; OS
+            # batteries do not act on it because they gate on `host ? class`,
+            # which no standalone home satisfies.
+            userCtx =
+              if userByName != null then
+                userByName
+              else
+                {
+                  name = userName;
+                  userName = userName;
+                  classes = [ config.class ];
+                };
 
             homeManagerConfiguration =
               if nameWithHost && hostByName != null then
@@ -111,7 +135,7 @@ let
               "system"
             ];
             config._module.args.host = hostCtx;
-            config._module.args.user = userByName;
+            config._module.args.user = userCtx;
             options = {
 
               userName = strOpt "user account name" userName;
@@ -121,7 +145,7 @@ let
                 description = "host name (null for unbound standalone homes)";
               };
               user = lib.mkOption {
-                default = userByName;
+                default = userCtx;
                 defaultText = lib.literalExpression "user";
               };
               host = lib.mkOption {

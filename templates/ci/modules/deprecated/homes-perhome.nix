@@ -54,14 +54,21 @@
           homeSchema.name = "tux";
           homeSchema.userName = "tux";
           homeSchema.hostName = "igloo";
-          # A `user@host` home with no declared host now carries a synthetic
-          # host identity (name only) so host-keyed provides/policies resolve
-          # without instantiating a real host. `user` stays null — only the
-          # host is synthesized. See deadbugs/standalone-home-host-context.nix.
+          # A `user@host` home with no declared host carries synthetic host AND
+          # user identities, so host-keyed provides/policies and `{ user, ... }`
+          # class modules resolve without instantiating a real host. Both stay
+          # identity-only and neither gains a `class`, which is what keeps OS
+          # routing inert — `keyboard.model` below is still "standalone".
+          # See deadbugs/standalone-home-host-context.nix and issue #640.
           homeSchema.host = {
             name = "igloo";
+            system = "x86_64-linux";
           };
-          homeSchema.user = null;
+          homeSchema.user = {
+            name = "tux";
+            userName = "tux";
+            classes = [ "homeManager" ];
+          };
           configuredUserName = "tux";
           keyboard.model = "standalone";
           keyboard.layout = "enthium";

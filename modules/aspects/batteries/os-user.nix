@@ -1,4 +1,4 @@
-{ den, ... }:
+{ den, lib, ... }:
 let
 
   description = ''
@@ -42,8 +42,11 @@ in
 
   den.policies.user-to-host =
     { user, host, ... }:
-    [
-      (den.lib.policy.route {
+    # Same gate as os-to-host: a standalone home binds a user and a synthetic
+    # host identity, neither of which has an OS to route into. `host ? class`
+    # keeps this inert there and reading `host.class` safe.
+    lib.optional (host ? class) (
+      den.lib.policy.route {
         fromClass = "user";
         intoClass = host.class;
         path = [
@@ -52,6 +55,6 @@ in
           user.userName
         ];
         adaptArgs = args: args // { osConfig = args.config; };
-      })
-    ];
+      }
+    );
 }
