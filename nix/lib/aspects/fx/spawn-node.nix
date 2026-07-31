@@ -193,11 +193,21 @@ in
       # at the target). Order/precedence preserved exactly: freshParent (parent
       # routes whose key ∉ spawn keys) ++ spawnHere.
       #
-      # Declaration-bearing parent routes are excluded outright, leaving the
-      # parent's copy as the single owner of that declaration: the parent
-      # materializes the same route at the same scope and both folds land in one
-      # target (the user's home-manager evaluation), so re-applying here emits a
-      # second `den.fwd.<key>` declaration.
+      # Declaration-bearing routes get the OPPOSITE precedence: the parent owns
+      # them, and the spawn's copy goes. The parent materializes the same route
+      # at the same scope and both folds land in one target (the user's
+      # home-manager evaluation), so whichever side re-applies it emits a second
+      # `den.fwd.<key>` declaration — and unlike content definitions, two
+      # declarations do not merge. So a declaring route is dropped from
+      # `freshParent` always, and additionally from `spawnHere` whenever the
+      # parent registered the same identity at that scope. A declaration the
+      # spawn alone registers stays: there is no other producer for it.
+      #
+      # Applying this by identity rather than by target class is deliberate. A
+      # declaration can reach the extracted class INDIRECTLY — an `inner -> mid`
+      # forward declares into the `mid` bucket, which a `mid -> homeManager` hop
+      # then nests into the target — so gating on `intoClass == class` would miss
+      # the chained shape.
       #
       # The parent's copy is always present to take over — an excluded route is
       # by construction inside the spawned subtree, and `suppressionVerdicts`'
@@ -219,11 +229,17 @@ in
           let
             spawnHere = spawnRoutes.${sid} or [ ];
             spawnKeys = lib.genAttrs (map (routeKey sid) spawnHere) (_: true);
+            parentDeclaredKeys = lib.genAttrs (map (routeKey sid) (
+              builtins.filter declaresForwardOption parentRoutes
+            )) (_: true);
             freshParent = builtins.filter (
               r: !(spawnKeys ? ${routeKey sid r}) && !(declaresForwardOption r)
             ) parentRoutes;
+            keptSpawnHere = builtins.filter (
+              r: !(declaresForwardOption r && parentDeclaredKeys ? ${routeKey sid r})
+            ) spawnHere;
           in
-          freshParent ++ spawnHere
+          freshParent ++ keptSpawnHere
         ) parentSubtreeRoutes;
 
       # The spawn's provides + routes fold + isolation-BLIND, dedup-FREE final
