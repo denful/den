@@ -161,6 +161,27 @@ in
         allScopeIds = spawnAllScopeIds;
       }) (_: true);
 
+      # A route that materializes an adapter DECLARES `options.den.fwd.<key>` in
+      # the target bucket (handlers/forward.nix mkAdapterAspect, edges/route.nix
+      # mkAdapterFunctor). Content definitions merge; an option DECLARATION does
+      # not — a second one in the same evalModules is a hard "already declared"
+      # error. Of buildForwardAspect's three arms only mkAdapterAspect declares:
+      # the top-level adapter arm evaluates inline and mkDirectAspect places
+      # content, so both stay.
+      #
+      # Testing __complexForward FIRST is load-bearing, not stylistic: every
+      # complex forward carries an adapterKey (lib/forward.nix always builds
+      # one), so a bare `adapterKey != null` would also exclude non-declaring
+      # forwards — among them the home-manager battery's own delivery route.
+      # The simple-route arm is defensive: adapterKey has one in-tree producer
+      # (lib/forward.nix), which only builds complex-forward specs.
+      declaresForwardOption =
+        r:
+        if r.__complexForward or false then
+          (r.needsAdapter or false) && !(r.needsTopLevelAdapter or false)
+        else
+          (r.adapterKey or null) != null;
+
       # DELIBERATE: parent-pipeline routes sourced inside the spawned
       # subtree MUST re-apply — the spawn re-emits class content at the same scope
       # ids but never re-fires schema policies, so without them a user-schema route
@@ -171,6 +192,24 @@ in
       # simple route would re-nest content in fresh keyless wrappers and conflict
       # at the target). Order/precedence preserved exactly: freshParent (parent
       # routes whose key ∉ spawn keys) ++ spawnHere.
+      #
+      # Declaration-bearing parent routes are excluded outright, leaving the
+      # parent's copy as the single owner of that declaration: the parent
+      # materializes the same route at the same scope and both folds land in one
+      # target (the user's home-manager evaluation), so re-applying here emits a
+      # second `den.fwd.<key>` declaration.
+      #
+      # The parent's copy is always present to take over — an excluded route is
+      # by construction inside the spawned subtree, and `suppressionVerdicts`'
+      # redundant-root rule only fires on a route AT the fold root, which for the
+      # parent is an ancestor of spawnRoot.
+      #
+      # For a forward-only custom class the parent's copy also carries what the
+      # spawn would have forwarded, because `getCollectedSource` pulls root-scope
+      # content for it. That is NOT general: `filterRootModules` narrows root
+      # content to `den.default` modules once fromClass is an entity-owned class,
+      # and the parent collects the host bucket unprojected where the spawn would
+      # have re-resolved it per user.
       spawnRoutes = result.state.scopedRoutes null;
       parentSubtreeRoutes = lib.filterAttrs (sid: _: subtreeSet ? ${sid}) parentState.scopedRoutes;
       mergedSpawnRoutes =
@@ -180,7 +219,9 @@ in
           let
             spawnHere = spawnRoutes.${sid} or [ ];
             spawnKeys = lib.genAttrs (map (routeKey sid) spawnHere) (_: true);
-            freshParent = builtins.filter (r: !(spawnKeys ? ${routeKey sid r})) parentRoutes;
+            freshParent = builtins.filter (
+              r: !(spawnKeys ? ${routeKey sid r}) && !(declaresForwardOption r)
+            ) parentRoutes;
           in
           freshParent ++ spawnHere
         ) parentSubtreeRoutes;
