@@ -532,6 +532,27 @@ let
   # A `den.default`-tagged module — root content shared across the entity chain.
   isDenDefaultModule = mod: lib.hasSuffix "@default" (mod.key or mod._file or "");
 
+  # A root-scope module that a descendant-arg fan-out bound to ONE entity
+  # belongs to that entity alone. handlers/bind.nix emits every fan instance at
+  # the emitting (root) scope, distinguished only by the `@<kind>=<name>` pairs
+  # in its {ctxId} — so a child-scope forward pulling the root bucket sees all
+  # siblings' instances and, without this, hands each child the union. Bindings
+  # naming a kind the child's ctx does not have are not about this child and
+  # cannot disqualify the module; unfanned content binds nothing and always
+  # passes.
+  boundToChild =
+    childCtx: mod:
+    let
+      bindings = den.lib.aspects.fx.identity.ctxBindings (toString (mod.key or mod._file or ""));
+    in
+    builtins.all (
+      kind:
+      let
+        record = childCtx.${kind} or null;
+      in
+      record == null || (record.name or null) == bindings.${kind}
+    ) (builtins.attrNames bindings);
+
   # Root-scope `fromClass` content a child-scope COMPLEX forward may pull in.
   # S-construction rule (§B Decision 2): when `fromClass` is owned by an entity in
   # the chain, root content under it is that entity's OWN declaration (not
@@ -545,11 +566,12 @@ let
         (childCtx.user.classes or [ ])
         ++ lib.optional (childCtx ? host) childCtx.host.class
         ++ lib.optional (childCtx ? home) childCtx.home.class;
+      ownBinding = builtins.filter (boundToChild childCtx) rootModules;
     in
     if builtins.elem spec.fromClass ownedClasses then
-      builtins.filter isDenDefaultModule rootModules
+      builtins.filter isDenDefaultModule ownBinding
     else
-      rootModules;
+      ownBinding;
 
   # The "collected" source branch: a child-scope forward collects its own-scope
   # fromClass modules PLUS the (filtered) root-scope fromClass modules; a root-

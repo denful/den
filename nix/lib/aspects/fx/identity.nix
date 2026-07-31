@@ -25,6 +25,32 @@ let
   # Strip the {ctxId} suffix from an identity, yielding the base identity.
   stripCtxSuffix = id: lib.head (lib.splitString "/{" id);
 
+  # The entity bindings a ctx-qualified identity carries, as { kind = name; }.
+  # handlers/bind.nix fans a descendant-arg aspect by appending `@<kind>=<name>`
+  # per bound child and emits EVERY instance at the same scope, so the {ctxId}
+  # suffix is the only record of which entity an instance belongs to. Identities
+  # with no suffix (unfanned content) bind nothing and yield { }.
+  ctxBindings =
+    id:
+    let
+      parts = lib.splitString "/{" id;
+    in
+    if builtins.length parts < 2 then
+      { }
+    else
+      builtins.listToAttrs (
+        builtins.concatMap (
+          pair:
+          let
+            kv = lib.splitString "=" pair;
+          in
+          lib.optional (builtins.length kv == 2) {
+            name = builtins.head kv;
+            value = lib.elemAt kv 1;
+          }
+        ) (builtins.tail (lib.splitString "@" (lib.removeSuffix "}" (lib.last parts))))
+      );
+
   tombstone = resolved: extra: {
     name = "~${resolved.name or "<anon>"}";
     meta =
@@ -114,6 +140,7 @@ in
     baseKey
     isAnonIdentity
     stripCtxSuffix
+    ctxBindings
     tombstone
     flattenPathSetByScope
     collectPathsHandler
