@@ -96,8 +96,14 @@ let
       # Forward provides children onto the merged aspect so
       # aspect.docker resolves to aspect.provides.docker.
       # provides-first so direct freeform keys on merged take priority.
-      # __providesForwarded tells the pipeline to skip these during classification.
+      # __providesForwarded tells the pipeline to skip these during
+      # classification — but only for names the aspect does not define
+      # itself. A name held by both loses the forwarded value to the direct
+      # key above, so masking it would classify neither: an aspect declaring
+      # provides.user alongside user-class content would silently emit no
+      # user class at all.
       providesChildren = builtins.removeAttrs (merged.provides or { }) [ "_module" ];
+      unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
       # Child aspect keys for synthetic provides: freeform keys that are
       # not structural, internal, class, pipe, or forwarded-from-provides.
       classReg = den.classes or { };
@@ -132,7 +138,7 @@ let
     // merged
     // {
       __functor = if originalFunctor != null then originalFunctor else resolveAspectWith;
-      __providesForwarded = builtins.attrNames providesChildren;
+      __providesForwarded = unshadowedProvides;
       provides = syntheticProvides;
       _ = syntheticProvides;
     };
@@ -514,8 +520,11 @@ let
           inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
           # Forward provides children onto the wrapper so
           # aspect.child.monitoring resolves to aspect.child.provides.monitoring,
-          # matching mergeWithAspectMeta behavior for root aspects.
+          # matching mergeWithAspectMeta behavior for root aspects — including
+          # the rule that a name the wrapper defines itself keeps its own value
+          # and stays classified.
           providesChildren = builtins.removeAttrs (merged.provides or { }) [ "_module" ];
+          unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
           provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
           # A key names a candidate child aspect when it is neither structural,
           # internal, class nor pipe. Provides children are reached through
@@ -564,7 +573,7 @@ let
         // {
           __contentValues = flatDefs;
           __provider = provider;
-          __providesForwarded = builtins.attrNames providesChildren;
+          __providesForwarded = unshadowedProvides;
           _ = underscoreAt provider annotatedMerged;
         }
         // lib.optionalAttrs singleFn {
