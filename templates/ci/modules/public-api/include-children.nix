@@ -348,6 +348,114 @@
       }
     );
 
+    # ._ at depth 3 — synthesis must not stop at the first nesting level
+    test-include-children-depth-three = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.a.b.c.x.nixos.services.openssh.enable = true;
+        den.aspects.a.b.c.y.nixos.networking.nameservers = [ "1.1.1.1" ];
+
+        den.aspects.igloo.includes = [ den.aspects.a.b.c._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          dns = igloo.networking.nameservers;
+        };
+        expected = {
+          ssh = true;
+          dns = [ "1.1.1.1" ];
+        };
+      }
+    );
+
+    # ._ at depth 4 — synthesis is depth-unbounded
+    test-include-children-depth-four = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.a.b.c.d.x.nixos.services.openssh.enable = true;
+        den.aspects.a.b.c.d.y.nixos.networking.nameservers = [ "1.1.1.1" ];
+
+        den.aspects.igloo.includes = [ den.aspects.a.b.c.d._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          dns = igloo.networking.nameservers;
+        };
+        expected = {
+          ssh = true;
+          dns = [ "1.1.1.1" ];
+        };
+      }
+    );
+
+    # Depth-3 ._ excludes class keys, same as the shallower levels
+    test-include-children-depth-three-skips-class-keys = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.a.b.c = {
+          nixos.networking.hostName = "should-not-leak";
+          child.nixos.services.openssh.enable = true;
+        };
+
+        den.aspects.igloo.includes = [ den.aspects.a.b.c._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          hostName = igloo.networking.hostName;
+        };
+        expected = {
+          ssh = true;
+          hostName = "nixos";
+        };
+      }
+    );
+
+    # Depth-3 ._ collects children contributed by several definitions
+    test-include-children-depth-three-multi-def = denTest (
+      {
+        den,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.a.b.c.x.nixos.services.openssh.enable = true;
+        den.aspects.a.b = {
+          c.y.nixos.networking.nameservers = [ "1.1.1.1" ];
+        };
+
+        den.aspects.igloo.includes = [ den.aspects.a.b.c._ ];
+
+        expr = {
+          ssh = igloo.services.openssh.enable;
+          dns = igloo.networking.nameservers;
+        };
+        expected = {
+          ssh = true;
+          dns = [ "1.1.1.1" ];
+        };
+      }
+    );
+
     # Nested ._ with parametric child aspects
     test-include-children-nested-parametric = denTest (
       {
