@@ -8,7 +8,7 @@
 let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
-  inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList;
+  inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList unwrapContentValuesAll;
   inherit (den.lib.schemaUtil) schemaEntityKindsSet;
 
   inherit (den.lib.aspects.fx.aspect) ctxFromHandlers;
@@ -105,10 +105,12 @@ let
     in
     fx.seq (lib.imap0 mkEntry modules);
 
+  # One entry per definition: quirk values accumulate at assembly, so several
+  # definitions of the same pipe key on one aspect must stay separate.
   emitPipeKey =
     aspect: ctx: contextDep: nodeIdentity: k:
     let
-      modules = unwrapContentValuesList aspect.${k};
+      modules = unwrapContentValuesAll aspect.${k};
       isMulti = builtins.length modules > 1;
       mkEntry =
         idx: module:

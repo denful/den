@@ -1,17 +1,24 @@
 { lib, ... }:
 let
+  # Definition values of a content wrapper, empty definitions dropped.
+  defValues =
+    rawValue:
+    builtins.filter (v: !(builtins.isAttrs v && v == { })) (map (d: d.value) rawValue.__contentValues);
+
   # Unwrap to a list of values, with empty-set fallback to [{}].
   # Used by aspect emitClassModules which needs per-element processing.
   # Matches source order: list check first, then __contentValues, then singleton.
+  #
+  # Several definitions of one CLASS key collapse into a single module: the
+  # module system merges them through `imports`, so the class sees one value.
+  # Quirk data has no such merge — see unwrapContentValuesAll.
   unwrapContentValuesList =
     rawValue:
     if builtins.isList rawValue then
       rawValue
     else if builtins.isAttrs rawValue && rawValue ? __contentValues then
       let
-        vals = builtins.filter (v: !(builtins.isAttrs v && v == { })) (
-          map (d: d.value) rawValue.__contentValues
-        );
+        vals = defValues rawValue;
       in
       if builtins.length vals == 0 then
         [ { } ]
@@ -19,6 +26,22 @@ let
         [ (builtins.head vals) ]
       else
         [ { imports = vals; } ]
+    else
+      [ rawValue ];
+
+  # Every definition, uncollapsed. Quirks accumulate rather than merge, so a
+  # pipe key defined by several modules must reach assembly as one entry per
+  # definition. Collapsing them into `{ imports = …; }` would hand consumers a
+  # single value carrying none of the emitted data.
+  unwrapContentValuesAll =
+    rawValue:
+    if builtins.isList rawValue then
+      rawValue
+    else if builtins.isAttrs rawValue && rawValue ? __contentValues then
+      let
+        vals = defValues rawValue;
+      in
+      if vals == [ ] then [ { } ] else vals
     else
       [ rawValue ];
 
@@ -59,6 +82,7 @@ in
 {
   inherit
     unwrapContentValuesList
+    unwrapContentValuesAll
     unwrapContentValuesForClassification
     applyProvide
     ;

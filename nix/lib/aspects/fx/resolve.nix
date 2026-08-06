@@ -694,7 +694,7 @@ let
         let
           allDeferred = (result.state.scopedDeferredIncludes or (_: { })) null;
           inherit (den.lib.aspects.fx.keyClassification) classifyKeys;
-          inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList;
+          inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList unwrapContentValuesAll;
           # Build enriched context for a scope by inheriting parent enrichment.
           # Walks up scopeParent to find enrichment keys not present in the
           # scope's own context.
@@ -744,8 +744,10 @@ let
                   lib.concatMap (
                     k:
                     let
-                      modules = unwrapContentValuesList child.${k};
                       isPipe = den.quirks ? ${k};
+                      # Pipe keys keep one entry per definition (quirks accumulate);
+                      # class keys collapse into a single module (the module system merges).
+                      modules = if isPipe then unwrapContentValuesAll child.${k} else unwrapContentValuesList child.${k};
                     in
                     map (
                       module:

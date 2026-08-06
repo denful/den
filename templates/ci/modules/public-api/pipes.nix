@@ -265,5 +265,45 @@
         expected = "resolved";
       }
     );
+
+    # Quirks accumulate: several definitions of one aspect (i.e. the same
+    # aspect name across several files) each contribute an entry, rather than
+    # collapsing into a single value the way class content does.
+    test-pipe-multi-def-same-aspect = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [
+          (_: {
+            den.aspects.svc.firewall.ports = [ 80 ];
+          })
+          (_: {
+            den.aspects.svc.firewall.ports = [ 5432 ];
+          })
+        ];
+
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.quirks.firewall = {
+          description = "Firewall port declarations";
+        };
+
+        den.aspects.igloo.includes = [
+          den.aspects.svc
+          den.aspects.consumer
+        ];
+
+        den.aspects.consumer.nixos =
+          { firewall, ... }:
+          {
+            networking.firewall.allowedTCPPorts = lib.concatMap (f: f.ports or [ ]) firewall;
+          };
+
+        # Merge order is not a contract — compare as a sorted set.
+        expr = lib.sort (a: b: a < b) igloo.networking.firewall.allowedTCPPorts;
+        expected = [
+          80
+          5432
+        ];
+      }
+    );
   };
 }
