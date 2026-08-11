@@ -122,6 +122,7 @@ in
   # Predicates exported directly (not through types mapAttrs which applies { } to each value).
   inherit (rawTypes)
     isParametricWrapper
+    isParametricContent
     isSubmoduleFn
     isMeaningfulName
     isSyntheticName

@@ -4,7 +4,12 @@
   den,
 }:
 let
-  inherit (den.lib.aspects) isSubmoduleFn isMeaningfulName isParametricWrapper;
+  inherit (den.lib.aspects)
+    isSubmoduleFn
+    isMeaningfulName
+    isParametricWrapper
+    isParametricContent
+    ;
 
   # Normalize a NixOS module function into an aspect attrset via type merge.
   normalizeModuleFn =
@@ -98,16 +103,7 @@ let
       let
         prov = child.__provider or [ ];
         provName = if prov != [ ] then lib.last prov else null;
-        fns = builtins.filter (
-          d:
-          lib.isFunction d.value
-          && (
-            let
-              args = builtins.functionArgs d.value;
-            in
-            args != { } && !(args ? config) && !(args ? options)
-          )
-        ) (child.__contentValues or [ ]);
+        fns = builtins.filter isParametricContent (child.__contentValues or [ ]);
       in
       child
       // lib.optionalAttrs (provName != null) {

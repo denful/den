@@ -22,8 +22,42 @@ let
   # not impossible. If explicit tagging is ever needed, add _type = "den:parametric".
   isParametricWrapper = v: builtins.isAttrs v && v ? __fn && v ? __args;
 
+  # A __contentValues entry holding a parametric function — a function with named
+  # args that is not a NixOS module function. Both sites that pull functions out
+  # of a content wrapper (providerType.merge here, wrapChild in normalize.nix for
+  # includes elements, which listOf hands over unprocessed) must agree on this.
+  isParametricContent =
+    cv:
+    lib.isFunction cv.value
+    && (
+      let
+        args = builtins.functionArgs cv.value;
+      in
+      args != { } && !(args ? config) && !(args ? options)
+    );
+
+  # A loc can hold non-string segments (module-system placeholders); render those
+  # as "<anon>", the same spelling isMeaningfulName rejects.
+  locName = loc: lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc);
+
   isMeaningfulName =
     name: name != "<anon>" && name != "<function body>" && !(lib.hasPrefix "[definition " name);
+
+  # Two __functor definitions at one path cannot be mechanically composed.
+  # Returns the sole functor, or null when there is none.
+  soleFunctor =
+    loc: defs:
+    let
+      withFunctor = builtins.filter (
+        d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
+      ) defs;
+    in
+    if builtins.length withFunctor > 1 then
+      throw "den: multiple __functor definitions at ${locName loc} — merge is ambiguous. Use lib.mkForce to override."
+    else if withFunctor != [ ] then
+      (lib.head withFunctor).value.__functor
+    else
+      null;
 
   # Constructor-stamped names like "<when>" repeat across instances; the
   # child walk indexes them and the gate never keys dedup on them. Both
@@ -48,7 +82,7 @@ let
       inherit (den.lib.aspects.fx.handlers) constantHandler;
       resolveInc =
         inc:
-        if builtins.isAttrs inc && inc ? __fn && inc ? __args then
+        if isParametricWrapper inc then
           let
             fn = inc.__fn;
             fnArgs = inc.__args;
@@ -72,18 +106,7 @@ let
       # Rescue explicit __functor from defs before the submodule merge
       # destroys it (freeform keys become deferred modules).
       # Providers like den.batteries.forward define their own __functor.
-      explicitFunctors = builtins.filter (
-        d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
-      ) defs;
-      originalFunctor =
-        if builtins.length explicitFunctors > 1 then
-          throw "den: multiple __functor definitions at ${
-            lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc)
-          } — merge is ambiguous. Use lib.mkForce to override."
-        else if explicitFunctors != [ ] then
-          (lib.head explicitFunctors).value.__functor
-        else
-          null;
+      originalFunctor = soleFunctor loc defs;
       merged = sub.merge loc (
         defs
         ++ [
@@ -110,9 +133,7 @@ let
       pipeReg = den.quirks or { };
       inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
       forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
-      aspectName =
-        merged.name
-          or (lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc));
+      aspectName = merged.name or (locName loc);
       childKeys = builtins.filter (
         k:
         !(structuralKeysSet ? ${k})
@@ -125,9 +146,9 @@ let
         name = "${aspectName}._";
         includes = map (k: merged.${k}) childKeys;
       };
-      # __functor hides synthetic keys from attrValues while making _
-      # usable in includes lists. wrapFunctorChild extracts the thunk
-      # and compile-parametric resolves it to syntheticAspect.
+      # __functor hides the synthetic aspect from attrValues while keeping _
+      # usable in an includes list: wrapChild sees a zero-arg functor and calls
+      # it, so the aspect below is built only when _ is actually included.
       syntheticProvides = providesChildren // {
         __functor = _self: _args: syntheticAspect;
       };
@@ -146,12 +167,8 @@ let
   aspectMeta =
     loc: defs:
     { config, ... }:
-    let
-      locSegments = map (x: if builtins.isString x then x else "<anon>") config.meta.loc;
-      nameFromLoc = lib.concatStringsSep "." locSegments;
-    in
     {
-      meta.name = lib.mkForce nameFromLoc;
+      meta.name = lib.mkForce (locName config.meta.loc);
       meta.file = lib.mkForce (lib.last defs).file;
       meta.loc = lib.mkForce loc;
     };
@@ -262,8 +279,12 @@ let
         builtins.isAttrs v
         || lib.isFunction v
         || (builtins.isList v && builtins.all (i: builtins.isAttrs i && i.__isPolicy or false) v);
+      # Content wrappers are expanded into their constituent defs first, so the
+      # dispatch below sees one def per definition rather than one per key.
       # Merge dispatch:
-      #   parametric wrappers (__fn/__args) → single: preserve wrapper; multi: coerce to includes
+      #   policy list → pass through as-is
+      #   parametric wrappers (__fn/__args) → sole wrapper with no other defs:
+      #     preserve wrapper; otherwise coerce every fn to { includes = [fn]; }
       #   mixed fns + attrsets → coerce parametric fns to { includes = [fn]; }
       #   all fns, has submodule fns → merge through aspectType
       #   all fns, bare parametric only → single: raw wrapper; multi: coerce to includes
@@ -287,15 +308,6 @@ let
               prov = v.__provider or [ ];
             in
             if prov != [ ] then lib.last prov else null;
-          isParametricContent =
-            cv:
-            lib.isFunction cv.value
-            && (
-              let
-                args = builtins.functionArgs cv.value;
-              in
-              args != { } && !(args ? config) && !(args ? options)
-            );
           # A content wrapper holds every definition of its key. Reducing it to
           # one value drops the others with no diagnostic, so expand it into one
           # def per parametric function plus one def carrying the static side.
@@ -373,18 +385,10 @@ let
           else
             let
               nonParametrics = builtins.filter (d: !isParametricWrapper d.value) defs';
-              # Error on conflicting __functor defs (callable aspect factories).
-              # Two factories at the same path is ambiguous — can't be mechanically composed.
-              explicitFunctors = builtins.filter (
-                d: builtins.isAttrs (d.value or null) && (d.value or { }) ? __functor
-              ) nonParametrics;
-              _functorCheck =
-                if builtins.length explicitFunctors > 1 then
-                  throw "den: multiple __functor definitions at ${
-                    lib.concatStringsSep "." (map (x: if builtins.isString x then x else "<anon>") loc)
-                  } — merge is ambiguous. Use lib.mkForce to override."
-                else
-                  null;
+              # Must fire here as well as in mergeWithAspectMeta: the mixed branch
+              # coerces a functor-bearing attrset to { includes = [fn]; }, erasing
+              # __functor before the submodule merge could ever see the conflict.
+              _functorCheck = soleFunctor loc nonParametrics;
               hasFns = builtins.seq _functorCheck (builtins.any (d: lib.isFunction d.value) nonParametrics);
               hasNonFns = builtins.any (d: !lib.isFunction d.value) nonParametrics;
             in
@@ -742,6 +746,7 @@ in
     aspectKeyType
     providerType
     isParametricWrapper
+    isParametricContent
     isSubmoduleFn
     isMeaningfulName
     isSyntheticName
