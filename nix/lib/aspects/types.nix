@@ -26,12 +26,15 @@ let
   # args that is not a NixOS module function. Both sites that pull functions out
   # of a content wrapper (providerType.merge here, wrapChild in normalize.nix for
   # includes elements, which listOf hands over unprocessed) must agree on this.
+  # lib.functionArgs, not builtins: lib.isFunction admits functor-carrying
+  # attrsets, and every merged aspect carries __functor, so the builtin would
+  # throw on any aspect reaching here by alias.
   isParametricContent =
     cv:
     lib.isFunction cv.value
     && (
       let
-        args = builtins.functionArgs cv.value;
+        args = lib.functionArgs cv.value;
       in
       args != { } && !(args ? config) && !(args ? options)
     );
@@ -439,9 +442,16 @@ let
           keyName = lib.last loc;
           # Flatten: if a def value is already wrapped, expand its __contentValues
           # instead of nesting another layer.
+          #
+          # Except once wrapperToAspect has converted it: that keeps the wrapper
+          # whole and moves the parametric definitions into includes, so
+          # __contentValues no longer lists every definition. Expanding such a
+          # value would discard the aspect and the includes with it, leaving only
+          # the static half. A raw wrapper has no name and a converted one always
+          # does, which is what tells them apart.
           flatDefs = lib.concatMap (
             d:
-            if builtins.isAttrs d.value && d.value ? __contentValues then
+            if builtins.isAttrs d.value && d.value ? __contentValues && !(d.value ? name) then
               d.value.__contentValues
             else
               [ { inherit (d) value file; } ]

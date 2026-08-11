@@ -82,28 +82,91 @@
       }
     );
 
-    # CONTROL: a navigated child carries __provider but no __contentValues, and
-    # nothing may invent an empty one for it — an empty __contentValues
-    # re-flattens to no definitions at all, turning a loud failure into an empty
-    # result. Green on both sides of the fix; it pins the invariant rather than
-    # reproducing a specific break.
-    test-navigated-child-keeps-no-content-values = denTest (
-      { den, igloo, ... }:
+    # An annotated child three levels down carries __provider and no
+    # __contentValues of its own. Nothing may invent an empty one when it passes
+    # through providerType: rawHasCV pins that the child starts without one, so
+    # the test cannot pass by accident on a shallower shape whose middle name IS
+    # the nested key and therefore has one already.
+    test-annotated-child-gains-no-content-values = denTest (
+      { den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
-        den.aspects.mid._.net.nixos.boot.kernelParams = [ "net-param" ];
-
-        den.aspects.igloo.includes = [ den.aspects.mid._.net ];
+        den.aspects.libraries.services.network.cilium.nixos.boot.kernelParams = [ "s-cil" ];
+        den.aspects.mid._.net = den.aspects.libraries.services.network;
 
         expr = {
-          invented = den.aspects.mid._.net ? __contentValues;
-          applied = builtins.filter (p: p == "net-param") igloo.boot.kernelParams;
+          rawHasCV = den.aspects.libraries.services.network ? __contentValues;
+          hopHasCV = den.aspects.mid._.net ? __contentValues;
         };
         expected = {
-          invented = false;
-          applied = [ "net-param" ];
+          rawHasCV = false;
+          hopHasCV = false;
         };
+      }
+    );
+
+    # A mixed wrapper re-exported through a providerType hop and then assigned to
+    # a nested key. The flatten must not expand an already-converted aspect back
+    # into its definitions — doing so discards the includes the parametric half
+    # was moved into, keeping only the static side.
+    test-mixed-wrapper-reexport = denTest (
+      {
+        den,
+        lib,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        imports = [
+          {
+            den.aspects.libraries.alpha =
+              { host, ... }:
+              {
+                nixos.boot.kernelParams = [ "a=${host.hostName}" ];
+              };
+          }
+          {
+            den.aspects.libraries.alpha.nixos.boot.kernelParams = [ "s" ];
+          }
+        ];
+
+        den.aspects.mid._.thing = den.aspects.libraries.alpha;
+        den.aspects.consumer.child = den.aspects.mid._.thing;
+
+        den.aspects.igloo.includes = [ den.aspects.consumer.child ];
+
+        expr = builtins.sort (a: b: a < b) (
+          builtins.filter (p: lib.hasPrefix "a=" p || p == "s") igloo.boot.kernelParams
+        );
+        expected = [
+          "a=igloo"
+          "s"
+        ];
+      }
+    );
+
+    # Aliasing a merged aspect: every merged aspect carries __functor, so a
+    # functor-blind functionArgs throws on the alias.
+    test-alias-merged-aspect = denTest (
+      {
+        den,
+        lib,
+        igloo,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.base.nixos.boot.kernelParams = [ "s-base" ];
+        den.aspects.libraries.alias = den.aspects.base;
+
+        den.aspects.igloo.includes = [ den.aspects.libraries.alias ];
+
+        expr = builtins.filter (lib.hasPrefix "s-") igloo.boot.kernelParams;
+        expected = [ "s-base" ];
       }
     );
 
