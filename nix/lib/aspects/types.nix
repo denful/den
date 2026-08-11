@@ -156,23 +156,26 @@ let
       meta.loc = lib.mkForce loc;
     };
 
+  # A parametric function reaching aspectSubmodule.merge is evaluated as a NixOS
+  # module and fails on its own context argument, so every def list handed to the
+  # base type passes through here first.
+  coerceFnDefs = map (
+    d:
+    if lib.isFunction d.value && !isSubmoduleFn d.value then
+      d
+      // {
+        value = {
+          includes = [ d.value ];
+        };
+      }
+    else
+      d
+  );
+
   # Merge branch: mixed function + attrset defs — coerce parametric fns to includes.
   mergeMixed =
     baseType: loc: defs:
-    baseType.merge loc (
-      map (
-        d:
-        if lib.isFunction d.value && !isSubmoduleFn d.value then
-          d
-          // {
-            value = {
-              includes = [ d.value ];
-            };
-          }
-        else
-          d
-      ) defs
-    );
+    baseType.merge loc (coerceFnDefs defs);
 
   # Merge branch: all-function defs — submodule fns merge through aspectType,
   # bare parametric fns: single-def returns raw wrapper, multi-def coerces to includes.
@@ -241,18 +244,10 @@ let
           __functor = self: self.__fn;
         }
     else
-      # Multiple bare parametric fns: coerce each to { includes = [fn]; }, merge through aspectType.
-      baseType.merge loc (
-        map (
-          d:
-          d
-          // {
-            value = {
-              includes = [ d.value ];
-            };
-          }
-        ) paramFns
-      );
+      # Multiple bare parametric fns: coerce each to { includes = [fn]; }, merge
+      # through aspectType. paramFns is all-function by construction, so the
+      # mixed branch's coercion is the same operation here.
+      mergeMixed baseType loc paramFns;
 
   providerType =
     typeCfg:
@@ -373,7 +368,7 @@ let
                     };
                   }
                 ) parametrics
-                ++ nonParametrics
+                ++ coerceFnDefs nonParametrics
               )
           else
             let
