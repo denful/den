@@ -174,20 +174,31 @@ let
     };
 
   # A parametric function reaching aspectSubmodule.merge is evaluated as a NixOS
-  # module and fails on its own context argument, so every def list handed to the
-  # base type passes through here first.
-  coerceFnDefs = map (
-    d:
-    if lib.isFunction d.value && !isSubmoduleFn d.value then
-      d
-      // {
-        value = {
-          includes = [ d.value ];
-        };
-      }
-    else
-      d
-  );
+  # module and fails on its own context argument, so def lists handed to the base
+  # type pass through here first.
+  #
+  # The predicate is a parameter because the two callers have different domains.
+  # mergeMixed's caller has already split on lib.isFunction, so a functor-carrying
+  # attrset is on the function side by construction and must stay coerced. The
+  # parametric branch has made no such split: every merged aspect carries
+  # __functor, so lib.isFunction there would demote ordinary aspect-valued defs
+  # to includes. Only a bare lambda can reach the module system as a module.
+  coerceFnDefsWith =
+    isFn:
+    map (
+      d:
+      if isFn d.value && !isSubmoduleFn d.value then
+        d
+        // {
+          value = {
+            includes = [ d.value ];
+          };
+        }
+      else
+        d
+    );
+  coerceFnDefs = coerceFnDefsWith lib.isFunction;
+  coerceBareFnDefs = coerceFnDefsWith builtins.isFunction;
 
   # Merge branch: mixed function + attrset defs — coerce parametric fns to includes.
   mergeMixed =
@@ -308,36 +319,42 @@ let
               prov = v.__provider or [ ];
             in
             if prov != [ ] then lib.last prov else null;
-          # A content wrapper holds every definition of its key. Reducing it to
-          # one value drops the others with no diagnostic, so expand it into one
-          # def per parametric function plus one def carrying the static side.
-          # The dispatch below then recombines them through mergeMixed, which is
-          # what handles a fn/attrset mix at an unwrapped key.
-          expandContent =
+          # A content wrapper holds every definition of its key. Taking one value
+          # out of it drops the rest with no diagnostic, so keep the wrapper as a
+          # single def and move its parametric definitions into includes, where
+          # the pipeline resolves them — the same shape wrapChild produces for an
+          # includes element, which listOf hands over without reaching this merge.
+          #
+          # One def rather than one per definition: the wrapper is the only
+          # carrier of __provider, so splitting it leaves the parametric defs
+          # nameless. They then resolve to an anonymous per-inclusion identity,
+          # which defeats gate dedup and duplicates their content once per path.
+          wrapperToAspect =
             d:
             let
               parts = builtins.partition isParametricContent (d.value.__contentValues or [ ]);
               provName = nameFromProvider d.value;
-              # Preserve identity: inject name and provider chain from
-              # __provider so aspectSubmodule.merge produces a meaningful
-              # identity instead of an anonymous include index.
-              staticDef = d // {
-                value =
-                  d.value
-                  // {
-                    __contentValues = parts.wrong;
-                  }
-                  // lib.optionalAttrs (provName != null) {
-                    name = provName;
-                    meta.provider = lib.init d.value.__provider;
-                  };
-              };
             in
-            if parts.right == [ ] then
-              [ (if provName != null then staticDef else d) ]
-            else
-              map (cv: d // { value = cv.value; }) parts.right ++ lib.optional (parts.wrong != [ ]) staticDef;
-          defs' = lib.concatMap (d: if isContentWrapper d then expandContent d else [ d ]) defs;
+            d
+            // {
+              value =
+                d.value
+                # Only narrow what exists: a navigated child carries __provider
+                # with no __contentValues, and inventing an empty one here makes
+                # the wrapper re-flatten to nothing instead of failing loudly.
+                // lib.optionalAttrs (d.value ? __contentValues) { __contentValues = parts.wrong; }
+                // lib.optionalAttrs (parts.right != [ ]) {
+                  includes = (d.value.includes or [ ]) ++ map (cv: cv.value) parts.right;
+                }
+                # Preserve identity: inject name and provider chain from
+                # __provider so aspectSubmodule.merge produces a meaningful
+                # identity instead of an anonymous include index.
+                // lib.optionalAttrs (provName != null) {
+                  name = provName;
+                  meta.provider = lib.init d.value.__provider;
+                };
+            };
+          defs' = map (d: if isContentWrapper d then wrapperToAspect d else d) defs;
           listDefs = builtins.filter (d: builtins.isList d.value) defs';
           policyDefs = builtins.filter (d: builtins.isAttrs d.value && d.value.__isPolicy or false) defs';
         in
@@ -380,7 +397,7 @@ let
                     };
                   }
                 ) parametrics
-                ++ coerceFnDefs nonParametrics
+                ++ coerceBareFnDefs nonParametrics
               )
           else
             let

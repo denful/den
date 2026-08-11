@@ -1,11 +1,16 @@
 # User report (second claim): setting a quirk value in the SAME aspect that
-# consumes the quirk silently drops the value. Setting it from a different
-# aspect works.
+# consumes the quirk silently drops the value.
+#
+# That diagnosis does not hold — the three same-aspect cases below were already
+# green. The dropped value was the merge defect covered by
+# samename-mixed-merge-drop: the quirk sat in a static definition that a
+# parametric definition of the same name displaced. Kept as a regression guard
+# for both the misattribution and the real cause.
 { denTest, lib, ... }:
 {
   flake.tests.deadbugs.quirk-set-and-consume-same-aspect = {
 
-    # FAILING: producer and consumer are the same aspect.
+    # Producer and consumer are the same aspect.
     test-same-aspect-set-and-consume = denTest (
       { den, igloo, ... }:
       {
