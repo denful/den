@@ -292,41 +292,45 @@ let
               prov = v.__provider or [ ];
             in
             if prov != [ ] then lib.last prov else null;
-          unwrapContent =
+          isParametricContent =
+            cv:
+            lib.isFunction cv.value
+            && (
+              let
+                args = builtins.functionArgs cv.value;
+              in
+              args != { } && !(args ? config) && !(args ? options)
+            );
+          # A content wrapper holds every definition of its key. Reducing it to
+          # one value drops the others with no diagnostic, so expand it into one
+          # def per parametric function plus one def carrying the static side.
+          # The dispatch below then recombines them through mergeMixed, which is
+          # what handles a fn/attrset mix at an unwrapped key.
+          expandContent =
             d:
             let
-              fns =
-                if d.value ? __contentValues then
-                  builtins.filter (
-                    cv:
-                    lib.isFunction cv.value
-                    && (
-                      let
-                        args = builtins.functionArgs cv.value;
-                      in
-                      args != { } && !(args ? config) && !(args ? options)
-                    )
-                  ) d.value.__contentValues
-                else
-                  [ ];
+              parts = builtins.partition isParametricContent (d.value.__contentValues or [ ]);
               provName = nameFromProvider d.value;
-            in
-            if builtins.length fns == 1 then
-              d // { value = (builtins.head fns).value; }
-            else if provName != null then
               # Preserve identity: inject name and provider chain from
               # __provider so aspectSubmodule.merge produces a meaningful
               # identity instead of an anonymous include index.
-              d
-              // {
-                value = d.value // {
-                  name = provName;
-                  meta.provider = lib.init d.value.__provider;
-                };
-              }
+              staticDef = d // {
+                value =
+                  d.value
+                  // {
+                    __contentValues = parts.wrong;
+                  }
+                  // lib.optionalAttrs (provName != null) {
+                    name = provName;
+                    meta.provider = lib.init d.value.__provider;
+                  };
+              };
+            in
+            if parts.right == [ ] then
+              [ (if provName != null then staticDef else d) ]
             else
-              d;
-          defs' = map (d: if isContentWrapper d then unwrapContent d else d) defs;
+              map (cv: d // { value = cv.value; }) parts.right ++ lib.optional (parts.wrong != [ ]) staticDef;
+          defs' = lib.concatMap (d: if isContentWrapper d then expandContent d else [ d ]) defs;
           listDefs = builtins.filter (d: builtins.isList d.value) defs';
           policyDefs = builtins.filter (d: builtins.isAttrs d.value && d.value.__isPolicy or false) defs';
         in
