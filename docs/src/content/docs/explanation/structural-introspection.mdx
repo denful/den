@@ -31,13 +31,23 @@ Every entity (host, user, home — and any custom schema kind) carries a
 readOnly `hasAspect` functor computed from its resolved aspect tree:
 
 ```nix
-host.hasAspect den.aspects.zfs-root        # bool — primary class
+host.hasAspect den.aspects.zfs-root        # bool — asks at the primary class
 host.hasAspect.forClass "nixos" den.aspects.zfs-root
-host.hasAspect.forAnyClass den.aspects.zfs-root   # union across the entity's classes
+host.hasAspect.forAnyClass den.aspects.zfs-root   # union over the entity's classes
 ```
 
 The reference is any aspect you can point at: `den.aspects.foo`,
 `den.aspects.foo.provides.bar`, a namespace aspect, …
+
+**All three agree for any class the entity declares.** Membership is
+*structural*, and the resolved tree is the same whichever class it is
+resolved at — a class decides what an aspect *emits*, never whether it is
+*in* the tree. The variants differ only in the class they ask at:
+`hasAspect` uses the primary class (the head of the entity's `classes` —
+`nixos` for a Linux host, `darwin` for a darwin one), `forClass` uses the
+class you name and answers `false` for one the entity does not declare, and
+`forAnyClass` unions over the declared classes. Prefer the bare functor; reach for the other two only when
+the class is the point of the question.
 
 ### Where you may call it
 
@@ -101,6 +111,10 @@ operate *on* the tree rather than reading *from inside* it.
 
 ### What "present" means
 
+*Present* is exactly what the boolean above reports: `hasAspect ref` is
+`true` when `ref` is in the entity's resolved tree, and `false` — *absent* —
+when it is not. Two rules decide which:
+
 - **Scoped to the entity** — membership covers the entity's own resolved
   tree: its scope and all descendants (for a host, the host scope plus its
   user scopes). A sibling host that included the aspect does *not* leak in,
@@ -113,9 +127,10 @@ operate *on* the tree rather than reading *from inside* it.
 ## Reading the tree: `entity.aspects`
 
 Alongside the boolean functor, every entity exposes `aspects` — a flat list
-of **all resolved aspect nodes** (every depth) for its primary class. The
-entity root itself and excluded/tombstoned aspects are not listed; anonymous
-aspects are. Each node keeps its `.name`, `.meta`, and `.includes` (its
+of **all resolved aspect nodes** (every depth), taken at its primary class —
+the same class-invariant tree `hasAspect` reads, so no class carries a
+different list. The entity root itself and excluded/tombstoned aspects are
+not listed; anonymous aspects are. Each node keeps its `.name`, `.meta`, and `.includes` (its
 resolved subtree), and adds identity accessors:
 
 | Field | Meaning |
@@ -138,9 +153,9 @@ den.aspects.report =
 (`aspects` lives on the *entity*, so reach it through the entity arg —
 `host.aspects`, `user.aspects`, `home.aspects` — not through `config`.)
 
-The entity's `hasAspect` record also carries `aspectsForClass` and
-`allAspects` (union across classes) when you need them via the lib-level
-constructors below.
+The entity's `hasAspect` record also carries the per-class and union
+counterparts, `aspectsForClass` and `allAspects`, for the same reasons you
+would reach for `forClass` / `forAnyClass` above.
 
 ## Writing structure: `meta.handleWith`
 
@@ -152,12 +167,19 @@ constructed via `den.lib.aspects.fx.constraints`:
 den.aspects.secrets-bundle = {
   includes = [
     den.aspects.agenix-rekey
-    den.aspects.sops-nix
+    den.aspects.workstation-role # pulls in sops-nix somewhere below
   ];
-  # Prefer agenix: drop sops-nix from this subtree whenever both are present.
+  # Prefer agenix: sops-nix never resolves under this bundle, whoever pulls it in.
   meta.handleWith = den.lib.aspects.fx.constraints.exclude den.aspects.sops-nix;
 };
 ```
+
+A constraint is unconditional — it is not a rule that fires when some other
+aspect turns out to be present. Registering it tombstones `ref` throughout
+the registering aspect's subtree, which is what makes it useful against
+aspects you never named yourself: `secrets-bundle` cannot see what
+`workstation-role` includes, but it can state that sops-nix is not welcome
+below it.
 
 ### `exclude ref`
 
