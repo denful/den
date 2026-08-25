@@ -32,6 +32,33 @@ module with `imports`. Runs the full pipeline including entity instantiation.
 Use for nested resolution where only class imports are needed, such as
 extracting `homeManager` modules from a host's aspect tree.
 
+### `den.lib.aspects.resolveWithPaths class aspect`
+
+**Internal.** Like `resolve`, but one pipeline run returns the full resolve
+record: `imports` plus the per-scope path set (`pathSetByScope`),
+`scopeContexts`, and the delivery-edge trace (`edgeTrace`). Entity
+`mainModule`/`__pathSetByScope` read it, so the pipeline runs exactly once
+per entity.
+
+### `den.lib.aspects.resolveWithState class aspect`
+
+**Internal.** Like `resolve`, but returns the raw fx-handle result
+`{ value, state }`, where `state` carries the trace `entries`, `ctxTrace`,
+and per-scope path sets -- used by
+[`den.lib.capture`](/reference/diag/).
+
+### Structural introspection helpers
+
+`den.lib.aspects` also exposes the building blocks behind
+[entity `hasAspect`](/explanation/structural-introspection/):
+
+- `hasAspectIn { tree, class, ref }` -- membership check over a resolved tree
+- `collectPathSet { tree, class }` -- the raw identity-key path set
+- `mkEntityHasAspect { tree, primaryClass, classes }` -- the full
+  hasAspect/aspects record (what entities get automatically)
+- `mkProjectedHasAspect { pathSetByScope, key }` -- pure lookup over an
+  already-computed path set (no pipeline run)
+
 ## `den.lib.resolveEntity name ctx`
 
 <Aside title="Source" icon="github">
@@ -56,8 +83,23 @@ scope is established. The record carries `name`, `meta`, `includes`, `excludes`,
 den.lib.aspects.resolve "flake" (den.lib.resolveEntity "flake" { });
 ```
 
-This is the public resolver used by [`den.hosts`/`den.homes`](/reference/options/)
+This is the public resolver used by [`den.hosts`/`den.homes`](/reference/schema/)
 (`config.resolved`) and by the flake outputs.
+
+## `den.lib.home-env`
+
+Factory helpers behind the home-environment batteries (`home-manager`, `hjem`,
+`maid`). Used to build a custom home-environment integration:
+
+- `makeHomeEnv { className, ctxName?, supportedOses?, optionPath, getModule, forwardPathFn, schemaIncludes? }` --
+  the full integration: host-scope detect policy, user-scope detect policy,
+  and the per-user forward. Returns `{ battery, userDetect, hostConf }`
+  (`hostConf` declares the `host.<optionPath>.enable` / `.module` options).
+- `mkDetectHost { className, supportedOses?, optionPath }` / `mkIntoClassUsers className` --
+  the individual predicates/compositions.
+
+See [Home Environments](/guides/home-manager/) for the batteries built on
+these.
 
 ## `den.lib.policy`
 

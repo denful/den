@@ -270,6 +270,13 @@ den.aspects.foo =
   }
 ```
 
+Beyond freeform metadata, `meta` carries pipeline-meaningful fields —
+`handleWith` (constraints: exclude/substitute/filter aspects in the
+subtree), `collisionPolicy` (flat-form class modules), and
+`guard`/`aspects` (conditional aspects). See
+[Structural Introspection & Constraints](/explanation/structural-introspection/)
+and the [aspects reference](/reference/aspects/#metahandlewith).
+
 ## Aspect Custom Submodule
 
 In case an aspect needs a custom submodule, it can be added this way:

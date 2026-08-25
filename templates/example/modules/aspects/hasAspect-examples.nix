@@ -1,4 +1,4 @@
-# Worked examples for `host.hasAspect` and `oneOfAspects`.
+# Worked examples for `host.hasAspect` and `meta.handleWith` constraints.
 #
 # Two complementary tools for two different jobs:
 #
@@ -7,10 +7,10 @@
 #     Cycle-safe because the body runs at evalModules time, long after
 #     the aspect tree has been resolved and frozen.
 #
-#   - `oneOfAspects` (and friends in `nix/lib/aspects/adapters.nix`)
-#     WRITE structure at adapter time with full structural visibility.
-#     The right tool for "prefer A over B when both are present" and
-#     other tree-shape decisions.
+#   - `meta.handleWith` with `den.lib.aspects.fx.constraints`
+#     (exclude / substitute / filterBy) WRITEs structure at resolve time
+#     with full structural visibility. The right tool for "prefer A over
+#     B when both are present" and other tree-shape decisions.
 #
 # These illustrative aspects are all `example-` prefixed to make it
 # clear they are pedagogical stubs and to avoid colliding with any
@@ -130,8 +130,8 @@
   # See `nix/lib/aspects/fx/constraints.nix` for available constraints:
   #
   #   - `exclude <ref>`              tombstone a specific aspect by reference
-  #   - `substitute <a> <b>`         swap one aspect for another
-  #   - `filter` / `filterIncludes`  custom filtering primitives
+  #   - `substitute <ref> <aspect>`  swap one aspect for another
+  #   - `filterBy <pred>`            custom predicate filtering
   #
   # These run during the tree walk with full structural visibility and
   # operate ON the tree rather than FROM INSIDE it, so they can't

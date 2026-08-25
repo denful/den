@@ -183,6 +183,20 @@ den.default.includes = [ den.batteries.self' ];
 
 Requires flake-parts. Works in host, user, and home contexts.
 
+### `den.batteries.flake-scope`
+
+Exposes `lib`, `inputs`, and `den` to aspect pipeline functions — the
+generic, non-flake-parts counterpart of `inputs'`/`self'`. No flake-parts
+required. Values are tagged so class-module-native values win silently on
+collision:
+
+```nix
+den.default.includes = [ den.batteries.flake-scope ];
+
+# now usable in parametric aspects
+den.aspects.my-aspect = { host, inputs, lib, ... }: { ... };
+```
+
 ## Usage Patterns
 
 ### Global Batteries

@@ -131,6 +131,43 @@ den.aspects.alice.container = {
 };
 ```
 
+## Class Schema Fields
+
+Every entry in `den.classes.<name>` is a small schema, not just a marker:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `description` | `str` | -- | Human-readable description of the class domain |
+| `forwardTo` | `nullOr { class; path? }` | `null` | Default routing target for the `forward` battery: when a forward omits `intoClass`/`intoPath`, the class's `forwardTo.class` and `forwardTo.path` are used instead |
+| `parentPath` | `nullOr (name -> path)` | `null` | For classes whose members nest inside an enclosing config owner (e.g. home-manager inside a host): a function `name -> attrpath` locating a named member within that owner's config -- the same route the class's content is delivered to. `null` for root classes that own a top-level config (`nixos`, `darwin`, …) |
+| `parentArg` | `nullOr str` | `null` | For nested classes, the module argument by which a member reaches the enclosing config owner (home-manager exposes the host config as `osConfig`). `null` for root classes |
+
+`forwardTo` lets a class declare its destination once, so forwards only name
+the source:
+
+```nix
+den.classes.custom = {
+  description = "Custom class with forwardTo";
+  forwardTo = { class = "nixos"; path = [ ]; };
+};
+
+# no intoClass / intoPath needed:
+den.batteries.forward {
+  each = lib.singleton true;
+  fromClass = _: "custom";
+  fromAspect = _: myAspect;
+};
+```
+
+`parentPath`/`parentArg` are what make **nested** classes work -- the pipe
+layer uses them to resolve a producer's config at its producing class +
+scope. Den's own `homeManager` class registers both:
+
+```nix
+den.classes.homeManager.parentPath = userName: [ "home-manager" "users" userName ];
+den.classes.homeManager.parentArg = "osConfig";
+```
+
 ## Advanced: Guards and Adapters
 
 `forward` supports optional parameters for complex scenarios:

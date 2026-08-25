@@ -278,6 +278,57 @@ pipe.from "http-backends" [
 ]
 ```
 
+### Fleet-wide: `pipe.broadcast`
+
+Push a scope's own pipe value to **every other scope** matching a predicate —
+in one stage, in any direction (user→user, user→host, host→user, fleet-wide).
+The push dual of `pipe.expose`: instead of one parent receiving, every matching
+scope receives.
+
+A common shape: every user publishes a device record, and every user's home
+sees the whole fleet's roster:
+
+```nix
+den.hosts.x86_64-linux.igloo.users.tux = {};
+den.hosts.x86_64-linux.iceberg.users.alice = {};
+
+# Both users get a home-manager home (see the Home Manager guide):
+den.schema.user.classes = lib.mkDefault [ "homeManager" ];
+
+den.quirks.peer-dev = {
+  description = "per-user device records";
+};
+
+den.aspects.tux = {
+  peer-dev = [ { who = "tux@igloo"; } ];
+  homeManager = { peer-dev, lib, ... }: {
+    home.sessionVariables.PEERS =
+      lib.concatStringsSep "," (map (p: p.who) peer-dev);
+  };
+};
+den.aspects.alice = {
+  peer-dev = [ { who = "alice@iceberg"; } ];
+  homeManager = { peer-dev, lib, ... }: {
+    home.sessionVariables.PEERS =
+      lib.concatStringsSep "," (map (p: p.who) peer-dev);
+  };
+};
+
+# Every user scope broadcasts its own peer-dev to all other user scopes.
+den.policies.broadcast-peers = { host, user, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "peer-dev" [ (pipe.broadcast ({ user, ... }: true)) ]) ];
+
+den.schema.user.includes = [ den.policies.broadcast-peers ];
+```
+
+`PEERS` on both tux's and alice's homes now lists **both** users — each scope
+sees its own emits plus everything broadcast to it. Transform stages before
+`pipe.broadcast` apply to the value as it leaves; config-dependent thunks are
+resolved against the *source* host's config when they cross hosts. Note the
+asymmetry: a broadcaster pushes its own raw emits only — data exposed *up* into
+it (e.g. a host broadcaster's users' `pipe.expose` data) does not ride along.
+
 ## Targeted delivery with `pipe.to`
 
 Route pipe data to specific aspects by identity:
