@@ -237,6 +237,32 @@ den.aspects.laptop.includes = [
 [`modules/aspects/batteries/import-tree.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/import-tree.nix)
 </Aside>
 
+### `den.batteries.flake-scope`
+
+Exposes `lib`, `inputs`, and `den` to aspect pipeline functions -- the
+generic (non-flake-parts) counterpart of `inputs'`/`self'`. A parametric
+aspect can then destructure these alongside entity args:
+
+```nix
+den.default.includes = [ den.batteries.flake-scope ];
+
+den.aspects.my-aspect = { host, inputs, lib, ... }: {
+  nixos = { pkgs, ... }: {
+    environment.etc."version".text = inputs.nixpkgs.lib.version;
+  };
+};
+```
+
+Values are tagged `pipelineOnly` (class-wins collision policy), so
+class-module-native values (e.g. NixOS's own `lib` from `_module.args`)
+win silently over the flake-scope ones.
+
+**Opt-in.**
+
+<Aside title="Source" icon="github">
+[`modules/aspects/batteries/flake-scope.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/flake-scope.nix)
+</Aside>
+
 ---
 
 ## Home Environments

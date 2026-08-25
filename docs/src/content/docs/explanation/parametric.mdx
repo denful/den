@@ -112,6 +112,28 @@ context drives the *entire aspect* (which classes to include, what includes to
 add). Use class-level injection when only a specific class module needs
 entity data alongside module-system args.
 
+<Aside type="note" title="Class modules that name a descendant kind">
+A **static** aspect (plain attrset) whose class module names a *descendant*
+entity kind of the emitting scope gets the same treatment as the aspect-level
+form: the pipeline promotes it to parametric and fans it out per descendant.
+
+```nix
+# Included at HOST scope — `user` is a descendant of `host` in the entity
+# schema, so this static aspect is promoted and fanned out per user,
+# exactly like the aspect-level { user, ... }: form.
+den.aspects.desktop = {
+  nixos = { user, ... }: {
+    services.xdg.portal.extraPortals = [ "${user.userName}-portal" ];
+  };
+};
+```
+
+This keeps the two forms equivalent: a class module that needs a descendant
+kind never silently drops its content. (A same-kind arg like `host` in a
+host-scope class module is not a descendant — it binds statically from the
+scope via class-level injection, per [Class Modules](/explanation/class-modules/).)
+</Aside>
+
 <Aside type="caution" title="Avoid anonymous functions in includes">
 Use named aspects instead of inline anonymous functions. Named aspects produce
 better error traces and are easier to debug with the [diagram library](/explanation/diagrams/).

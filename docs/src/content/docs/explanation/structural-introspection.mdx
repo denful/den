@@ -1,0 +1,234 @@
+---
+title: Structural Introspection & Constraints
+description: Reading and writing the aspect tree structure — entity.hasAspect, entity.aspects, and meta.handleWith constraints.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+[`modules/context/has-aspect.nix`](https://github.com/denful/den/blob/main/modules/context/has-aspect.nix) ·
+[`nix/lib/aspects/has-aspect.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/has-aspect.nix) ·
+[`nix/lib/aspects/fx/constraints.nix`](https://github.com/denful/den/blob/main/nix/lib/aspects/fx/constraints.nix)
+</Aside>
+
+Sometimes a piece of configuration depends on *what else is in the aspect
+tree* — "use the zfs flavor of impermanence when `zfs-root` is present,
+otherwise the btrfs flavor". Den splits that need into two complementary
+tools:
+
+- **Reading structure** — `entity.hasAspect` and `entity.aspects` let a
+  class module ask "is aspect X in this entity's tree?"
+- **Writing structure** — `meta.handleWith` with constraint records lets an
+  aspect decide "aspect Y should not be in my subtree (or should be
+  replaced by Z)"
+
+The two live at different points in evaluation, and that difference is what
+makes them safe.
+
+## Reading structure: `entity.hasAspect`
+
+Every entity (host, user, home — and any custom schema kind) carries a
+readOnly `hasAspect` functor computed from its resolved aspect tree:
+
+```nix
+host.hasAspect den.aspects.zfs-root        # bool — asks at the primary class
+host.hasAspect.forClass "nixos" den.aspects.zfs-root
+host.hasAspect.forAnyClass den.aspects.zfs-root   # union over the entity's classes
+```
+
+The reference is any aspect you can point at: `den.aspects.foo`,
+`den.aspects.foo.provides.bar`, a namespace aspect, …
+
+**All three agree for any class the entity declares.** Membership is
+*structural*, and the resolved tree is the same whichever class it is
+resolved at — a class decides what an aspect *emits*, never whether it is
+*in* the tree. The variants differ only in the class they ask at:
+`hasAspect` uses the primary class (the head of the entity's `classes` —
+`nixos` for a Linux host, `darwin` for a darwin one), `forClass` uses the
+class you name and answers `false` for one the entity does not declare, and
+`forAnyClass` unions over the declared classes. Prefer the bare functor; reach for the other two only when
+the class is the point of the question.
+
+### Where you may call it
+
+**Safe — inside class module bodies.** The `nixos`/`homeManager`/… module
+bodies run during `evalModules`, long after the aspect tree has been resolved
+and frozen:
+
+```nix
+den.aspects.impermanence =
+  { host, ... }:
+  {
+    nixos =
+      { lib, ... }:
+      lib.mkMerge [
+        (lib.mkIf (host.hasAspect den.aspects.zfs-root) {
+          # zfs-flavored impermanence wiring
+        })
+        (lib.mkIf (host.hasAspect den.aspects.btrfs-root) {
+          # btrfs-flavored impermanence wiring
+        })
+      ];
+  };
+```
+
+This is cycle-safe: the body reads a frozen tree; nothing in the tree reads
+the body.
+
+**Safe — in policy guards.** `den.lib.policy.when` over an *inline aspect*
+compiles a [conditional aspect](/reference/aspects/#metaguard--metaaspects--conditional-aspects) whose
+guard gets the same scoped, structural `hasAspect`:
+
+```nix
+den.aspects.igloo.includes = [
+  (den.lib.policy.when ({ host, ... }: host.hasAspect den.aspects.git) {
+    nixos.environment.variables.GIT_ENABLED = "true";
+  })
+];
+```
+
+<Aside type="caution" title="Never in `includes`">
+Do **not** use `hasAspect` to decide an aspect's `includes` list:
+
+```nix
+# BROKEN — infinite recursion at evaluation
+den.aspects.broken =
+  { host, ... }:
+  {
+    includes =
+      if host.hasAspect den.aspects.zfs-root
+      then [ den.aspects.zfs-impermanence ]
+      else [ den.aspects.btrfs-impermanence ];
+  };
+```
+
+The tree depends on every aspect's `includes`; `includes` depending on the
+tree is a back-edge with no fixed point. If the decision is *structural*
+(which aspects belong in the tree), use [constraints](#writing-structure-metahandlewith)
+instead — they run during the walk, with full structural visibility, and
+operate *on* the tree rather than reading *from inside* it.
+</Aside>
+
+### What "present" means
+
+*Present* is exactly what the boolean above reports: `hasAspect ref` is
+`true` when `ref` is in the entity's resolved tree, and `false` — *absent* —
+when it is not. Two rules decide which:
+
+- **Scoped to the entity** — membership covers the entity's own resolved
+  tree: its scope and all descendants (for a host, the host scope plus its
+  user scopes). A sibling host that included the aspect does *not* leak in,
+  regardless of evaluation order. (The guard-level `hasAspect` in
+  [conditional aspects](/reference/aspects/#metaguard--metaaspects--conditional-aspects)
+  is scoped to the current pipeline scope plus its ancestors.)
+- **Exclude-aware** — an aspect excluded from the entity's scope (via
+  `excludes` or a constraint) reads as *absent*.
+
+## Reading the tree: `entity.aspects`
+
+Alongside the boolean functor, every entity exposes `aspects` — a flat list
+of **all resolved aspect nodes** (every depth), taken at its primary class —
+the same class-invariant tree `hasAspect` reads, so no class carries a
+different list. The entity root itself and excluded/tombstoned aspects are
+not listed; anonymous aspects are. Each node keeps its `.name`, `.meta`, and `.includes` (its
+resolved subtree), and adds identity accessors:
+
+| Field | Meaning |
+|---|---|
+| `.identity` | Base fully-qualified name, ctx-stripped — e.g. `"roles/workstation"` |
+| `.identityKey` | Full unique key incl. `{ctxId}` — distinguishes anonymous instances |
+| `.isNamed` | `false` for anonymous/synthetic aspects (filter on this) |
+
+```nix
+den.aspects.report =
+  { host, ... }:
+  {
+    nixos = {
+      environment.etc."aspect-inventory".text =
+        lib.concatMapStringsSep "\n" (n: n.identity) host.aspects;
+    };
+  };
+```
+
+(`aspects` lives on the *entity*, so reach it through the entity arg —
+`host.aspects`, `user.aspects`, `home.aspects` — not through `config`.)
+
+The entity's `hasAspect` record also carries the per-class and union
+counterparts, `aspectsForClass` and `allAspects`, for the same reasons you
+would reach for `forClass` / `forAnyClass` above.
+
+## Writing structure: `meta.handleWith`
+
+`meta.handleWith` on an aspect takes a constraint handler record (or a list
+of them) and registers it for the aspect's subtree. Constraints are
+constructed via `den.lib.aspects.fx.constraints`:
+
+```nix
+den.aspects.secrets-bundle = {
+  includes = [
+    den.aspects.agenix-rekey
+    den.aspects.workstation-role # pulls in sops-nix somewhere below
+  ];
+  # Prefer agenix: sops-nix never resolves under this bundle, whoever pulls it in.
+  meta.handleWith = den.lib.aspects.fx.constraints.exclude den.aspects.sops-nix;
+};
+```
+
+A constraint is unconditional — it is not a rule that fires when some other
+aspect turns out to be present. Registering it tombstones `ref` throughout
+the registering aspect's subtree, which is what makes it useful against
+aspects you never named yourself: `secrets-bundle` cannot see what
+`workstation-role` includes, but it can state that sops-nix is not welcome
+below it.
+
+### `exclude ref`
+
+Tombstones `ref` — it contributes no modules, and its exclusion is visible
+to `hasAspect` queries (they return `false`) and to traces/diagrams.
+
+### `substitute ref replacement`
+
+Tombstones `ref` **and resolves `replacement` in its place** at the same
+position. The tombstone records `replacedBy` for tracing.
+
+### `filterBy predicate`
+
+Keeps/drops each aspect in scope by predicate. The predicate receives the
+aspect attrset (with `.name`, `.meta`, `.includes`, …) and returns a bool.
+
+### Scope: `subtree` (default) vs `.global`
+
+Every constructor has a `.global` variant:
+
+```nix
+den.lib.aspects.fx.constraints.exclude den.aspects.sops-nix        # subtree
+den.lib.aspects.fx.constraints.exclude.global den.aspects.sops-nix # global
+```
+
+- **`subtree`** (default) — the constraint applies within the including
+  aspect's own include chain. Two siblings including different aspects are
+  unaffected by each other's constraints.
+- **`global`** — the constraint applies fleet-wide, in every scope.
+
+`excludes` (the structural key) is the same mechanism in shorthand: each
+excluded ref registers a `subtree`-scoped exclude — and it works on policies
+by name as well as aspects.
+
+## Lib-level building blocks
+
+`den.lib.aspects` exposes the pieces the entity options are built from, for
+custom pipelines and tooling (see the [lib reference](/reference/lib/#structural-introspection-helpers)):
+
+- `hasAspectIn { tree, class, ref }` — membership over a resolved tree
+- `collectPathSet { tree, class }` — the raw identity-key path set
+- `mkEntityHasAspect { tree, primaryClass, classes }` — the full
+  `hasAspect`/`aspects` record
+- `mkProjectedHasAspect { pathSetByScope, key }` — pure lookup over an
+  already-computed path set (no pipeline run)
+
+## See also
+
+- [Aspects](/reference/aspects/) — structural keys, `meta`, conditional aspects
+- [Policies](/reference/policies/) — `include`/`exclude` effects and the `when`/`for` combinators
+- [Class Modules](/explanation/class-modules/) — where `hasAspect` is safely readable
+- [Diagrams](/reference/diag/) — excluded/tombstoned aspects are visible in captures

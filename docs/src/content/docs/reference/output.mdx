@@ -87,6 +87,20 @@ den.hosts.x86_64-linux.myhost = {
 };
 ```
 
+## `den.systems`
+
+The list of systems the flake walks. Drives the `flake-to-systems` policy --
+one `flake-system` scope per entry, which fans out to that system's hosts
+and homes.
+
+**Type:** `listOf str` · **Default:** the union of the system keys of
+`den.hosts` and `den.homes`; if you declare neither, `lib.systems.flakeExposed`.
+
+```nix
+# Explicit -- e.g. to pin the system set or add a system with no hosts yet:
+den.systems = [ "x86_64-linux" ];
+```
+
 ## Flake outputs like `packages`, `checks`, etc.
 
 Den aspects can directly contribute to `packages` and similar flake outputs.

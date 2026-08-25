@@ -313,3 +313,17 @@ Returns `{ entries, pathsByClass, ctxTrace }` -- entries plus per-class path set
 ### `captureWithPathsWith { classes, root, extraHandlers? }`
 
 Extended form accepting additional trace handlers.
+
+### `captureFleet { class?, extraHandlers? }`
+
+Fleet-level capture: runs the **entire** flake scope tree (flake → fleet →
+host → user) from the flake root, not a single entity. Returns the trace
+entries **plus** post-pipeline scope state for pipe-flow analysis:
+
+```nix
+{ entries, ctxTrace, scopeParent, scopeContexts, scopeEntityKind,
+  scopedPipeEffects, scopedClassImports, pipeProducers, pipeConsumers }
+```
+
+`class` defaults to `"nixos"`. Use this for fleet-wide pipe views (who
+produces what, who consumes it) rather than per-host captures.

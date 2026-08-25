@@ -159,6 +159,15 @@ den.schema.host.includes = [
 ];
 ```
 
+<Aside type="note" title="`when` over inline aspects is different">
+`when` applied to an **inline aspect** (not a registered policy) does not
+gate policy dispatch — it compiles the aspect into a **conditional aspect**
+(`meta.guard`) whose guard is evaluated against the in-flight tree with a
+structural, exclude-aware `hasAspect`. That is what makes predicates like
+`host.hasAspect den.aspects.git` safe to write. See
+[Conditional aspects](/reference/aspects/#metaguard--metaaspects--conditional-aspects).
+</Aside>
+
 This page covers the *concept*. For the full activation model — the
 registry/value distinction, cascading across scopes, authoritative
 exclude semantics, the `for`/`when` combinators, and the dispatch
