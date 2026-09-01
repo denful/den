@@ -100,6 +100,7 @@ jobs:
       - uses: cachix/install-nix-action@v31
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: actions/checkout@v6
+      - run: grep -qF '# den.outPath' templates/noflake/default.nix
       - run: sed -i 's@# den.outPath@den.outPath@' templates/noflake/default.nix
       - run: |
           cat <<-EOF > templates/noflake/modules/ci-runtime.nix

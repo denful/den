@@ -9,9 +9,9 @@
       },
       "branch": "main",
       "submodules": false,
-      "revision": "fba67817bd16955e10ff158c9758874031af089c",
-      "url": "https://github.com/denful/den/archive/fba67817bd16955e10ff158c9758874031af089c.tar.gz",
-      "hash": "sha256-eo2Snm2hoYAq8MA7bfjnn8p36riLcpJDA74Fzx9gcsY="
+      "revision": "e8e8de1e32646456cfc613f152175a7a548508ec",
+      "url": "https://github.com/denful/den/archive/e8e8de1e32646456cfc613f152175a7a548508ec.tar.gz",
+      "hash": "sha256-gp7Q7rMEjsqAyW4Uwz+sms8j+XegD5P/lzRCuMW2fNI="
     },
     "hjem": {
       "type": "Git",
@@ -65,11 +65,11 @@
         "owner": "feel-co",
         "repo": "smfh"
       },
-      "branch": "master",
+      "branch": "main",
       "submodules": false,
-      "revision": "dcc9937332ad77426fa2e8d6c5d8fed037689c69",
-      "url": "https://github.com/feel-co/smfh/archive/dcc9937332ad77426fa2e8d6c5d8fed037689c69.tar.gz",
-      "hash": "sha256-s75rkkrfle2g0/DTE0XaU9q+yTvrQHTQSrhMEPLGkIc="
+      "revision": "d4636e2adbfff58f0e2cc25e795d9844e7208f65",
+      "url": "https://github.com/feel-co/smfh/archive/d4636e2adbfff58f0e2cc25e795d9844e7208f65.tar.gz",
+      "hash": "sha256-+Gw0vFNMq8xLNyAiVOAIokFSMAoMpTcBcgq65EgRRW4="
     },
     "with-inputs": {
       "type": "Git",

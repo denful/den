@@ -16,10 +16,10 @@ This template provides runnable apps for each host/home (see modules/nh.nix)
 
 ```shell
 # default action is `build`
-nix-run . -A den.sh --run igloo
+nix-shell -A den.sh --run igloo
 
 # you can specify any other action like `switch`, `repl`, `build`, `--help`
-nix-run . -A den.sh --run 'igloo build'
+nix-shell -A den.sh --run 'igloo build'
 ```
 
 or

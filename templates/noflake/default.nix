@@ -1,8 +1,9 @@
 let
   sources = import ./npins;
   with-inputs = import sources.with-inputs sources {
-    # uncomment for local checkout on CI
-    den.outPath = ./../..;
+    # Uncomment for local checkout on CI.
+    # Do NOT commit this line uncommented, or it will break the template for new users.
+    # den.outPath = ./../..;
   };
 
   outputs =

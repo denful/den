@@ -48,8 +48,9 @@ modules/
 let
   sources = import ./npins;
   with-inputs = import sources.with-inputs sources {
-    # uncomment for local checkout on CI
-    den.outPath = ./../..;
+    # Uncomment for local checkout on CI.
+    # Do NOT commit this line uncommented, or it will break the template for new users.
+    # den.outPath = ./../..;
   };
 
   outputs =
@@ -163,10 +164,10 @@ The template exposes runnable apps under `den.sh` (one per host/home). The defau
 
 ```console
 # build the igloo host
-nix-run . -A den.sh --run igloo
+nix-shell -A den.sh --run igloo
 
 # or pass any nh action: switch, repl, build, --help
-nix-run . -A den.sh --run 'igloo build'
+nix-shell -A den.sh --run 'igloo build'
 ```
 
 You can also build with plain `nixos-rebuild` or `nix-build`:
