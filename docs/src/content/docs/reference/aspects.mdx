@@ -68,13 +68,28 @@ registered class), *nested aspect keys*, or one of these structural keys:
 | `excludes` | `listOf unspecified` | Aspects or policies excluded from this subtree |
 | `provides` / `_` | submodule | Sub-aspect namespace (`_` is an alias for `provides`) |
 | `policies` | policy registry | Named policy functions, activated by placing in `includes` |
-| `meta` | submodule | Attached metadata (`handleWith`, `provider`, `collisionPolicy`) |
+| `meta` | submodule | Attached metadata (`handleWith`, `provider`, `collisionPolicy`; `guard`/`aspects` for conditional aspects) |
 | `classes` | `lazyAttrsOf raw` | Class schemas declared by this aspect, merged into `den.classes` |
 | `name` / `description` | `str` | Aspect name and description |
 
 The pipeline also attaches internal `__`-prefixed fields (e.g. `__args` on
 parametric aspects, `__functor` to make merged aspects callable). These are
 implementation details, not authoring surface.
+
+### Reserved keys
+
+Keys on an aspect that match a registered class, quirk, or nested-aspect
+shape are dispatched by the pipeline. Anything else is treated as a class
+key of an unregistered class (backwards compat). To keep your own metadata
+keys out of dispatch entirely, reserve them globally:
+
+```nix
+den.reservedKeys = [ "settings" "tags" ];
+```
+
+Reserved keys are structural: the pipeline ignores them, so you can carry
+arbitrary metadata on any aspect without it being interpreted as class
+content.
 
 ### Static vs parametric includes
 
@@ -88,8 +103,11 @@ scope context arguments (`{ host }`, `{ user }`, `{ home }`, etc.) is
 
 Type: `nullOr (handler record or list of handler records)`. Default: `null`.
 
-Resolution handlers for the aspect's subtree (current). Handlers compose
-down the tree — a parent's constraint cannot be overridden by children.
+Resolution handlers for the aspect's subtree. The primary handler records are
+the **constraints** from `den.lib.aspects.fx.constraints` (`exclude`,
+`substitute`, `filterBy`) -- see
+[Structural Introspection & Constraints](/explanation/structural-introspection/)
+for the full API and examples.
 
 <Aside type="note">
 `meta.handleWith` is the current name for this field. `meta.adapter` no
@@ -108,6 +126,43 @@ providers accumulate: `foo._.bar._.baz` has `meta.provider = ["foo" "bar"]`.
 The `meta.provider` list distinguishes aspects by origin during pipeline
 resolution.
 
+### `meta.guard` / `meta.aspects` -- conditional aspects
+
+An aspect carrying `meta.guard` is **conditional**: instead of emitting its
+content immediately, the pipeline evaluates the guard against the in-flight
+aspect tree and only emits when it passes.
+
+You almost never write these fields by hand -- the user-facing entry point is
+[`policy.when`](/reference/policies/#combinators) applied to an **inline
+aspect** (or a `policy.include` effect):
+
+```nix
+den.aspects.igloo.includes = [
+  (den.lib.policy.when ({ host, ... }: host.hasAspect den.aspects.git) {
+    nixos.environment.variables.GIT_ENABLED = "true";
+  })
+];
+```
+
+`when` wraps the inline aspect into a conditional
+(`meta.guard = predicate; meta.aspects = [ … ]`). Key semantics:
+
+- **Guard context** -- the predicate receives `hasAspect ref` (bool) directly,
+  plus entity-shaped stubs (`host.hasAspect ref`, `user.hasAspect ref`, …) for
+  the kinds bound in the current scope. Membership is **structural** (the
+  in-flight tree, scoped to this entity's own subtree + ancestors -- not
+  fleet-wide) and **exclude-aware** (excluded aspects read as absent).
+- **Deferred re-evaluation** -- if the guard fails, the conditional is parked
+  and re-evaluated after siblings finish resolving. A guard on an aspect that
+  a *later* include pulls in still passes (the classic "order shouldn't
+  matter" case).
+- **Why this exists** -- a predicate that reads `entity.hasAspect` must not
+  touch `config.resolved` during policy dispatch (that is cyclic). Routing
+  `when` over inline aspects through the compile-conditional path is what
+  makes `hasAspect` predicates safe to write.
+- A failed guard that never recovers leaves a tombstone (visible in
+  traces/diagrams, contributes no modules).
+
 ## Class module collision policy
 
 A collision occurs when a flat-form class module declares an arg (e.g.
@@ -122,10 +177,11 @@ The policy is resolved from three levels, first match wins:
 | Level | Where to set | Type / default | Scope |
 |-------|--------------|----------------|-------|
 | Aspect | `meta.collisionPolicy` on the aspect | `nullOr (enum)`, default `null` | All class modules in that aspect |
-| Entity | `collisionPolicy` on the entity schema (`den.schema.<kind>`) | `nullOr (enum)`, default `null` | All uses of that entity kind |
+| Entity | `collisionPolicy` on a single entity (e.g. `den.hosts.<sys>.<name>.collisionPolicy`) | `nullOr (enum)`, default `null` | That entity's class modules |
+| Kind | `collisionPolicy` on the entity schema (`den.schema.<kind>`) | `nullOr (enum)`, default `null` | All entities of that kind |
 | Global | `den.config.classModuleCollisionPolicy` | `enum`, default `"error"` | Entire flake |
 
-A `null` at the aspect or entity level falls through to the next level.
+A `null` at any of the first three levels falls through to the next.
 The global level supplies the effective default of `"error"`.
 
 ### Strategy values
@@ -145,7 +201,10 @@ The enum is the same at every level: `"error"`, `"class-wins"`,
 # Aspect level — meta.collisionPolicy
 den.aspects.my-aspect.meta.collisionPolicy = "den-wins";
 
-# Entity level — den.schema.<kind>.collisionPolicy (all hosts)
+# Entity level -- one host
+den.hosts.x86_64-linux.igloo.collisionPolicy = "class-wins";
+
+# Kind level -- den.schema.<kind>.collisionPolicy (all hosts)
 den.schema.host.collisionPolicy = "den-wins";
 
 # Global — den.config.classModuleCollisionPolicy

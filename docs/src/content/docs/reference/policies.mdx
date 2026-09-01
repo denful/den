@@ -47,6 +47,7 @@ policy.resolve { myFlag = true; }
 **Variants:**
 - `policy.resolve.shared bindings` — shared (non-isolated) fan-out
 - `policy.resolve.to kind bindings` — target a specific entity kind
+- `policy.resolve.shared.to kind bindings` — shared fan-out with explicit target kind
 - `policy.resolve.withIncludes includes bindings` — attach includes to the new scope
 - `policy.resolve.to.withIncludes kind includes bindings` — both
 
@@ -98,6 +99,17 @@ policy.deliver {
   `reinstantiate` flag** — verbatim is requested by `mode` directly. `verbatim`
   applies only to class sources, not module sources.
 
+Class sources accept two optional fields:
+
+- `guard = args: bool` — only deliver when the predicate holds against the
+  target's module-system args (e.g. `{ options, ... }: options ? wsl`). A
+  failed guard means the delivered content contributes nothing.
+- `adaptArgs = args: attrs` — an args/specialArgs adapter for the delivered
+  modules: with a non-empty `at`, the source modules are evaluated in a
+  submodule whose `specialArgs` are `adaptArgs` applied to the target's args
+  (e.g. inject `osConfig = config`); at the root (`at = []`), it adapts the
+  args each module function receives.
+
 `deliver` deliberately does **not** expose `appendToParent` (parent-targeting is
 constructor-internal) — use a class source whose `to` already names the target.
 
@@ -116,6 +128,16 @@ policy.route {
 }
 ```
 
+Additional spec fields (passed through to the underlying edge):
+
+- `intoPath = item: path` — public alias for `path` that pairs with
+  `fromClass`/`intoClass` (the `forward` battery's naming). Passing **both**
+  `path` and `intoPath` is an error.
+- `guard` / `adaptArgs` — same semantics as on `deliver` (see above).
+- `collectSubtree = true` — also collect the source class's content from the
+  scope's descendant scopes, not just the scope itself. Used by the built-in
+  flake-parts policy so per-system `packages` gather host/user contributions.
+
 ### `policy.provide spec`
 
 Deliver a module directly to a target class, bypassing the aspect tree. A
@@ -127,12 +149,25 @@ from `path` — `merge` at the root, `nest` under a non-empty `path`):
 policy.provide { class = "nixos"; module = { pkgs, ... }: { ... }; }
 ```
 
-### `policy.instantiate entity`
+### `policy.instantiate spec`
 
-Request post-pipeline instantiation of an entity:
+Request post-pipeline instantiation. Pass an entity to use its own
+`instantiate`/`intoAttr` metadata:
 
 ```nix
 policy.instantiate den.hosts.x86_64-linux.igloo
+```
+
+Or pass a custom spec to instantiate something that isn't an entity (e.g.
+a third-party builder fed by a den class — the terranix pattern):
+
+```nix
+policy.instantiate {
+  name = "${host.name}-tf";
+  class = "terranix";              # which class bucket to collect
+  instantiate = { modules, ... }: modules;  # how to build from collected modules
+  intoAttr = [ "terranixModules" host.name ];  # where the result lands
+};
 ```
 
 ### `policy.spawn`
@@ -255,6 +290,29 @@ den.lib.policy.when (ctx: ctx.flag or false)
 | Policy | From | To | Behavior |
 |---|---|---|---|
 | `host-to-users` | `host` | `user` | One `{ host, user }` per `host.users` entry |
+
+### Battery-driven class routing
+
+These fire automatically with their battery (most via `den.default.includes`,
+so they are active without any explicit inclusion):
+
+| Policy | Source | Behavior |
+|---|---|---|
+| `os-to-host` | `batteries/os-class` | Route `os` class content to the host's class (`nixos`/`darwin`) in every host/user scope |
+| `user-to-host` | `batteries/os-user` | Route `user` class content to `users.users.<userName>`, injecting `osConfig` |
+| `host-to-hm-users` / `hm-user-detect` | `batteries/home-manager` | Import the HM OS module; forward each HM user's `homeManager` class into `home-manager.users.<name>`. The `*-user-detect` policy covers users resolved by registry/policy rather than `host.users`. `hjem` and `maid` batteries register the same family (`host-to-hjem-users`, `host-to-maid-users`, …) |
+| `host-to-wsl-host` / `wsl-to-host` | `batteries/wsl` | Resolve the `wsl-host` entity when `host.wsl.enable`; route `wsl` class content to the host's OS at `wsl` |
+
+### Flake-parts (`policies/flake-parts.nix`, opt-in via `den.schema`)
+
+| Policy | From | To | Behavior |
+|---|---|---|---|
+| `system-to-flake-parts` | `flake-system` | `flake-parts` | One `{ flake-parts }` per system |
+| `packages-to-flake-parts` | `flake-system` | `flake-parts` | Route `packages` class into perSystem `packages` (`collectSubtree`) |
+
+The `flake-scope` battery carries its own internal policy
+(`den-flake-scope`) for pipeline-arg enrichment — see
+[Batteries](/reference/batteries/#denbatteriesflake-scope).
 
 ### Flake output traversal (`flake.nix`)
 

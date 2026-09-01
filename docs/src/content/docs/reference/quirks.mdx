@@ -249,6 +249,31 @@ pipe.collectAll ({ host, ... }: true)
 Entity kind filtering and non-terminal chaining work the same as
 `pipe.collect`. Both stages also compose with `pipe.withProvenance`.
 
+### `pipe.broadcast predicate`
+
+Push the broadcasting scope's pipe value to **every other scope** whose context
+matches the predicate — fleet-wide, not just siblings or parents. The push
+dual of `pipe.expose` (which routes up to the parent). Receivers read the pipe
+normally; broadcast values are merged into their pool.
+
+```nix
+pipe.from "peer-dev" [ (pipe.broadcast ({ user, ... }: true)) ]
+```
+
+- **Entity kind filtering is automatic**, same as `pipe.collect`: the
+  predicate's required args restrict which scopes can receive.
+- **Source values are the broadcaster's raw emits** — transform stages before
+  `pipe.broadcast` apply, but data exposed *up* into the broadcaster (e.g. a
+  host broadcaster does not fold in its users' `pipe.expose` data) is not
+  included. This is an intentional asymmetry with `collect`.
+- **Receivers see broadcast values as-is** — they are appended to the
+  receiver's pool after the receiver's own transform stages have run, so a
+  receiver's `pipe.filter`/`pipe.transform` do not apply to data broadcast to
+  it (the broadcaster's transforms already did).
+- **Config-dependent thunks** are resolved eagerly against the *source* scope's
+  producer config when they cross hosts, exactly like `pipe.collect`.
+- **Isolated per pipe name** — broadcasting one quirk never leaks into another.
+
 ### `pipe.to aspects`
 
 Route transformed data to specific aspects by identity. Only the named
@@ -301,14 +326,16 @@ Pipe assembly runs post-pipeline in `assemblePipes`, before class module
 wrapping. The sequence:
 
 1. **Expose pass** — bottom-up tree walk collects all `pipe.expose` data
-2. **Per-scope assembly** — for each scope:
+2. **Broadcast pass** — each broadcaster pushes its (post-transform) value to
+   every other scope matching its `pipe.broadcast` predicate
+3. **Per-scope assembly** — for each scope:
    - Extract raw pipe entries from `scopedClassImports`
    - Merge exposed data from children
    - Mark local config thunks
    - Apply untargeted pipe effects
    - Route inbound `pipe.as` effects from other pipes
    - Build targeted data (`pipe.to`, `pipe.as` + `pipe.to`)
-3. **Inject into scope contexts** — pipe data becomes available as
+4. **Inject into scope contexts** — pipe data becomes available as
    function args in `wrapClassModule`
 
 ## See also

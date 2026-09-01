@@ -54,7 +54,10 @@ be able to read `host.hardened` value.
 
 ## `den.schema`
 
-Base modules merged into all hosts, users, or homes.
+Base modules merged into all hosts, users, or homes. `den.schema` is built on
+top of [gen-schema](https://github.com/sini/gen-schema) -- each key is a schema
+entity, and the registry exposes introspection attrs (e.g. `_kindNames`,
+`_topology`, `_edges`) that the pipeline itself consumes.
 
 | Option | Type | Description |
 |--------|------|-------------|
@@ -62,6 +65,7 @@ Base modules merged into all hosts, users, or homes.
 | `den.schema.host` | `deferredModule` | Applied to all hosts (imports `conf`) |
 | `den.schema.user` | `deferredModule` | Applied to all users (imports `conf`) |
 | `den.schema.home` | `deferredModule` | Applied to all homes (imports `conf`) |
+| `den.schema.aspect` | `deferredModule` | Applied to **all aspects** (imported into every aspect submodule) -- where `den.lib.strict` is applied for [strict mode](/explanation/entities/#strict-mode) |
 
 ```nix
 den.schema.conf = { lib, ... }: {
@@ -72,13 +76,17 @@ den.schema.host = { ... }: {
 };
 ```
 
-A schema entry also accepts two list attributes, stripped before the module
+A schema entry also accepts attributes, stripped before the module
 merge and consumed by the resolution pipeline:
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `includes` | `listOf raw` | Aspects/policies activated for every entity of this kind |
-| `excludes` | `listOf raw` | Aspects/policies suppressed for every entity of this kind |
+| Attribute | Type | Default | Description |
+|-----------|------|---------|-------------|
+| `includes` | `listOf raw` | `[]` | Aspects/policies activated for every entity of this kind |
+| `excludes` | `listOf raw` | `[]` | Aspects/policies suppressed for every entity of this kind |
+| `isEntity` | `bool` | computed | Whether the kind is a real entity (fan-out/policy target). Computed as `true` when the entry carries any content beyond collection keys; set it explicitly for content-free entity kinds (e.g. `den.schema.flake-parts.isEntity = true`) |
+| `isolated` | `bool` | `false` | Mark this kind's scopes as isolated -- when an ancestor collects its subtree, it cannot cross into an isolated scope (the isolated scope still collects its own content) |
+| `parent` | `nullOr str` | `null` | The enclosing entity kind (e.g. `user.parent = "host"`). Defines the entity schema DAG the pipeline uses for descendant fan-out and [class-module arg promotion](/explanation/parametric/#where-parametric-args-work) |
+| `collisionPolicy` | `nullOr enum` | `null` | Class-module collision policy for every entity of this kind (see [Class Modules](/explanation/class-modules/)) |
 
 ```nix
 # Activate a policy for every host
@@ -104,6 +112,19 @@ host definitions as freeform attribute sets.
 
 ```nix
 den.hosts.x86_64-linux.myhost = {
+  users.vic = {};
+};
+```
+
+### Flat form
+
+The system level can be omitted: declare `system` inside the host value and
+Den normalizes it into the two-level form. Both forms coexist freely:
+
+```nix
+# Equivalent to den.hosts.x86_64-linux.myhost = { ...; };
+den.hosts.myhost = {
+  system = "x86_64-linux";
   users.vic = {};
 };
 ```
@@ -172,6 +193,17 @@ an unbound standalone home.
 
 ```nix
 den.homes.x86_64-linux.vic = {};
+```
+
+### Flat form
+
+As with `den.hosts`, the system level can be omitted -- put `system` inside
+the home value (both forms coexist):
+
+```nix
+den.homes."tux@igloo" = {
+  system = "x86_64-linux";
+};
 ```
 
 ### Home options

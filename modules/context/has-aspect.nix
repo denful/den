@@ -61,8 +61,9 @@ let
           Safe to call from inside class-config module bodies
           (`nixos = ...`, `homeManager = ...`) and from lazy positions
           inside aspect functor bodies. NOT safe to use for deciding an
-          aspect's `includes` list — that's cyclic; use meta.adapter +
-          excludeAspect / oneOfAspects for structural decisions instead.
+          aspect's `includes` list — that's cyclic; use `meta.handleWith`
+          with `den.lib.aspects.fx.constraints` for structural decisions
+          instead.
         '';
         internal = true;
         visible = false;
