@@ -148,7 +148,12 @@ let
 
       provides = aspect.provides or { };
       crossKeys = builtins.filter (k: k != aspectName) (builtins.attrNames provides);
-      compatKeys = builtins.filter (k: !(schemaEntityKindsSet ? ${k})) crossKeys;
+      # Every merged aspect carries a synthetic `__functor` on `provides`; it is
+      # pipeline machinery, not a delivery target. Registering it produced one
+      # inert policy per aspect that re-dispatched on every iteration.
+      compatKeys = builtins.filter (
+        k: !(schemaEntityKindsSet ? ${k}) && !(lib.hasPrefix "__" k)
+      ) crossKeys;
       allRegistrations = map (mkCrossPolicy nodeIdentity provides) compatKeys;
 
       hasSelfProvide = provides ? ${aspectName};

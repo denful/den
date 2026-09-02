@@ -45,6 +45,40 @@
       }
     );
 
+    # The delivery assertions above pass for any fix that merely keeps the two
+    # registrations apart. This pins the cause: the two sub-aspects must hold
+    # DISTINCT identities, which is what `hasAspect` reads.
+    test-same-named-sub-aspects-have-distinct-identities = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.alpha
+          den.aspects.beta
+        ];
+
+        den.aspects.alpha = {
+          includes = [ den.aspects.alpha.tools ];
+          tools.nixos.environment.etc."alpha".text = "yes";
+        };
+
+        den.aspects.beta = {
+          includes = [ den.aspects.beta.tools ];
+          tools.nixos.environment.etc."beta".text = "yes";
+        };
+
+        expr = {
+          alphaTools = igloo.environment.etc ? "alpha";
+          betaTools = igloo.environment.etc ? "beta";
+        };
+        expected = {
+          alphaTools = true;
+          betaTools = true;
+        };
+      }
+    );
+
     # CONTROL: same shape, distinct sub-aspect names — reporter says this works.
     test-control-distinct-sub-aspect-names = denTest (
       { den, tuxHm, ... }:

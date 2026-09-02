@@ -564,7 +564,7 @@ let
             let
               v = merged._ or null;
             in
-            if builtins.isAttrs v && !(v ? __functor) then v else { };
+            lib.optionalAttrs (builtins.isAttrs v && !(v ? __functor)) v;
           providesChildren = builtins.removeAttrs ((merged.provides or { }) // writtenUnderscore) [
             "_module"
           ];

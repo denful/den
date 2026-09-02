@@ -8,9 +8,7 @@ let
     "register-aspect-policy" =
       { param, state }:
       let
-        entry = {
-          inherit (param) fn ownerIdentity;
-        };
+        entry = { inherit (param) fn; };
         # The registry is the one scoped field that merges rather than appends,
         # so a repeated key is a silent drop. Derive it here from the owner's
         # identity instead of letting each caller name its own: a caller that

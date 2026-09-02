@@ -133,7 +133,7 @@
     # The written value reads back through `_` as well as through `provides`,
     # matching how a root aspect publishes both.
     test-underscore-reads-back-on-nested-aspect = denTest (
-      { den, tuxHm, ... }:
+      { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
@@ -141,8 +141,16 @@
 
         den.aspects.alpha.tools._.shared.nixos.environment.etc."shared".text = "yes";
 
-        expr = den.aspects.alpha.tools.provides ? shared;
-        expected = true;
+        expr = {
+          viaUnderscore = den.aspects.alpha.tools._ ? shared;
+          viaProvides = den.aspects.alpha.tools.provides ? shared;
+          delivered = igloo.environment.etc."shared".text or "<missing>";
+        };
+        expected = {
+          viaUnderscore = true;
+          viaProvides = true;
+          delivered = "yes";
+        };
       }
     );
 
