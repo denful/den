@@ -32,7 +32,9 @@ in
         raw = param.aspect;
         aspect = builtins.removeAttrs raw parametricInternalKeys;
         nodeIdentity = identity.key aspect;
-        chainIdentity = identity.pathKey ((aspect.meta.provider or [ ]) ++ [ (aspect.name or "<anon>") ]);
+        chainIdentity = identity.pathKey (
+          (aspect.meta.aspect-chain or [ ]) ++ [ (aspect.name or "<anon>") ]
+        );
         isMeaningful = isMeaningfulName (aspect.name or "<anon>");
       in
       {

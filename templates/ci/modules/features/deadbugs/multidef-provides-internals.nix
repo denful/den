@@ -1,5 +1,5 @@
 # A `provides` (or `_`) key defined in more than one file merges into a content
-# wrapper, which carries `__contentValues` / `__provider` / `_` beside the real
+# wrapper, which carries `__contentValues` / `__aspectChain` / `_` beside the real
 # children. Those leaked out as provides children: they surfaced as keys of the
 # published `provides`, entered `__providesForwarded`, and `_` — not being
 # `__`-prefixed — registered an inert cross-provide policy of its own.

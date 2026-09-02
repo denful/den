@@ -153,18 +153,18 @@ let
         else
           [ ];
       # Compute exclude identity, normalizing content wrappers that have
-      # __provider but no name (nested keys without _ prefix).
+      # __aspectChain but no name (nested keys without _ prefix).
       excludeIdentity =
         ref:
         if builtins.isAttrs ref && ref.__isPolicy or false then
           ref.name
-        else if builtins.isAttrs ref && ref ? __provider && !(ref ? name) then
+        else if builtins.isAttrs ref && ref ? __aspectChain && !(ref ? name) then
           let
-            prov = ref.__provider;
+            prov = ref.__aspectChain;
           in
           identity.key {
             name = if prov != [ ] then lib.last prov else "<anon>";
-            meta.provider = if prov != [ ] then lib.init prov else [ ];
+            meta.aspect-chain = if prov != [ ] then lib.init prov else [ ];
           }
         else
           identity.key ref;

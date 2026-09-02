@@ -75,7 +75,7 @@ in
       {
         expr = {
           hasContentValues = val ? __contentValues;
-          hasProvider = val ? __provider;
+          hasProvider = val ? __aspectChain;
           valueCount = builtins.length val.__contentValues;
           value = (builtins.head val.__contentValues).value;
         };
@@ -113,7 +113,7 @@ in
       {
         expr = {
           hasContentValues = val ? __contentValues;
-          hasProvider = val ? __provider;
+          hasProvider = val ? __aspectChain;
           valueCount = builtins.length val.__contentValues;
         };
         expected = {

@@ -129,7 +129,7 @@ in
       }
     );
 
-    # aspectContentType wraps values with __contentValues and __provider.
+    # aspectContentType wraps values with __contentValues and __aspectChain.
     test-content-wrapper-shape = denTest (
       { den, ... }:
       let
@@ -145,8 +145,8 @@ in
       {
         expr = {
           hasContentValues = val ? __contentValues;
-          hasProvider = val ? __provider;
-          provider = val.__provider;
+          hasProvider = val ? __aspectChain;
+          provider = val.__aspectChain;
           valueCount = builtins.length val.__contentValues;
         };
         expected = {

@@ -53,7 +53,7 @@
         fxLib = den.lib.aspects.fx;
         target = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         root = {
           name = "root";
@@ -63,7 +63,7 @@
           includes = [
             {
               name = "keep";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               nixos = {
                 a = 1;
               };
@@ -71,7 +71,7 @@
             }
             {
               name = "drop";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               nixos = {
                 b = 2;
               };
@@ -152,7 +152,7 @@
         fxLib = den.lib.aspects.fx;
         target = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         root = {
           name = "root";
@@ -162,12 +162,12 @@
           includes = [
             {
               name = "keep";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
             {
               name = "drop";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
           ];
@@ -221,7 +221,7 @@
         fxLib = den.lib.aspects.fx;
         target = {
           name = "x";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         root = {
           name = "root";

@@ -1,5 +1,5 @@
 # A nested aspect key carries its identity on the content wrapper, via
-# __provider. Anything that takes definitions out of the wrapper has to keep
+# __aspectChain. Anything that takes definitions out of the wrapper has to keep
 # that identity, or the definitions resolve to an anonymous per-inclusion name,
 # gate dedup stops matching them, and their content lands once per include path.
 { denTest, ... }:
@@ -82,7 +82,7 @@
       }
     );
 
-    # An annotated child three levels down carries __provider and no
+    # An annotated child three levels down carries __aspectChain and no
     # __contentValues of its own. Nothing may invent an empty one when it passes
     # through providerType: rawHasCV pins that the child starts without one, so
     # the test cannot pass by accident on a shallower shape whose middle name IS

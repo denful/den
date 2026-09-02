@@ -22,7 +22,7 @@
         provider = {
           name = "monitoring";
           meta = {
-            provider = [ ];
+            aspect-chain = [ ];
           };
           includes = [ inner ];
         };
@@ -128,15 +128,15 @@
       }
     );
 
-    # Meta carryover: meta.provider survives deep resolution.
-    test-meta-provider-survives = denTest (
+    # Meta carryover: meta.aspect-chain survives deep resolution.
+    test-meta-chain-survives = denTest (
       { den, ... }:
       let
         fx = den.lib.fx;
         child = {
           name = "sub";
           meta = {
-            provider = [ "monitoring" ];
+            aspect-chain = [ "monitoring" ];
           };
           nixos = { };
           includes = [ ];
@@ -144,7 +144,7 @@
         parent = {
           name = "monitoring";
           meta = {
-            provider = [ ];
+            aspect-chain = [ ];
           };
           includes = [ child ];
         };
@@ -163,7 +163,7 @@
         childResult = builtins.head (builtins.head result.value).includes;
       in
       {
-        expr = childResult.meta.provider;
+        expr = childResult.meta.aspect-chain;
         expected = [ "monitoring" ];
       }
     );

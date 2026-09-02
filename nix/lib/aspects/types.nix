@@ -314,12 +314,12 @@ let
           isContentWrapper =
             d:
             builtins.isAttrs d.value
-            && (d.value ? __contentValues || d.value ? __provider)
+            && (d.value ? __contentValues || d.value ? __aspectChain)
             && !(d.value ? __fn);
           nameFromProvider =
             v:
             let
-              prov = v.__provider or [ ];
+              prov = v.__aspectChain or [ ];
             in
             if prov != [ ] then lib.last prov else null;
           # A content wrapper holds every definition of its key. Taking one value
@@ -329,7 +329,7 @@ let
           # includes element, which listOf hands over without reaching this merge.
           #
           # One def rather than one per definition: the wrapper is the only
-          # carrier of __provider, so splitting it leaves the parametric defs
+          # carrier of __aspectChain, so splitting it leaves the parametric defs
           # nameless. They then resolve to an anonymous per-inclusion identity,
           # which defeats gate dedup and duplicates their content once per path.
           wrapperToAspect =
@@ -342,7 +342,7 @@ let
             // {
               value =
                 d.value
-                # Only narrow what exists: a navigated child carries __provider
+                # Only narrow what exists: a navigated child carries __aspectChain
                 # with no __contentValues, and inventing an empty one here makes
                 # the wrapper re-flatten to nothing instead of failing loudly.
                 // lib.optionalAttrs (d.value ? __contentValues) { __contentValues = parts.wrong; }
@@ -350,11 +350,11 @@ let
                   includes = (d.value.includes or [ ]) ++ map (cv: cv.value) parts.right;
                 }
                 # Preserve identity: inject name and provider chain from
-                # __provider so aspectSubmodule.merge produces a meaningful
+                # __aspectChain so aspectSubmodule.merge produces a meaningful
                 # identity instead of an anonymous include index.
                 // lib.optionalAttrs (provName != null) {
                   name = provName;
-                  meta.provider = lib.init d.value.__provider;
+                  meta.aspect-chain = lib.init d.value.__aspectChain;
                 };
             };
           defs' = map (d: if isContentWrapper d then wrapperToAspect d else d) defs;
@@ -534,7 +534,7 @@ let
                   annotatedSub
                   // {
                     __contentValues = defsForKey;
-                    __provider = provBase;
+                    __aspectChain = provBase;
                     _ = underscoreAt provBase annotatedSub;
                   }
               );
@@ -566,7 +566,7 @@ let
             in
             lib.optionalAttrs (builtins.isAttrs v && !(v ? __functor)) v;
           # Both spellings arrive as a content wrapper when the key is defined in
-          # more than one file, carrying `__contentValues` / `__provider` / `_`
+          # more than one file, carrying `__contentValues` / `__aspectChain` / `_`
           # alongside the real children. Those are wrapper machinery, not
           # provides children: unfiltered they surface as `provides` keys, enter
           # `__providesForwarded`, and `_` (not `__`-prefixed) registers an inert
@@ -591,7 +591,7 @@ let
               includes = map (k: attrs.${k}) (builtins.filter isChildKey (builtins.attrNames attrs));
             };
           };
-          # Annotate nested attrset children with __provider so deeply nested
+          # Annotate nested attrset children with __aspectChain so deeply nested
           # aspects carry provenance for hasAspect resolution, and give each
           # one its own ._ so the shorthand holds at every depth rather than
           # only at this wrapper. Without the recursion, navigation through a
@@ -609,10 +609,10 @@ let
                 childPath = provPath ++ [ k ];
                 sub = annotateChildren childPath v;
               in
-              if isChildKey k && builtins.isAttrs v && !(v ? __provider) && !(v ? __contentValues) then
+              if isChildKey k && builtins.isAttrs v && !(v ? __aspectChain) && !(v ? __contentValues) then
                 sub
                 // {
-                  __provider = childPath;
+                  __aspectChain = childPath;
                   _ = underscoreAt childPath sub;
                 }
               else
@@ -624,7 +624,7 @@ let
         // annotatedMerged
         // {
           __contentValues = flatDefs;
-          __provider = provider;
+          __aspectChain = provider;
           __providesForwarded = unshadowedProvides;
           # Root aspects publish `provides` and `_` as one value — provides-
           # children plus the all-children functor (mergeWithAspectMeta's
@@ -659,7 +659,7 @@ let
       # Reserved/structural keys are metadata, not aspect content: pass their
       # value through untouched (last def wins) so consumers read it back as
       # declared. Without this, the content wrapper mangles the value into a
-      # __contentValues/__provider shape even though the pipeline ignores the
+      # __contentValues/__aspectChain shape even though the pipeline ignores the
       # key for dispatch. Everything else gets the provenance/content wrapper.
       merge =
         loc: defs:
@@ -684,7 +684,7 @@ let
         );
         default = null;
       };
-      options.provider = lib.mkOption {
+      options.aspect-chain = lib.mkOption {
         internal = true;
         visible = false;
         description = "Provider path tracking aspect provenance";
@@ -732,13 +732,13 @@ let
     lib.types.submodule (
       { name, config, ... }:
       let
-        # The chain this aspect's children hang off. `meta.provider` defaults to
+        # The chain this aspect's children hang off. `meta.aspect-chain` defaults to
         # `typeCfg.providerPrefix`, but providerType.merge overrides it when it
         # re-types an included nested aspect (wrapperToAspect injects the chain
-        # from __provider). Reading the static typeCfg there truncates the chain
+        # from __aspectChain). Reading the static typeCfg there truncates the chain
         # to the aspect's own name, so `alpha/tools` and `beta/tools` both hand
         # their children the prefix ["tools"] and the children collide.
-        childProviderPrefix = config.meta.provider ++ [ config.name ];
+        childProviderPrefix = config.meta.aspect-chain ++ [ config.name ];
       in
       {
         freeformType = lib.types.lazyAttrsOf (

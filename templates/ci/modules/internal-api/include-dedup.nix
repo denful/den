@@ -296,7 +296,7 @@
       let
         shared = {
           name = "shared";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           nixos = {
             x = 1;
           };

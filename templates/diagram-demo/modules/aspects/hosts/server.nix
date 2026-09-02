@@ -17,7 +17,7 @@
       (den.lib.aspects.fx.constraints.exclude den.aspects.monitoring.nginx-exporter)
       # Remove all aspects whose provider chain starts with "monitoring" (prefix filter)
       (den.lib.aspects.fx.constraints.filterBy (
-        a: lib.take 1 (a.meta.provider or [ ]) != [ "monitoring" ]
+        a: lib.take 1 (a.meta.aspect-chain or [ ]) != [ "monitoring" ]
       ))
     ];
   };

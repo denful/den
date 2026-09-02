@@ -6,7 +6,9 @@
 let
   aspectPath =
     a:
-    (a.meta.provider or [ ]) ++ [ (a.name or "<anon>") ] ++ lib.optional (a ? __ctxId) "{${a.__ctxId}}";
+    (a.meta.aspect-chain or [ ])
+    ++ [ (a.name or "<anon>") ]
+    ++ lib.optional (a ? __ctxId) "{${a.__ctxId}}";
 
   pathKey = path: lib.concatStringsSep "/" path;
 
@@ -15,7 +17,7 @@ let
 
   # Base identity without the {ctxId} instance suffix: provider chain + name.
   # The pretty, stable fully-qualified name (e.g. "roles/workstation").
-  baseKey = a: pathKey ((a.meta.provider or [ ]) ++ [ (a.name or "<anon>") ]);
+  baseKey = a: pathKey ((a.meta.aspect-chain or [ ]) ++ [ (a.name or "<anon>") ]);
 
   # True when an identity string refers to an anonymous/unresolved node.
   isAnonIdentity =

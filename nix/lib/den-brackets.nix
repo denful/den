@@ -26,14 +26,14 @@ let
     in
     if tail == [ ] then resolved else resolveWithProvidesFallback resolved tail;
 
-  # Ensure bare attrset results from bracket resolution carry __provider
+  # Ensure bare attrset results from bracket resolution carry __aspectChain
   # so the pipeline can compute stable identity.  Forwarded attrs from
-  # content wrappers are bare attrsets that lack __provider — without
+  # content wrappers are bare attrsets that lack __aspectChain — without
   # this, they get anonymous identities and dedup fails.
   tagProvider =
     path: result:
-    if builtins.isAttrs result && !(result ? __provider) && !(result ? __fn) then
-      result // { __provider = path; }
+    if builtins.isAttrs result && !(result ? __aspectChain) && !(result ? __fn) then
+      result // { __aspectChain = path; }
     else
       result;
 

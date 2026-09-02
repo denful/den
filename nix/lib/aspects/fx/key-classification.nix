@@ -25,7 +25,7 @@ let
     "__entityKind"
     "__parametricResolvedArgs"
     "__contentValues"
-    "__provider"
+    "__aspectChain"
     "__providesForwarded"
     "_module"
     "_"

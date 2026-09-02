@@ -65,11 +65,11 @@ let
   # Shared entry fields for both trace handlers.
   mkBaseEntry = class: param: {
     inherit class;
-    provider = param.meta.provider or [ ];
+    aspect-chain = param.meta.aspect-chain or [ ];
     excluded = param.meta.excluded or false;
     excludedFrom = param.meta.excludedFrom or null;
     replacedBy = param.meta.replacedBy or null;
-    isProvider = (param.meta.provider or [ ]) != [ ];
+    isProvider = (param.meta.aspect-chain or [ ]) != [ ];
     handlers = param.meta.handleWith or [ ];
     hasClass = param ? ${class};
     isParametric = param.meta.isParametric or false;
@@ -137,7 +137,7 @@ let
       { param, state }:
       let
         rawName = param.meta.originalName or param.name or "<anon>";
-        provPath = lib.concatStringsSep "/" (param.meta.provider or [ ]);
+        provPath = lib.concatStringsSep "/" (param.meta.aspect-chain or [ ]);
         entityKind =
           let
             direct = param.__entityKind or null;
@@ -268,7 +268,7 @@ let
           name = policyName;
           class = "";
           parent = null;
-          provider = [ ];
+          aspect-chain = [ ];
           excluded = false;
           excludedFrom = null;
           replacedBy = null;

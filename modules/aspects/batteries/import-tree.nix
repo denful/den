@@ -76,7 +76,7 @@
     in
     {
       name = "import-tree(${baseNameOf rootStr})";
-      meta.provider = [
+      meta.aspect-chain = [
         "den"
         "batteries"
       ];

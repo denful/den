@@ -1,4 +1,4 @@
-# `meta.provider` is a node's position, not an accumulating set. Two files
+# `meta.aspect-chain` is a node's position, not an accumulating set. Two files
 # defining one aspect path each inject the same chain, and a `listOf` type
 # concatenated them into ["a" "a"] — which every descendant then inherited as
 # its own prefix, corrupting the whole subtree's identities.
@@ -17,7 +17,7 @@
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.a.tools.nixos.environment.etc."t".text = "y";
 
-        expr = den.aspects.igloo.provides.shared.meta.provider or [ ];
+        expr = den.aspects.igloo.provides.shared.meta.aspect-chain or [ ];
         expected = [ "a" ];
       }
     );
@@ -31,7 +31,7 @@
         den.aspects.a.tools.nixos.environment.etc."t".text = "y";
         den.aspects.igloo.provides.shared = den.aspects.a.tools;
 
-        expr = den.aspects.igloo.provides.shared.meta.provider or [ ];
+        expr = den.aspects.igloo.provides.shared.meta.aspect-chain or [ ];
         expected = [ "a" ];
       }
     );
