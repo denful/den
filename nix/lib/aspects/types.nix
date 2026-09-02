@@ -72,7 +72,7 @@ let
     let
       sub = aspectSubmodule typeCfg;
     in
-    sub // { merge = mergeWithAspectMeta sub; };
+    sub // { merge = mergeWithAspectMeta typeCfg sub; };
 
   # Resolve parametric includes in an aspect with the given args.
   # Used by __functor so aspects are callable: (aspect { host = ...; }).
@@ -104,7 +104,7 @@ let
     };
 
   mergeWithAspectMeta =
-    sub: loc: defs:
+    typeCfg: sub: loc: defs:
     let
       # Rescue explicit __functor from defs before the submodule merge
       # destroys it (freeform keys become deferred modules).
@@ -115,7 +115,7 @@ let
         ++ [
           {
             file = (lib.last defs).file;
-            value = aspectMeta loc defs;
+            value = aspectMeta typeCfg loc defs;
           }
         ]
       );
@@ -168,12 +168,23 @@ let
     };
 
   aspectMeta =
-    loc: defs:
+    typeCfg: loc: defs:
     { config, ... }:
     {
       meta.name = lib.mkForce (locName config.meta.loc);
       meta.file = lib.mkForce (lib.last defs).file;
       meta.loc = lib.mkForce loc;
+      # mkDefault, not mkForce: a declared aspect (root, or one re-typed by
+      # providerType.merge's wrapperToAspect) sets its own chain at NORMAL
+      # priority, and that must win here so the chain travels with the
+      # aspect through re-inclusion the way meta.loc does not — nixpkgs
+      # drops a mkDefault def entirely once any normal-priority def exists,
+      # so this only ever supplies the value when nothing else does.
+      # typeCfg carries a providerPrefix for root/container declarations
+      # (`or [ ]` yields [ ]); includes elements get providerPrefix
+      # explicitly nulled (aspectSubmodule), so the present-but-null key
+      # bypasses `or` and this yields null there — absence, not root.
+      meta.aspect-chain = lib.mkDefault (typeCfg.providerPrefix or [ ]);
     };
 
   # A parametric function reaching aspectSubmodule.merge is evaluated as a NixOS
@@ -268,7 +279,7 @@ let
         {
           name = nameFromLoc;
           meta = {
-            provider = typeCfg.providerPrefix or [ ];
+            aspect-chain = typeCfg.providerPrefix or [ ];
           };
           __fn = fn;
           __args = args;
@@ -694,25 +705,34 @@ let
         # yields ["a" "a"] — a chain every descendant then inherits. Agreeing
         # definitions collapse; genuinely different ones are an ambiguity den
         # cannot resolve, so it says so rather than picking one.
+        #
+        # null means "no chain set" — distinct from [ ] ("root, chain is
+        # empty"). Without this distinction a root aspect and an inline
+        # literal both defaulted to [ ] and were indistinguishable. There is
+        # no default here: a declared aspect must set its own chain
+        # (aspectMeta's mkDefault) rather than inherit one, so the value
+        # travels with the aspect through re-inclusion instead of being
+        # re-derived at whatever site last merged it.
         type = lib.types.mkOptionType {
           name = "aspectChain";
           description = "aspect provenance chain";
-          check = v: builtins.isList v && builtins.all builtins.isString v;
+          check = v: v == null || (builtins.isList v && builtins.all builtins.isString v);
           merge =
             loc: defs:
             let
               distinct = lib.unique (map (d: d.value) defs);
+              render = c: if c == null then "null" else "[${lib.concatStringsSep " " c}]";
             in
             if distinct == [ ] then
-              [ ]
+              null
             else if builtins.length distinct == 1 then
               builtins.head distinct
             else
               throw "den: conflicting provenance for ${locName loc}: ${
-                lib.concatMapStringsSep " vs " (c: "[${lib.concatStringsSep " " c}]") distinct
+                lib.concatMapStringsSep " vs " render distinct
               }";
         };
-        default = typeCfg.providerPrefix or [ ];
+        default = null;
       };
       options.collisionPolicy = lib.mkOption {
         description = "Collision policy for flat-form class module arg/module-system arg overlap.";
@@ -738,7 +758,14 @@ let
         # from __aspectChain). Reading the static typeCfg there truncates the chain
         # to the aspect's own name, so `alpha/tools` and `beta/tools` both hand
         # their children the prefix ["tools"] and the children collide.
-        childProviderPrefix = config.meta.aspect-chain ++ [ config.name ];
+        #
+        # meta.aspect-chain can be null here (an inline includes literal that
+        # never had its own chain filled in). Naming this aspect's own
+        # descendants is a separate, computational concern from the chain
+        # value itself, so null falls back to [ ] purely for that purpose —
+        # this is not a place that reads absence as root.
+        ownChain = if config.meta.aspect-chain == null then [ ] else config.meta.aspect-chain;
+        childProviderPrefix = ownChain ++ [ config.name ];
       in
       {
         freeformType = lib.types.lazyAttrsOf (
@@ -776,7 +803,12 @@ let
           };
           includes = lib.mkOption {
             description = "Providers to ask aspects from";
-            type = lib.types.listOf (providerType typeCfg);
+            # providerPrefix explicitly null (not omitted): `or [ ]` only
+            # falls back on a genuinely MISSING key, so a present-but-null
+            # key still yields null through aspectMeta's default. That is
+            # what makes an inline includes literal's chain read as
+            # "unknown" rather than silently defaulting to root's [ ].
+            type = lib.types.listOf (providerType (typeCfg // { providerPrefix = null; }));
             default = [ ];
           };
           excludes = lib.mkOption {

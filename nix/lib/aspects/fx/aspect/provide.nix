@@ -99,7 +99,7 @@ let
       inherit (resolveProviderFn providerVal) innerFn args isParamWrapper;
       isPositionalFn = lib.isFunction innerFn && args == { };
       providerMeta = {
-        aspect-chain = (aspect.meta.aspect-chain or [ ]) ++ [ aspectName ];
+        aspect-chain = identity.ownChain aspect ++ [ aspectName ];
         selfProvide = true;
       };
     in

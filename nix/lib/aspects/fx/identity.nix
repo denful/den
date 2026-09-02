@@ -4,11 +4,20 @@
   ...
 }:
 let
-  aspectPath =
+  # meta.aspect-chain is null for an aspect that hasn't set its own chain yet
+  # (e.g. an inline includes literal — see aspectMeta in types.nix). Callers
+  # here build ON TOP of the chain (this aspect's own identity, or a child's
+  # prefix); that is a computation, not a check for root, so null and root
+  # both contribute the empty chain.
+  ownChain =
     a:
-    (a.meta.aspect-chain or [ ])
-    ++ [ (a.name or "<anon>") ]
-    ++ lib.optional (a ? __ctxId) "{${a.__ctxId}}";
+    let
+      c = a.meta.aspect-chain or null;
+    in
+    if c == null then [ ] else c;
+
+  aspectPath =
+    a: ownChain a ++ [ (a.name or "<anon>") ] ++ lib.optional (a ? __ctxId) "{${a.__ctxId}}";
 
   pathKey = path: lib.concatStringsSep "/" path;
 
@@ -17,7 +26,7 @@ let
 
   # Base identity without the {ctxId} instance suffix: provider chain + name.
   # The pretty, stable fully-qualified name (e.g. "roles/workstation").
-  baseKey = a: pathKey ((a.meta.aspect-chain or [ ]) ++ [ (a.name or "<anon>") ]);
+  baseKey = a: pathKey (ownChain a ++ [ (a.name or "<anon>") ]);
 
   # True when an identity string refers to an anonymous/unresolved node.
   isAnonIdentity =
@@ -136,6 +145,7 @@ let
 in
 {
   inherit
+    ownChain
     aspectPath
     pathKey
     key

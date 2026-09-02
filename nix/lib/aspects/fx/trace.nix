@@ -4,7 +4,7 @@
   ...
 }:
 let
-  inherit (den.lib.aspects.fx.identity) aspectPath pathKey;
+  inherit (den.lib.aspects.fx.identity) aspectPath pathKey ownChain;
   inherit (den.lib.aspects) isMeaningfulName;
 
   # Derive the entity kind for the current node by walking the includes
@@ -65,11 +65,14 @@ let
   # Shared entry fields for both trace handlers.
   mkBaseEntry = class: param: {
     inherit class;
-    aspect-chain = param.meta.aspect-chain or [ ];
+    # null (no chain set) and root ([ ]) both display as "no provider chain"
+    # here — trace output is a display/computation concern, not a place that
+    # distinguishes absence from root.
+    aspect-chain = ownChain param;
     excluded = param.meta.excluded or false;
     excludedFrom = param.meta.excludedFrom or null;
     replacedBy = param.meta.replacedBy or null;
-    isProvider = (param.meta.aspect-chain or [ ]) != [ ];
+    isProvider = ownChain param != [ ];
     handlers = param.meta.handleWith or [ ];
     hasClass = param ? ${class};
     isParametric = param.meta.isParametric or false;
@@ -137,7 +140,7 @@ let
       { param, state }:
       let
         rawName = param.meta.originalName or param.name or "<anon>";
-        provPath = lib.concatStringsSep "/" (param.meta.aspect-chain or [ ]);
+        provPath = lib.concatStringsSep "/" (ownChain param);
         entityKind =
           let
             direct = param.__entityKind or null;
