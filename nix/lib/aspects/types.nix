@@ -681,12 +681,21 @@ let
     typeCfg:
     lib.types.submodule (
       { name, config, ... }:
+      let
+        # The chain this aspect's children hang off. `meta.provider` defaults to
+        # `typeCfg.providerPrefix`, but providerType.merge overrides it when it
+        # re-types an included nested aspect (wrapperToAspect injects the chain
+        # from __provider). Reading the static typeCfg there truncates the chain
+        # to the aspect's own name, so `alpha/tools` and `beta/tools` both hand
+        # their children the prefix ["tools"] and the children collide.
+        childProviderPrefix = config.meta.provider ++ [ config.name ];
+      in
       {
         freeformType = lib.types.lazyAttrsOf (
           aspectKeyType (
             typeCfg
             // {
-              providerPrefix = (typeCfg.providerPrefix or [ ]) ++ [ config.name ];
+              providerPrefix = childProviderPrefix;
             }
           )
         );
@@ -733,7 +742,7 @@ let
                 providerType (
                   typeCfg
                   // {
-                    providerPrefix = (typeCfg.providerPrefix or [ ]) ++ [ config.name ];
+                    providerPrefix = childProviderPrefix;
                   }
                 )
               );

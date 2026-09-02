@@ -14,7 +14,7 @@ let
   inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
 
   mkCrossPolicy =
-    aspectName: nodeIdentity: provides: key:
+    nodeIdentity: provides: key:
     let
       value = provides.${key};
       policyFn =
@@ -52,9 +52,9 @@ let
           );
     in
     fx.send "register-aspect-policy" {
-      name = "${aspectName}/${key}";
       fn = policyFn;
       ownerIdentity = nodeIdentity;
+      label = key;
     };
 
   # Extract the inner function and args from a provider value.
@@ -149,7 +149,7 @@ let
       provides = aspect.provides or { };
       crossKeys = builtins.filter (k: k != aspectName) (builtins.attrNames provides);
       compatKeys = builtins.filter (k: !(schemaEntityKindsSet ? ${k})) crossKeys;
-      allRegistrations = map (mkCrossPolicy aspectName nodeIdentity provides) compatKeys;
+      allRegistrations = map (mkCrossPolicy nodeIdentity provides) compatKeys;
 
       hasSelfProvide = provides ? ${aspectName};
       selfProvide = mkSelfProvideInclude aspect aspectName;
