@@ -553,7 +553,21 @@ let
           # matching mergeWithAspectMeta behavior for root aspects — including
           # the rule that a name the wrapper defines itself keeps its own value
           # and stays classified.
-          providesChildren = builtins.removeAttrs (merged.provides or { }) [ "_module" ];
+          # `_` is the write alias for `provides`. aspectSubmodule wires it with
+          # mkAliasOptionModule, but a nested key never reaches that submodule:
+          # `_` is structural, so an alias write arrives here as a plain key and
+          # is then discarded by the `_` this wrapper publishes below. Fold it
+          # into the provides source so both spellings mean the same thing at
+          # every depth. A `_` read back off another wrapper carries __functor;
+          # that is the read shorthand, not a write, and stays out of provides.
+          writtenUnderscore =
+            let
+              v = merged._ or null;
+            in
+            if builtins.isAttrs v && !(v ? __functor) then v else { };
+          providesChildren = builtins.removeAttrs ((merged.provides or { }) // writtenUnderscore) [
+            "_module"
+          ];
           unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
           provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
           # A key names a candidate child aspect when it is neither structural,
@@ -604,7 +618,12 @@ let
           __contentValues = flatDefs;
           __provider = provider;
           __providesForwarded = unshadowedProvides;
-          _ = underscoreAt provider annotatedMerged;
+          # Root aspects publish `provides` and `_` as one value — provides-
+          # children plus the all-children functor (mergeWithAspectMeta's
+          # syntheticProvides). Match that here so the two spellings are
+          # interchangeable for reading as well as writing, at any depth.
+          provides = providesChildren // underscoreAt provider annotatedMerged;
+          _ = providesChildren // underscoreAt provider annotatedMerged;
         }
         // lib.optionalAttrs singleFn {
           __functor = _self: (builtins.head flatDefs).value;
