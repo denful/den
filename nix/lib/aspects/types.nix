@@ -680,7 +680,30 @@ let
         internal = true;
         visible = false;
         description = "Provider path tracking aspect provenance";
-        type = lib.types.listOf lib.types.str;
+        # NOT listOf: that type accumulates, and a node has exactly one
+        # position. Two files defining one aspect path each inject the same
+        # chain (providerType.merge, wrapperToAspect), and concatenating them
+        # yields ["a" "a"] — a chain every descendant then inherits. Agreeing
+        # definitions collapse; genuinely different ones are an ambiguity den
+        # cannot resolve, so it says so rather than picking one.
+        type = lib.types.mkOptionType {
+          name = "aspectChain";
+          description = "aspect provenance chain";
+          check = v: builtins.isList v && builtins.all builtins.isString v;
+          merge =
+            loc: defs:
+            let
+              distinct = lib.unique (map (d: d.value) defs);
+            in
+            if distinct == [ ] then
+              [ ]
+            else if builtins.length distinct == 1 then
+              builtins.head distinct
+            else
+              throw "den: conflicting provenance for ${locName loc}: ${
+                lib.concatMapStringsSep " vs " (c: "[${lib.concatStringsSep " " c}]") distinct
+              }";
+        };
         default = typeCfg.providerPrefix or [ ];
       };
       options.collisionPolicy = lib.mkOption {
