@@ -565,9 +565,17 @@ let
               v = merged._ or null;
             in
             lib.optionalAttrs (builtins.isAttrs v && !(v ? __functor)) v;
-          providesChildren = builtins.removeAttrs ((merged.provides or { }) // writtenUnderscore) [
-            "_module"
-          ];
+          # Both spellings arrive as a content wrapper when the key is defined in
+          # more than one file, carrying `__contentValues` / `__provider` / `_`
+          # alongside the real children. Those are wrapper machinery, not
+          # provides children: unfiltered they surface as `provides` keys, enter
+          # `__providesForwarded`, and `_` (not `__`-prefixed) registers an inert
+          # cross-provide policy. Filtering here covers `provides` and `_` at
+          # once, and the single-def path is unaffected because a raw attrset
+          # carries none of these keys.
+          providesChildren = lib.filterAttrs (k: _: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k)) (
+            (merged.provides or { }) // writtenUnderscore
+          );
           unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
           provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
           # A key names a candidate child aspect when it is neither structural,
