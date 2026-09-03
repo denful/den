@@ -7,7 +7,9 @@
   <a href="https://github.com/denful/den/actions"><img src="https://github.com/denful/den/actions/workflows/test.yml/badge.svg" alt="CI Status"/></a>
 </p>
 
-> den and [vic](https://bsky.app/profile/oeiuwq.bsky.social)'s [aspect libs](https://denful.dev) made for you with Love++ and AI--. If you like my work, consider [sponsoring](https://denful.dev/sponsor)
+> If Den or other [denful libs](https://github.com/denful) have been of use to you, consider [sponsoring](https://denful.dev/sponsor).
+>
+> NOTE: Den no longer relates to the <code>"Dendritic"</code> name, Den was born to explore the limits of that pattern and has evolved to something much more advanced and flexible, the official dendritic repo no longer considers this Dendritic.
 
 # den — Aspect-oriented, Context-driven Nix
 
