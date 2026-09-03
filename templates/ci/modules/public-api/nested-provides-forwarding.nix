@@ -109,5 +109,73 @@
         };
       }
     );
+
+    # `_` is documented as an alias for `provides`. aspectSubmodule wires it via
+    # mkAliasOptionModule, which a nested key never reaches — writes through it
+    # used to land on a structural key the content wrapper then overwrote.
+    test-underscore-write-alias-on-nested-aspect = denTest (
+      { den, tuxHm, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [ den.aspects.alpha ];
+
+        den.aspects.alpha = {
+          includes = [ den.aspects.alpha.tools ];
+          tools._.to-users.homeManager.home.sessionVariables.ALPHA = "yes";
+        };
+
+        expr = tuxHm.home.sessionVariables.ALPHA or "<missing>";
+        expected = "yes";
+      }
+    );
+
+    # The written value reads back through `_` as well as through `provides`,
+    # matching how a root aspect publishes both.
+    test-underscore-reads-back-on-nested-aspect = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [ den.aspects.alpha.tools._.shared ];
+
+        den.aspects.alpha.tools._.shared.nixos.environment.etc."shared".text = "yes";
+
+        expr = {
+          viaUnderscore = den.aspects.alpha.tools._ ? shared;
+          viaProvides = den.aspects.alpha.tools.provides ? shared;
+          delivered = igloo.environment.etc."shared".text or "<missing>";
+        };
+        expected = {
+          viaUnderscore = true;
+          viaProvides = true;
+          delivered = "yes";
+        };
+      }
+    );
+
+    # `_` called as the all-children shorthand still works alongside the alias.
+    test-underscore-shorthand-still-collects-children = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [ (den.aspects.alpha.tools._ { }) ];
+
+        den.aspects.alpha.tools = {
+          one.nixos.environment.etc."one".text = "yes";
+          two.nixos.environment.etc."two".text = "yes";
+        };
+
+        expr = {
+          one = igloo.environment.etc ? "one";
+          two = igloo.environment.etc ? "two";
+        };
+        expected = {
+          one = true;
+          two = true;
+        };
+      }
+    );
   };
 }

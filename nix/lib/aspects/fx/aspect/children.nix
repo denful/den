@@ -55,7 +55,7 @@ let
   registerPolicy =
     p:
     fx.send "register-aspect-policy" {
-      inherit (p) name fn;
+      inherit (p) fn;
       ownerIdentity = identity.key p;
     };
 
