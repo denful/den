@@ -100,6 +100,50 @@ in
       }
     );
 
+    # emitAspectPolicies: the wrapper's own stale meta must not survive past
+    # providerMeta (the freshly computed self-provide chain) — a parametric
+    # wrapper carrying its own meta.aspect-chain must not win the merge.
+    test-self-provide-wrapper-meta-does-not-override-chain = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        aspect = {
+          name = "host";
+          meta = { };
+          provides = {
+            host = {
+              __fn = ctx: {
+                name = "host-provider";
+                meta = { };
+                includes = [ ];
+              };
+              __args = {
+                ctx = false;
+              };
+              meta = {
+                aspect-chain = [
+                  "wrong"
+                  "chain"
+                ];
+                selfProvide = false;
+              };
+            };
+          };
+          includes = [ ];
+        };
+        comp = den.lib.aspects.fx.aspect.emitAspectPolicies aspect;
+        result = fx.handle {
+          handlers = collectHandlers;
+          state = { };
+        } comp;
+        emitted = builtins.head result.value;
+      in
+      {
+        expr = den.lib.aspects.fx.identity.key emitted;
+        expected = "host/host";
+      }
+    );
+
     # Into keys excluded from class emission by structuralKeys.
     test-into-not-class = denTest (
       { den, ... }:

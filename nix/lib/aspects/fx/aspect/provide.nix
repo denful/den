@@ -130,7 +130,7 @@ let
           // (
             if isParamWrapper then
               builtins.removeAttrs (providerVal.meta or { }) [
-                "provider"
+                "aspect-chain"
                 "selfProvide"
               ]
             else
