@@ -162,6 +162,7 @@ let
     scopedDeferredIncludes = _: { };
     scopedDeferredConditionals = _: { };
     scopedIncludesChain = _: { };
+    scopedIncludesChainSegments = _: { };
     scopedConstraintRegistry = _: { };
     # Flat filter list only (excludes/substitutes are entity-scoped via
     # scopedConstraintRegistry; filters have no scoped registry).

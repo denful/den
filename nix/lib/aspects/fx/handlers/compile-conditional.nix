@@ -138,7 +138,7 @@ let
   # anonymous payloads get distinct names instead of dedup-colliding.
   emitGuardedAspects =
     condNode:
-    chainWrap (identity.key condNode) true (
+    chainWrap (identity.key condNode) (identity.aspectPath condNode) true (
       emitIncludes {
         __parentScopeHandlers = condNode.__scopeHandlers or null;
         __parentCtxId = condNode.__ctxId or null;

@@ -32,7 +32,11 @@ in
         raw = param.aspect;
         aspect = builtins.removeAttrs raw parametricInternalKeys;
         nodeIdentity = identity.key aspect;
-        chainIdentity = identity.pathKey (identity.ownChain aspect ++ [ (aspect.name or "<anon>") ]);
+        # The segment list IS this node's position; chainIdentity is just its
+        # rendering. Push both so a child needing to fill an absent chain
+        # gets the edge itself, not a string to re-parse.
+        chainSegments = identity.ownChain aspect ++ [ (aspect.name or "<anon>") ];
+        chainIdentity = identity.pathKey chainSegments;
         isMeaningful = isMeaningfulName (aspect.name or "<anon>");
       in
       {
@@ -70,7 +74,7 @@ in
                         _:
                         fx.bind (fx.send "resolve-children" {
                           aspect = tagged;
-                          inherit isMeaningful chainIdentity;
+                          inherit isMeaningful chainIdentity chainSegments;
                         }) (resolved: fx.pure [ resolved ])
                       )
                   )
