@@ -32,11 +32,11 @@ in
         raw = param.aspect;
         aspect = builtins.removeAttrs raw parametricInternalKeys;
         nodeIdentity = identity.key aspect;
-        # The segment list IS this node's position; chainIdentity is just its
-        # rendering. Push both so a child needing to fill an absent chain
-        # gets the edge itself, not a string to re-parse.
-        chainSegments = identity.ownChain aspect ++ [ (aspect.name or "<anon>") ];
-        chainIdentity = identity.pathKey chainSegments;
+        # Pushed onto the walk's chain for descendants — identity.aspectPath,
+        # not ownChain ++ [name], so this equals the list identity.key itself
+        # renders (chainWrap derives its string the same way), and every
+        # producer of a chain-push agrees on what a segment list means.
+        chainSegments = identity.aspectPath aspect;
         isMeaningful = isMeaningfulName (aspect.name or "<anon>");
       in
       {
@@ -74,7 +74,7 @@ in
                         _:
                         fx.bind (fx.send "resolve-children" {
                           aspect = tagged;
-                          inherit isMeaningful chainIdentity chainSegments;
+                          inherit isMeaningful chainSegments;
                         }) (resolved: fx.pure [ resolved ])
                       )
                   )

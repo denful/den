@@ -50,7 +50,6 @@ in
       let
         aspect = param.aspect;
         isMeaningful = param.isMeaningful;
-        chainIdentity = param.chainIdentity;
         # Defaulted: internal-api tests exercise this handler directly without
         # a segment list, and isMeaningful = false skips chainWrap's push
         # anyway.
@@ -81,7 +80,7 @@ in
                   )
               );
           in
-          fx.bind (chainWrap chainIdentity chainSegments isMeaningful (resolveChildSequence aspect)) (
+          fx.bind (chainWrap chainSegments isMeaningful (resolveChildSequence aspect)) (
             allChildren:
             fx.bind (maybeDrain allChildren) (
               finalChildren:

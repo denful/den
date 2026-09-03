@@ -23,14 +23,15 @@ let
   # siblings don't dedup-collide at the gate.
   inherit (den.lib.aspects) isSyntheticName;
 
-  # Wrap a computation in chain-push/chain-pop of the given identity. Pushes
-  # the segment list alongside the rendered string — a child that needs to
-  # fill an absent chain reads the edge itself, not a string to re-parse.
+  # Wrap a computation in chain-push/chain-pop of the given position. Takes
+  # the segment list alone and derives the rendered string from it — a single
+  # carrier for one fact, so the string can never name a different position
+  # than the list it was rendered from.
   chainWrap =
-    nodeIdentity: nodeSegments: shouldPush: comp:
+    nodeSegments: shouldPush: comp:
     if shouldPush then
       fx.bind (fx.send "chain-push" {
-        identity = nodeIdentity;
+        identity = identity.pathKey nodeSegments;
         segments = nodeSegments;
       }) (_: fx.bind comp (result: fx.bind (fx.send "chain-pop" null) (_: fx.pure result)))
     else
