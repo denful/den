@@ -30,5 +30,21 @@
       }
     );
 
+    # A bare parametric fn (no lib/config/options args) at a nested `provides`
+    # key returns a raw wrapper built directly in types.nix, bypassing the
+    # module system's option merging for `meta`. That wrapper must still carry
+    # its parent's provider prefix so identity.key gives it a scoped identity
+    # ("foo/bar") rather than colliding with every other aspect named "bar" —
+    # the gate dedups on this string.
+    test-parametric-fn-provides-inherits-provider-prefix = denTest (
+      { den, ... }:
+      {
+        den.aspects.foo.provides.bar = { host, ... }: { };
+
+        expr = den.lib.aspects.fx.identity.key den.aspects.foo.provides.bar;
+        expected = "foo/bar";
+      }
+    );
+
   };
 }
