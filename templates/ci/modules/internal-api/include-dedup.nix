@@ -148,7 +148,7 @@
       let
         shared = {
           name = "shared";
-          meta = { };
+          meta.aspect-chain = [ ];
           nixos = {
             networking.hostName = "test";
           };
@@ -199,7 +199,7 @@
       let
         shared = {
           name = "shared";
-          meta = { };
+          meta.aspect-chain = [ ];
           nixos =
             { config, ... }:
             {
@@ -242,6 +242,35 @@
           ) { } (builtins.attrValues (result.state.scopedClassImports null))).nixos or [ ]
         );
         expected = 1;
+      }
+    );
+
+    # A hand-built aspect fed straight to fxFullResolve (bypassing the module
+    # system, which is what normally stamps a declared aspect's chain as
+    # `[ ]`) must state its own chain rather than reading null at resolution.
+    # Falsify by reverting `shared`'s `meta.aspect-chain = [ ]` to `meta = { }`.
+    test-raw-fixture-carries-its-own-chain = denTest (
+      { den, ... }:
+      let
+        shared = {
+          name = "shared";
+          meta.aspect-chain = [ ];
+          includes = [ ];
+        };
+        result = den.lib.aspects.fx.pipeline.fxFullResolve {
+          class = "nixos";
+          self = {
+            name = "root";
+            meta = { };
+            includes = [ shared ];
+          };
+          ctx = { };
+        };
+        sharedNode = ((result.state.resolvedNodes or (_: { })) null)."shared" or null;
+      in
+      {
+        expr = sharedNode.meta.aspect-chain or null;
+        expected = [ ];
       }
     );
 

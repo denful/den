@@ -90,6 +90,7 @@
           name = "sops";
           meta = {
             provider = [ ];
+            aspect-chain = [ ];
           };
           includes = [ ];
         };
@@ -184,6 +185,7 @@
           name = "sops";
           meta = {
             provider = [ ];
+            aspect-chain = [ ];
           };
           includes = [ ];
         };

@@ -13,14 +13,14 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           nixos = {
             a = 1;
           };
           includes = [
             {
               name = "child";
-              meta = { };
+              meta.aspect-chain = [ ];
               nixos = {
                 b = 2;
               };
@@ -58,6 +58,7 @@
         root = {
           name = "root";
           meta = {
+            aspect-chain = [ ];
             handleWith = fxLib.constraints.exclude target;
           };
           includes = [
@@ -99,11 +100,11 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           includes = [
             {
               name = "child";
-              meta = { };
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
           ];
@@ -122,15 +123,15 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           includes = [
             {
               name = "child";
-              meta = { };
+              meta.aspect-chain = [ ];
               includes = [
                 {
                   name = "grandchild";
-                  meta = { };
+                  meta.aspect-chain = [ ];
                   includes = [ ];
                 }
               ];
@@ -157,6 +158,7 @@
         root = {
           name = "root";
           meta = {
+            aspect-chain = [ ];
             handleWith = fxLib.constraints.exclude target;
           };
           includes = [
@@ -187,7 +189,7 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           nixos = {
             a = 1;
           };
@@ -226,6 +228,7 @@
         root = {
           name = "root";
           meta = {
+            aspect-chain = [ ];
             handleWith = fxLib.constraints.exclude target;
           };
           includes = [ ];
