@@ -40,11 +40,11 @@ let
   # via the closure each edge carries.
 
   # Freeform type for route nesting evalModules: merges like NixOS (attrsets
-  # deep-merge, lists concatenate) but errors on conflicting scalar/derivation
-  # values instead of silently clobbering.
+  # deep-merge, lists concatenate, equal values collapse) but errors on
+  # disagreeing scalar/derivation values instead of silently clobbering.
   mergeableType = lib.mkOptionType {
     name = "mergeable";
-    description = "auto-merged value (attrsets merge, lists concatenate, scalars conflict)";
+    description = "auto-merged value (attrsets merge, lists concatenate, scalars must agree)";
     merge =
       loc: defs:
       let
@@ -60,6 +60,10 @@ let
         builtins.concatLists values
       else if allMergeableAttrs then
         (lib.types.lazyAttrsOf mergeableType).merge loc defs
+      # Agreeing definitions are not a conflict — same rule as NixOS's
+      # `mergeEqualOption`. Checked last: it forces the values.
+      else if builtins.all (v: v == first) values then
+        first
       else
         throw "den: the option `${lib.showOption loc}' has conflicting definitions from multiple aspects";
   };
