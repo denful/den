@@ -39,8 +39,11 @@
           den.aspects.pkg-two
         ];
 
-        expr = builtins.readFile config.flake.packages.x86_64-linux.shared;
-        expected = "same";
+        # Forcing the merged option is the whole oracle — before the fix this
+        # threw. Reading the file would realise an x86_64-linux derivation and
+        # fail the macOS runner on platform mismatch.
+        expr = config.flake.packages.x86_64-linux.shared.name;
+        expected = "shared";
       }
     );
 
