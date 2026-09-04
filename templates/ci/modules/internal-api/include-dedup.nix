@@ -261,7 +261,7 @@
           class = "nixos";
           self = {
             name = "root";
-            meta = { };
+            meta.aspect-chain = [ ];
             includes = [ shared ];
           };
           ctx = { };
@@ -270,6 +270,19 @@
       in
       {
         expr = sharedNode.meta.aspect-chain or null;
+        expected = [ ];
+      }
+    );
+
+    # The cell above hardcodes `shared`'s own chain, so it can't discriminate
+    # the actual construction site (defaults.nix stamping den.default's own
+    # chain, since den.default is a bare top-level submodule option that
+    # bypasses aspectType's merge). Assert on that production value directly.
+    # Falsify by deleting defaults.nix's `config.den.default.meta.aspect-chain`.
+    test-den-default-states-its-own-chain = denTest (
+      { den, ... }:
+      {
+        expr = den.default.meta.aspect-chain;
         expected = [ ];
       }
     );
