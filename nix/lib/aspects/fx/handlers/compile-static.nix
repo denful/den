@@ -65,25 +65,21 @@ in
         defPos = withoutParametricKeys.meta.__defPos or null;
         defValue = withoutParametricKeys.meta.__defValue or null;
         chainRegistry = ((state.chainByDefPos or (_: { })) null);
-        claimedEntry = if defPos == null then null else chainRegistry.${defPos} or null;
         # A position identifies a token, so it over-merges: a factory called
         # twice and `base // { ... }` specialised twice are two distinct
-        # aspects at one position. Reuse the claimed chain only when the raw
-        # authored value is the same value. One value included twice is
+        # aspects at one position, and either can hold several distinct raw
+        # values over the run — so each position keeps a list of claims, not
+        # one. Reuse a claimed chain only when the raw authored value (the
+        # whole value, `meta` included: `__defValue` is captured pre-stamp, so
+        # there is nothing of the guard's own bookkeeping to strip) is the
+        # same value as that claim's. One value included twice is
         # pointer-identical, which `==` settles without descending; two
-        # distinct values stop at their first differing attribute. `meta` is
-        # dropped from the comparison because it carries this stamp itself.
-        claimedChain =
-          if claimedEntry == null then
-            null
-          else if
-            defValue != null
-            && claimedEntry.value != null
-            && builtins.removeAttrs defValue [ "meta" ] == builtins.removeAttrs claimedEntry.value [ "meta" ]
-          then
-            claimedEntry.chain
-          else
-            null;
+        # distinct values stop at their first differing attribute.
+        claimedEntries = if defPos == null then [ ] else chainRegistry.${defPos} or [ ];
+        matchingClaim = lib.findFirst (
+          e: defValue != null && e.value != null && defValue == e.value
+        ) null claimedEntries;
+        claimedChain = if matchingClaim == null then null else matchingClaim.chain;
         fillsChain =
           (withoutParametricKeys.meta.aspect-chain or null) == null
           && !(withoutParametricKeys.__walkStamped or false);
@@ -108,13 +104,15 @@ in
             withoutParametricKeys;
         nodeIdentity = identity.key aspect;
         nextState =
-          if fillsChain && defPos != null && claimedEntry == null then
+          if fillsChain && defPos != null && matchingClaim == null then
             let
               updated = chainRegistry // {
-                ${defPos} = {
-                  chain = parentChainSegments;
-                  value = defValue;
-                };
+                ${defPos} = claimedEntries ++ [
+                  {
+                    chain = parentChainSegments;
+                    value = defValue;
+                  }
+                ];
               };
             in
             state // { chainByDefPos = _: updated; }

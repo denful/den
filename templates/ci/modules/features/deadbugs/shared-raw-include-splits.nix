@@ -297,5 +297,128 @@
       }
     );
 
+    # C1 (fix round 1): a factory call varying ONLY `meta` must not merge with
+    # its sibling — the guard's comparison must cover the whole raw value.
+    # `meta` is not comparison-inert: metaType declares real fields
+    # (handleWith, collisionPolicy), and __defValue is captured BEFORE this
+    # guard's own stamp, so there is nothing of the guard's bookkeeping to
+    # strip. A projection that drops `meta` from the comparison reads this as
+    # one value, silently drops one owner's node, and reads identically to
+    # the rejected 38e1f725 on this input.
+    test-p2-meta-only-difference-does-not-merge = denTest (
+      { den, igloo, ... }:
+      let
+        mkProbe = tag: {
+          name = "probed";
+          meta.probe = tag;
+          nixos.environment.etc."common".text = "yes";
+        };
+        probedNodes = builtins.filter (n: n.name == "probed") den.hosts.x86_64-linux.igloo.aspects;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.alpha
+          den.aspects.beta
+        ];
+
+        den.aspects.alpha.includes = [ (mkProbe "a") ];
+        den.aspects.beta.includes = [ (mkProbe "b") ];
+
+        expr = {
+          count = builtins.length probedNodes;
+          probes = builtins.sort builtins.lessThan (map (n: n.meta.probe) probedNodes);
+          text = igloo.environment.etc."common".text;
+        };
+        expected = {
+          count = 2;
+          probes = [
+            "a"
+            "b"
+          ];
+          text = "yes\nyes";
+        };
+      }
+    );
+
+    # C2 (fix round 1): a def-position registry that keeps a single claim lets
+    # a differing sibling (gamma, its own factory call) occupy the position
+    # first and permanently block a genuinely shared value (two owners of the
+    # same `mkTool "sh"` pointer) from ever registering its own claim — so the
+    # shared value's two sightings never find each other and the mechanism is
+    # a no-op for this walk order (identical to the pre-mechanism reading).
+    test-p1-sibling-claims-position-then-shared-value-splits = denTest (
+      { den, igloo, ... }:
+      let
+        mkTool = tag: {
+          name = "tools";
+          nixos.environment.etc.${tag}.text = "yes";
+        };
+        shared = mkTool "sh";
+        toolsNodes = builtins.filter (n: n.name == "tools") den.hosts.x86_64-linux.igloo.aspects;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.gamma
+          den.aspects.alpha
+          den.aspects.beta
+        ];
+
+        den.aspects.gamma.includes = [ (mkTool "gammafile") ];
+        den.aspects.alpha.includes = [ shared ];
+        den.aspects.beta.includes = [ shared ];
+
+        expr = {
+          count = builtins.length toolsNodes;
+          shText = igloo.environment.etc."sh".text;
+        };
+        expected = {
+          count = 2;
+          shText = "yes";
+        };
+      }
+    );
+
+    # Same probe, shared walked before the differing sibling: shared claims
+    # the position's only slot first, so it merges with itself correctly —
+    # this ordering happens to work even under the single-claim bug, which is
+    # exactly why the bug needs the reordered cell above to be caught at all.
+    test-p1b-shared-value-walked-first-merges = denTest (
+      { den, igloo, ... }:
+      let
+        mkTool = tag: {
+          name = "tools";
+          nixos.environment.etc.${tag}.text = "yes";
+        };
+        shared = mkTool "sh";
+        toolsNodes = builtins.filter (n: n.name == "tools") den.hosts.x86_64-linux.igloo.aspects;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.alpha
+          den.aspects.beta
+          den.aspects.gamma
+        ];
+
+        den.aspects.alpha.includes = [ shared ];
+        den.aspects.beta.includes = [ shared ];
+        den.aspects.gamma.includes = [ (mkTool "gammafile") ];
+
+        expr = {
+          count = builtins.length toolsNodes;
+          shText = igloo.environment.etc."sh".text;
+        };
+        expected = {
+          count = 2;
+          shText = "yes";
+        };
+      }
+    );
+
   };
 }
