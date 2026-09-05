@@ -47,7 +47,8 @@ let
         };
     }
     // lib.optionalAttrs (aspect ? into) { inherit (aspect) into; }
-    // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; };
+    // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; }
+    // lib.optionalAttrs (aspect ? __walkStamped) { inherit (aspect) __walkStamped; };
 
   # Merge the resolved value into the parametric base.
   mkParametricNext =
