@@ -318,6 +318,35 @@ let
       merge =
         loc: defs:
         let
+          # Definition position of the value as the author wrote it, read from
+          # the ORIGINAL defs: wrapperToAspect below rewrites `name`, and a
+          # position read after that points at types.nix rather than the
+          # author's file. Two inclusion sites of one let-bound value report
+          # ONE position; two separately-written inline literals report two.
+          defPosOf =
+            v:
+            let
+              p = if v ? name then builtins.unsafeGetAttrPos "name" v else null;
+            in
+            if p == null then null else "${toString p.file}:${toString p.line}:${toString p.column}";
+          stampDefPos =
+            d:
+            let
+              pos = defPosOf d.value;
+            in
+            if
+              builtins.isAttrs d.value && !(d.value.__isPolicy or false) && !(d.value ? __fn) && pos != null
+            then
+              d
+              // {
+                value = d.value // {
+                  meta = (d.value.meta or { }) // {
+                    __defPos = pos;
+                  };
+                };
+              }
+            else
+              d;
           # Normalize __contentValues wrappers (from aspectContentType) that
           # contain parametric functions.  Without this, the wrapper merges
           # through aspectSubmodule and the function is buried as a freeform
@@ -368,7 +397,7 @@ let
                   meta.aspect-chain = lib.init d.value.__aspectChain;
                 };
             };
-          defs' = map (d: if isContentWrapper d then wrapperToAspect d else d) defs;
+          defs' = map (d: if isContentWrapper d then wrapperToAspect d else d) (map stampDefPos defs);
           listDefs = builtins.filter (d: builtins.isList d.value) defs';
           policyDefs = builtins.filter (d: builtins.isAttrs d.value && d.value.__isPolicy or false) defs';
         in
