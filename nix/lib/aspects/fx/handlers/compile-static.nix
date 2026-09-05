@@ -76,6 +76,13 @@ in
         # pointer-identical, which `==` settles without descending; two
         # distinct values stop at their first differing attribute.
         claimedEntries = if defPos == null then [ ] else chainRegistry.${defPos} or [ ];
+        # K(K-1)/2 in K, the count of distinct raw values sharing one
+        # position: the Nth arrival walks up to N-1 earlier claims before
+        # adding its own. Bounded in practice because the registry is
+        # per-run, so K only grows where one factory body is called many
+        # times inside a single entity's resolve. (A prior figure recording
+        # this as linear in K was measured against the single-claim form,
+        # before distinct values got a claim each.)
         matchingClaim = lib.findFirst (
           e: defValue != null && e.value != null && defValue == e.value
         ) null claimedEntries;
