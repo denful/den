@@ -120,5 +120,182 @@
       }
     );
 
+    # O2: a factory called twice reports ONE __defPos (the call site inside
+    # the factory body never changes) but TWO distinct raw values — the
+    # rejected `38e1f725` mechanism keyed the registry on that position alone
+    # and merged them, silently dropping beta's delivery. The value-equality
+    # guard must see the two calls differ and let both through.
+    test-factory-samename-two-owners = denTest (
+      { den, igloo, ... }:
+      let
+        mkTool = tag: {
+          name = "tools";
+          nixos.environment.etc.${tag}.text = "yes";
+        };
+        toolsNodes = builtins.filter (n: n.name == "tools") den.hosts.x86_64-linux.igloo.aspects;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.alpha
+          den.aspects.beta
+        ];
+
+        den.aspects.alpha.includes = [ (mkTool "alphafile") ];
+        den.aspects.beta.includes = [ (mkTool "betafile") ];
+
+        expr = {
+          alpha = igloo.environment.etc ? "alphafile";
+          beta = igloo.environment.etc ? "betafile";
+          count = builtins.length toolsNodes;
+          identities = builtins.sort builtins.lessThan (map (n: n.identity) toolsNodes);
+        };
+        expected = {
+          alpha = true;
+          beta = true;
+          count = 2;
+          identities = [
+            "alpha/tools"
+            "beta/tools"
+          ];
+        };
+      }
+    );
+
+    # O3: same class of defect as O2, reached via `base // { ... }` instead of
+    # a factory call — each specialisation is a distinct raw value at one
+    # position.
+    test-overlay-samename-two-owners = denTest (
+      { den, igloo, ... }:
+      let
+        base = {
+          name = "tools";
+          nixos.environment.etc."common".text = "yes";
+        };
+        toolsNodes = builtins.filter (n: n.name == "tools") den.hosts.x86_64-linux.igloo.aspects;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.alpha
+          den.aspects.beta
+        ];
+
+        den.aspects.alpha.includes = [
+          (base // { nixos.environment.etc."alphaonly".text = "yes"; })
+        ];
+        den.aspects.beta.includes = [
+          (base // { nixos.environment.etc."betaonly".text = "yes"; })
+        ];
+
+        expr = {
+          alpha = igloo.environment.etc ? "alphaonly";
+          beta = igloo.environment.etc ? "betaonly";
+          count = builtins.length toolsNodes;
+          identities = builtins.sort builtins.lessThan (map (n: n.identity) toolsNodes);
+        };
+        expected = {
+          alpha = true;
+          beta = true;
+          count = 2;
+          identities = [
+            "alpha/tools"
+            "beta/tools"
+          ];
+        };
+      }
+    );
+
+    # O5: two BYTE-IDENTICAL inline literals at two source positions split
+    # into two nodes, and that is accepted — they never collide in the
+    # registry because they occupy two positions, so the equality guard is
+    # never consulted. Asserted so a future author does not read this split
+    # as a regression.
+    test-byte-identical-literals = denTest (
+      { den, igloo, ... }:
+      let
+        twinNodes = builtins.filter (n: n.name == "twin") den.hosts.x86_64-linux.igloo.aspects;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.alpha
+          den.aspects.beta
+        ];
+
+        den.aspects.alpha.includes = [
+          {
+            name = "twin";
+            nixos.environment.etc."twin".text = "yes";
+          }
+        ];
+        den.aspects.beta.includes = [
+          {
+            name = "twin";
+            nixos.environment.etc."twin".text = "yes";
+          }
+        ];
+
+        expr = {
+          count = builtins.length twinNodes;
+          identities = builtins.sort builtins.lessThan (map (n: n.identity) twinNodes);
+          text = igloo.environment.etc."twin".text;
+        };
+        expected = {
+          count = 2;
+          identities = [
+            "alpha/twin"
+            "beta/twin"
+          ];
+          text = "yes\nyes";
+        };
+      }
+    );
+
+    # O6: a shared value that is itself cyclic. Two inclusion sites of one
+    # let-bound cyclic value must still collapse to one node — proving the
+    # equality guard's raw-value comparison takes the pointer-identical O(1)
+    # path rather than descending into the cycle (a distinct cyclic value
+    # would have to descend; see deadbugs/aspect-equality-author-cycle for
+    # that accepted cost).
+    test-shared-cyclic-value-across-two-owners-is-one-node = denTest (
+      { den, igloo, ... }:
+      let
+        shared =
+          let
+            v = {
+              name = "loopy";
+              carrier.loop = v;
+              nixos.environment.etc."loopy".text = "yes";
+            };
+          in
+          v;
+        nodes = builtins.filter (n: n.name == "loopy") den.hosts.x86_64-linux.igloo.aspects;
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.igloo.includes = [
+          den.aspects.o1
+          den.aspects.o2
+        ];
+
+        den.aspects.o1.includes = [ shared ];
+        den.aspects.o2.includes = [ shared ];
+
+        expr = {
+          count = builtins.length nodes;
+          text = igloo.environment.etc."loopy".text;
+        };
+        expected = {
+          count = 1;
+          text = "yes";
+        };
+      }
+    );
+
   };
 }

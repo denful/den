@@ -155,6 +155,10 @@ let
     pathSetByScope = _: { };
     # Full resolved nodes keyed by unique identity, for entity.aspects.
     resolvedNodes = _: { };
+    # Definition-position → { chain; value; } claims for the inline-chain fill
+    # (compile-static.nix). Flat by design: a shared value's identity must not
+    # depend on which scope happened to walk it first.
+    chainByDefPos = _: { };
 
     # --- Scope-partitioned output state (handlers write here) ---
     scopedClassImports = _: { };

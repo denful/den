@@ -62,20 +62,64 @@ in
         # copies compound multiplicatively at every further level of
         # nesting. Testing the marker, not the name's shape, means an
         # author's own name (e.g. "gcc:14") can never be mistaken for one.
-        aspect =
-          if
-            (withoutParametricKeys.meta.aspect-chain or null) == null
-            && !(withoutParametricKeys.__walkStamped or false)
+        defPos = withoutParametricKeys.meta.__defPos or null;
+        defValue = withoutParametricKeys.meta.__defValue or null;
+        chainRegistry = ((state.chainByDefPos or (_: { })) null);
+        claimedEntry = if defPos == null then null else chainRegistry.${defPos} or null;
+        # A position identifies a token, so it over-merges: a factory called
+        # twice and `base // { ... }` specialised twice are two distinct
+        # aspects at one position. Reuse the claimed chain only when the raw
+        # authored value is the same value. One value included twice is
+        # pointer-identical, which `==` settles without descending; two
+        # distinct values stop at their first differing attribute. `meta` is
+        # dropped from the comparison because it carries this stamp itself.
+        claimedChain =
+          if claimedEntry == null then
+            null
+          else if
+            defValue != null
+            && claimedEntry.value != null
+            && builtins.removeAttrs defValue [ "meta" ] == builtins.removeAttrs claimedEntry.value [ "meta" ]
           then
+            claimedEntry.chain
+          else
+            null;
+        fillsChain =
+          (withoutParametricKeys.meta.aspect-chain or null) == null
+          && !(withoutParametricKeys.__walkStamped or false);
+        # A shared let-bound value reports the same __defPos at every inclusion
+        # site: the first node to fill here claims parentChainSegments for that
+        # position, and every later node at the same position reuses the
+        # claimed chain instead of filling its own — so both render one
+        # identity and gate dedup collapses them to one emission. A node with
+        # no __defPos (no author position, or the null the head-of-attrNames
+        # fallback would have destroyed — see types.nix) behaves exactly as
+        # the unregistered fill below.
+        filledChain = if claimedChain != null then claimedChain else parentChainSegments;
+        aspect =
+          if fillsChain then
             withoutParametricKeys
             // {
               meta = (withoutParametricKeys.meta or { }) // {
-                aspect-chain = parentChainSegments;
+                aspect-chain = filledChain;
               };
             }
           else
             withoutParametricKeys;
         nodeIdentity = identity.key aspect;
+        nextState =
+          if fillsChain && defPos != null && claimedEntry == null then
+            let
+              updated = chainRegistry // {
+                ${defPos} = {
+                  chain = parentChainSegments;
+                  value = defValue;
+                };
+              };
+            in
+            state // { chainByDefPos = _: updated; }
+          else
+            state;
         # Pushed onto the walk's chain for descendants — identity.aspectPath,
         # not ownChain ++ [name], so this equals the list identity.key itself
         # renders (chainWrap derives its string the same way), and every
@@ -125,7 +169,7 @@ in
               )
             )
           );
-        inherit state;
+        state = nextState;
       };
   };
 }
