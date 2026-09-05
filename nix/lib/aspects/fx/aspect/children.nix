@@ -55,13 +55,80 @@ let
       ctx = { };
     };
 
-  # Route a single __isPolicy value to the policy registry.
+  # Route a single __isPolicy value to the policy registry. A policy's bare
+  # `name` is the identity every other consumer already relies on (excludes,
+  # cross-scope fired-tracking, broadcast dedup) — changing it unconditionally
+  # would fix the collision below at the cost of every one of those. So the
+  # bare name stays the identity in the overwhelming common case (one
+  # registration per name per scope), and only a genuine collision — a
+  # second, DIFFERENT record claiming a name already taken IN THIS SCOPE —
+  # gets displaced to a chain-qualified identity instead of silently
+  # overwriting the first (scopedAspectPolicies merges by overwrite, one dict
+  # per scope).
+  #
+  # Claims are bucketed by bare name and scoped by state.currentScope, not by
+  # definition position (Task 4c's registry for aspects): traced empirically,
+  # two aspects each declaring their own "policies.tools" merge at DIFFERENT
+  # option paths — each aspect's own submodule eval bakes its own name into
+  # `loc` — so a def-position bucket puts them in separate buckets and misses
+  # the collision entirely, even though both still land in the SAME scope's
+  # scopedAspectPolicies and one overwrites the other. Whole-value equality
+  # within one scope is what actually tells "one shared policy referenced
+  # twice" (O5, must merge into one identity) apart from "two distinct
+  # same-named policies" (O4, must split); two different scopes never
+  # collide in scopedAspectPolicies to begin with, so entries from another
+  # scope are excluded from the comparison rather than forcing a needless
+  # qualification.
   registerPolicy =
     p:
-    fx.send "register-aspect-policy" {
-      inherit (p) fn;
-      ownerIdentity = identity.key p;
-    };
+    fx.bind fx.effects.state.get (
+      state:
+      let
+        scope = state.currentScope;
+        bucketKey = "name:${p.name}";
+        claimRegistry = (state.policyClaimsByName or (_: { })) null;
+        claimedEntries = claimRegistry.${bucketKey} or [ ];
+        sameScopeEntries = builtins.filter (e: e.scope == scope) claimedEntries;
+        # Whole-record comparison, nothing projected out: a record differing
+        # only in, say, an attached label must not be read as the same
+        # registration as one that lacks it.
+        matchingClaim = lib.findFirst (e: p == e.value) null sameScopeEntries;
+        parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
+        parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
+        ownerIdentity =
+          if matchingClaim != null then
+            matchingClaim.identity
+          else if sameScopeEntries == [ ] then
+            p.name
+          else
+            identity.pathKey (parentChainSegments ++ [ p.name ]);
+        registerEffect = fx.send "register-aspect-policy" {
+          inherit (p) fn;
+          inherit ownerIdentity;
+        };
+      in
+      if matchingClaim != null then
+        registerEffect
+      else
+        fx.bind (fx.effects.state.modify (
+          st:
+          st
+          // {
+            policyClaimsByName =
+              _:
+              claimRegistry
+              // {
+                ${bucketKey} = claimedEntries ++ [
+                  {
+                    value = p;
+                    identity = ownerIdentity;
+                    inherit scope;
+                  }
+                ];
+              };
+          }
+        )) (_: registerEffect)
+    );
 
   isPolicy = v: builtins.isAttrs v && v.__isPolicy or false;
 

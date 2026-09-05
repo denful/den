@@ -163,6 +163,17 @@ let
     # Flat by design: a shared value's identity must not depend on which scope
     # happened to walk it first.
     chainByDefPos = _: { };
+    # Policy identity claims: bare name → list of { scope; value; identity; }
+    # claims, consulted by children.nix's registerPolicy to tell a shared
+    # den.policies.<name> (one registration, included twice into the same
+    # scope) apart from two distinct same-named policies registering into
+    # that same scope (which must each keep their own, chain-qualified,
+    # identity). Bucketed by name rather than definition position: a
+    # position-keyed bucket puts two aspects' own same-named
+    # `.policies.<name>` in separate buckets (each merges at a different
+    # option path) even though both still land in one scope's
+    # scopedAspectPolicies, which is exactly where they'd collide.
+    policyClaimsByName = _: { };
 
     # --- Scope-partitioned output state (handlers write here) ---
     scopedClassImports = _: { };
