@@ -27,6 +27,7 @@ let
     "__contentValues"
     "__aspectChain"
     "__providesForwarded"
+    "__walkStamped"
     "_module"
     "_"
   ];

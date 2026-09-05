@@ -97,13 +97,27 @@ let
         state:
         let
           childName = withScope.name or "<anon>";
+          # __walkStamped records that the name below was invented from walk
+          # position, not authored — compile-static reads it to decide
+          # whether filling meta.aspect-chain here would double-encode the
+          # same position (once in the stamped name, once in the chain).
+          # A marker set here, rather than a shape compile-static infers from
+          # the name, can't be confused with an author's own name choice.
           child =
             if skipNameAnon then
               withScope
             else if !(isMeaningfulName childName) then
-              withScope // { name = nameAnon state idx (withScope.__ctxId or null); }
+              withScope
+              // {
+                name = nameAnon state idx (withScope.__ctxId or null);
+                __walkStamped = true;
+              }
             else if isSyntheticName childName then
-              withScope // { name = nameIndexed state childName idx (withScope.__ctxId or null); }
+              withScope
+              // {
+                name = nameIndexed state childName idx (withScope.__ctxId or null);
+                __walkStamped = true;
+              }
             else
               withScope;
         in

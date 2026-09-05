@@ -23,20 +23,6 @@ let
     "__parametricResolvedArgs"
   ];
 
-  # nameIndexed/nameAnon (children.nix) already stamp an unnamed or
-  # synthetic-named sibling's walk position straight into its name —
-  # "<parent>/<base>:<idx>" — precisely so it disambiguates without a
-  # chain at all. Filling the chain for one of these too would encode
-  # that same position twice (once in the name, once in
-  # meta.aspect-chain), and the two copies compound multiplicatively
-  # at every further level of nesting: each level's stamped name
-  # already contains the whole rendered chain so far, then that name
-  # becomes an element of the next level's filled chain, doubling it.
-  # Detect the stamp by its mechanical ":<idx>" suffix rather than by
-  # which synthetic marker produced it, since nameIndexed uses this
-  # same shape for every marker (<anon>, <when>, ...).
-  isWalkStampedName = n: builtins.match ".*:[0-9]+(/.*)?" n != null;
-
 in
 {
   compileStaticHandler = {
@@ -68,10 +54,18 @@ in
         # different inclusion sites must keep its one identity — stamping
         # the inclusion site here instead would give it two and double-emit
         # it.
+        #
+        # __walkStamped (set by children.nix's nameAnon/nameIndexed) marks a
+        # name invented from walk position rather than authored. Filling the
+        # chain for one of these too would encode that same position twice
+        # (once in the stamped name, once in meta.aspect-chain), and the two
+        # copies compound multiplicatively at every further level of
+        # nesting. Testing the marker, not the name's shape, means an
+        # author's own name (e.g. "gcc:14") can never be mistaken for one.
         aspect =
           if
             (withoutParametricKeys.meta.aspect-chain or null) == null
-            && !(isWalkStampedName (withoutParametricKeys.name or "<anon>"))
+            && !(withoutParametricKeys.__walkStamped or false)
           then
             withoutParametricKeys
             // {
