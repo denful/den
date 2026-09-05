@@ -7,6 +7,10 @@ let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
   inherit (import ./normalize.nix { inherit lib den; }) wrapChild isMeaningfulName;
+  # foldScopeAncestors: the shared cycle-guarded self-or-ancestor walk over
+  # scopeParent (also used by the constraint registry). registerPolicy reuses
+  # it rather than a same-scope-only filter — see its comment for why.
+  inherit (import ../handlers/constraint.nix { inherit lib den; }) foldScopeAncestors;
 
   nameIndexed =
     state: base: idx: ctxId:
@@ -61,47 +65,70 @@ let
   # would fix the collision below at the cost of every one of those. So the
   # bare name stays the identity in the overwhelming common case (one
   # registration per name per scope), and only a genuine collision — a
-  # second, DIFFERENT record claiming a name already taken IN THIS SCOPE —
-  # gets displaced to a chain-qualified identity instead of silently
-  # overwriting the first (scopedAspectPolicies merges by overwrite, one dict
-  # per scope).
+  # second, DIFFERENT record claiming a name already taken — gets displaced
+  # to a chain-qualified identity instead of silently overwriting the first
+  # (scopedAspectPolicies merges by overwrite, one dict per scope).
   #
-  # Claims are bucketed by bare name and scoped by state.currentScope, not by
-  # definition position (Task 4c's registry for aspects): traced empirically,
-  # two aspects each declaring their own "policies.tools" merge at DIFFERENT
-  # option paths — each aspect's own submodule eval bakes its own name into
-  # `loc` — so a def-position bucket puts them in separate buckets and misses
-  # the collision entirely, even though both still land in the SAME scope's
-  # scopedAspectPolicies and one overwrites the other. Whole-value equality
-  # within one scope is what actually tells "one shared policy referenced
-  # twice" (O5, must merge into one identity) apart from "two distinct
-  # same-named policies" (O4, must split); two different scopes never
-  # collide in scopedAspectPolicies to begin with, so entries from another
-  # scope are excluded from the comparison rather than forcing a needless
-  # qualification.
+  # Claims are bucketed by bare name, not by definition position (Task 4c's
+  # registry for aspects): traced empirically, two aspects each declaring
+  # their own "policies.tools" merge at DIFFERENT option paths — each
+  # aspect's own submodule eval bakes its own name into `loc` — so a
+  # def-position bucket puts them in separate buckets and misses the
+  # collision entirely, even though both still land in one scope's
+  # scopedAspectPolicies. Whole-value equality is what actually tells "one
+  # shared policy referenced twice" (O5, must merge into one identity) apart
+  # from "two distinct same-named policies" (O4, must split).
+  #
+  # "Same scope" for that comparison means self-or-ancestor (foldScopeAncestors
+  # over scopeParent), not `e.scope == scope`: the late-policy dispatch
+  # (policy/schema.nix emitLateForSibling) merges a parent scope's
+  # registrations with a descendant sibling's BY THIS SAME ownerIdentity
+  # (`allAspectPolicies = scopedAspectPolicies.${parentScope} //
+  # scopedAspectPolicies.${sib.scopeId}`) — a same-scope-only filter let a
+  # host-scope "tools" and a distinct descendant-scope "tools" both keep the
+  # bare name and collide at that merge.
+  #
+  # A displaced identity is qualified with the claim's own index within its
+  # bucket, not just the parent chain: every claimant sharing one parent
+  # chain (e.g. three factory-built policies included as siblings) shares
+  # the SAME chain segments, so without the index the second and third (and
+  # every later) distinct claimant would collide with EACH OTHER under one
+  # identical qualified string.
   registerPolicy =
     p:
     fx.bind fx.effects.state.get (
       state:
       let
         scope = state.currentScope;
+        scopeParentMap = (state.scopeParent or (_: { })) null;
         bucketKey = "name:${p.name}";
         claimRegistry = (state.policyClaimsByName or (_: { })) null;
         claimedEntries = claimRegistry.${bucketKey} or [ ];
-        sameScopeEntries = builtins.filter (e: e.scope == scope) claimedEntries;
+        # foldScopeAncestors's accumulator is an attrset (its other caller
+        # merges constraint-registry dicts); key each step by its own scope
+        # id — foldScopeAncestors visits each scope at most once (cycle
+        # guard), so those keys never collide — then flatten to the list
+        # matchingClaim/ownerIdentity actually want.
+        entriesByAncestorScope = foldScopeAncestors (a: b: a // b) scopeParentMap (s: {
+          ${s} = builtins.filter (e: e.scope == s) claimedEntries;
+        }) scope;
+        sameScopeEntries = builtins.concatLists (builtins.attrValues entriesByAncestorScope);
         # Whole-record comparison, nothing projected out: a record differing
         # only in, say, an attached label must not be read as the same
         # registration as one that lacks it.
         matchingClaim = lib.findFirst (e: p == e.value) null sameScopeEntries;
         parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
         parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
+        # Taken before this claim is appended, so the first displaced claim
+        # gets 1, the second 2, etc. — unique per claim, not just per parent.
+        claimIndex = builtins.length sameScopeEntries;
         ownerIdentity =
           if matchingClaim != null then
             matchingClaim.identity
           else if sameScopeEntries == [ ] then
             p.name
           else
-            identity.pathKey (parentChainSegments ++ [ p.name ]);
+            identity.pathKey (parentChainSegments ++ [ "${p.name}#${toString claimIndex}" ]);
         registerEffect = fx.send "register-aspect-policy" {
           inherit (p) fn;
           inherit ownerIdentity;
