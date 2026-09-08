@@ -36,5 +36,36 @@
       }
     );
 
+    # Container roots other than den.aspects declare their own `origin` seed
+    # (batteries.nix, namespace-types.nix) rather than inheriting the [ ]
+    # default. This pins those two seeds directly rather than relying on
+    # suite totals, so a regression here is caught even though no other
+    # cell in the corpus asserts a battery or namespace chain literal.
+    test-battery-root-chain = denTest (
+      { den, ... }:
+      {
+        expr = den.batteries.hostname.meta.aspect-chain or [ ];
+        expected = [
+          "den"
+          "batteries"
+        ];
+      }
+    );
+
+    test-namespace-root-chain = denTest (
+      {
+        inputs,
+        ns,
+        ...
+      }:
+      {
+        imports = [ (inputs.den.namespace "ns" false) ];
+        ns.probe.nixos.environment.etc."t".text = "y";
+
+        expr = ns.probe.meta.aspect-chain or [ ];
+        expected = [ "ns" ];
+      }
+    );
+
   };
 }
