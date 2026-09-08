@@ -154,7 +154,7 @@ let
   # replacing what was a single `registry.${name} or []` lookup. Per call:
   # O(E + R × D × C). Per dispatch over P policies: O(P × (E + R × D × C)).
   #   E = constraint entries in the scoped registry — per-entity, bounded by
-  #       include-nesting depth, not fleet-wide.
+  #       how many excludes/handleWith one aspect tree declares, not fleet-wide.
   #   R = rawRef excludes in scope.
   #   D = scopes visited per resolveClaim ancestor walk — small (e.g. a
   #       user-scope walk visits 4: self, host, system, and the root ""
