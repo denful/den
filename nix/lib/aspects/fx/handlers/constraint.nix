@@ -53,6 +53,27 @@ let
     in
     go { } scope { };
 
+  # Self-or-ancestor raw-value claim lookup (foldScopeAncestors over one
+  # policyClaimsByName bucket). Shared by registerPolicy (children.nix,
+  # write path: appends a new claim when nothing matches) and raw-ref
+  # exclude resolution (dispatch-policies.nix, read path). Both must judge
+  # "is this the same registration" by the identical rule, so an exclude and
+  # its target are matched exactly as registerPolicy would have matched
+  # them. Whole-value `==`, not a projection: two claims differing only in
+  # an attached label must not read as one registration.
+  resolveClaim =
+    scopeParentMap: scope: claimedEntries: target:
+    let
+      entriesByAncestorScope = foldScopeAncestors (a: b: a // b) scopeParentMap (s: {
+        ${s} = builtins.filter (e: e.scope == s) claimedEntries;
+      }) scope;
+      sameScopeEntries = builtins.concatLists (builtins.attrValues entriesByAncestorScope);
+    in
+    {
+      inherit sameScopeEntries;
+      matchingClaim = lib.findFirst (e: target == e.value) null sameScopeEntries;
+    };
+
   # The constraint registry relevant to a scope, as one identity→entries map —
   # the merge of the scope's own + ANCESTOR scopes' entries (cycle-guarded walk
   # up scopeParent). Replaces the fleet-wide flat registry: it is the SINGLE
@@ -92,6 +113,52 @@ let
 
   # The common case: scope to the state's currentScope.
   scopedConstraintsFor = state: scopedConstraintsForScope state (state.currentScope or null);
+
+  # A raw-ref exclude entry's OWN target identity, resolved the same way
+  # registerPolicy assigned it: self-or-ancestor lookup in the claim
+  # registry by raw value, from `scope`. null when the referenced policy
+  # never actually registered anywhere reachable from `scope`. `scope` is
+  # taken explicitly rather than read off `state.currentScope`: the
+  # late-sibling caller resolves FOR a sibling scope while running AT its
+  # parent's, and a claim registered only at the sibling's own scope is a
+  # descendant of, not an ancestor of, the parent — invisible to a walk that
+  # started there instead.
+  resolveRawRefIdentity =
+    state: scope: e:
+    let
+      scopeParentMap = (state.scopeParent or (_: { })) null;
+      claimRegistry = (state.policyClaimsByName or (_: { })) null;
+      claimedEntries = claimRegistry."name:${e.rawRef.name}" or [ ];
+      resolved = resolveClaim scopeParentMap scope claimedEntries e.rawRef;
+    in
+    if resolved.matchingClaim != null then resolved.matchingClaim.identity else null;
+
+  # Is `name` excluded by `registry` (a constraint registry already scoped to
+  # `scope` — see scopedConstraintsFor/scopedConstraintsForScope)? Two arms,
+  # mirroring registerPolicy's own identity assignment (children.nix): (a) a
+  # direct match under name's own bucket, where a rawRef-tagged entry counts
+  # only as a FALLBACK — when its raw-value resolution fails because the
+  # referenced policy never registered — since its bare-name storage key is
+  # otherwise just a guess, displaced by (b); (b) a rawRef-tagged entry
+  # anywhere in the registry whose raw-value resolution names `name`
+  # precisely. The single entry point for both the initial per-scope
+  # dispatch (dispatch-policies.nix, scope = state.currentScope) and the
+  # late-sibling re-dispatch (policy/schema.nix emitLateForSibling, scope =
+  # sib.scopeId) — both must exclude the SAME claimant, or a claimant
+  # filtered from one still fires through the other.
+  isPolicyExcluded =
+    state: scope: registry: name:
+    let
+      directEntries = registry.${name} or [ ];
+      directApplies =
+        e:
+        e.type == "exclude" && ((e.rawRef or null) == null || resolveRawRefIdentity state scope e == null);
+      rawRefEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) != null) (
+        builtins.concatLists (builtins.attrValues registry)
+      );
+    in
+    builtins.any directApplies directEntries
+    || builtins.any (e: resolveRawRefIdentity state scope e == name) rawRefEntries;
 
   entryToResume =
     entry:
@@ -137,6 +204,10 @@ let
             inherit (param) type;
             getReplacement = param.getReplacement or (_: null);
             owner = param.owner or "<anon>";
+            # Carried for dispatch-policies.nix's raw-ref exclude resolution
+            # (null for every non-policy constraint — see children.nix's
+            # excludeList).
+            rawRef = param.rawRef or null;
             inherit scope ownerChain;
           };
         in
@@ -208,6 +279,8 @@ in
     lookupEntries
     isAncestorChain
     foldScopeAncestors
+    resolveClaim
+    isPolicyExcluded
     collectScopedConstraints
     scopedConstraintsFor
     scopedConstraintsForScope

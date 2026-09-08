@@ -63,6 +63,79 @@
       }
     );
 
+    # PE / PE3: excludeIdentity resolves a policy exclude to its bare name,
+    # but post-Task-5 same-named claimants are no longer all addressable by
+    # that name — only whichever one registered FIRST keeps it; later
+    # claimants get a chain-qualified identity (children.nix registerPolicy).
+    # `excludes = [ betaTools ]` names a SPECIFIC record, but the bare-name
+    # identity it resolves to belongs to whichever claimant registered
+    # first — alpha here, since it's first in `includes`. PE3 is
+    # byte-identical with `includes` reversed: same `excludes`, but now beta
+    # registers first and the bare name happens to land on the right
+    # claimant. The pair together is the order-dependence proof: an authored
+    # exclude must mean the same thing regardless of its target's position.
+    test-pe-exclude-targets-wrong-same-named-claimant = denTest (
+      { den, igloo, ... }:
+      let
+        alphaTools = den.lib.policy.mkPolicy "tools" (_: [
+          (den.lib.policy.include { nixos.environment.variables.ALPHA_MARKER = "yes"; })
+        ]);
+        betaTools = den.lib.policy.mkPolicy "tools" (_: [
+          (den.lib.policy.include { nixos.environment.variables.BETA_MARKER = "yes"; })
+        ]);
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo = {
+          includes = [
+            alphaTools
+            betaTools
+          ];
+          excludes = [ betaTools ];
+        };
+
+        expr = {
+          alpha-fires = igloo.environment.variables ? ALPHA_MARKER;
+          beta-excluded = !(igloo.environment.variables ? BETA_MARKER);
+        };
+        expected = {
+          alpha-fires = true;
+          beta-excluded = true;
+        };
+      }
+    );
+
+    test-pe3-same-scenario-includes-order-reversed = denTest (
+      { den, igloo, ... }:
+      let
+        alphaTools = den.lib.policy.mkPolicy "tools" (_: [
+          (den.lib.policy.include { nixos.environment.variables.ALPHA_MARKER = "yes"; })
+        ]);
+        betaTools = den.lib.policy.mkPolicy "tools" (_: [
+          (den.lib.policy.include { nixos.environment.variables.BETA_MARKER = "yes"; })
+        ]);
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo = {
+          includes = [
+            betaTools
+            alphaTools
+          ];
+          excludes = [ betaTools ];
+        };
+
+        expr = {
+          alpha-fires = igloo.environment.variables ? ALPHA_MARKER;
+          beta-excluded = !(igloo.environment.variables ? BETA_MARKER);
+        };
+        expected = {
+          alpha-fires = true;
+          beta-excluded = true;
+        };
+      }
+    );
+
     # Parent excludes are authoritative — child includes cannot override.
     test-parent-excludes-authoritative = denTest (
       { den, igloo, ... }:

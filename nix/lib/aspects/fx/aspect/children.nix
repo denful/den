@@ -10,7 +10,11 @@ let
   # foldScopeAncestors: the shared cycle-guarded self-or-ancestor walk over
   # scopeParent (also used by the constraint registry). registerPolicy reuses
   # it rather than a same-scope-only filter — see its comment for why.
-  inherit (import ../handlers/constraint.nix { inherit lib den; }) foldScopeAncestors;
+  # resolveClaim: the same self-or-ancestor raw-value claim lookup, shared
+  # with dispatch-policies.nix's raw-ref exclude resolution — see
+  # registerConstraints's excludeList comment for why that's deferred there
+  # rather than resolved here.
+  inherit (import ../handlers/constraint.nix { inherit lib den; }) foldScopeAncestors resolveClaim;
 
   nameIndexed =
     state: base: idx: ctxId:
@@ -104,19 +108,8 @@ let
         bucketKey = "name:${p.name}";
         claimRegistry = (state.policyClaimsByName or (_: { })) null;
         claimedEntries = claimRegistry.${bucketKey} or [ ];
-        # foldScopeAncestors's accumulator is an attrset (its other caller
-        # merges constraint-registry dicts); key each step by its own scope
-        # id — foldScopeAncestors visits each scope at most once (cycle
-        # guard), so those keys never collide — then flatten to the list
-        # matchingClaim/ownerIdentity actually want.
-        entriesByAncestorScope = foldScopeAncestors (a: b: a // b) scopeParentMap (s: {
-          ${s} = builtins.filter (e: e.scope == s) claimedEntries;
-        }) scope;
-        sameScopeEntries = builtins.concatLists (builtins.attrValues entriesByAncestorScope);
-        # Whole-record comparison, nothing projected out: a record differing
-        # only in, say, an attached label must not be read as the same
-        # registration as one that lacks it.
-        matchingClaim = lib.findFirst (e: p == e.value) null sameScopeEntries;
+        claimResult = resolveClaim scopeParentMap scope claimedEntries p;
+        inherit (claimResult) sameScopeEntries matchingClaim;
         parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
         parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
         # Taken before this claim is appended, so the first displaced claim
@@ -280,11 +273,28 @@ let
           }
         else
           identity.key ref;
-      excludeList = map (ref: {
-        type = "exclude";
-        scope = "subtree";
-        identity = excludeIdentity ref;
-      }) rawExcludes;
+      # A policy exclude's `identity` is still only a bare-name guess (kept
+      # as a fallback storage key — see the __isPolicy branch above): this
+      # aspect's own registerConstraints runs BEFORE its includes are
+      # walked (compile-static sequences registerConstraints ahead of
+      # resolve-children's emitIncludes), so the claim registry a raw-value
+      # lookup would need is measurably still empty here — traced empirically,
+      # `state.policyClaimsByName."name:<bucket>"` reads `[ ]` at this exact
+      # point even though the excluded record's own self-equality already
+      # compares true (`ref == ref`). rawRef carries the record itself so
+      # constraint.nix's isPolicyExcluded (shared by dispatch-policies.nix's
+      # initial dispatch and policy/schema.nix's late-sibling re-dispatch)
+      # can resolve it later, once dispatch has run past this aspect's own
+      # includes and the registry actually holds the claim.
+      excludeList = map (
+        ref:
+        {
+          type = "exclude";
+          scope = "subtree";
+          identity = excludeIdentity ref;
+        }
+        // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+      ) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
     in

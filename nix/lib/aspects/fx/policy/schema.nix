@@ -16,7 +16,10 @@
   mkSupplementalResolution,
 }:
 let
-  inherit (import ../handlers/constraint.nix { inherit lib den; }) scopedConstraintsForScope;
+  inherit (import ../handlers/constraint.nix { inherit lib den; })
+    scopedConstraintsForScope
+    isPolicyExcluded
+    ;
 
   # Determine target entity kind from a schema effect.
   resolveTargetKind =
@@ -209,8 +212,9 @@ let
         # child sibling, and the relevant excludes (e.g. den.schema.flake-system.
         # excludes) register at the sibling/descendant scope, not an ancestor.
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
-        isExcluded = name: builtins.any (e: e.type == "exclude") (constraintRegistry.${name} or [ ]);
-        filteredPolicies = lib.filterAttrs (name: _: !isExcluded name) latePolicies;
+        filteredPolicies = lib.filterAttrs (
+          name: _: !isPolicyExcluded state sib.scopeId constraintRegistry name
+        ) latePolicies;
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };
