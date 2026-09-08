@@ -92,6 +92,51 @@ let
     else
       attrs;
 
+  # Registries are ambient — populated by battery modules and aspect-schema.nix,
+  # and identical at every site that builds a synthetic `_`. Not parameters.
+  classReg = den.classes or { };
+  pipeReg = den.quirks or { };
+  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+
+  # A key names a candidate child aspect when it is neither structural,
+  # internal, class, nor pipe. Provides children are reached through
+  # `provides`/`_`, which are structural, so this alone decides child-key
+  # membership — a key held both as a provides child and as a direct key is
+  # still a child key, included via its direct value (see mkUnderscore).
+  isChildKey =
+    k:
+    !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k) && !(classReg ? ${k}) && !(pipeReg ? ${k});
+
+  # The synthetic `_`/`provides` aspect, built once for all three shapes an
+  # aspect construction can take (declared submodule, functor-carrying
+  # battery, nested freeform key). `own` is the aspect's own attrset — it
+  # supplies both the child-key domain (`attrNames own`) and the provides
+  # source (`own.provides or { }`). `path` is the aspect's dotted position
+  # (`chain ++ [ localName ]`), naming the synthetic aspect "<path>._".
+  #
+  # `_` is a total alias for `provides`: a key held both as a provides child
+  # and a direct key is included via its direct value, never excluded for
+  # being shadowed — excluding it would make `_` a filtered view of
+  # `provides` rather than another spelling of it.
+  mkUnderscore =
+    own: path:
+    let
+      providesChildren = lib.filterAttrs (k: _: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k)) (
+        own.provides or { }
+      );
+      childKeys = builtins.filter isChildKey (builtins.attrNames own);
+      functor = {
+        __functor = _self: _args: {
+          name = "${lib.concatStringsSep "." path}._";
+          includes = map (k: own.${k}) childKeys;
+        };
+      };
+    in
+    {
+      inherit providesChildren functor;
+      syntheticProvides = providesChildren // functor;
+    };
+
   aspectType =
     typeCfg:
     let
@@ -153,33 +198,13 @@ let
       # key above, so masking it would classify neither: an aspect declaring
       # provides.user alongside user-class content would silently emit no
       # user class at all.
-      providesChildren = builtins.removeAttrs (merged.provides or { }) [ "_module" ];
-      unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
-      # Child aspect keys for synthetic provides: freeform keys that are
-      # not structural, internal, class, pipe, or forwarded-from-provides.
-      classReg = den.classes or { };
-      pipeReg = den.quirks or { };
-      inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
-      forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
       aspectName = merged.name or (locName loc);
-      childKeys = builtins.filter (
-        k:
-        !(structuralKeysSet ? ${k})
-        && !(lib.hasPrefix "__" k)
-        && !(classReg ? ${k})
-        && !(pipeReg ? ${k})
-        && !(forwardedSet ? ${k})
-      ) (builtins.attrNames merged);
-      syntheticAspect = {
-        name = "${aspectName}._";
-        includes = map (k: merged.${k}) childKeys;
-      };
       # __functor hides the synthetic aspect from attrValues while keeping _
       # usable in an includes list: wrapChild sees a zero-arg functor and calls
       # it, so the aspect below is built only when _ is actually included.
-      syntheticProvides = providesChildren // {
-        __functor = _self: _args: syntheticAspect;
-      };
+      underscore = mkUnderscore merged ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
+      inherit (underscore) providesChildren;
+      unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
     in
     # __functor makes merged aspects callable (aspect { host = ...; }).
     # Explicit functors (e.g. den.batteries.forward) take priority.
@@ -188,8 +213,8 @@ let
     // {
       __functor = if originalFunctor != null then originalFunctor else resolveAspectWith;
       __providesForwarded = unshadowedProvides;
-      provides = syntheticProvides;
-      _ = syntheticProvides;
+      provides = underscore.syntheticProvides;
+      _ = underscore.syntheticProvides;
     };
 
   aspectMeta =
@@ -270,33 +295,14 @@ let
         # aspect.child both work, matching mergeWithAspectMeta behavior.
         let
           normalizedFn = foldUnderscoreIntoProvides fn;
-          providesChildren = builtins.removeAttrs (normalizedFn.provides or { }) [ "_module" ];
-          classReg = den.classes or { };
-          pipeReg = den.quirks or { };
-          inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
-          forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
-          result = providesChildren // normalizedFn;
           aspectName = fn.name or (lib.last loc);
-          childKeys = builtins.filter (
-            k:
-            !(structuralKeysSet ? ${k})
-            && !(lib.hasPrefix "__" k)
-            && !(classReg ? ${k})
-            && !(pipeReg ? ${k})
-            && !(forwardedSet ? ${k})
-          ) (builtins.attrNames result);
-          syntheticAspect = {
-            name = "${aspectName}._";
-            includes = map (k: result.${k}) childKeys;
-          };
-          syntheticProvides = providesChildren // {
-            __functor = _self: _args: syntheticAspect;
-          };
+          underscore = mkUnderscore normalizedFn ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
         in
-        result
+        underscore.providesChildren
+        // normalizedFn
         // {
-          provides = syntheticProvides;
-          _ = syntheticProvides;
+          provides = underscore.syntheticProvides;
+          _ = underscore.syntheticProvides;
         }
       else
         let
@@ -624,10 +630,6 @@ let
           # wrapper must still be invocable like the providerType path.
           singleFn = builtins.length flatDefs == 1 && lib.isFunction (builtins.head flatDefs).value;
           # Synthetic ._ for nested aspects — same semantics as root aspects.
-          # Collect forwarded child keys (exclude class, pipe, structural, internal).
-          classReg = den.classes or { };
-          pipeReg = den.quirks or { };
-          inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
           # Forward provides children onto the wrapper so
           # aspect.child.monitoring resolves to aspect.child.provides.monitoring,
           # matching mergeWithAspectMeta behavior for root aspects — including
@@ -640,32 +642,12 @@ let
           # every `_` write into `provides` on flatDefs above, so `merged` never
           # carries a `_` key for genuine writes and `merged.provides` alone is
           # the complete source, at every depth.
-          #
-          # Both spellings arrive as a content wrapper when the key is defined
-          # in more than one file, carrying `__contentValues` / `__aspectChain`
-          # / `_` alongside the real children. Those are wrapper machinery, not
-          # provides children: unfiltered they surface as `provides` keys and
-          # enter `__providesForwarded`. Filtering here covers both, and the
-          # single-def path is unaffected because a raw attrset carries none of
-          # these keys.
-          providesChildren = lib.filterAttrs (k: _: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k)) (
-            merged.provides or { }
-          );
-          unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
           provider = (typeCfg.chain or typeCfg.origin) ++ [ keyName ];
-          # A key names a candidate child aspect when it is neither structural,
-          # internal, class nor pipe. Provides children are reached through
-          # `provides`/`_`, which are structural — ._ never collects them.
-          isChildKey =
-            k:
-            !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k) && !(classReg ? ${k}) && !(pipeReg ? ${k});
-          # The synthetic aspect behind ._ at a given tree position.
-          underscoreAt = provPath: attrs: {
-            __functor = _self: _args: {
-              name = "${lib.concatStringsSep "." provPath}._";
-              includes = map (k: attrs.${k}) (builtins.filter isChildKey (builtins.attrNames attrs));
-            };
-          };
+          # The synthetic aspect behind ._ at a given tree position — reused
+          # unqualified (no providesChildren fold) for every nested position by
+          # annotateChildren below; the top-level `provides`/`_` fold
+          # providesChildren in explicitly, matching mergeWithAspectMeta.
+          underscoreAt = provPath: attrs: (mkUnderscore attrs provPath).functor;
           # Annotate nested attrset children with __aspectChain so deeply nested
           # aspects carry provenance for hasAspect resolution, and give each
           # one its own ._ so the shorthand holds at every depth rather than
@@ -694,6 +676,18 @@ let
                 v
             ) attrs;
           annotatedMerged = annotateChildren provider merged;
+          # Both spellings arrive as a content wrapper when the key is defined
+          # in more than one file, carrying `__contentValues` / `__aspectChain`
+          # / `_` alongside the real children. Those are wrapper machinery, not
+          # provides children: unfiltered they surface as `provides` keys and
+          # enter `__providesForwarded`. Filtering here covers both, and the
+          # single-def path is unaffected because a raw attrset carries none of
+          # these keys.
+          topUnderscore = mkUnderscore annotatedMerged provider;
+          inherit (topUnderscore) providesChildren;
+          unshadowedProvides = builtins.filter (k: !(annotatedMerged ? ${k})) (
+            builtins.attrNames providesChildren
+          );
         in
         providesChildren
         // annotatedMerged
@@ -705,8 +699,8 @@ let
           # children plus the all-children functor (mergeWithAspectMeta's
           # syntheticProvides). Match that here so the two spellings are
           # interchangeable for reading as well as writing, at any depth.
-          provides = providesChildren // underscoreAt provider annotatedMerged;
-          _ = providesChildren // underscoreAt provider annotatedMerged;
+          provides = topUnderscore.syntheticProvides;
+          _ = topUnderscore.syntheticProvides;
         }
         // lib.optionalAttrs singleFn {
           __functor = _self: (builtins.head flatDefs).value;
