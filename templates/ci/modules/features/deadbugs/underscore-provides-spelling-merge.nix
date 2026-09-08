@@ -151,5 +151,41 @@
         };
       }
     );
+
+    # mergeFunctions' battery branch (import-tree/forward-style attrsets
+    # carrying __functor) used to read only fn.provides and ignore fn._
+    # outright — no host eval needed, this calls providerType.merge
+    # directly on a battery-shaped def to pin the forwarding itself.
+    test-q4-battery-underscore-write-forwards = denTest (
+      { den, ... }:
+      let
+        merge = den.lib.aspects.types.providerType.merge;
+        battery = {
+          __functor = self: args: { };
+          _.child.nixos.environment.etc."x".text = "y";
+        };
+        merged =
+          merge
+            [ "probe" ]
+            [
+              {
+                file = "<test>";
+                value = battery;
+              }
+            ];
+      in
+      {
+        expr = {
+          direct = merged ? child;
+          viaUnderscore = merged ? _ && merged._ ? child;
+          viaProvides = merged ? provides && merged.provides ? child;
+        };
+        expected = {
+          direct = true;
+          viaUnderscore = true;
+          viaProvides = true;
+        };
+      }
+    );
   };
 }

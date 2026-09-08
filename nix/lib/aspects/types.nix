@@ -68,10 +68,15 @@ let
   isSyntheticName = name: lib.hasPrefix "<" name && lib.hasSuffix ">" name;
 
   # Fold a `_` write into `provides` so both spellings of one provides key
-  # are indistinguishable to every construction site from here on — the
-  # normalization root already gets for free from mkAliasOptionModule
-  # (aspectSubmodule's imports), applied by hand for the two sites that
-  # build their own provides view outside the module system.
+  # are indistinguishable to the two sites that build their own provides
+  # view outside the module system.
+  #
+  # Root must NOT call this   : it is a `//` overwrite, whereas root's alias
+  # (mkAliasOptionModule, in aspectSubmodule's imports) is priority-preserving
+  # and conflict-detecting. Wiring this helper in at root would replace root's
+  # genuine conflict error with the same spelling-priority overwrite this fold
+  # exists to fix at nested — a regression, not a no-op.
+  #
   # A `_` read back off another wrapper carries __functor (the read
   # shorthand, not a write, e.g. `bar._ = otherAspect._;`) and must stay
   # out of provides, matching aspectSubmodule's module-system alias, which
