@@ -9,22 +9,14 @@ let
   inherit (import ./wrap-classes.nix { inherit lib den; }) wrapCollectedClasses;
   inherit (import ./assemble-pipes.nix { inherit lib den; }) assemblePipes;
   inherit (import ./spawn-node.nix { inherit lib den; }) mkSpawnNode;
-  routeEdges = import ./edges/route.nix { inherit lib den; };
   inherit (import ./edge-trace.nix { inherit lib den; })
-    extractEdgeTrace
     extractTopLevelEdges
     sortEdges
     ;
   inherit (import ./scope-walk.nix { inherit lib; }) subtreeScopes dedupByKey;
-  inherit (import ./edges/materialize.nix { inherit lib den; }) assembleSubtree;
   inherit (import ./edges/pi.nix { inherit lib; }) mkStaticPi;
   inherit (import ./edges/instantiate-edges.nix { inherit lib den; }) mkInstantiateEdges;
   inherit (import ./edges/edge.nix { inherit lib; }) scopeName edgeSortKey;
-  inherit (import ./edges/provides.nix { inherit lib den; })
-    applyProvidesEdges
-    dedupProvides
-    providesEdges
-    ;
   inherit (import ./edges/materialize-unified.nix { inherit lib den; }) materializeUnified;
   instantiateEdges = import ./edges/instantiate.nix { inherit lib; };
   handlers = den.lib.aspects.fx.handlers;
@@ -65,30 +57,9 @@ let
       perScope = wrappedPerScope;
     };
 
-  # Phase 2 (policy.provide → target classes) is now an edge constructor:
-  # edges/provides.nix applyProvidesEdges. The nest-into-source-bucket
-  # materialization + the (policyName/class/path) dedup live there (§B Decision 1).
-
-  # Phase 3: Apply routes. The first positional is the node spawn primitive
-  # (threaded with this pipeline's parent scope-tree state) used to resolve a
-  # complex-route forward SOURCE with full fleet visibility (replaces the old
-  # isolated fxResolve fallback).
-  applyRoutes =
-    spawnNode: ctx: scopeContexts: rootScopeId: scopeParent: scopeIsolated: scopeEntityKind: scopedRoutes: acc:
-    routeEdges.applyRoutes {
-      inherit
-        scopedRoutes
-        scopeContexts
-        scopeParent
-        scopeIsolated
-        scopeEntityKind
-        rootScopeId
-        spawnNode
-        ;
-      wrappedPerScope = acc.perScope;
-      classImports = acc.classImports;
-      inherit (handlers) buildForwardAspect;
-    };
+  # Phase 2 (policy.provide) and phase 3 (routes) are both edge constructors now,
+  # interleaved by ONE ordered-dispatch fold (edges/materialize-unified.nix
+  # materializeUnified) — there is no standalone phase2/phase3 fold in this file.
 
   # Phase 4: Apply entity instantiation.
   # Resolve the entity scope an instantiate spec targets.
