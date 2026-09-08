@@ -148,18 +148,30 @@ let
   # both must exclude the SAME claimant, or a claimant filtered from one
   # still fires through the other.
   #
-  # Cost: registry is already scoped to one entity's self+ancestors (bounded
-  # by include-nesting depth, not fleet-wide), but within that scope this
-  # flattens EVERY identity bucket to find rawRef entries and re-walks
-  # ancestor scopes (resolveClaim) per rawRef entry — replacing what was a
-  # single `registry.${name} or []` lookup. Per call: O(E + R × D), E = total
-  # constraint entries in scope, R = rawRef excludes in scope, D = ancestor
-  # depth per resolveClaim walk. Called once per policy name per dispatch, so
-  # a dispatch over P policies is O(P × (E + R × D)). Bounded in practice by
-  # how many excludes/policies one aspect tree declares — not by fleet size,
-  # since scope is per-entity. den's performance suite (perf 29/29) declares
-  # zero hosts and does not exercise this path at entity scale; unmeasured
-  # there.
+  # Cost: registry is already scoped to one entity's self+ancestors, but
+  # within that scope this flattens EVERY identity bucket to find rawRef
+  # entries and re-walks ancestor scopes (resolveClaim) per rawRef entry —
+  # replacing what was a single `registry.${name} or []` lookup. Per call:
+  # O(E + R × D × C). Per dispatch over P policies: O(P × (E + R × D × C)).
+  #   E = constraint entries in the scoped registry — per-entity, bounded by
+  #       include-nesting depth, not fleet-wide.
+  #   R = rawRef excludes in scope.
+  #   D = scopes visited per resolveClaim ancestor walk — small (e.g. a
+  #       user-scope walk visits 4: self, host, system, and the root ""
+  #       scope), bounded by scope-tree depth, not fleet-wide.
+  #   C = size of the claim bucket resolveClaim scans at each visited scope
+  #       (claimRegistry."name:<n>" — builtins.filter + findFirst over it).
+  #       This bucket is FLEET-WIDE, not per-entity: policyClaimsByName
+  #       accumulates every claim under that bare name across the whole run,
+  #       regardless of scope. Traced: N entities each declaring their own
+  #       "tools" policy grows C to N while the entity-scoped walk still
+  #       keeps exactly 1 matching claim. So with R > 0 and multiple entities
+  #       declaring a same-named policy, the R × D × C term is linear in
+  #       fleet size N — do not read E's per-entity bound as covering the
+  #       whole cost; E and C are scoped oppositely and must not be merged
+  #       under one "bounded per-entity" claim.
+  # den's performance suite (perf 29/29) declares zero hosts and does not
+  # exercise this path at entity scale; unmeasured there.
   isPolicyExcluded =
     state: scope: registry: name:
     let
