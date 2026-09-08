@@ -10,11 +10,12 @@
 # would actually split `provides.x` and `_.x` across modules — a single
 # literal setting both keys never exercised the cross-file path.
 #
-# test-q4-nested-conflict-is-error is a guard, not a regression check: it
-# asserts nested's genuine scalar conflict IS an error, which is false under
-# the intended fix (unifying spelling only, not root's and nested's separate
-# merge semantics) and must stay red. A green there means nested started
-# erroring like root — a larger change than this file's own scope.
+# test-q4-root-nested-conflict-diverges pins a fact, not a preference: root
+# and nested deliberately still disagree on a genuine scalar conflict (root
+# errors, nested last-wins) — closing that gap is the strong reading of O8
+# and out of scope for this task. It must read green; if it goes red, either
+# position's conflict behaviour changed and that's a bigger change than this
+# file's own scope.
 { denTest, ... }:
 {
   flake.tests.deadbugs.underscore-provides-spelling-merge = {
@@ -111,25 +112,43 @@
       }
     );
 
-    # Guard — see file header. Must stay red.
-    test-q4-nested-conflict-is-error = denTest (
+    # See file header. Root and nested target different options so one
+    # side's raw conflicting defs can't also poison the other's already-
+    # collapsed value in the same host evaluation.
+    test-q4-root-nested-conflict-diverges = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         imports = [
-          { den.aspects.conflictNested.sub.provides.hn.nixos.networking.hostName = "hA"; }
-          { den.aspects.conflictNested.sub._.hn.nixos.networking.hostName = "hB"; }
+          { den.aspects.conflictRoot.provides.hn.nixos.networking.hostName = "hA"; }
+          { den.aspects.conflictRoot._.hn.nixos.networking.hostName = "hB"; }
+          { den.aspects.conflictNested.sub.provides.tz.nixos.time.timeZone = "hA"; }
+          { den.aspects.conflictNested.sub._.tz.nixos.time.timeZone = "hB"; }
         ];
 
-        den.aspects.igloo.includes = [ den.aspects.conflictNested.sub.hn ];
+        den.aspects.igloo.includes = [
+          den.aspects.conflictRoot.hn
+          den.aspects.conflictNested.sub.tz
+        ];
 
         expr =
           let
-            attempt = builtins.tryEval igloo.networking.hostName;
+            tryOr =
+              v:
+              let
+                a = builtins.tryEval v;
+              in
+              if a.success then a.value else "ERROR";
           in
-          if attempt.success then attempt.value else "ERROR";
-        expected = "ERROR";
+          {
+            root = tryOr igloo.networking.hostName;
+            nested = tryOr igloo.time.timeZone;
+          };
+        expected = {
+          root = "ERROR";
+          nested = "hB";
+        };
       }
     );
   };
