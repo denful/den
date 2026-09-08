@@ -187,5 +187,31 @@
         };
       }
     );
+
+    # Same fields as the cell above, but through a real declaration
+    # (den.aspects.battHolder.provides.batt) rather than a hand-minted def
+    # handed straight to merge — pins the behaviour a consumer actually sees,
+    # not just the internal signature.
+    test-rvb-consumer-battery-underscore = denTest (
+      { den, ... }:
+      {
+        den.aspects.battHolder.provides.batt = {
+          __functor = self: args: { };
+          _.child.nixos.environment.etc."x".text = "y";
+        };
+
+        expr = {
+          direct = den.aspects.battHolder.batt ? child;
+          viaUnderscore = den.aspects.battHolder.batt ? _ && den.aspects.battHolder.batt._ ? child;
+          viaProvides =
+            den.aspects.battHolder.batt ? provides && den.aspects.battHolder.batt.provides ? child;
+        };
+        expected = {
+          direct = true;
+          viaUnderscore = true;
+          viaProvides = true;
+        };
+      }
+    );
   };
 }

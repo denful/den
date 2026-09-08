@@ -71,7 +71,7 @@ let
   # are indistinguishable to the two sites that build their own provides
   # view outside the module system.
   #
-  # Root must NOT call this   : it is a `//` overwrite, whereas root's alias
+  # Root must NOT call this: it is a `//` overwrite, whereas root's alias
   # (mkAliasOptionModule, in aspectSubmodule's imports) is priority-preserving
   # and conflict-detecting. Wiring this helper in at root would replace root's
   # genuine conflict error with the same spelling-priority overwrite this fold
