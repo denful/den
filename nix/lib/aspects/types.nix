@@ -871,7 +871,7 @@ let
           };
           excludes = lib.mkOption {
             description = "Aspects or policies to exclude from this subtree";
-            type = lib.types.listOf lib.types.unspecified;
+            type = lib.types.listOf (providerType (typeCfg // { chain = null; }));
             default = [ ];
           };
           provides = lib.mkOption {
