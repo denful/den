@@ -664,8 +664,6 @@ let
         augmentedContexts:
         let
           allDeferred = (result.state.scopedDeferredIncludes or (_: { })) null;
-          inherit (den.lib.aspects.fx.keyClassification) classifyKeys;
-          inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList unwrapContentValuesAll;
           # Build enriched context for a scope by inheriting parent enrichment.
           # Walks up scopeParent to find enrichment keys not present in the
           # scope's own context.
@@ -706,46 +704,53 @@ let
               accImports
             else
               let
-                newEntries = lib.concatMap (
+                # Re-enter the pipeline for each drainable child, mirroring
+                # scope-widen.nix's in-pipeline drain. A flat key-lift off
+                # `d.child` cannot work here: every drainable entry is a
+                # parametric aspect (compile.nix routes __fn/__args-bearing
+                # aspects to compile-parametric, the only sender of "bind",
+                # the only sender of "defer"), so its content lives inside
+                # `__fn` and its own top-level keys are all structural.
+                walkedBuckets = lib.concatMap (
                   d:
                   let
-                    child = d.child;
-                    classified = classifyKeys null child;
+                    walked = mkPipeline { inherit class; } {
+                      self = d.child;
+                      ctx = scopeCtx;
+                    };
+                    # The walk roots at its OWN scope id (mkScopeId hashes
+                    # every ctx key, and scopeCtx carries the pipe value the
+                    # child required), never the draining scope's id — so
+                    # its buckets are folded under `scopeId` explicitly
+                    # below rather than merged in by scope id.
+                    walkedScopeIds = builtins.attrNames (walked.state.scopeContexts null);
                   in
-                  lib.concatMap (
-                    k:
-                    let
-                      isPipe = den.quirks ? ${k};
-                      # Pipe keys keep one entry per definition (quirks accumulate);
-                      # class keys collapse into a single module (the module system merges).
-                      modules = if isPipe then unwrapContentValuesAll child.${k} else unwrapContentValuesList child.${k};
-                    in
-                    map (
-                      module:
-                      {
-                        __rawEntry = true;
-                        class = k;
-                        inherit module;
-                        ctx = scopeCtx;
-                        identity = child.name or "<deferred>";
-                        aspectPolicy = child.meta.collisionPolicy or null;
-                        globalPolicy = den.config.classModuleCollisionPolicy or "error";
-                        isContextDependent = false;
-                      }
-                      // lib.optionalAttrs isPipe { __isPipeEntry = true; }
-                    ) modules
-                  ) (classified.classKeys ++ classified.pipeKeys)
+                  if builtins.length walkedScopeIds > 1 then
+                    # A deferred child whose own `includes` fan over an entity
+                    # arg (or that carries a `resolve.to`) pushes real child
+                    # scopes of its own. Collapsing those into the draining
+                    # scope would hoist their content across scope isolation
+                    # silently; no measured shape reaches this today, so throw
+                    # loud rather than guess (D1 §4.2).
+                    throw
+                      "den: pipe-arg-deferred include '${d.child.name or "<deferred>"}' fanned into ${toString (builtins.length walkedScopeIds)} scopes (${lib.concatStringsSep ", " walkedScopeIds}) while draining at scope '${scopeId}' — folding a fanned child's scopes into the drain scope is not supported"
+                  else
+                    lib.attrValues (walked.state.scopedClassImports null)
                 ) drainable;
               in
               builtins.foldl' (
-                acc: entry:
+                acc: byClass:
                 acc
                 // {
-                  ${scopeId} = (acc.${scopeId} or { }) // {
-                    ${entry.class} = ((acc.${scopeId} or { }).${entry.class} or [ ]) ++ [ entry ];
-                  };
+                  ${scopeId} = builtins.foldl' (
+                    a: cls:
+                    a
+                    // {
+                      ${cls} = (a.${cls} or [ ]) ++ byClass.${cls};
+                    }
+                  ) (acc.${scopeId} or { }) (builtins.attrNames byClass);
                 }
-              ) accImports newEntries
+              ) accImports walkedBuckets
           ) importsForPipes (builtins.attrNames allDeferred);
 
           # Materialize deferred node spawn markers (policy.spawn) over the
