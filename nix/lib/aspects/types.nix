@@ -67,6 +67,26 @@ let
   # sites must share this predicate or naming and dedup silently desync.
   isSyntheticName = name: lib.hasPrefix "<" name && lib.hasSuffix ">" name;
 
+  # Fold a `_` write into `provides` so both spellings of one provides key
+  # are indistinguishable to every construction site from here on — the
+  # normalization root already gets for free from mkAliasOptionModule
+  # (aspectSubmodule's imports), applied by hand for the two sites that
+  # build their own provides view outside the module system.
+  # A `_` read back off another wrapper carries __functor (the read
+  # shorthand, not a write, e.g. `bar._ = otherAspect._;`) and must stay
+  # out of provides, matching aspectSubmodule's module-system alias, which
+  # only ever sees genuine definitions.
+  foldUnderscoreIntoProvides =
+    attrs:
+    let
+      u = if builtins.isAttrs attrs then attrs._ or null else null;
+      isWrite = builtins.isAttrs u && !(u ? __functor);
+    in
+    if isWrite then
+      (builtins.removeAttrs attrs [ "_" ]) // { provides = (attrs.provides or { }) // u; }
+    else
+      attrs;
+
   aspectType =
     typeCfg:
     let
@@ -243,12 +263,13 @@ let
         # Forward provides children and add _ alias so aspect._.child and
         # aspect.child both work, matching mergeWithAspectMeta behavior.
         let
-          providesChildren = builtins.removeAttrs (fn.provides or { }) [ "_module" ];
+          normalizedFn = foldUnderscoreIntoProvides fn;
+          providesChildren = builtins.removeAttrs (normalizedFn.provides or { }) [ "_module" ];
           classReg = den.classes or { };
           pipeReg = den.quirks or { };
           inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
           forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
-          result = providesChildren // fn;
+          result = providesChildren // normalizedFn;
           aspectName = fn.name or (lib.last loc);
           childKeys = builtins.filter (
             k:
@@ -495,13 +516,20 @@ let
           # value would discard the aspect and the includes with it, leaving only
           # the static half. A raw wrapper has no name and a converted one always
           # does, which is what tells them apart.
-          flatDefs = lib.concatMap (
-            d:
-            if builtins.isAttrs d.value && d.value ? __contentValues && !(d.value ? name) then
-              d.value.__contentValues
-            else
-              [ { inherit (d) value file; } ]
-          ) defs;
+          # _ folded into provides here, once, before any per-key merge below
+          # sees them: both spellings become defs of the same key, so the
+          # existing multi-def merge (deepMerge — recurse attrsets, concat
+          # lists, last-wins on scalars) treats them exactly like two defs of
+          # `provides` itself, regardless of which spelling each file used.
+          flatDefs = map (d: d // { value = foldUnderscoreIntoProvides d.value; }) (
+            lib.concatMap (
+              d:
+              if builtins.isAttrs d.value && d.value ? __contentValues && !(d.value ? name) then
+                d.value.__contentValues
+              else
+                [ { inherit (d) value file; } ]
+            ) defs
+          );
           # Merge attrset definition values per-key.  Single-def keys are
           # forwarded directly; multi-def attrset keys get a __contentValues
           # wrapper so downstream consumers (emit-classes) collect all
@@ -600,27 +628,22 @@ let
           # the rule that a name the wrapper defines itself keeps its own value
           # and stays classified.
           # `_` is the write alias for `provides`. aspectSubmodule wires it with
-          # mkAliasOptionModule, but a nested key never reaches that submodule:
-          # `_` is structural, so an alias write arrives here as a plain key and
-          # is then discarded by the `_` this wrapper publishes below. Fold it
-          # into the provides source so both spellings mean the same thing at
-          # every depth. A `_` read back off another wrapper carries __functor;
-          # that is the read shorthand, not a write, and stays out of provides.
-          writtenUnderscore =
-            let
-              v = merged._ or null;
-            in
-            lib.optionalAttrs (builtins.isAttrs v && !(v ? __functor)) v;
-          # Both spellings arrive as a content wrapper when the key is defined in
-          # more than one file, carrying `__contentValues` / `__aspectChain` / `_`
-          # alongside the real children. Those are wrapper machinery, not
-          # provides children: unfiltered they surface as `provides` keys, enter
-          # `__providesForwarded`, and `_` (not `__`-prefixed) registers an inert
-          # cross-provide policy. Filtering here covers `provides` and `_` at
-          # once, and the single-def path is unaffected because a raw attrset
-          # carries none of these keys.
+          # mkAliasOptionModule, but a nested key never reaches that submodule —
+          # `_` is structural, so an alias write would otherwise arrive here as
+          # a plain key of its own. foldUnderscoreIntoProvides already folded
+          # every `_` write into `provides` on flatDefs above, so `merged` never
+          # carries a `_` key for genuine writes and `merged.provides` alone is
+          # the complete source, at every depth.
+          #
+          # Both spellings arrive as a content wrapper when the key is defined
+          # in more than one file, carrying `__contentValues` / `__aspectChain`
+          # / `_` alongside the real children. Those are wrapper machinery, not
+          # provides children: unfiltered they surface as `provides` keys and
+          # enter `__providesForwarded`. Filtering here covers both, and the
+          # single-def path is unaffected because a raw attrset carries none of
+          # these keys.
           providesChildren = lib.filterAttrs (k: _: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k)) (
-            (merged.provides or { }) // writtenUnderscore
+            merged.provides or { }
           );
           unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
           provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
