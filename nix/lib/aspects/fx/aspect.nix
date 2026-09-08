@@ -33,7 +33,34 @@ let
 
   # --- Parametric resolution ---
 
-  # Build the base attrset for a parametric resolution result.
+  # Structural keys the parametric round-trip itself re-derives, so a general
+  # carry-forward must not copy them from the pre-resolution `aspect`:
+  # name/meta are handled explicitly below; __fn/__args/__scopeHandlers/
+  # __ctxId/__parametricResolvedArgs are rebuilt by mkParametricNext /
+  # tagParametricResult from `resolved` (or `aspect` directly); __functor/
+  # __functionArgs are function-representation machinery already normalized
+  # into __fn/__args before an aspect reaches here; __aspectChain and
+  # __providesForwarded are identity/classification state the walk re-derives
+  # when the result re-enters `resolve` — carrying a stale copy forward risks
+  # reintroducing a doubled identity.
+  parametricOwnedKeysSet = lib.genAttrs [
+    "name"
+    "meta"
+    "__fn"
+    "__args"
+    "__functor"
+    "__functionArgs"
+    "__scopeHandlers"
+    "__ctxId"
+    "__parametricResolvedArgs"
+    "__aspectChain"
+    "__providesForwarded"
+  ] (_: true);
+
+  # Build the base attrset for a parametric resolution result. Every other
+  # structural key present on `aspect` (includes, provides, into,
+  # __walkStamped, ...) survives the rebuild unchanged unless the resolved
+  # value overrides it downstream in mkParametricNext.
   mkParametricBase =
     aspect: resolved:
     {
@@ -46,9 +73,7 @@ let
           fnArgNames = builtins.attrNames (aspect.__args or { });
         };
     }
-    // lib.optionalAttrs (aspect ? into) { inherit (aspect) into; }
-    // lib.optionalAttrs (aspect ? provides) { inherit (aspect) provides; }
-    // lib.optionalAttrs (aspect ? __walkStamped) { inherit (aspect) __walkStamped; };
+    // lib.filterAttrs (k: _: (structuralKeysSet ? ${k}) && !(parametricOwnedKeysSet ? ${k})) aspect;
 
   # Merge the resolved value into the parametric base.
   mkParametricNext =
