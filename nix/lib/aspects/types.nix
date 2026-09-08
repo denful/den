@@ -205,11 +205,12 @@ let
       # aspect through re-inclusion the way meta.loc does not — nixpkgs
       # drops a mkDefault def entirely once any normal-priority def exists,
       # so this only ever supplies the value when nothing else does.
-      # typeCfg carries a providerPrefix for root/container declarations
-      # (`or [ ]` yields [ ]); includes elements get providerPrefix
-      # explicitly nulled (aspectSubmodule), so the present-but-null key
-      # bypasses `or` and this yields null there — absence, not root.
-      meta.aspect-chain = lib.mkDefault (typeCfg.providerPrefix or [ ]);
+      # typeCfg.origin is the container's fixed seed; typeCfg.chain is the
+      # threaded definition chain, explicitly nulled for includes elements
+      # (aspectSubmodule). `or` only falls back on a MISSING key, so a
+      # present-but-null chain bypasses it and this yields null there —
+      # absence, not root.
+      meta.aspect-chain = lib.mkDefault (typeCfg.chain or typeCfg.origin);
     };
 
   # A parametric function reaching aspectSubmodule.merge is evaluated as a NixOS
@@ -305,7 +306,7 @@ let
         {
           name = nameFromLoc;
           meta = {
-            aspect-chain = typeCfg.providerPrefix or [ ];
+            aspect-chain = typeCfg.chain or typeCfg.origin;
           };
           __fn = fn;
           __args = args;
@@ -604,7 +605,7 @@ let
                           bv
                       ) b;
                     subForwarded = builtins.foldl' deepMerge { } subAttrVals;
-                    provBase = (typeCfg.providerPrefix or [ ]) ++ [
+                    provBase = (typeCfg.chain or typeCfg.origin) ++ [
                       keyName
                       k
                     ];
@@ -651,7 +652,7 @@ let
             merged.provides or { }
           );
           unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
-          provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
+          provider = (typeCfg.chain or typeCfg.origin) ++ [ keyName ];
           # A key names a candidate child aspect when it is neither structural,
           # internal, class nor pipe. Provides children are reached through
           # `provides`/`_`, which are structural — ._ never collects them.
@@ -816,7 +817,7 @@ let
       { name, config, ... }:
       let
         # The chain this aspect's children hang off. `meta.aspect-chain` defaults to
-        # `typeCfg.providerPrefix`, but providerType.merge overrides it when it
+        # `typeCfg.chain or typeCfg.origin`, but providerType.merge overrides it when it
         # re-types an included nested aspect (wrapperToAspect injects the chain
         # from __aspectChain). Reading the static typeCfg there truncates the chain
         # to the aspect's own name, so `alpha/tools` and `beta/tools` both hand
@@ -835,7 +836,7 @@ let
           aspectKeyType (
             typeCfg
             // {
-              providerPrefix = childProviderPrefix;
+              chain = childProviderPrefix;
             }
           )
         );
@@ -866,12 +867,12 @@ let
           };
           includes = lib.mkOption {
             description = "Providers to ask aspects from";
-            # providerPrefix explicitly null (not omitted): `or [ ]` only
-            # falls back on a genuinely MISSING key, so a present-but-null
-            # key still yields null through aspectMeta's default. That is
-            # what makes an inline includes literal's chain read as
-            # "unknown" rather than silently defaulting to root's [ ].
-            type = lib.types.listOf (providerType (typeCfg // { providerPrefix = null; }));
+            # chain explicitly null (not omitted): `or origin` only falls
+            # back on a genuinely MISSING key, so a present-but-null chain
+            # still yields null through aspectMeta's default. That is what
+            # makes an inline includes literal's chain read as "unknown"
+            # rather than silently defaulting to the container's origin.
+            type = lib.types.listOf (providerType (typeCfg // { chain = null; }));
             default = [ ];
           };
           excludes = lib.mkOption {
@@ -887,7 +888,7 @@ let
                 providerType (
                   typeCfg
                   // {
-                    providerPrefix = childProviderPrefix;
+                    chain = childProviderPrefix;
                   }
                 )
               );

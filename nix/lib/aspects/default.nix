@@ -99,7 +99,7 @@ let
       self = wrapped;
     };
 
-  types = lib.mapAttrs (_: v: v { }) rawTypes;
+  types = lib.mapAttrs (_: v: v { origin = [ ]; }) rawTypes;
 in
 {
   inherit
