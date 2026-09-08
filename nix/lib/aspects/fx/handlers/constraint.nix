@@ -134,25 +134,37 @@ let
     if resolved.matchingClaim != null then resolved.matchingClaim.identity else null;
 
   # Is `name` excluded by `registry` (a constraint registry already scoped to
-  # `scope` — see scopedConstraintsFor/scopedConstraintsForScope)? Two arms,
-  # mirroring registerPolicy's own identity assignment (children.nix): (a) a
-  # direct match under name's own bucket, where a rawRef-tagged entry counts
-  # only as a FALLBACK — when its raw-value resolution fails because the
-  # referenced policy never registered — since its bare-name storage key is
-  # otherwise just a guess, displaced by (b); (b) a rawRef-tagged entry
-  # anywhere in the registry whose raw-value resolution names `name`
-  # precisely. The single entry point for both the initial per-scope
-  # dispatch (dispatch-policies.nix, scope = state.currentScope) and the
-  # late-sibling re-dispatch (policy/schema.nix emitLateForSibling, scope =
-  # sib.scopeId) — both must exclude the SAME claimant, or a claimant
-  # filtered from one still fires through the other.
+  # `scope` — see scopedConstraintsFor/scopedConstraintsForScope)? Two arms:
+  # (a) a direct match under name's own bucket, for entries with no rawRef
+  # (schema/aspect-content excludes, and the dead string-policy-exclude route
+  # — both key on bare identity already); (b) a rawRef-tagged entry anywhere
+  # in the registry whose raw-value resolution names `name` precisely. A
+  # rawRef entry whose target never registered resolves to null and excludes
+  # nothing — naming a record that was never included must not fall back to
+  # matching some unrelated policy that happens to share its bare name. The
+  # single entry point for both the initial per-scope dispatch
+  # (dispatch-policies.nix, scope = state.currentScope) and the late-sibling
+  # re-dispatch (policy/schema.nix emitLateForSibling, scope = sib.scopeId) —
+  # both must exclude the SAME claimant, or a claimant filtered from one
+  # still fires through the other.
+  #
+  # Cost: registry is already scoped to one entity's self+ancestors (bounded
+  # by include-nesting depth, not fleet-wide), but within that scope this
+  # flattens EVERY identity bucket to find rawRef entries and re-walks
+  # ancestor scopes (resolveClaim) per rawRef entry — replacing what was a
+  # single `registry.${name} or []` lookup. Per call: O(E + R × D), E = total
+  # constraint entries in scope, R = rawRef excludes in scope, D = ancestor
+  # depth per resolveClaim walk. Called once per policy name per dispatch, so
+  # a dispatch over P policies is O(P × (E + R × D)). Bounded in practice by
+  # how many excludes/policies one aspect tree declares — not by fleet size,
+  # since scope is per-entity. den's performance suite (perf 29/29) declares
+  # zero hosts and does not exercise this path at entity scale; unmeasured
+  # there.
   isPolicyExcluded =
     state: scope: registry: name:
     let
       directEntries = registry.${name} or [ ];
-      directApplies =
-        e:
-        e.type == "exclude" && ((e.rawRef or null) == null || resolveRawRefIdentity state scope e == null);
+      directApplies = e: e.type == "exclude" && (e.rawRef or null) == null;
       rawRefEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) != null) (
         builtins.concatLists (builtins.attrValues registry)
       );

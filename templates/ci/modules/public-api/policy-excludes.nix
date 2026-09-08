@@ -136,6 +136,39 @@
       }
     );
 
+    # X1: excludes naming a same-named record that was never included must
+    # exclude nothing — not fall back to a bare-name match that kills an
+    # unrelated, legitimately-included policy sharing that name. ghostTools
+    # is never in `includes`, so its raw-value resolution fails; realTools
+    # (the only "tools" claimant that actually registered) must still fire.
+    test-x1-absent-exclude-target-excludes-nothing = denTest (
+      { den, igloo, ... }:
+      let
+        realTools = den.lib.policy.mkPolicy "tools" (_: [
+          (den.lib.policy.include { nixos.environment.variables.REAL_MARKER = "yes"; })
+        ]);
+        ghostTools = den.lib.policy.mkPolicy "tools" (_: [
+          (den.lib.policy.include { nixos.environment.variables.GHOST_MARKER = "yes"; })
+        ]);
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo = {
+          includes = [ realTools ];
+          excludes = [ ghostTools ];
+        };
+
+        expr = {
+          real-still-fires = igloo.environment.variables ? REAL_MARKER;
+          ctrl = !(igloo.environment.variables ? GHOST_MARKER);
+        };
+        expected = {
+          real-still-fires = true;
+          ctrl = true;
+        };
+      }
+    );
+
     # Parent excludes are authoritative — child includes cannot override.
     test-parent-excludes-authoritative = denTest (
       { den, igloo, ... }:

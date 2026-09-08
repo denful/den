@@ -7,14 +7,13 @@ let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
   inherit (import ./normalize.nix { inherit lib den; }) wrapChild isMeaningfulName;
-  # foldScopeAncestors: the shared cycle-guarded self-or-ancestor walk over
-  # scopeParent (also used by the constraint registry). registerPolicy reuses
-  # it rather than a same-scope-only filter — see its comment for why.
-  # resolveClaim: the same self-or-ancestor raw-value claim lookup, shared
-  # with dispatch-policies.nix's raw-ref exclude resolution — see
+  # resolveClaim: the shared cycle-guarded self-or-ancestor raw-value claim
+  # lookup (also used by the constraint registry). registerPolicy reuses it
+  # rather than a same-scope-only filter — see its comment for why. Also
+  # shared with dispatch-policies.nix's raw-ref exclude resolution — see
   # registerConstraints's excludeList comment for why that's deferred there
   # rather than resolved here.
-  inherit (import ../handlers/constraint.nix { inherit lib den; }) foldScopeAncestors resolveClaim;
+  inherit (import ../handlers/constraint.nix { inherit lib den; }) resolveClaim;
 
   nameIndexed =
     state: base: idx: ctxId:
