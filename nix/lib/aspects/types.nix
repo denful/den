@@ -121,7 +121,26 @@ let
   mkUnderscore =
     own: path:
     let
-      providesChildren = lib.filterAttrs (k: _: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k)) (
+      # A provides child's NAME lives in a different namespace than the
+      # aspect's own top-level keys — `structuralKeysSet` classifies the
+      # latter (own-key dispatch) and does not apply here: every declared
+      # aspect option (description, meta, includes, …) already has a
+      # default, so `merged` always wins the top-level
+      # `providesChildren // merged` shadow for those names (see
+      # unshadowedProvides below) while `.provides`/`._` still reach the
+      # child's own content untouched — measured per key, nothing else in
+      # structuralKeysSet is genuine machinery at this seam. `_module` is
+      # real NixOS module-system machinery, but it never reaches
+      # `own.provides`'s attrNames in the first place (the module system
+      # consumes it before freeform merge), so no explicit reservation is
+      # needed for it either.
+      #
+      # Two keys ARE genuine machinery here: `__`-prefixed (pipeline
+      # internals) and `_` — a multi-def nested key merges into a content
+      # wrapper carrying `__contentValues`/`__aspectChain`/`_` beside its
+      # real children (aspectContentType below), and `_` is the one of
+      # those three not already caught by the `__`-prefix rule.
+      providesChildren = lib.filterAttrs (k: _: !(lib.hasPrefix "__" k) && k != "_") (
         own.provides or { }
       );
       childKeys = builtins.filter isChildKey (builtins.attrNames own);
