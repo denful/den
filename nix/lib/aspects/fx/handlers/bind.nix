@@ -232,6 +232,16 @@ in
                   fanable = argClass.fanableDescendants schema scopeKind availRecords descendants;
                   pick = if fanable != [ ] then builtins.head fanable else builtins.head descendants;
                 in
+                # Deliberately NOT recorded via `record-inert`, unlike the
+                # misplaced-entity verdict above: double-cover avoidance is not a
+                # vanished delivery — the descendant does receive this content —
+                # so recording it would make the terminal drain's residue guard
+                # throw on correct behaviour. No cell can catch that mistake:
+                # recording all three inert sites is observationally identical to
+                # recording one across the whole suite, because the drain walk
+                # starts a fresh pipeline where `scopeKind` is null and
+                # `arg-class.nix` leaves `descendants` empty. The reason is
+                # semantic, and this comment is the only instrument guarding it.
                 if sharedWithDescendant pick then fx.pure { inert = true; } else fanOut pick
               )
             # Only non-entity (pipe/conditional/enrichment) args remain → defer.

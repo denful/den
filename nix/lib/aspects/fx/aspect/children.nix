@@ -246,7 +246,12 @@ let
     aspect:
     let
       rawHandleWith = aspect.meta.handleWith or null;
-      rawExcludes = aspect.excludes or [ ];
+      # Flattened for the same reason `includes` is (fx/aspect.nix): `providerType`
+      # names a list of policy records as a valid element, so `excludes = [ [ p ] ]`
+      # type-checks. Unflattened it reached `identity.key` as a list, which yields
+      # "<anon>" and excludes nothing — the silent no-op #3c5b5227 closed for bare
+      # strings, still open over the shape that commit's own type admits.
+      rawExcludes = lib.flatten (aspect.excludes or [ ]);
       handleWithList =
         if rawHandleWith == null then
           [ ]
