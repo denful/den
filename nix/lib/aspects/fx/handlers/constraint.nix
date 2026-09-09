@@ -198,6 +198,43 @@ let
     in
     builtins.any directApplies directEntries || rawRefExcluded ? ${name};
 
+  # The `den:` diagnostics for raw-ref excludes that resolved to no claim
+  # ANYWHERE in a finished resolution — a user naming a record den never found,
+  # suppressing nothing, previously in silence.
+  #
+  # DELIBERATELY NOT ON THE PER-SCOPE PATH. resolveRawRefIdentity returning null
+  # for one scope is ordinary correct behaviour: an exclude registered at host
+  # scope reaches every descendant scope, and the policy it names is typically
+  # claimed in only some of them. Warning from isPolicyExcluded would fire on
+  # every non-matching scope of every legitimate exclude. The warnable condition
+  # is global — no claim in the whole run carries this reference — so it takes
+  # the TERMINAL state, and is read once at post-assembly (resolve.nix's
+  # fxResolveFull), never during dispatch.
+  #
+  # Whole-value `==` against the claim bucket, matching resolveClaim's rule
+  # exactly, minus its scope walk: the question here is whether the referenced
+  # record registered AT ALL, not whether it registered somewhere a given scope
+  # can see. Deliberately the weaker test — a claim in an unreachable sibling
+  # scope stays silent rather than risk a false alarm.
+  unmatchedRawRefExcludes =
+    state:
+    let
+      registry = (state.scopedConstraintRegistry or (_: { })) null;
+      claims = (state.policyClaimsByName or (_: { })) null;
+      rawRefEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) != null) (
+        builtins.concatMap (scopeData: builtins.concatLists (builtins.attrValues scopeData)) (
+          builtins.attrValues registry
+        )
+      );
+      isUnmatched = e: !(builtins.any (c: c.value == e.rawRef) (claims."name:${e.rawRef.name}" or [ ]));
+    in
+    lib.unique (
+      map (
+        e:
+        "den: exclude in aspect '${e.owner}' names policy '${e.rawRef.name}', which never registered in this resolution — the exclude suppresses nothing"
+      ) (builtins.filter isUnmatched rawRefEntries)
+    );
+
   entryToResume =
     entry:
     if entry.type == "exclude" then
@@ -319,6 +356,7 @@ in
     foldScopeAncestors
     resolveClaim
     isPolicyExcluded
+    unmatchedRawRefExcludes
     collectScopedConstraints
     scopedConstraintsFor
     scopedConstraintsForScope

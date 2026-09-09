@@ -1068,7 +1068,15 @@ let
       );
     in
     {
-      imports = phase4.${class} or [ ];
+      # Terminal position for the unmatched-raw-ref-exclude diagnostic: both
+      # the constraint registry and policyClaimsByName are complete on
+      # result.state here, and nothing per-scope can decide the question (see
+      # unmatchedRawRefExcludes in handlers/constraint.nix). Attached to
+      # `imports` so it surfaces exactly when the resolved module set is
+      # consumed, not when a path-set or edge-trace reader touches the bundle.
+      imports = lib.foldl' (v: msg: lib.warn msg v) (phase4.${class} or [ ]) (
+        handlers.unmatchedRawRefExcludes result.state
+      );
       # Surfaced from the SAME result.state — this is thunked onto state.
       pathSetByScope = result.state.pathSetByScope null;
       # Per-scope ctx + entity-kind, so the entity surface can re-key the path
