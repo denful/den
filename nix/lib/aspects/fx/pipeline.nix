@@ -71,6 +71,7 @@ let
     // handlers.compileStaticHandler
     // handlers.bindHandler
     // handlers.deferHandler
+    // handlers.recordInertHandler
     // handlers.drainHandler
     // handlers.scopeWidenHandler
     // handlers.classifyHandler
@@ -179,6 +180,7 @@ let
     scopedClassImports = _: { };
     scopedAspectPolicies = _: { };
     scopedDeferredIncludes = _: { };
+    scopedInertAspects = _: { };
     scopedDeferredConditionals = _: { };
     scopedIncludesChain = _: { };
     scopedIncludesChainSegments = _: { };

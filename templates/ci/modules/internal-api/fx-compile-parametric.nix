@@ -209,7 +209,10 @@
               inherit state;
             };
         };
-        # No scope handlers — bind will defer.
+        # No scope handlers — `host` is an entity kind with no scope kind to be
+        # a descendant of, so bind rules it misplaced → inert (it never reaches
+        # defer). recordInertHandler is listed for the same reason deferHandler
+        # is: this composition must handle every effect bind can send.
         comp = fx.send "compile-parametric" param;
         result = fx.handle {
           handlers =
@@ -217,6 +220,7 @@
             // handlers.gateHandler
             // handlers.bindHandler
             // handlers.deferHandler
+            // handlers.recordInertHandler
             // identity.collectPathsHandler
             // stubs;
           inherit state;

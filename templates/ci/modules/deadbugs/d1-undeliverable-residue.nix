@@ -68,6 +68,65 @@ let
       ];
     };
   };
+
+  # ARM C — pipe-arg deferred, whose OWN `includes` fans over an entity arg.
+  # The drain walk has no entity kind, so `user` is neither in-ctx nor a
+  # descendant: bind rules the whole child inert and 10410 vanished with no
+  # residue in any effect map (D1 F1 arm C). 10400 kept delivering, so the
+  # loss showed up as nothing at all.
+  fixtureEntityFan = den: {
+    den.hosts.x86_64-linux.igloo.users.tux = { };
+    den.quirks.firewall.description = "Firewall port declarations";
+
+    den.aspects.igloo = {
+      firewall.ports = [ 22 ];
+      includes = [
+        (
+          { firewall, ... }:
+          {
+            name = "gate3-deferred";
+            nixos.networking.firewall.allowedTCPPorts = [ 10400 ];
+            includes = [
+              (
+                { user, ... }:
+                {
+                  name = "fan-over-user";
+                  nixos.networking.firewall.allowedTCPPorts = [ 10410 ];
+                }
+              )
+            ];
+          }
+        )
+      ];
+    };
+  };
+
+  # ARM D — the live control for arm C's ruling. The pipe-arg-deferred child
+  # legitimately delivers nothing into the drained class, while the run's
+  # other scopes deliver normally. A guard written on the ABSENCE of
+  # scopedClassImports cannot tell this from arm C and throws here; a guard
+  # written on bind's recorded verdict stays silent. Measured both ways: with
+  # the absence guard swapped in, this cell goes red and arm C goes green —
+  # the two are not interchangeable, and arm C alone would not have caught it.
+  fixtureInertElsewhere = den: {
+    den.hosts.x86_64-linux.igloo.users.tux = { };
+    den.quirks.firewall.description = "Firewall port declarations";
+
+    den.aspects.tux.homeManager.programs.direnv.enable = true;
+
+    den.aspects.igloo = {
+      firewall.ports = [ 22 ];
+      nixos.networking.firewall.allowedTCPPorts = [ 10500 ];
+      includes = [
+        (
+          { firewall, ... }:
+          {
+            name = "gate4-deferred";
+          }
+        )
+      ];
+    };
+  };
 in
 {
   flake.tests.d1residue = {
@@ -107,6 +166,50 @@ in
           builtins.elem 10305 igloo.networking.firewall.allowedTCPPorts
           && builtins.elem 10320 igloo.networking.firewall.allowedTCPPorts;
         expected = true;
+      }
+    );
+
+    # ARM C, the exhibit: the entity-fan half must be loud, not absent.
+    test-entity-fan-residue-throws-loud = denTest (
+      { den, igloo, ... }:
+      (fixtureEntityFan den)
+      // {
+        expr = igloo.networking.firewall.allowedTCPPorts;
+        expectedError = {
+          type = "ThrownError";
+          msg = "left undeliverable content";
+        };
+      }
+    );
+
+    test-entity-fan-residue-throws-loud-under-just-ci = denTest (
+      { den, igloo, ... }:
+      (fixtureEntityFan den)
+      // {
+        expr = (builtins.tryEval (builtins.deepSeq igloo.networking.firewall.allowedTCPPorts null)).success;
+        expected = false;
+      }
+    );
+
+    # ARM D, the control: same drain, an aspect that legitimately delivers
+    # nothing HERE and delivers at the user scope. Must stay silent.
+    test-inert-elsewhere-drains-silently = denTest (
+      {
+        den,
+        igloo,
+        tuxHm,
+        ...
+      }:
+      (fixtureInertElsewhere den)
+      // {
+        expr = [
+          (builtins.elem 10500 igloo.networking.firewall.allowedTCPPorts)
+          tuxHm.programs.direnv.enable
+        ];
+        expected = [
+          true
+          true
+        ];
       }
     );
   };

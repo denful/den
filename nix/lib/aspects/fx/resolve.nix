@@ -737,18 +737,21 @@ let
                     # deferred child carrying both direct class content and
                     # a `resolve.to` policy delivered the direct half and
                     # dropped the policy half with no diagnostic). Guard on
-                    # that residue instead: throw loud when any of the five
+                    # that residue instead: throw loud when any of the scoped
                     # scoped-effect maps hold something for this walk,
                     # rather than deliver `scopedClassImports` alone and
                     # lose the rest quietly.
                     #
-                    # Known gap NOT covered here: a deferred child whose own
-                    # `includes` fans over an entity arg loses its content
-                    # with no residue in any of these maps (`includeSeen` is
-                    # set, `scopedClassImports` is simply absent) — closing
-                    # that needs `bind`'s entity-arg fan classification, a
-                    # different position entirely (D1 F1 arm C, open).
-                    # Per-scope values are lists for four of these
+                    # A deferred child whose own `includes` fans over an entity
+                    # arg is covered by the same guard: this walk has no entity
+                    # kind, so every entity arg there is misplaced and bind
+                    # rules the aspect inert. That verdict left no trace in any
+                    # effect map (`includeSeen` set, `scopedClassImports` simply
+                    # absent), which is indistinguishable from an aspect that
+                    # legitimately emits nothing — so bind records the verdict
+                    # itself into scopedInertAspects (handlers/inert.nix) and it
+                    # reads as residue below (D1 F1 arm C).
+                    # Per-scope values are lists for five of these
                     # (scopedAppend) but scopedAspectPolicies is a merged
                     # attrset keyed by policy name (scopedMerge, policy.nix)
                     # — normalise both to a list before concatenating.
@@ -765,6 +768,7 @@ let
                       "scopedInstantiates"
                       "scopedProvides"
                       "scopedDeferredIncludes"
+                      "scopedInertAspects"
                     ];
                   in
                   if residueKinds != [ ] then
