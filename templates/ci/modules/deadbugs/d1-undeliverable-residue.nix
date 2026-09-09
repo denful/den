@@ -85,6 +85,18 @@ in
       }
     );
 
+    # Same scenario, via tryEval instead of expectedError: proves the
+    # residue guard is visible to `just ci` independent of the
+    # expectedError branch above (see ci.bash's hasExpectedError handling).
+    test-policy-borne-residue-throws-loud-under-just-ci = denTest (
+      { den, igloo, ... }:
+      (fixtureDeferred den)
+      // {
+        expr = (builtins.tryEval (builtins.deepSeq igloo.networking.firewall.allowedTCPPorts null)).success;
+        expected = false;
+      }
+    );
+
     # Same shapes, not deferred: both halves must still deliver, in the same
     # run — proves the guard does not touch the ordinary (non-drain) path.
     test-plain-twin-both-halves-deliver = denTest (
