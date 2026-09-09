@@ -121,27 +121,40 @@ let
     own: path:
     let
       # A provides child's NAME lives in a different namespace than the
-      # aspect's own top-level keys — `isStructuralKey` classifies the
-      # latter (own-key dispatch) and does not apply here: every declared
-      # aspect option (description, meta, includes, …) already has a
-      # default, so `merged` always wins the top-level
-      # `providesChildren // merged` shadow for those names (see
-      # unshadowedProvides below) while `.provides`/`._` still reach the
-      # child's own content untouched — measured per key, nothing else in
-      # the structural registry is genuine machinery at this seam. `_module` is
-      # real NixOS module-system machinery, but it never reaches
-      # `own.provides`'s attrNames in the first place (the module system
-      # consumes it before freeform merge), so no explicit reservation is
-      # needed for it either.
-      #
-      # Two keys ARE genuine machinery here: `__`-prefixed (pipeline
-      # internals) and `_` — a multi-def nested key merges into a content
-      # wrapper carrying `__contentValues`/`__aspectChain`/`_` beside its
-      # real children (aspectContentType below), and `_` is the one of
-      # those three not already caught by the `__`-prefix rule.
+      # aspect's own top-level keys, so `.provides`/`._` reach every child
+      # untouched whatever it is called. Two keys ARE genuine machinery even
+      # there: `__`-prefixed (pipeline internals) and `_` — a multi-def
+      # nested key merges into a content wrapper carrying
+      # `__contentValues`/`__aspectChain`/`_` beside its real children
+      # (aspectContentType below), and `_` is the one of those three not
+      # already caught by the `__`-prefix rule. `_module` is real NixOS
+      # module-system machinery but never reaches `own.provides`'s attrNames
+      # (the module system consumes it before freeform merge), so it needs no
+      # reservation here.
       providesChildren = lib.filterAttrs (k: _: !(lib.hasPrefix "__" k) && k != "_") (
         own.provides or { }
       );
+      # Forwarding a child onto the aspect's own top level is a different
+      # question from reaching it through `._`, and it is the one that
+      # depends on the construction site. Where the aspect is a declared
+      # submodule (mergeWithAspectMeta) every aspect option already has a
+      # default, so `merged` wins the `providesChildren // merged` shadow for
+      # those names on its own. The two RAW sites — providerType.merge's
+      # functor-carrying battery attrset and aspectContentType's nested
+      # freeform key — have no submodule and therefore no defaults to win it,
+      # so an unreserved child named `name`/`includes`/`meta`/… would land in
+      # the aspect's own option position and be read structurally from there.
+      # `forwardable` is what those two sites fold, making one user-written
+      # shape behave the same at all three: the aspect's own value keeps the
+      # top level, the child stays reachable at `._.<name>`.
+      #
+      # Reserved by the structural registry rather than by the declared-option
+      # list, because that registry is what decides own-key dispatch in the
+      # first place. It is a superset by two inert names: `into` (declared
+      # only on the deprecated den.ctx shim) and anything in user
+      # `den.reservedKeys` — both reachable through `._` exactly as the
+      # declared options are.
+      forwardable = lib.filterAttrs (k: _: !(isStructuralKey k)) providesChildren;
       childKeys = builtins.filter isChildKey (builtins.attrNames own);
       functor = {
         __functor = _self: _args: {
@@ -151,7 +164,7 @@ let
       };
     in
     {
-      inherit providesChildren functor;
+      inherit providesChildren forwardable functor;
       syntheticProvides = providesChildren // functor;
     };
 
@@ -315,12 +328,10 @@ let
           normalizedFn = foldUnderscoreIntoProvides fn;
           aspectName = fn.name or (lib.last loc);
           underscore = mkUnderscore normalizedFn ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
-          inherit (underscore) providesChildren;
-          unshadowedProvides = builtins.filter (k: !(normalizedFn ? ${k})) (
-            builtins.attrNames providesChildren
-          );
+          inherit (underscore) forwardable;
+          unshadowedProvides = builtins.filter (k: !(normalizedFn ? ${k})) (builtins.attrNames forwardable);
         in
-        providesChildren
+        forwardable
         // normalizedFn
         // {
           __providesForwarded = unshadowedProvides;
@@ -717,12 +728,12 @@ let
           # single-def path is unaffected because a raw attrset carries none of
           # these keys.
           topUnderscore = mkUnderscore annotatedMerged provider;
-          inherit (topUnderscore) providesChildren;
+          inherit (topUnderscore) forwardable;
           unshadowedProvides = builtins.filter (k: !(annotatedMerged ? ${k})) (
-            builtins.attrNames providesChildren
+            builtins.attrNames forwardable
           );
         in
-        providesChildren
+        forwardable
         // annotatedMerged
         // {
           __contentValues = flatDefs;
