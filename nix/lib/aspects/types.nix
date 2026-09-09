@@ -316,10 +316,15 @@ let
           normalizedFn = foldUnderscoreIntoProvides fn;
           aspectName = fn.name or (lib.last loc);
           underscore = mkUnderscore normalizedFn ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
+          inherit (underscore) providesChildren;
+          unshadowedProvides = builtins.filter (k: !(normalizedFn ? ${k})) (
+            builtins.attrNames providesChildren
+          );
         in
-        underscore.providesChildren
+        providesChildren
         // normalizedFn
         // {
+          __providesForwarded = unshadowedProvides;
           provides = underscore.syntheticProvides;
           _ = underscore.syntheticProvides;
         }
