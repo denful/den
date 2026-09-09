@@ -39,7 +39,6 @@ let
     sortEdges
     collected
     rewalk
-    synthesize
     rootTarget
     outputTarget
     ;
@@ -71,7 +70,7 @@ let
   # production's, not a parallel render.
   instantiateEdges = import ./edges/instantiate.nix { inherit lib; };
 in
-rec {
+{
   # extractTopLevelEdges: pipeline end-state → the per-COMPONENT edge lists,
   # UNSORTED. Consumed by resolve.nix's production edge trace, which wants the
   # SAME top-level mechanism lists but drops the `spawnEdges` rewalk arm (it
