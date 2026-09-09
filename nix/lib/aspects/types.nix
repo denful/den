@@ -430,11 +430,21 @@ let
                 }
                 # Preserve identity: inject name and provider chain from
                 # __aspectChain so aspectSubmodule.merge produces a meaningful
-                # identity instead of an anonymous include index.
-                // lib.optionalAttrs (provName != null) {
-                  name = provName;
-                  meta.aspect-chain = lib.init d.value.__aspectChain;
-                };
+                # identity instead of an anonymous include index. Fill only
+                # what the value does not already carry — an aliased aspect
+                # (den.aspects.group.key = den.aspects.other;) owns a
+                # meaningful name and chain of its own, and an author's name
+                # outranks its position here.
+                // lib.optionalAttrs (provName != null) (
+                  lib.optionalAttrs (!(d.value ? name) || !(isMeaningfulName d.value.name)) {
+                    name = provName;
+                  }
+                  // lib.optionalAttrs ((d.value.meta.aspect-chain or null) == null) {
+                    meta = (d.value.meta or { }) // {
+                      aspect-chain = lib.init d.value.__aspectChain;
+                    };
+                  }
+                );
             };
           defs' = map (d: if isContentWrapper d then wrapperToAspect d else d) (map stampDefPos defs);
           listDefs = builtins.filter (d: builtins.isList d.value) defs';
