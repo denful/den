@@ -70,7 +70,7 @@ let
         includes = resolved.includes or [ ];
       }
       // lib.filterAttrs (
-        k: _: (fx.keyClassification.structuralKeysSet ? ${k}) && !(functorRootOwnedKeys ? ${k})
+        k: _: fx.keyClassification.isStructuralKey k && !(functorRootOwnedKeys ? ${k})
       ) resolved
     else
       resolved;

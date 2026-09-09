@@ -6,7 +6,7 @@
 let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
-  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+  inherit (den.lib.aspects.fx.keyClassification) isStructuralKey;
   inherit (import ./class-module.nix { inherit lib den; }) wrapClassModule;
 
   ctxFromHandlers =
@@ -73,7 +73,7 @@ let
           fnArgNames = builtins.attrNames (aspect.__args or { });
         };
     }
-    // lib.filterAttrs (k: _: (structuralKeysSet ? ${k}) && !(parametricOwnedKeysSet ? ${k})) aspect;
+    // lib.filterAttrs (k: _: isStructuralKey k && !(parametricOwnedKeysSet ? ${k})) aspect;
 
   # Merge the resolved value into the parametric base.
   mkParametricNext =
@@ -185,7 +185,7 @@ in
     emitIncludes
     emitAspectPolicies
     chainWrap
-    structuralKeysSet
+    isStructuralKey
     wrapClassModule
     ctxFromHandlers
     enterScope

@@ -96,16 +96,15 @@ let
   # and identical at every site that builds a synthetic `_`. Not parameters.
   classReg = den.classes or { };
   pipeReg = den.quirks or { };
-  inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+  inherit (den.lib.aspects.fx.keyClassification) isStructuralKey;
 
-  # A key names a candidate child aspect when it is neither structural,
-  # internal, class, nor pipe. Provides children are reached through
-  # `provides`/`_`, which are structural, so this alone decides child-key
-  # membership — a key held both as a provides child and as a direct key is
-  # still a child key, included via its direct value (see mkUnderscore).
-  isChildKey =
-    k:
-    !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k) && !(classReg ? ${k}) && !(pipeReg ? ${k});
+  # A key names a candidate child aspect when it is neither structural (which
+  # covers `__`-prefixed internals by rule), class, nor pipe. Provides children
+  # are reached through `provides`/`_`, which are structural, so this alone
+  # decides child-key membership — a key held both as a provides child and as a
+  # direct key is still a child key, included via its direct value (see
+  # mkUnderscore).
+  isChildKey = k: !(isStructuralKey k) && !(classReg ? ${k}) && !(pipeReg ? ${k});
 
   # The synthetic `_`/`provides` aspect, built once for all three shapes an
   # aspect construction can take (declared submodule, functor-carrying
@@ -122,14 +121,14 @@ let
     own: path:
     let
       # A provides child's NAME lives in a different namespace than the
-      # aspect's own top-level keys — `structuralKeysSet` classifies the
+      # aspect's own top-level keys — `isStructuralKey` classifies the
       # latter (own-key dispatch) and does not apply here: every declared
       # aspect option (description, meta, includes, …) already has a
       # default, so `merged` always wins the top-level
       # `providesChildren // merged` shadow for those names (see
       # unshadowedProvides below) while `.provides`/`._` still reach the
       # child's own content untouched — measured per key, nothing else in
-      # structuralKeysSet is genuine machinery at this seam. `_module` is
+      # the structural registry is genuine machinery at this seam. `_module` is
       # real NixOS module-system machinery, but it never reaches
       # `own.provides`'s attrNames in the first place (the module system
       # consumes it before freeform merge), so no explicit reservation is
@@ -753,7 +752,7 @@ let
     typeCfg:
     let
       contentType = aspectContentType typeCfg;
-      inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+      inherit (den.lib.aspects.fx.keyClassification) isStructuralKey;
     in
     lib.types.mkOptionType {
       name = "aspectKey";
@@ -766,7 +765,7 @@ let
       # key for dispatch. Everything else gets the provenance/content wrapper.
       merge =
         loc: defs:
-        if structuralKeysSet ? ${lib.last loc} then (lib.last defs).value else contentType.merge loc defs;
+        if isStructuralKey (lib.last loc) then (lib.last defs).value else contentType.merge loc defs;
     };
 
   # Aspect meta submodule type: handleWith, provider, collisionPolicy.
