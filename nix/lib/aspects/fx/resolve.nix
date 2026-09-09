@@ -718,22 +718,57 @@ let
                       self = d.child;
                       ctx = scopeCtx;
                     };
-                    # The walk roots at its OWN scope id (mkScopeId hashes
-                    # every ctx key, and scopeCtx carries the pipe value the
-                    # child required), never the draining scope's id — so
-                    # its buckets are folded under `scopeId` explicitly
-                    # below rather than merged in by scope id.
-                    walkedScopeIds = builtins.attrNames (walked.state.scopeContexts null);
+                    # This walk never runs policy dispatch: installPolicies
+                    # (resolve-children.nix) skips any aspect without
+                    # __entityKind, and nothing on a deferred child's walk
+                    # ever attaches one (resolve-entity.nix is the only
+                    # site that does, reached only via the resolve-entity
+                    # effect). Since push-scope fires only from inside
+                    # policy dispatch, that also means this walk can never
+                    # fan into more than one scope — scope-forking and
+                    # policy dispatch share one gate (D1 F1, measured: 51
+                    # walk firings across the D1 suites, all n=1).
+                    #
+                    # What DOES happen on this path: a policy effect
+                    # (route/instantiate/provide/aspect-policy) or a
+                    # still-deferred nested include gets REGISTERED by the
+                    # walk's compile step without ever being DISPATCHED, and
+                    # that content was silently lost (D1 F1 — a pipe-arg-
+                    # deferred child carrying both direct class content and
+                    # a `resolve.to` policy delivered the direct half and
+                    # dropped the policy half with no diagnostic). Guard on
+                    # that residue instead: throw loud when any of the five
+                    # scoped-effect maps hold something for this walk,
+                    # rather than deliver `scopedClassImports` alone and
+                    # lose the rest quietly.
+                    #
+                    # Known gap NOT covered here: a deferred child whose own
+                    # `includes` fans over an entity arg loses its content
+                    # with no residue in any of these maps (`includeSeen` is
+                    # set, `scopedClassImports` is simply absent) — closing
+                    # that needs `bind`'s entity-arg fan classification, a
+                    # different position entirely (D1 F1 arm C, open).
+                    # Per-scope values are lists for four of these
+                    # (scopedAppend) but scopedAspectPolicies is a merged
+                    # attrset keyed by policy name (scopedMerge, policy.nix)
+                    # — normalise both to a list before concatenating.
+                    residueOf =
+                      key:
+                      builtins.concatLists (
+                        map (v: if builtins.isList v then v else lib.attrValues v) (
+                          lib.attrValues ((walked.state.${key} or (_: { })) null)
+                        )
+                      );
+                    residueKinds = builtins.filter (k: residueOf k != [ ]) [
+                      "scopedAspectPolicies"
+                      "scopedRoutes"
+                      "scopedInstantiates"
+                      "scopedProvides"
+                      "scopedDeferredIncludes"
+                    ];
                   in
-                  if builtins.length walkedScopeIds > 1 then
-                    # A deferred child whose own `includes` fan over an entity
-                    # arg (or that carries a `resolve.to`) pushes real child
-                    # scopes of its own. Collapsing those into the draining
-                    # scope would hoist their content across scope isolation
-                    # silently; no measured shape reaches this today, so throw
-                    # loud rather than guess (D1 §4.2).
-                    throw
-                      "den: pipe-arg-deferred include '${d.child.name or "<deferred>"}' fanned into ${toString (builtins.length walkedScopeIds)} scopes (${lib.concatStringsSep ", " walkedScopeIds}) while draining at scope '${scopeId}' — folding a fanned child's scopes into the drain scope is not supported"
+                  if residueKinds != [ ] then
+                    throw "den: pipe-arg-deferred include '${d.child.name or "<deferred>"}' left undeliverable content (${lib.concatStringsSep ", " residueKinds}) while draining at scope '${scopeId}' — this drain walk does not dispatch policies, so registered effects are silently dropped rather than delivered"
                   else
                     lib.attrValues (walked.state.scopedClassImports null)
                 ) drainable;
