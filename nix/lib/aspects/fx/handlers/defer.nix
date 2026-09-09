@@ -26,6 +26,14 @@ in
             null
           else
             throw "den: entity-kind arg '${builtins.head entityArgs}' reached defer for aspect '${child.name or "<anon>"}' — bind should have classified it (fan-out/inert); this is a resolver bug";
+        # Bookkeeping only — deliberately NOT a rebuild of `child`. The child
+        # is queued intact below and resolves in full when the drain fires;
+        # this record exists so the deferred node still registers an identity,
+        # and every resolve-complete consumer (identity.collectPathsHandler,
+        # trace.nix) reads name/meta and nothing else. `includes = [ ]` states
+        # that this marker carries no children of its own — it is a reset, not
+        # a dropped carry-forward, and adding structural state here would only
+        # duplicate what the drained `child` emits later.
         stub = {
           name = child.name or "<anon>";
           meta = (child.meta or { }) // {
