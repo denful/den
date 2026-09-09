@@ -1,7 +1,12 @@
 #!/usr/bin/env bash
 #
 # Uses nix-eval-jobs with $(nproc) workers
-# NOTE: Ignores tests with expectedError
+# NOTE: expectedError cells only verify that expr throws SOMETHING (via
+# tryEval, in the --select expression below). They do not verify
+# expectedError.type/.msg — nix-eval-jobs runs each job out-of-process, so
+# only tryEval's success/failure crosses that boundary, not the caught
+# exception's details. Use `nix-unit` directly (`just ci-deep`/`just test`)
+# for full type/msg verification.
 #
 # Redirect stdout to null IF you only want to see failures
 set -aeuo pipefail
@@ -68,8 +73,16 @@ nix-eval-jobs \
         let
           hasExpected = v ? expected && !(v.expected ? undefined);
           hasExpectedError = v ? expectedError && !(v.expectedError ? undefined);
+          # nix-eval-jobs runs each job in a separate worker; only
+          # tryEval'\''s success/failure crosses that boundary, not the
+          # caught exception'\''s type/msg text. So this only proves expr
+          # throws SOMETHING — closing the class where a fix silently stops
+          # throwing and the cell still reads green. It does not verify
+          # expectedError.type/.msg; only `nix-unit` does that (it uses
+          # the evaluator'\''s C++ API directly to inspect the exception).
           pass = if hasExpected then v.expr == v.expected
-                 else if hasExpectedError then true # ignored
+                 else if hasExpectedError then
+                   !(builtins.tryEval (builtins.deepSeq v.expr null)).success
                  else true;
           name = builtins.replaceStrings ["." "'\''"] ["-" "_"] prefix;
         in derivation {
