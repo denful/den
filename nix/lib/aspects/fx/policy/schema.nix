@@ -212,9 +212,9 @@ let
         # child sibling, and the relevant excludes (e.g. den.schema.flake-system.
         # excludes) register at the sibling/descendant scope, not an ancestor.
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
-        filteredPolicies = lib.filterAttrs (
-          name: _: !isPolicyExcluded state sib.scopeId constraintRegistry name
-        ) latePolicies;
+        # Applied once, outside the lambda — see isPolicyExcluded's currying note.
+        excluded = isPolicyExcluded state sib.scopeId constraintRegistry;
+        filteredPolicies = lib.filterAttrs (name: _: !excluded name) latePolicies;
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };

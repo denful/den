@@ -20,9 +20,9 @@ in
         # Entity-scoped (scope + ancestors, NOT fleet-wide) — a sibling entity's
         # policy-exclude must not filter this scope's policies (#613 analog).
         registry = scopedConstraintsFor state;
-        filteredPolicies = lib.filterAttrs (
-          name: _: !isPolicyExcluded state state.currentScope registry name
-        ) param.aspectPolicies;
+        # Applied once, outside the lambda — see isPolicyExcluded's currying note.
+        excluded = isPolicyExcluded state state.currentScope registry;
+        filteredPolicies = lib.filterAttrs (name: _: !excluded name) param.aspectPolicies;
       in
       {
         resume = mkDispatch filteredPolicies param.firedPolicies param.resolveCtx;

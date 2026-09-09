@@ -148,11 +148,16 @@ let
   # both must exclude the SAME claimant, or a claimant filtered from one
   # still fires through the other.
   #
-  # Cost: registry is already scoped to one entity's self+ancestors, but
-  # within that scope this flattens EVERY identity bucket to find rawRef
-  # entries and re-walks ancestor scopes (resolveClaim) per rawRef entry —
-  # replacing what was a single `registry.${name} or []` lookup. Per call:
-  # O(E + R × D × C). Per dispatch over P policies: O(P × (E + R × D × C)).
+  # CURRIED DELIBERATELY: `name` is the last argument and everything above it
+  # is a partial application both callers make ONCE, outside their filterAttrs
+  # lambda. Nothing in arm (b) depends on the name being tested, so applying
+  # all four arguments per candidate rebuilt the whole rawRef resolution for
+  # each of P policy names. Callers must keep hoisting the partial application;
+  # re-inlining a fully-applied call inside a per-name lambda silently restores
+  # the P factor below.
+  #
+  # Cost, with the hoist: O(E + R × D × C) once per dispatch, plus O(1) per
+  # candidate name. Without it, every term was multiplied by P.
   #   E = constraint entries in the scoped registry — per-entity, bounded by
   #       how many excludes/handleWith one aspect tree declares, not fleet-wide.
   #   R = rawRef excludes in scope.
@@ -170,19 +175,28 @@ let
   #       fleet size N — do not read E's per-entity bound as covering the
   #       whole cost; E and C are scoped oppositely and must not be merged
   #       under one "bounded per-entity" claim.
-  # den's performance suite (perf 29/29) declares zero hosts and does not
-  # exercise this path at entity scale; unmeasured there.
+  #
+  # The rawRef arm now resolves EVERY rawRef entry rather than stopping at the
+  # first whose identity matches. That is deliberate: which entries got
+  # resolved previously depended on the order candidate names arrived in, so
+  # any error reachable through resolveClaim surfaced for some dispatch orders
+  # and not others.
   isPolicyExcluded =
-    state: scope: registry: name:
+    state: scope: registry:
     let
-      directEntries = registry.${name} or [ ];
-      directApplies = e: e.type == "exclude" && (e.rawRef or null) == null;
       rawRefEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) != null) (
         builtins.concatLists (builtins.attrValues registry)
       );
+      rawRefExcluded = lib.genAttrs (builtins.filter (id: id != null) (
+        map (resolveRawRefIdentity state scope) rawRefEntries
+      )) (_: true);
     in
-    builtins.any directApplies directEntries
-    || builtins.any (e: resolveRawRefIdentity state scope e == name) rawRefEntries;
+    name:
+    let
+      directEntries = registry.${name} or [ ];
+      directApplies = e: e.type == "exclude" && (e.rawRef or null) == null;
+    in
+    builtins.any directApplies directEntries || rawRefExcluded ? ${name};
 
   entryToResume =
     entry:
