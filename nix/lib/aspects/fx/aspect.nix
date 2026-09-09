@@ -185,7 +185,6 @@ in
     emitIncludes
     emitAspectPolicies
     chainWrap
-    isStructuralKey
     wrapClassModule
     ctxFromHandlers
     enterScope
