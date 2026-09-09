@@ -737,10 +737,30 @@ let
                     # deferred child carrying both direct class content and
                     # a `resolve.to` policy delivered the direct half and
                     # dropped the policy half with no diagnostic). Guard on
-                    # that residue instead: throw loud when any of the scoped
-                    # scoped-effect maps hold something for this walk,
-                    # rather than deliver `scopedClassImports` alone and
-                    # lose the rest quietly.
+                    # that residue instead: throw loud when one of the six
+                    # scoped-effect maps listed at `residueKinds` below holds
+                    # something for this walk, rather than deliver
+                    # `scopedClassImports` alone and lose the rest quietly.
+                    #
+                    # Six of the fourteen scope-partitioned maps
+                    # (pipeline.nix), not all of them. `scopedClassImports` is
+                    # the one delivered rather than guarded, and the
+                    # includes-chain, constraint-registry and emitted-loc maps
+                    # are bookkeeping rather than deliverable content. Three
+                    # maps that DO carry deliverable content are left out
+                    # because they cannot be reached on this walk — DERIVED by
+                    # reading their senders and consumers, not measured, and
+                    # that derivation is the guard's whole warrant:
+                    #   - scopedPipeEffects, scopedSpawns — written only by
+                    #     policy effect emission (policy/apply.nix), and this
+                    #     walk never dispatches policies;
+                    #   - scopedDeferredConditionals — cleared in-walk:
+                    #     resolve-children fires drain-conditionals at the
+                    #     sub-pipeline's own root and compile-conditional
+                    #     empties the scope's bucket.
+                    # A fourth policy-independent sender, or a push-scope path
+                    # that skips policy dispatch, re-opens exactly the class
+                    # this guard closes. Add the map to the list below.
                     #
                     # A deferred child whose own `includes` fans over an entity
                     # arg is covered by the same guard: this walk has no entity
@@ -1037,7 +1057,7 @@ let
       # deterministic structural edges production invokes via assembleSubtree /
       # applyInstantiates (no drift surface). This corrects the legacy oracle's
       # spawn rewalk UNDERCOUNT. A lazy thunk — forced only by inspection / the
-      # delivery-edges + fx-unified-edges suites, never by normal resolve consumers.
+      # delivery-edges suite, never by normal resolve consumers.
       productionEdgeTrace = sortEdges (
         materialized.edges
         ++ topLevelEdgeParts.defaultFold

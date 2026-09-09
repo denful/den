@@ -30,7 +30,10 @@ in
         # is queued intact below and resolves in full when the drain fires;
         # this record exists so the deferred node still registers an identity,
         # and every resolve-complete consumer (identity.collectPathsHandler,
-        # trace.nix) reads name/meta and nothing else. `includes = [ ]` states
+        # trace.nix) reads name, meta, `__entityKind` and `__ctxId` — none
+        # reads includes. Omitting the two `__` keys costs this marker the
+        # `{ctxId}` instance suffix identity.nix's aspectPath would append; the
+        # base path registers either way. `includes = [ ]` states
         # that this marker carries no children of its own — it is a reset, not
         # a dropped carry-forward, and adding structural state here would only
         # duplicate what the drained `child` emits later.

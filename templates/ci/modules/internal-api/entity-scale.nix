@@ -1,4 +1,4 @@
-# PERFORMANCE SUITE COVERAGE — read this before trusting `perf 29/29`.
+# PERFORMANCE SUITE COVERAGE — read this before trusting `perf 31/31`.
 #
 # Every OTHER file feeding `flake.tests.performance` (resolve.nix, depth.nix,
 # forward.nix, namespace.nix, ctx-pipeline.nix, ctx-chain.nix, pure-eval.nix,

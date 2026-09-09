@@ -57,7 +57,8 @@ let
   # materialization-time path-dependent — see routeEdges' note).
   inherit (import ./edges/route.nix { inherit lib den; }) routeEdges;
   # The provides edge constructor — the SAME constructor production materializes
-  # provides through (resolve.nix phase-2 → edges/provides.nix applyProvidesEdges).
+  # provides through (resolve.nix → materializeUnified's ordered-dispatch fold,
+  # edges/materialize-unified.nix).
   # v0's inline provides arm + its own dedup is REPLACED by this import: oracle and
   # production converge on ONE provides constructor (spec §3a). The two-edge
   # decomposition (nest into source bucket, merge half = default-fold) is recorded
@@ -125,7 +126,8 @@ in
       # ===== provides edges (two-edge decomposition, §B Decision 1) ======
       # Rendered by the SHARED provides constructor (edges/provides.nix
       # providesEdges) — the SAME constructor production materializes provides
-      # through (resolve.nix phase-2 → applyProvidesEdges). Each spec → a nest edge
+      # through (resolve.nix → materializeUnified's ordered-dispatch fold). Each
+      # spec → a nest edge
       # into the SOURCE scope's bucket; the merge half is the default-fold edge
       # (annotated mergeHalf). Dedup key = (policyName, class, path), NOT scope-
       # keyed (§B Decision 1).

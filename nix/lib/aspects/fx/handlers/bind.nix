@@ -212,6 +212,16 @@ in
             # inert verdicts stay unrecorded on purpose — zero children has no
             # target to deliver to, and the shared-with-descendant case is
             # double-cover avoidance, where the descendant does receive it.
+            #
+            # Adding an fx.send is not a local change: every hand-composed
+            # handler set under templates/ci/modules/internal-api/ has to list
+            # a handler for it. One of the twelve bare compositions there
+            # installs recordInertHandler; the other eleven are green only
+            # because they do not reach this branch, and nothing structurally
+            # stops a future cell in them from doing so. The failure is
+            # `unhandled effect '<name>'`, which names nothing about the test
+            # that caused it, and it surfaces as ☢️ rather than ❌ — a gate
+            # tallying only ❌ reads it clean. Sweep that directory.
             if misplaced != [ ] then
               fx.bind (fx.send "record-inert" {
                 aspect = aspect.name or "<anon>";
