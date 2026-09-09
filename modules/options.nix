@@ -77,6 +77,25 @@ in
       };
       excludes = {
         default = [ ];
+        # Bare-string elements used to be accepted and silently exclude
+        # nothing: `identity.key` (nix/lib/aspects/fx/identity.nix) reduces a
+        # string to "<anon>", which matches no policy. gen-schema has no
+        # per-collection `type` to route this through, so validate here —
+        # the same defect at the aspect tier (den.aspects.*.excludes) was
+        # fixed by routing it through a type; this is the equivalent
+        # declaration-time check for the untyped schema-tier collection.
+        merge =
+          acc: val:
+          acc
+          ++ map (
+            v:
+            if builtins.isAttrs v then
+              v
+            else
+              throw "den: den.schema.<kind>.excludes: expected a policy or aspect reference, got ${
+                if builtins.isString v then ''"${v}"'' else builtins.typeOf v
+              }"
+          ) val;
       };
       isEntity = {
         default = false;
