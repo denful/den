@@ -9,6 +9,25 @@ let
   hasAspect = import ./has-aspect.nix { inherit den lib; };
   fx = import ./fx { inherit den lib; };
 
+  # Structural keys the functor-root unwrap below re-derives itself, so the
+  # general carry-forward must not copy them off the pre-normalization root:
+  # name/meta/includes are defaulted explicitly; __fn/__args are built here
+  # from the functor; __functor/__functionArgs are the function representation
+  # this branch consumes into __fn/__args, and re-emitting them would leave the
+  # root looking unnormalized to content-util's functor unwrap; _module is
+  # module-system bookkeeping the aspect merge leaves behind (resolveAspectWith
+  # strips it for the same reason), never pipeline state.
+  functorRootOwnedKeys = lib.genAttrs [
+    "name"
+    "meta"
+    "includes"
+    "__fn"
+    "__args"
+    "__functor"
+    "__functionArgs"
+    "_module"
+  ] (_: true);
+
   normalizeRoot =
     resolved:
     let
@@ -40,6 +59,9 @@ let
         meta = { };
       }
     else if needsWrap then
+      # Every other structural key on the root (excludes, provides, policies,
+      # into, classes, __scopeHandlers, __walkStamped, …) survives the unwrap
+      # unchanged — a whitelist here silently dropped each new marker.
       {
         __fn = resolved.__functor resolved;
         __args = functorArgs;
@@ -47,7 +69,9 @@ let
         meta = resolved.meta or { };
         includes = resolved.includes or [ ];
       }
-      // lib.optionalAttrs (resolved ? __scopeHandlers) { inherit (resolved) __scopeHandlers; }
+      // lib.filterAttrs (
+        k: _: fx.keyClassification.isStructuralKey k && !(functorRootOwnedKeys ? ${k})
+      ) resolved
     else
       resolved;
 
@@ -99,7 +123,7 @@ let
       self = wrapped;
     };
 
-  types = lib.mapAttrs (_: v: v { }) rawTypes;
+  types = lib.mapAttrs (_: v: v { origin = [ ]; }) rawTypes;
 in
 {
   inherit

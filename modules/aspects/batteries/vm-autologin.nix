@@ -23,7 +23,7 @@ let
 
   __functor = _self: username: {
     name = "vm-autologin(${username})";
-    meta.provider = [
+    meta.aspect-chain = [
       "den"
       "provides"
     ];

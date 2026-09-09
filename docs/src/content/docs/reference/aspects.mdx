@@ -114,17 +114,29 @@ for the full API and examples.
 longer exists.
 </Aside>
 
-### `meta.provider`
+### `meta.aspect-chain`
 
-Type: `listOf str` (internal, read-only). Default: the provider prefix.
+Type: `listOf str` or `null` (internal, read-only). No default -- a declared
+aspect sets its own chain.
 
-Tracks the structural origin of an aspect as a path. Top-level aspects have
-`meta.provider = []`. An aspect provided by `foo` (via `foo.provides.bar` or
-its alias `foo._.bar`) has `meta.provider = ["foo"]`. Deeply nested
-providers accumulate: `foo._.bar._.baz` has `meta.provider = ["foo" "bar"]`.
+Tracks the structural origin of an aspect as a path. A top-level aspect has
+`meta.aspect-chain = []`. An aspect provided by `foo` (via `foo.provides.bar`
+or its alias `foo._.bar`) has `meta.aspect-chain = ["foo"]`. Deeply nested
+providers accumulate: `foo._.bar._.baz` has
+`meta.aspect-chain = ["foo" "bar"]`.
 
-The `meta.provider` list distinguishes aspects by origin during pipeline
-resolution.
+`null` and `[]` are different values. `[]` means "root -- the chain is
+empty"; `null` means "no chain set", which is what an inline `includes`
+literal carries until something fills it in. Absence, not root.
+
+The chain distinguishes aspects by origin during pipeline resolution.
+
+<Aside type="caution">
+This field was called `meta.provider`. `meta` has a freeform type, so a
+`meta.provider = [ "foo" ]` written today is absorbed into freeform meta and
+silently ignored -- no error, no warning, and the chain stays whatever the
+pipeline derives.
+</Aside>
 
 ### `meta.guard` / `meta.aspects` -- conditional aspects
 

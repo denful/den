@@ -1,9 +1,9 @@
 # Regression: navigating through a MULTI-DEF nested namespace key strips
 # aspect identity from its children.
 #
-# aspectContentType's multi-def branch returns `subForwarded // { __provider;
+# aspectContentType's multi-def branch returns `subForwarded // { __aspectChain;
 # __contentValues; }` — the colliding key itself is tagged, but its forwarded
-# children are raw attrsets with no `name` and no `__provider`. wrapChild then
+# children are raw attrsets with no `name` and no `__aspectChain`. wrapChild then
 # falls through nameless and children.nix renames the child to
 # `<parent>/<anon>:<idx>`, so the same aspect included via two paths gets two
 # identities: emit-class dedup fails and the class content double-applies

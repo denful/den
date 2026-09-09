@@ -67,7 +67,7 @@ let
       inherit name;
       meta = {
         handleWith = null;
-        provider = [ ];
+        aspect-chain = [ ];
       };
       excludes = schemaExcludes;
       includes = selfProvide ++ schemaIncludes;

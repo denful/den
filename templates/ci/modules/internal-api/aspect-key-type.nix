@@ -59,7 +59,7 @@ in
     test-class-key-shape = denTest (
       { den, ... }:
       let
-        types = den.lib.aspects.mkAspectsType { providerPrefix = [ ]; };
+        types = den.lib.aspects.mkAspectsType { origin = [ ]; };
         evaluated = lib.evalModules {
           modules = [
             { freeformType = lib.types.lazyAttrsOf types.aspectKeyType; }
@@ -75,7 +75,7 @@ in
       {
         expr = {
           hasContentValues = val ? __contentValues;
-          hasProvider = val ? __provider;
+          hasProvider = val ? __aspectChain;
           valueCount = builtins.length val.__contentValues;
           value = (builtins.head val.__contentValues).value;
         };
@@ -95,7 +95,7 @@ in
     test-unregistered-key-shape = denTest (
       { den, ... }:
       let
-        types = den.lib.aspects.mkAspectsType { providerPrefix = [ ]; };
+        types = den.lib.aspects.mkAspectsType { origin = [ ]; };
         evaluated = lib.evalModules {
           modules = [
             { freeformType = lib.types.lazyAttrsOf types.aspectKeyType; }
@@ -113,7 +113,7 @@ in
       {
         expr = {
           hasContentValues = val ? __contentValues;
-          hasProvider = val ? __provider;
+          hasProvider = val ? __aspectChain;
           valueCount = builtins.length val.__contentValues;
         };
         expected = {
@@ -128,7 +128,7 @@ in
     test-parametric-unregistered-key-shape = denTest (
       { den, ... }:
       let
-        types = den.lib.aspects.mkAspectsType { providerPrefix = [ ]; };
+        types = den.lib.aspects.mkAspectsType { origin = [ ]; };
         evaluated = lib.evalModules {
           modules = [
             { freeformType = lib.types.lazyAttrsOf types.aspectKeyType; }
@@ -160,7 +160,7 @@ in
     test-multi-def-class-key = denTest (
       { den, ... }:
       let
-        types = den.lib.aspects.mkAspectsType { providerPrefix = [ ]; };
+        types = den.lib.aspects.mkAspectsType { origin = [ ]; };
         evaluated = lib.evalModules {
           modules = [
             { freeformType = lib.types.lazyAttrsOf types.aspectKeyType; }

@@ -201,7 +201,7 @@
           class = "nixos";
           # missing `name` — must throw
           ref = {
-            meta.provider = [ "x" ];
+            meta.aspect-chain = [ "x" ];
           };
         });
       in

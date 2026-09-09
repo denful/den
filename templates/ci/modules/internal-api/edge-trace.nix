@@ -3,8 +3,9 @@
 # Task 18.2 `edgeTrace` is the production edge object: its fold-ordered
 # provides+routes portion is CAPTURED from the production materializeUnified folds
 # (not re-derived), with constructor-built default-fold + instantiate edges and the
-# SURFACED spawn / per-host edges. This means (vs the legacy re-derivation, now
-# `legacyEdgeTrace`): the dedup-suppressed route twins are ABSENT (production never
+# SURFACED spawn / per-host edges. This means (vs the legacy re-derivation, whose
+# `legacyEdgeTrace` binding has since been retired): the dedup-suppressed route
+# twins are ABSENT (production never
 # dispatches them), the spawn rewalk arm is replaced by the spawn's real surfaced
 # edges, and instantiate topologies carry the per-host fold edges.
 #
@@ -739,8 +740,9 @@ in
     # level the host is the ctx-seeded root (not a resolve.to-created entity scope
     # in scopeEntityKind), so the drain-fold spawn arm is a no-op — neither the
     # rewalk edge NOR a surfaced-spawn edge exists here. The surfaced-spawn edges
-    # only appear at FLAKE level (asserted in fx-unified-edges /
-    # fx-oracle-production-differential). So the production host trace carries NO
+    # only appear at FLAKE level — which the fx-unified-edges and
+    # fx-oracle-production-differential suites asserted until both were retired;
+    # no suite asserts it today. So the production host trace carries NO
     # rewalk-source edge.
     test-topology-host-aspects-spawn = denTest (
       { den, lib, ... }:
@@ -1026,8 +1028,11 @@ in
     # Suppression annotation ABSENT in the production object: the production edge
     # object (Task 18.2) CAPTURES the edges its fold dispatched (kept routes only),
     # so the legacy oracle's dedup-suppressed twin — which carried
-    # `suppressed = true` — is never present. The suppressed-twin edge lives in
-    # legacyEdgeTrace, asserted by the fx-oracle-production-differential suite.
+    # `suppressed = true` — is never present. The suppressed twin lived in the
+    # legacy re-derivation; that oracle and the
+    # fx-oracle-production-differential suite that compared the two are both
+    # retired, so nothing asserts the twin's shape now. This cell covers one
+    # direction only: the production object's ABSENCE of the annotation.
     test-corollary-suppression-annotation = denTest (
       { den, lib, ... }:
       let

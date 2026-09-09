@@ -110,7 +110,7 @@
       let
         target = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         self = {
           name = "host";
@@ -120,7 +120,7 @@
           includes = [
             {
               name = "keep";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               nixos = {
                 a = 1;
               };
@@ -128,7 +128,7 @@
             }
             {
               name = "drop";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               nixos = {
                 b = 2;
               };

@@ -1,15 +1,11 @@
-# edge-trace.nix — the LEGACY end-state re-derivation of the pipeline's delivery
-# decisions as a normalized, stably-sorted edge list. As of Task 18 this is NO
-# LONGER the live trace: the live `edgeTrace` is the CAPTURED production edge
-# object (resolve.nix — its fold-ordered provides+routes come straight from the
-# production materializeUnified folds). This `extractEdgeTrace` is retained and
-# surfaced as `legacyEdgeTrace` ONLY as the legacy arm of the oracle≡production
-# DIFFERENTIAL (templates/ci/.../fx-oracle-production-differential.nix): it
-# re-derives the edge set from END-STATE, INCLUDING the spawn `rewalk` arm (the
-# undercount the production object eliminates) and the dedup-`suppressed` route
-# twins (which production never folds). It was the migration oracle for the
-# Phase-2 port (spec 2026-06-12 §3a); post-Task-18 its job is to prove, by diff,
-# that production dropped exactly the rewalk undercount + suppressed twins.
+# edge-trace.nix — the per-component edge-list constructors shared between
+# production and the read-only oracle. The live `edgeTrace` (resolve.nix) is the
+# CAPTURED production edge object: its fold-ordered provides+routes come straight
+# from the production materializeUnified folds. `extractTopLevelEdges` below
+# supplies the top-level mechanism lists (default fold, provides, routes, spawns,
+# instantiates) both resolve.nix's production object and any end-state oracle
+# consume — the retired full-union oracle (`extractEdgeTrace`, the legacy arm of
+# the oracle≡production differential) was removed once that proof was complete.
 #
 # All edge kinds (default folds, simple + complex routes, provides, spawns,
 # instantiates) render through the SAME constructors production materializes
@@ -43,7 +39,6 @@ let
     sortEdges
     collected
     rewalk
-    synthesize
     rootTarget
     outputTarget
     ;
@@ -62,7 +57,8 @@ let
   # materialization-time path-dependent — see routeEdges' note).
   inherit (import ./edges/route.nix { inherit lib den; }) routeEdges;
   # The provides edge constructor — the SAME constructor production materializes
-  # provides through (resolve.nix phase-2 → edges/provides.nix applyProvidesEdges).
+  # provides through (resolve.nix → materializeUnified's ordered-dispatch fold,
+  # edges/materialize-unified.nix).
   # v0's inline provides arm + its own dedup is REPLACED by this import: oracle and
   # production converge on ONE provides constructor (spec §3a). The two-edge
   # decomposition (nest into source bucket, merge half = default-fold) is recorded
@@ -75,15 +71,14 @@ let
   # production's, not a parallel render.
   instantiateEdges = import ./edges/instantiate.nix { inherit lib; };
 in
-rec {
+{
   # extractTopLevelEdges: pipeline end-state → the per-COMPONENT edge lists,
-  # UNSORTED. The shared seam between the read-only oracle (extractEdgeTrace,
-  # which sorts the union) and the production unifiedEdges collector (resolve.nix),
-  # which wants the SAME top-level mechanism lists but drops the `spawnEdges`
-  # rewalk arm (it surfaces the real spawn edges from the drain-fold instead) and
-  # adds the per-host / B′ instantiate edges. Both consume the EXACT SAME
-  # constructor calls over the SAME end-state, so oracle and production can never
-  # diverge on the top-level set (spec §3a).
+  # UNSORTED. Consumed by resolve.nix's production edge trace, which wants the
+  # SAME top-level mechanism lists but drops the `spawnEdges` rewalk arm (it
+  # surfaces the real spawn edges from the drain-fold instead) and adds the
+  # per-host / B′ instantiate edges. Production consumes the EXACT SAME
+  # constructor calls over the SAME end-state as the trace-facing constructors
+  # (routeEdges, providesEdges below) it shares with them (spec §3a).
   extractTopLevelEdges =
     {
       scopeContexts,
@@ -131,7 +126,8 @@ rec {
       # ===== provides edges (two-edge decomposition, §B Decision 1) ======
       # Rendered by the SHARED provides constructor (edges/provides.nix
       # providesEdges) — the SAME constructor production materializes provides
-      # through (resolve.nix phase-2 → applyProvidesEdges). Each spec → a nest edge
+      # through (resolve.nix → materializeUnified's ordered-dispatch fold). Each
+      # spec → a nest edge
       # into the SOURCE scope's bucket; the merge half is the default-fold edge
       # (annotated mergeHalf). Dedup key = (policyName, class, path), NOT scope-
       # keyed (§B Decision 1).
@@ -245,24 +241,7 @@ rec {
         ;
     };
 
-  # extractEdgeTrace: pipeline end-state → stably-sorted normalized edge list.
-  # The oracle's union INCLUDES the spawn `rewalk` arm (one rewalk edge per spawn
-  # marker — the undercount the unifiedEdges collector corrects by surfacing the
-  # spawn's real edge set instead).
-  extractEdgeTrace =
-    args:
-    let
-      parts = extractTopLevelEdges args;
-    in
-    sortEdges (
-      parts.defaultFold
-      ++ parts.providesEdgeList
-      ++ parts.routeEdgeList
-      ++ parts.spawnEdges
-      ++ parts.instantiateEdgeList
-    );
-
-  # Re-exported so resolve.nix's unifiedEdges can sort its union without a
-  # second import of edges/edge.nix.
+  # Re-exported so resolve.nix's production edge trace can sort its union
+  # without a second import of edges/edge.nix.
   inherit sortEdges;
 }

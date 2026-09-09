@@ -86,29 +86,29 @@ let
       else
         wrapBareFn child
     # Content wrapper from aspectContentType (has __contentValues but no name
-    # yet).  Inject identity from __provider and extract parametric functions
+    # yet).  Inject identity from __aspectChain and extract parametric functions
     # into includes so the pipeline resolves them.  listOf doesn't call
     # providerType.merge per-element, so inner wrappers in includes lists
     # arrive here unprocessed.
-    # A navigated nested aspect carries __provider (its full path) but may have
+    # A navigated nested aspect carries __aspectChain (its full path) but may have
     # no __contentValues (single-def keys forward their raw value directly).
-    # Either way, when it has no name yet, derive name + meta.provider from
-    # __provider so it resolves to its OWN identity (e.g. apps/gaming/steam)
+    # Either way, when it has no name yet, derive name + meta.aspect-chain from
+    # __aspectChain so it resolves to its OWN identity (e.g. apps/gaming/steam)
     # regardless of inclusion path. Without this it falls through nameless and
     # children.nix renames it to <parent>/<anon>:<idx>, so the same aspect
     # included via two paths gets two identities and fails to dedup.
     else if
-      builtins.isAttrs child && (child ? __contentValues || child ? __provider) && !(child ? name)
+      builtins.isAttrs child && (child ? __contentValues || child ? __aspectChain) && !(child ? name)
     then
       let
-        prov = child.__provider or [ ];
+        prov = child.__aspectChain or [ ];
         provName = if prov != [ ] then lib.last prov else null;
         fns = builtins.filter isParametricContent (child.__contentValues or [ ]);
       in
       child
       // lib.optionalAttrs (provName != null) {
         name = provName;
-        meta.provider = lib.init prov;
+        meta.aspect-chain = lib.init prov;
       }
       // lib.optionalAttrs (fns != [ ]) {
         includes = (child.includes or [ ]) ++ map (d: d.value) fns;

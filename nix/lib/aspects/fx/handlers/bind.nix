@@ -205,8 +205,28 @@ in
               misplaced = builtins.filter (k: !(builtins.elem k descendants)) entityMissing;
             in
             # An entity arg that is neither in-ctx nor a descendant → inert.
+            # Silent here by design, but the verdict is recorded: a TERMINAL
+            # walk (resolve.nix's post-assembly drain) has no later scope to
+            # deliver at, and reads this residue to tell a vanished delivery
+            # from an aspect that legitimately emits nothing. The other two
+            # inert verdicts stay unrecorded on purpose — zero children has no
+            # target to deliver to, and the shared-with-descendant case is
+            # double-cover avoidance, where the descendant does receive it.
+            #
+            # Adding an fx.send is not a local change: every hand-composed
+            # handler set under templates/ci/modules/internal-api/ has to list
+            # a handler for it. One of the twelve bare compositions there
+            # installs recordInertHandler; the other eleven are green only
+            # because they do not reach this branch, and nothing structurally
+            # stops a future cell in them from doing so. The failure is
+            # `unhandled effect '<name>'`, which names nothing about the test
+            # that caused it, and it surfaces as ☢️ rather than ❌ — a gate
+            # tallying only ❌ reads it clean. Sweep that directory.
             if misplaced != [ ] then
-              fx.pure { inert = true; }
+              fx.bind (fx.send "record-inert" {
+                aspect = aspect.name or "<anon>";
+                args = misplaced;
+              }) (_: fx.pure { inert = true; })
             # First descendant arg fans out — unless the same source is also
             # injected at the descendant kind (e.g. den.default), in which case
             # it reaches the descendant directly and fanning out here would
@@ -222,6 +242,16 @@ in
                   fanable = argClass.fanableDescendants schema scopeKind availRecords descendants;
                   pick = if fanable != [ ] then builtins.head fanable else builtins.head descendants;
                 in
+                # Deliberately NOT recorded via `record-inert`, unlike the
+                # misplaced-entity verdict above: double-cover avoidance is not a
+                # vanished delivery — the descendant does receive this content —
+                # so recording it would make the terminal drain's residue guard
+                # throw on correct behaviour. No cell can catch that mistake:
+                # recording all three inert sites is observationally identical to
+                # recording one across the whole suite, because the drain walk
+                # starts a fresh pipeline where `scopeKind` is null and
+                # `arg-class.nix` leaves `descendants` empty. The reason is
+                # semantic, and this comment is the only instrument guarding it.
                 if sharedWithDescendant pick then fx.pure { inert = true; } else fanOut pick
               )
             # Only non-entity (pipe/conditional/enrichment) args remain → defer.

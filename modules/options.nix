@@ -74,9 +74,52 @@ in
     collections = {
       includes = {
         default = [ ];
+        # A bare-string (or other non-aspect) element used to reach
+        # children.nix's aspect walk unchecked and crash with a raw Nix
+        # `expected a set but found a string` from propagateScope's `//` —
+        # the aspect tier catches this via providerType's `check`, but this
+        # freeform collection has no type to route through, so validate here
+        # instead, same as excludes below. Recurses into nested lists:
+        # children.nix's processInclude walks nested lists the same way, so a
+        # bad leaf at any depth must still be caught, just with a den:
+        # message instead of the raw one.
+        merge =
+          acc: val:
+          let
+            check =
+              v:
+              if builtins.isList v then
+                map check v
+              else if builtins.isAttrs v || lib.isFunction v then
+                v
+              else
+                throw "den: den.schema.<kind>.includes: expected a policy or aspect reference, got ${
+                  if builtins.isString v then ''"${v}"'' else builtins.typeOf v
+                }";
+          in
+          acc ++ map check val;
       };
       excludes = {
         default = [ ];
+        # Bare-string elements used to be accepted and silently exclude
+        # nothing: `identity.key` (nix/lib/aspects/fx/identity.nix) reduces a
+        # string to "<anon>", which matches no policy. gen-schema has no
+        # per-collection `type` to route this through, so validate here —
+        # the same defect at the aspect tier (den.aspects.*.excludes) was
+        # fixed by routing it through a type; this is the equivalent
+        # declaration-time check for the untyped schema-tier collection.
+        merge =
+          acc: val:
+          acc
+          ++ map (
+            v:
+            if builtins.isAttrs v then
+              v
+            else
+              throw "den: den.schema.<kind>.excludes: expected a policy or aspect reference, got ${
+                if builtins.isString v then ''"${v}"'' else builtins.typeOf v
+              }"
+          ) val;
       };
       isEntity = {
         default = false;

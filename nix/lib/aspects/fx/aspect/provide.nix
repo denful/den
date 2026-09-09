@@ -99,7 +99,7 @@ let
       inherit (resolveProviderFn providerVal) innerFn args isParamWrapper;
       isPositionalFn = lib.isFunction innerFn && args == { };
       providerMeta = {
-        provider = (aspect.meta.provider or [ ]) ++ [ aspectName ];
+        aspect-chain = identity.ownChain aspect ++ [ aspectName ];
         selfProvide = true;
       };
     in
@@ -130,7 +130,7 @@ let
           // (
             if isParamWrapper then
               builtins.removeAttrs (providerVal.meta or { }) [
-                "provider"
+                "aspect-chain"
                 "selfProvide"
               ]
             else

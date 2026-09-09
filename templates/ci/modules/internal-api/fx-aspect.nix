@@ -285,7 +285,7 @@ in
       let
         target = {
           name = "targetAspect";
-          meta.provider = [ "pkg" ];
+          meta.aspect-chain = [ "pkg" ];
         };
         aspect = {
           name = "constrainedAspect";

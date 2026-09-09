@@ -96,7 +96,8 @@
     );
 
     # Regression: non-parametric direct freeform child must not duplicate content.
-    # Without __contentValues in structuralKeysSet, the content wrapper's
+    # Without __contentValues classified as structural (the `__`-prefix rule
+    # in key-classification.nix), the content wrapper's
     # __contentValues key is classified as class content and emitted alongside
     # the forwarded nixos attr — applying overlays/config twice.
     test-direct-child-no-duplication = denTest (

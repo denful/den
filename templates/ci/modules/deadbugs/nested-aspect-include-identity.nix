@@ -5,7 +5,7 @@
 #
 # Reproduces apps.gaming.steam included via BOTH roles.gaming (host) and a
 # per-user entity-named aspect's includes (user-aspect-auto-include policy):
-# the navigated nested aspect carried __provider but no name, so wrapChild left
+# the navigated nested aspect carried __aspectChain but no name, so wrapChild left
 # it nameless and children.nix renamed it to <parent>/<anon>:<idx>. That gave a
 # different identity on the user path than the host path, defeating cross-scope
 # dedup, so steam's programs.steam.package was defined twice.

@@ -80,7 +80,7 @@
             KEYS
             ;
         };
-        expected.KEYS = "collisionPolicy:file:handleWith:loc:name:provider:self";
+        expected.KEYS = "aspect-chain:collisionPolicy:file:handleWith:loc:name:self";
       }
     );
 
@@ -110,7 +110,7 @@
             KEYS
             ;
         };
-        expected.KEYS = "collisionPolicy:file:foo:handleWith:loc:name:provider:self";
+        expected.KEYS = "aspect-chain:collisionPolicy:file:foo:handleWith:loc:name:self";
       }
     );
 

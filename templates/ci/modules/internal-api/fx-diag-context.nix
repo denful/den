@@ -50,7 +50,7 @@
       let
         excludeDecl = den.lib.aspects.fx.constraints.exclude {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
       in
       {

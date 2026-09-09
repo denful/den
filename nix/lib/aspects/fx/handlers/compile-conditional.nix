@@ -138,7 +138,7 @@ let
   # anonymous payloads get distinct names instead of dedup-colliding.
   emitGuardedAspects =
     condNode:
-    chainWrap (identity.key condNode) true (
+    chainWrap (identity.aspectPath condNode) true (
       emitIncludes {
         __parentScopeHandlers = condNode.__scopeHandlers or null;
         __parentCtxId = condNode.__ctxId or null;
@@ -149,6 +149,17 @@ let
   deferConditional =
     condNode:
     let
+      # Bookkeeping only — deliberately NOT a rebuild of condNode. The node is
+      # queued intact by the defer-conditional effect below and re-evaluated at
+      # the entity boundary; this record exists so the deferred conditional
+      # still registers an identity, and every resolve-complete consumer
+      # (identity.collectPathsHandler, trace.nix) reads name, meta,
+      # `__entityKind` and `__ctxId` — none reads includes. Omitting the two
+      # `__` keys costs this marker the `{ctxId}` instance suffix
+      # identity.nix's aspectPath would append; the base path registers either
+      # way. guard/aspects are stripped because the payload has not fired, and
+      # `includes = [ ]` states that this marker carries no children of its own
+      # — a reset, not a dropped carry-forward.
       stub = {
         name = condNode.name or "<when>";
         meta =

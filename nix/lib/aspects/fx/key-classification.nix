@@ -5,7 +5,8 @@
 }:
 let
   # Structural keys are always handled by the pipeline itself — not
-  # dispatched as class or nested aspect keys.
+  # dispatched as class or nested aspect keys. Only the names that carry no
+  # marker prefix are listed; the `__` half is a rule below.
   builtinStructuralKeys = [
     "name"
     "description"
@@ -16,23 +17,20 @@ let
     "policies"
     "into"
     "classes"
-    "__fn"
-    "__args"
-    "__functor"
-    "__functionArgs"
-    "__scopeHandlers"
-    "__ctxId"
-    "__entityKind"
-    "__parametricResolvedArgs"
-    "__contentValues"
-    "__provider"
-    "__providesForwarded"
     "_module"
     "_"
   ];
 
   # User-extensible reserved keys via den.reservedKeys option.
-  structuralKeysSet = lib.genAttrs (builtinStructuralKeys ++ (den.reservedKeys or [ ])) (_: true);
+  listedStructuralKeys = lib.genAttrs (builtinStructuralKeys ++ (den.reservedKeys or [ ])) (_: true);
+
+  # A `__`-prefixed key is a pipeline internal by convention, so the registry
+  # closes by RULE rather than by enumeration: every marker (__walkStamped,
+  # __aspectChain, __ctxId, __contentValues, …) is structural the moment it
+  # exists, not the moment someone remembers to add it here. Listing them was
+  # a standing silent-drop hazard — a forgotten marker got dispatched as class
+  # or nested-aspect content instead of being handled by the pipeline.
+  isStructuralKey = k: lib.hasPrefix "__" k || listedStructuralKeys ? ${k};
 
   # Schema registry for key classification.
   # Top-level den.classes lives outside den.schema, breaking
@@ -74,7 +72,7 @@ let
     builtins.isAttrs val
     && builtins.any (
       sk:
-      structuralKeysSet ? ${sk}
+      isStructuralKey sk
       || pipeRegistry ? ${sk}
       || (classRegistry ? ${sk} && looksLikeClassContent val.${sk})
     ) (builtins.attrNames val);
@@ -83,7 +81,7 @@ let
     targetClass: aspect:
     let
       forwardedSet = lib.genAttrs (aspect.__providesForwarded or [ ]) (_: true);
-      allKeys = builtins.filter (k: !(structuralKeysSet ? ${k}) && !(forwardedSet ? ${k})) (
+      allKeys = builtins.filter (k: !(isStructuralKey k) && !(forwardedSet ? ${k})) (
         builtins.attrNames aspect
       );
     in
@@ -111,5 +109,5 @@ let
       };
 in
 {
-  inherit structuralKeysSet classifyKeys pipeRegistry;
+  inherit isStructuralKey classifyKeys pipeRegistry;
 }

@@ -44,7 +44,7 @@ let
           );
         };
       };
-      freeformType = (mkAspectsType { providerPrefix = [ name ]; }).aspectsType;
+      freeformType = (mkAspectsType { origin = [ name ]; }).aspectsType;
     }
   );
 in
