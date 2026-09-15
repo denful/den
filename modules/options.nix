@@ -20,6 +20,38 @@ let
   # lazily at eval time, so they safely use den.lib.schema.
   schemaLib = import ./../nix/lib/schema.nix { inherit inputs lib; };
 
+  # Element check for BOTH schema-tier collections. gen-schema has no
+  # per-collection `type` to route a bad element through, so the check that the
+  # aspect tier gets from `providerType` has to live here — and it has to be
+  # ONE check: the two collections take the same references, so a shape that
+  # excludes at the aspect tier must not throw at the schema tier.
+  #
+  # A bare string was the original defect at both. Unchecked, it reached
+  # children.nix's aspect walk and crashed with a raw Nix `expected a set but
+  # found a string` from propagateScope's `//` on the includes side, and on the
+  # excludes side `identity.key` reduced it to "<anon>", which matches no
+  # policy and so excluded nothing in silence.
+  #
+  # Recurses into nested lists because `providerType` names a list of policy
+  # records as a valid element and children.nix walks nested lists the same way
+  # at both tiers (`processInclude`, and `lib.flatten` over excludes since
+  # 6127cbc). Admits a function because a parametric aspect reference is one.
+  checkCollectionElement =
+    collection:
+    let
+      check =
+        v:
+        if builtins.isList v then
+          map check v
+        else if builtins.isAttrs v || lib.isFunction v then
+          v
+        else
+          throw "den: den.schema.<kind>.${collection}: expected a policy or aspect reference, got ${
+            if builtins.isString v then ''"${v}"'' else builtins.typeOf v
+          }";
+    in
+    check;
+
   classSchemaType = lib.types.submodule (
     { ... }:
     {
@@ -74,52 +106,11 @@ in
     collections = {
       includes = {
         default = [ ];
-        # A bare-string (or other non-aspect) element used to reach
-        # children.nix's aspect walk unchecked and crash with a raw Nix
-        # `expected a set but found a string` from propagateScope's `//` —
-        # the aspect tier catches this via providerType's `check`, but this
-        # freeform collection has no type to route through, so validate here
-        # instead, same as excludes below. Recurses into nested lists:
-        # children.nix's processInclude walks nested lists the same way, so a
-        # bad leaf at any depth must still be caught, just with a den:
-        # message instead of the raw one.
-        merge =
-          acc: val:
-          let
-            check =
-              v:
-              if builtins.isList v then
-                map check v
-              else if builtins.isAttrs v || lib.isFunction v then
-                v
-              else
-                throw "den: den.schema.<kind>.includes: expected a policy or aspect reference, got ${
-                  if builtins.isString v then ''"${v}"'' else builtins.typeOf v
-                }";
-          in
-          acc ++ map check val;
+        merge = acc: val: acc ++ map (checkCollectionElement "includes") val;
       };
       excludes = {
         default = [ ];
-        # Bare-string elements used to be accepted and silently exclude
-        # nothing: `identity.key` (nix/lib/aspects/fx/identity.nix) reduces a
-        # string to "<anon>", which matches no policy. gen-schema has no
-        # per-collection `type` to route this through, so validate here —
-        # the same defect at the aspect tier (den.aspects.*.excludes) was
-        # fixed by routing it through a type; this is the equivalent
-        # declaration-time check for the untyped schema-tier collection.
-        merge =
-          acc: val:
-          acc
-          ++ map (
-            v:
-            if builtins.isAttrs v then
-              v
-            else
-              throw "den: den.schema.<kind>.excludes: expected a policy or aspect reference, got ${
-                if builtins.isString v then ''"${v}"'' else builtins.typeOf v
-              }"
-          ) val;
+        merge = acc: val: acc ++ map (checkCollectionElement "excludes") val;
       };
       isEntity = {
         default = false;
