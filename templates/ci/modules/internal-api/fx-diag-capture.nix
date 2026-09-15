@@ -13,14 +13,14 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           nixos = {
             a = 1;
           };
           includes = [
             {
               name = "child";
-              meta = { };
+              meta.aspect-chain = [ ];
               nixos = {
                 b = 2;
               };
@@ -53,17 +53,18 @@
         fxLib = den.lib.aspects.fx;
         target = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         root = {
           name = "root";
           meta = {
+            aspect-chain = [ ];
             handleWith = fxLib.constraints.exclude target;
           };
           includes = [
             {
               name = "keep";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               nixos = {
                 a = 1;
               };
@@ -71,7 +72,7 @@
             }
             {
               name = "drop";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               nixos = {
                 b = 2;
               };
@@ -99,11 +100,11 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           includes = [
             {
               name = "child";
-              meta = { };
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
           ];
@@ -122,15 +123,15 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           includes = [
             {
               name = "child";
-              meta = { };
+              meta.aspect-chain = [ ];
               includes = [
                 {
                   name = "grandchild";
-                  meta = { };
+                  meta.aspect-chain = [ ];
                   includes = [ ];
                 }
               ];
@@ -152,22 +153,23 @@
         fxLib = den.lib.aspects.fx;
         target = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         root = {
           name = "root";
           meta = {
+            aspect-chain = [ ];
             handleWith = fxLib.constraints.exclude target;
           };
           includes = [
             {
               name = "keep";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
             {
               name = "drop";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
           ];
@@ -187,7 +189,7 @@
       let
         root = {
           name = "root";
-          meta = { };
+          meta.aspect-chain = [ ];
           nixos = {
             a = 1;
           };
@@ -221,11 +223,12 @@
         fxLib = den.lib.aspects.fx;
         target = {
           name = "x";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         root = {
           name = "root";
           meta = {
+            aspect-chain = [ ];
             handleWith = fxLib.constraints.exclude target;
           };
           includes = [ ];

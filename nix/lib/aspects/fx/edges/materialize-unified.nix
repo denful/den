@@ -1,9 +1,11 @@
 # materialize-unified.nix — the ordered-dispatch delivery engine (Task 17).
 #
-# Today the fx delivery pipeline materializes via PHASE FOLDS: phase2 applies ALL
-# provides (edges/provides.nix applyProvidesEdges), THEN phase3 applies ALL routes
-# (edges/route.nix applyRoutes, which itself toposorts its route specs). The
-# accumulator `{ classImports; perScope }` threads through both.
+# It REPLACED phase folds, and they are gone: phase2 applied ALL provides
+# (edges/provides.nix `applyProvidesEdges`), THEN phase3 applied ALL routes
+# (edges/route.nix `applyRoutes`, which itself toposorted its route specs),
+# threading an accumulator `{ classImports; perScope }` through both. Neither
+# function still exists; the shape is described here only because the ordering
+# argument below is stated against it.
 #
 # materializeUnified collapses that into ONE ordered-dispatch fold that INTERLEAVES
 # provides + routes in `topoSortEdges` order, reusing the EXISTING per-spec
@@ -24,8 +26,9 @@
 # This engine IS production delivery at every site as of Task 17 (fxResolveFull,
 # fxResolveImports, the per-host re-walk, and the spawn re-entry all fold it). It
 # was proven byte-equivalent to the old phase2∘phase3 (+ optional assembleSubtree)
-# by the fx-materialize-unified suite (the materializeEquiv oracle in resolve.nix
-# keeps that comparison standing). Its `exposeEdges` mode (Task 18) returns the
+# by the fx-materialize-unified suite and its materializeEquiv oracle. Both were
+# retired with the phase folds, so that equivalence is history rather than a
+# standing comparison. Its `exposeEdges` mode (Task 18) returns the
 # folded provides+routes edge records so the production `edgeTrace` is captured,
 # not re-derived.
 { lib, den }:

@@ -67,12 +67,113 @@ let
   # sites must share this predicate or naming and dedup silently desync.
   isSyntheticName = name: lib.hasPrefix "<" name && lib.hasSuffix ">" name;
 
+  # Fold a `_` write into `provides` so both spellings of one provides key
+  # are indistinguishable to the two sites that build their own provides
+  # view outside the module system.
+  #
+  # Root must NOT call this: it is a `//` overwrite, whereas root's alias
+  # (mkAliasOptionModule, in aspectSubmodule's imports) is priority-preserving
+  # and conflict-detecting. Wiring this helper in at root would replace root's
+  # genuine conflict error with the same spelling-priority overwrite this fold
+  # exists to fix at nested — a regression, not a no-op.
+  #
+  # A `_` read back off another wrapper carries __functor (the read
+  # shorthand, not a write, e.g. `bar._ = otherAspect._;`) and must stay
+  # out of provides, matching aspectSubmodule's module-system alias, which
+  # only ever sees genuine definitions.
+  foldUnderscoreIntoProvides =
+    attrs:
+    let
+      u = if builtins.isAttrs attrs then attrs._ or null else null;
+      isWrite = builtins.isAttrs u && !(u ? __functor);
+    in
+    if isWrite then
+      (builtins.removeAttrs attrs [ "_" ]) // { provides = (attrs.provides or { }) // u; }
+    else
+      attrs;
+
+  # Registries are ambient — populated by battery modules and aspect-schema.nix,
+  # and identical at every site that builds a synthetic `_`. Not parameters.
+  classReg = den.classes or { };
+  pipeReg = den.quirks or { };
+  inherit (den.lib.aspects.fx.keyClassification) isStructuralKey;
+
+  # A key names a candidate child aspect when it is neither structural (which
+  # covers `__`-prefixed internals by rule), class, nor pipe. Provides children
+  # are reached through `provides`/`_`, which are structural, so this alone
+  # decides child-key membership — a key held both as a provides child and as a
+  # direct key is still a child key, included via its direct value (see
+  # mkUnderscore).
+  isChildKey = k: !(isStructuralKey k) && !(classReg ? ${k}) && !(pipeReg ? ${k});
+
+  # The synthetic `_`/`provides` aspect, built once for all three shapes an
+  # aspect construction can take (declared submodule, functor-carrying
+  # battery, nested freeform key). `own` is the aspect's own attrset — it
+  # supplies both the child-key domain (`attrNames own`) and the provides
+  # source (`own.provides or { }`). `path` is the aspect's dotted position
+  # (`chain ++ [ localName ]`), naming the synthetic aspect "<path>._".
+  #
+  # `_` is a total alias for `provides`: a key held both as a provides child
+  # and a direct key is included via its direct value, never excluded for
+  # being shadowed — excluding it would make `_` a filtered view of
+  # `provides` rather than another spelling of it.
+  mkUnderscore =
+    own: path:
+    let
+      # A provides child's NAME lives in a different namespace than the
+      # aspect's own top-level keys, so `.provides`/`._` reach every child
+      # untouched whatever it is called. Two keys ARE genuine machinery even
+      # there: `__`-prefixed (pipeline internals) and `_` — a multi-def
+      # nested key merges into a content wrapper carrying
+      # `__contentValues`/`__aspectChain`/`_` beside its real children
+      # (aspectContentType below), and `_` is the one of those three not
+      # already caught by the `__`-prefix rule. `_module` is real NixOS
+      # module-system machinery but never reaches `own.provides`'s attrNames
+      # (the module system consumes it before freeform merge), so it needs no
+      # reservation here.
+      providesChildren = lib.filterAttrs (k: _: !(lib.hasPrefix "__" k) && k != "_") (
+        own.provides or { }
+      );
+      # Forwarding a child onto the aspect's own top level is a different
+      # question from reaching it through `._`, and it is the one that
+      # depends on the construction site. Where the aspect is a declared
+      # submodule (mergeWithAspectMeta) every aspect option already has a
+      # default, so `merged` wins the `providesChildren // merged` shadow for
+      # those names on its own. The two RAW sites — providerType.merge's
+      # functor-carrying battery attrset and aspectContentType's nested
+      # freeform key — have no submodule and therefore no defaults to win it,
+      # so an unreserved child named `name`/`includes`/`meta`/… would land in
+      # the aspect's own option position and be read structurally from there.
+      # `forwardable` is what those two sites fold, making one user-written
+      # shape behave the same at all three: the aspect's own value keeps the
+      # top level, the child stays reachable at `._.<name>`.
+      #
+      # Reserved by the structural registry rather than by the declared-option
+      # list, because that registry is what decides own-key dispatch in the
+      # first place. It is a superset by two inert names: `into` (declared
+      # only on the deprecated den.ctx shim) and anything in user
+      # `den.reservedKeys` — both reachable through `._` exactly as the
+      # declared options are.
+      forwardable = lib.filterAttrs (k: _: !(isStructuralKey k)) providesChildren;
+      childKeys = builtins.filter isChildKey (builtins.attrNames own);
+      functor = {
+        __functor = _self: _args: {
+          name = "${lib.concatStringsSep "." path}._";
+          includes = map (k: own.${k}) childKeys;
+        };
+      };
+    in
+    {
+      inherit providesChildren forwardable functor;
+      syntheticProvides = providesChildren // functor;
+    };
+
   aspectType =
     typeCfg:
     let
       sub = aspectSubmodule typeCfg;
     in
-    sub // { merge = mergeWithAspectMeta sub; };
+    sub // { merge = mergeWithAspectMeta typeCfg sub; };
 
   # Resolve parametric includes in an aspect with the given args.
   # Used by __functor so aspects are callable: (aspect { host = ...; }).
@@ -104,7 +205,7 @@ let
     };
 
   mergeWithAspectMeta =
-    sub: loc: defs:
+    typeCfg: sub: loc: defs:
     let
       # Rescue explicit __functor from defs before the submodule merge
       # destroys it (freeform keys become deferred modules).
@@ -115,7 +216,7 @@ let
         ++ [
           {
             file = (lib.last defs).file;
-            value = aspectMeta loc defs;
+            value = aspectMeta typeCfg loc defs;
           }
         ]
       );
@@ -128,33 +229,13 @@ let
       # key above, so masking it would classify neither: an aspect declaring
       # provides.user alongside user-class content would silently emit no
       # user class at all.
-      providesChildren = builtins.removeAttrs (merged.provides or { }) [ "_module" ];
-      unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
-      # Child aspect keys for synthetic provides: freeform keys that are
-      # not structural, internal, class, pipe, or forwarded-from-provides.
-      classReg = den.classes or { };
-      pipeReg = den.quirks or { };
-      inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
-      forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
       aspectName = merged.name or (locName loc);
-      childKeys = builtins.filter (
-        k:
-        !(structuralKeysSet ? ${k})
-        && !(lib.hasPrefix "__" k)
-        && !(classReg ? ${k})
-        && !(pipeReg ? ${k})
-        && !(forwardedSet ? ${k})
-      ) (builtins.attrNames merged);
-      syntheticAspect = {
-        name = "${aspectName}._";
-        includes = map (k: merged.${k}) childKeys;
-      };
       # __functor hides the synthetic aspect from attrValues while keeping _
       # usable in an includes list: wrapChild sees a zero-arg functor and calls
       # it, so the aspect below is built only when _ is actually included.
-      syntheticProvides = providesChildren // {
-        __functor = _self: _args: syntheticAspect;
-      };
+      underscore = mkUnderscore merged ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
+      inherit (underscore) providesChildren;
+      unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
     in
     # __functor makes merged aspects callable (aspect { host = ...; }).
     # Explicit functors (e.g. den.batteries.forward) take priority.
@@ -163,17 +244,29 @@ let
     // {
       __functor = if originalFunctor != null then originalFunctor else resolveAspectWith;
       __providesForwarded = unshadowedProvides;
-      provides = syntheticProvides;
-      _ = syntheticProvides;
+      provides = underscore.syntheticProvides;
+      _ = underscore.syntheticProvides;
     };
 
   aspectMeta =
-    loc: defs:
+    typeCfg: loc: defs:
     { config, ... }:
     {
       meta.name = lib.mkForce (locName config.meta.loc);
       meta.file = lib.mkForce (lib.last defs).file;
       meta.loc = lib.mkForce loc;
+      # mkDefault, not mkForce: a declared aspect (root, or one re-typed by
+      # providerType.merge's wrapperToAspect) sets its own chain at NORMAL
+      # priority, and that must win here so the chain travels with the
+      # aspect through re-inclusion the way meta.loc does not — nixpkgs
+      # drops a mkDefault def entirely once any normal-priority def exists,
+      # so this only ever supplies the value when nothing else does.
+      # typeCfg.origin is the container's fixed seed; typeCfg.chain is the
+      # threaded definition chain, explicitly nulled for includes elements
+      # (aspectSubmodule). `or` only falls back on a MISSING key, so a
+      # present-but-null chain bypasses it and this yields null there —
+      # absence, not root.
+      meta.aspect-chain = lib.mkDefault (typeCfg.chain or typeCfg.origin);
     };
 
   # A parametric function reaching aspectSubmodule.merge is evaluated as a NixOS
@@ -232,33 +325,18 @@ let
         # Forward provides children and add _ alias so aspect._.child and
         # aspect.child both work, matching mergeWithAspectMeta behavior.
         let
-          providesChildren = builtins.removeAttrs (fn.provides or { }) [ "_module" ];
-          classReg = den.classes or { };
-          pipeReg = den.quirks or { };
-          inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
-          forwardedSet = lib.genAttrs (builtins.attrNames providesChildren) (_: true);
-          result = providesChildren // fn;
+          normalizedFn = foldUnderscoreIntoProvides fn;
           aspectName = fn.name or (lib.last loc);
-          childKeys = builtins.filter (
-            k:
-            !(structuralKeysSet ? ${k})
-            && !(lib.hasPrefix "__" k)
-            && !(classReg ? ${k})
-            && !(pipeReg ? ${k})
-            && !(forwardedSet ? ${k})
-          ) (builtins.attrNames result);
-          syntheticAspect = {
-            name = "${aspectName}._";
-            includes = map (k: result.${k}) childKeys;
-          };
-          syntheticProvides = providesChildren // {
-            __functor = _self: _args: syntheticAspect;
-          };
+          underscore = mkUnderscore normalizedFn ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
+          inherit (underscore) forwardable;
+          unshadowedProvides = builtins.filter (k: !(normalizedFn ? ${k})) (builtins.attrNames forwardable);
         in
-        result
+        forwardable
+        // normalizedFn
         // {
-          provides = syntheticProvides;
-          _ = syntheticProvides;
+          __providesForwarded = unshadowedProvides;
+          provides = underscore.syntheticProvides;
+          _ = underscore.syntheticProvides;
         }
       else
         let
@@ -268,7 +346,7 @@ let
         {
           name = nameFromLoc;
           meta = {
-            provider = typeCfg.providerPrefix or [ ];
+            aspect-chain = typeCfg.chain or typeCfg.origin;
           };
           __fn = fn;
           __args = args;
@@ -311,15 +389,50 @@ let
           # contain parametric functions.  Without this, the wrapper merges
           # through aspectSubmodule and the function is buried as a freeform
           # key.  Extract the function so existing dispatch handles it.
+          # Definition position of the value as the author wrote it, read from
+          # the ORIGINAL defs: wrapperToAspect below rewrites `name`, and a
+          # position read after that points at types.nix rather than the
+          # author's file. Two inclusion sites of one let-bound value report
+          # ONE position; two separately-written inline literals report two.
+          defPosOf =
+            v:
+            let
+              p = if v ? name then builtins.unsafeGetAttrPos "name" v else null;
+            in
+            if p == null then null else "${toString p.file}:${toString p.line}:${toString p.column}";
+          stampDefPos =
+            d:
+            let
+              pos = defPosOf d.value;
+            in
+            if
+              builtins.isAttrs d.value && !(d.value.__isPolicy or false) && !(d.value ? __fn) && pos != null
+            then
+              d
+              // {
+                value = d.value // {
+                  meta = (d.value.meta or { }) // {
+                    __defPos = pos;
+                    # The value exactly as the author wrote it, captured before
+                    # wrapperToAspect rewrites anything. A position is a token,
+                    # not a value: one position carries as many distinct values
+                    # as a factory is called times. This is what lets the
+                    # registry tell those apart from one value seen twice.
+                    __defValue = d.value;
+                  };
+                };
+              }
+            else
+              d;
           isContentWrapper =
             d:
             builtins.isAttrs d.value
-            && (d.value ? __contentValues || d.value ? __provider)
+            && (d.value ? __contentValues || d.value ? __aspectChain)
             && !(d.value ? __fn);
           nameFromProvider =
             v:
             let
-              prov = v.__provider or [ ];
+              prov = v.__aspectChain or [ ];
             in
             if prov != [ ] then lib.last prov else null;
           # A content wrapper holds every definition of its key. Taking one value
@@ -329,7 +442,7 @@ let
           # includes element, which listOf hands over without reaching this merge.
           #
           # One def rather than one per definition: the wrapper is the only
-          # carrier of __provider, so splitting it leaves the parametric defs
+          # carrier of __aspectChain, so splitting it leaves the parametric defs
           # nameless. They then resolve to an anonymous per-inclusion identity,
           # which defeats gate dedup and duplicates their content once per path.
           wrapperToAspect =
@@ -342,7 +455,7 @@ let
             // {
               value =
                 d.value
-                # Only narrow what exists: a navigated child carries __provider
+                # Only narrow what exists: a navigated child carries __aspectChain
                 # with no __contentValues, and inventing an empty one here makes
                 # the wrapper re-flatten to nothing instead of failing loudly.
                 // lib.optionalAttrs (d.value ? __contentValues) { __contentValues = parts.wrong; }
@@ -350,14 +463,24 @@ let
                   includes = (d.value.includes or [ ]) ++ map (cv: cv.value) parts.right;
                 }
                 # Preserve identity: inject name and provider chain from
-                # __provider so aspectSubmodule.merge produces a meaningful
-                # identity instead of an anonymous include index.
-                // lib.optionalAttrs (provName != null) {
-                  name = provName;
-                  meta.provider = lib.init d.value.__provider;
-                };
+                # __aspectChain so aspectSubmodule.merge produces a meaningful
+                # identity instead of an anonymous include index. Fill only
+                # what the value does not already carry — an aliased aspect
+                # (den.aspects.group.key = den.aspects.other;) owns a
+                # meaningful name and chain of its own, and an author's name
+                # outranks its position here.
+                // lib.optionalAttrs (provName != null) (
+                  lib.optionalAttrs (!(d.value ? name) || !(isMeaningfulName d.value.name)) {
+                    name = provName;
+                  }
+                  // lib.optionalAttrs ((d.value.meta.aspect-chain or null) == null) {
+                    meta = (d.value.meta or { }) // {
+                      aspect-chain = lib.init d.value.__aspectChain;
+                    };
+                  }
+                );
             };
-          defs' = map (d: if isContentWrapper d then wrapperToAspect d else d) defs;
+          defs' = map (d: if isContentWrapper d then wrapperToAspect d else d) (map stampDefPos defs);
           listDefs = builtins.filter (d: builtins.isList d.value) defs';
           policyDefs = builtins.filter (d: builtins.isAttrs d.value && d.value.__isPolicy or false) defs';
         in
@@ -449,13 +572,20 @@ let
           # value would discard the aspect and the includes with it, leaving only
           # the static half. A raw wrapper has no name and a converted one always
           # does, which is what tells them apart.
-          flatDefs = lib.concatMap (
-            d:
-            if builtins.isAttrs d.value && d.value ? __contentValues && !(d.value ? name) then
-              d.value.__contentValues
-            else
-              [ { inherit (d) value file; } ]
-          ) defs;
+          # _ folded into provides here, once, before any per-key merge below
+          # sees them: both spellings become defs of the same key, so the
+          # existing multi-def merge (deepMerge — recurse attrsets, concat
+          # lists, last-wins on scalars) treats them exactly like two defs of
+          # `provides` itself, regardless of which spelling each file used.
+          flatDefs = map (d: d // { value = foldUnderscoreIntoProvides d.value; }) (
+            lib.concatMap (
+              d:
+              if builtins.isAttrs d.value && d.value ? __contentValues && !(d.value ? name) then
+                d.value.__contentValues
+              else
+                [ { inherit (d) value file; } ]
+            ) defs
+          );
           # Merge attrset definition values per-key.  Single-def keys are
           # forwarded directly; multi-def attrset keys get a __contentValues
           # wrapper so downstream consumers (emit-classes) collect all
@@ -525,7 +655,7 @@ let
                           bv
                       ) b;
                     subForwarded = builtins.foldl' deepMerge { } subAttrVals;
-                    provBase = (typeCfg.providerPrefix or [ ]) ++ [
+                    provBase = (typeCfg.chain or typeCfg.origin) ++ [
                       keyName
                       k
                     ];
@@ -534,7 +664,7 @@ let
                   annotatedSub
                   // {
                     __contentValues = defsForKey;
-                    __provider = provBase;
+                    __aspectChain = provBase;
                     _ = underscoreAt provBase annotatedSub;
                   }
               );
@@ -544,54 +674,25 @@ let
           # wrapper must still be invocable like the providerType path.
           singleFn = builtins.length flatDefs == 1 && lib.isFunction (builtins.head flatDefs).value;
           # Synthetic ._ for nested aspects — same semantics as root aspects.
-          # Collect forwarded child keys (exclude class, pipe, structural, internal).
-          classReg = den.classes or { };
-          pipeReg = den.quirks or { };
-          inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
           # Forward provides children onto the wrapper so
           # aspect.child.monitoring resolves to aspect.child.provides.monitoring,
           # matching mergeWithAspectMeta behavior for root aspects — including
           # the rule that a name the wrapper defines itself keeps its own value
           # and stays classified.
           # `_` is the write alias for `provides`. aspectSubmodule wires it with
-          # mkAliasOptionModule, but a nested key never reaches that submodule:
-          # `_` is structural, so an alias write arrives here as a plain key and
-          # is then discarded by the `_` this wrapper publishes below. Fold it
-          # into the provides source so both spellings mean the same thing at
-          # every depth. A `_` read back off another wrapper carries __functor;
-          # that is the read shorthand, not a write, and stays out of provides.
-          writtenUnderscore =
-            let
-              v = merged._ or null;
-            in
-            lib.optionalAttrs (builtins.isAttrs v && !(v ? __functor)) v;
-          # Both spellings arrive as a content wrapper when the key is defined in
-          # more than one file, carrying `__contentValues` / `__provider` / `_`
-          # alongside the real children. Those are wrapper machinery, not
-          # provides children: unfiltered they surface as `provides` keys, enter
-          # `__providesForwarded`, and `_` (not `__`-prefixed) registers an inert
-          # cross-provide policy. Filtering here covers `provides` and `_` at
-          # once, and the single-def path is unaffected because a raw attrset
-          # carries none of these keys.
-          providesChildren = lib.filterAttrs (k: _: !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k)) (
-            (merged.provides or { }) // writtenUnderscore
-          );
-          unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
-          provider = (typeCfg.providerPrefix or [ ]) ++ [ keyName ];
-          # A key names a candidate child aspect when it is neither structural,
-          # internal, class nor pipe. Provides children are reached through
-          # `provides`/`_`, which are structural — ._ never collects them.
-          isChildKey =
-            k:
-            !(structuralKeysSet ? ${k}) && !(lib.hasPrefix "__" k) && !(classReg ? ${k}) && !(pipeReg ? ${k});
-          # The synthetic aspect behind ._ at a given tree position.
-          underscoreAt = provPath: attrs: {
-            __functor = _self: _args: {
-              name = "${lib.concatStringsSep "." provPath}._";
-              includes = map (k: attrs.${k}) (builtins.filter isChildKey (builtins.attrNames attrs));
-            };
-          };
-          # Annotate nested attrset children with __provider so deeply nested
+          # mkAliasOptionModule, but a nested key never reaches that submodule —
+          # `_` is structural, so an alias write would otherwise arrive here as
+          # a plain key of its own. foldUnderscoreIntoProvides already folded
+          # every `_` write into `provides` on flatDefs above, so `merged` never
+          # carries a `_` key for genuine writes and `merged.provides` alone is
+          # the complete source, at every depth.
+          provider = (typeCfg.chain or typeCfg.origin) ++ [ keyName ];
+          # The synthetic aspect behind ._ at a given tree position — reused
+          # unqualified (no providesChildren fold) for every nested position by
+          # annotateChildren below; the top-level `provides`/`_` fold
+          # providesChildren in explicitly, matching mergeWithAspectMeta.
+          underscoreAt = provPath: attrs: (mkUnderscore attrs provPath).functor;
+          # Annotate nested attrset children with __aspectChain so deeply nested
           # aspects carry provenance for hasAspect resolution, and give each
           # one its own ._ so the shorthand holds at every depth rather than
           # only at this wrapper. Without the recursion, navigation through a
@@ -609,29 +710,41 @@ let
                 childPath = provPath ++ [ k ];
                 sub = annotateChildren childPath v;
               in
-              if isChildKey k && builtins.isAttrs v && !(v ? __provider) && !(v ? __contentValues) then
+              if isChildKey k && builtins.isAttrs v && !(v ? __aspectChain) && !(v ? __contentValues) then
                 sub
                 // {
-                  __provider = childPath;
+                  __aspectChain = childPath;
                   _ = underscoreAt childPath sub;
                 }
               else
                 v
             ) attrs;
           annotatedMerged = annotateChildren provider merged;
+          # Both spellings arrive as a content wrapper when the key is defined
+          # in more than one file, carrying `__contentValues` / `__aspectChain`
+          # / `_` alongside the real children. Those are wrapper machinery, not
+          # provides children: unfiltered they surface as `provides` keys and
+          # enter `__providesForwarded`. Filtering here covers both, and the
+          # single-def path is unaffected because a raw attrset carries none of
+          # these keys.
+          topUnderscore = mkUnderscore annotatedMerged provider;
+          inherit (topUnderscore) forwardable;
+          unshadowedProvides = builtins.filter (k: !(annotatedMerged ? ${k})) (
+            builtins.attrNames forwardable
+          );
         in
-        providesChildren
+        forwardable
         // annotatedMerged
         // {
           __contentValues = flatDefs;
-          __provider = provider;
+          __aspectChain = provider;
           __providesForwarded = unshadowedProvides;
           # Root aspects publish `provides` and `_` as one value — provides-
           # children plus the all-children functor (mergeWithAspectMeta's
           # syntheticProvides). Match that here so the two spellings are
           # interchangeable for reading as well as writing, at any depth.
-          provides = providesChildren // underscoreAt provider annotatedMerged;
-          _ = providesChildren // underscoreAt provider annotatedMerged;
+          provides = topUnderscore.syntheticProvides;
+          _ = topUnderscore.syntheticProvides;
         }
         // lib.optionalAttrs singleFn {
           __functor = _self: (builtins.head flatDefs).value;
@@ -650,7 +763,7 @@ let
     typeCfg:
     let
       contentType = aspectContentType typeCfg;
-      inherit (den.lib.aspects.fx.keyClassification) structuralKeysSet;
+      inherit (den.lib.aspects.fx.keyClassification) isStructuralKey;
     in
     lib.types.mkOptionType {
       name = "aspectKey";
@@ -659,11 +772,11 @@ let
       # Reserved/structural keys are metadata, not aspect content: pass their
       # value through untouched (last def wins) so consumers read it back as
       # declared. Without this, the content wrapper mangles the value into a
-      # __contentValues/__provider shape even though the pipeline ignores the
+      # __contentValues/__aspectChain shape even though the pipeline ignores the
       # key for dispatch. Everything else gets the provenance/content wrapper.
       merge =
         loc: defs:
-        if structuralKeysSet ? ${lib.last loc} then (lib.last defs).value else contentType.merge loc defs;
+        if isStructuralKey (lib.last loc) then (lib.last defs).value else contentType.merge loc defs;
     };
 
   # Aspect meta submodule type: handleWith, provider, collisionPolicy.
@@ -684,7 +797,7 @@ let
         );
         default = null;
       };
-      options.provider = lib.mkOption {
+      options.aspect-chain = lib.mkOption {
         internal = true;
         visible = false;
         description = "Provider path tracking aspect provenance";
@@ -694,25 +807,34 @@ let
         # yields ["a" "a"] — a chain every descendant then inherits. Agreeing
         # definitions collapse; genuinely different ones are an ambiguity den
         # cannot resolve, so it says so rather than picking one.
+        #
+        # null means "no chain set" — distinct from [ ] ("root, chain is
+        # empty"). Without this distinction a root aspect and an inline
+        # literal both defaulted to [ ] and were indistinguishable. There is
+        # no default here: a declared aspect must set its own chain
+        # (aspectMeta's mkDefault) rather than inherit one, so the value
+        # travels with the aspect through re-inclusion instead of being
+        # re-derived at whatever site last merged it.
         type = lib.types.mkOptionType {
           name = "aspectChain";
           description = "aspect provenance chain";
-          check = v: builtins.isList v && builtins.all builtins.isString v;
+          check = v: v == null || (builtins.isList v && builtins.all builtins.isString v);
           merge =
             loc: defs:
             let
               distinct = lib.unique (map (d: d.value) defs);
+              render = c: if c == null then "null" else "[${lib.concatStringsSep " " c}]";
             in
             if distinct == [ ] then
-              [ ]
+              null
             else if builtins.length distinct == 1 then
               builtins.head distinct
             else
               throw "den: conflicting provenance for ${locName loc}: ${
-                lib.concatMapStringsSep " vs " (c: "[${lib.concatStringsSep " " c}]") distinct
+                lib.concatMapStringsSep " vs " render distinct
               }";
         };
-        default = typeCfg.providerPrefix or [ ];
+        default = null;
       };
       options.collisionPolicy = lib.mkOption {
         description = "Collision policy for flat-form class module arg/module-system arg overlap.";
@@ -732,20 +854,27 @@ let
     lib.types.submodule (
       { name, config, ... }:
       let
-        # The chain this aspect's children hang off. `meta.provider` defaults to
-        # `typeCfg.providerPrefix`, but providerType.merge overrides it when it
+        # The chain this aspect's children hang off. `meta.aspect-chain` defaults to
+        # `typeCfg.chain or typeCfg.origin`, but providerType.merge overrides it when it
         # re-types an included nested aspect (wrapperToAspect injects the chain
-        # from __provider). Reading the static typeCfg there truncates the chain
+        # from __aspectChain). Reading the static typeCfg there truncates the chain
         # to the aspect's own name, so `alpha/tools` and `beta/tools` both hand
         # their children the prefix ["tools"] and the children collide.
-        childProviderPrefix = config.meta.provider ++ [ config.name ];
+        #
+        # meta.aspect-chain can be null here (an inline includes literal that
+        # never had its own chain filled in). Naming this aspect's own
+        # descendants is a separate, computational concern from the chain
+        # value itself, so null falls back to [ ] purely for that purpose —
+        # this is not a place that reads absence as root.
+        ownChain = if config.meta.aspect-chain == null then [ ] else config.meta.aspect-chain;
+        childProviderPrefix = ownChain ++ [ config.name ];
       in
       {
         freeformType = lib.types.lazyAttrsOf (
           aspectKeyType (
             typeCfg
             // {
-              providerPrefix = childProviderPrefix;
+              chain = childProviderPrefix;
             }
           )
         );
@@ -776,12 +905,17 @@ let
           };
           includes = lib.mkOption {
             description = "Providers to ask aspects from";
-            type = lib.types.listOf (providerType typeCfg);
+            # chain explicitly null (not omitted): `or origin` only falls
+            # back on a genuinely MISSING key, so a present-but-null chain
+            # still yields null through aspectMeta's default. That is what
+            # makes an inline includes literal's chain read as "unknown"
+            # rather than silently defaulting to the container's origin.
+            type = lib.types.listOf (providerType (typeCfg // { chain = null; }));
             default = [ ];
           };
           excludes = lib.mkOption {
             description = "Aspects or policies to exclude from this subtree";
-            type = lib.types.listOf lib.types.unspecified;
+            type = lib.types.listOf (providerType (typeCfg // { chain = null; }));
             default = [ ];
           };
           provides = lib.mkOption {
@@ -792,7 +926,7 @@ let
                 providerType (
                   typeCfg
                   // {
-                    providerPrefix = childProviderPrefix;
+                    chain = childProviderPrefix;
                   }
                 )
               );

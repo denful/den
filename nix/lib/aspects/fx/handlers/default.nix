@@ -21,6 +21,7 @@ args:
 // (import ./resolve.nix args)
 // (import ./bind.nix args)
 // (import ./defer.nix args)
+// (import ./inert.nix args)
 // (import ./drain.nix args)
 // (import ./scope-widen.nix args)
 // (import ./classify.nix args)

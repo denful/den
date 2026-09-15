@@ -129,11 +129,11 @@ in
       }
     );
 
-    # aspectContentType wraps values with __contentValues and __provider.
+    # aspectContentType wraps values with __contentValues and __aspectChain.
     test-content-wrapper-shape = denTest (
       { den, ... }:
       let
-        contentType = (den.lib.aspects.mkAspectsType { providerPrefix = [ "test" ]; }).aspectContentType;
+        contentType = (den.lib.aspects.mkAspectsType { origin = [ "test" ]; }).aspectContentType;
         evaluated = lib.evalModules {
           modules = [
             { freeformType = lib.types.lazyAttrsOf contentType; }
@@ -145,8 +145,8 @@ in
       {
         expr = {
           hasContentValues = val ? __contentValues;
-          hasProvider = val ? __provider;
-          provider = val.__provider;
+          hasProvider = val ? __aspectChain;
+          provider = val.__aspectChain;
           valueCount = builtins.length val.__contentValues;
         };
         expected = {
@@ -165,7 +165,7 @@ in
     test-multi-site-merge = denTest (
       { den, ... }:
       let
-        contentType = (den.lib.aspects.mkAspectsType { providerPrefix = [ ]; }).aspectContentType;
+        contentType = (den.lib.aspects.mkAspectsType { origin = [ ]; }).aspectContentType;
         evaluated = lib.evalModules {
           modules = [
             { freeformType = lib.types.lazyAttrsOf contentType; }
@@ -194,7 +194,7 @@ in
     test-function-value = denTest (
       { den, ... }:
       let
-        contentType = (den.lib.aspects.mkAspectsType { providerPrefix = [ ]; }).aspectContentType;
+        contentType = (den.lib.aspects.mkAspectsType { origin = [ ]; }).aspectContentType;
         evaluated = lib.evalModules {
           modules = [
             { freeformType = lib.types.lazyAttrsOf contentType; }

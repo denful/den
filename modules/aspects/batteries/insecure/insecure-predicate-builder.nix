@@ -27,10 +27,14 @@ let
       };
     };
 
+  # Chain segments state each child's position under "insecure-predicate"
+  # explicitly rather than letting the name carry it — a name can never
+  # double-encode an ancestor that's already named as its own chain segment.
   osAspect =
     { host }:
     {
-      name = "insecure-predicate/os";
+      name = "os";
+      meta.aspect-chain = [ "insecure-predicate" ];
     }
     # A synthetic host identity (from a `user@host` home with no declared host)
     # has no class output, so there is nothing to import into. Guard like
@@ -42,7 +46,8 @@ let
   userAspect =
     { host, user }:
     {
-      name = "insecure-predicate/user";
+      name = "user";
+      meta.aspect-chain = [ "insecure-predicate" ];
     }
     // lib.optionalAttrs (lib.elem "homeManager" user.classes) {
       homeManager.imports = [ insecureModule ];
@@ -51,7 +56,8 @@ let
   homeAspect =
     { home }:
     {
-      name = "insecure-predicate/home";
+      name = "home";
+      meta.aspect-chain = [ "insecure-predicate" ];
     }
     // lib.optionalAttrs (home ? class) {
       ${home.class}.imports = [ insecureModule ];
@@ -59,6 +65,10 @@ let
 
   aspect = {
     name = "insecure-predicate";
+    # Stated explicitly, not left to fill from the walk: this is included
+    # from den.default, and without its own chain it would inherit
+    # den.default's position instead of staying a root.
+    meta.aspect-chain = [ ];
     inherit description;
     includes = [
       osAspect

@@ -119,7 +119,7 @@ New test files must be `git add`'d before nix can evaluate them. Use `--override
 - Idiomatic Nix: use `lib.optional` `lib.optionals` `lib.optionalAttrs` for basic conditionals
 - Idiomatic Nix: avoid `with` — prefer `inherit` to bring names into scope. `with` obscures where bindings come from and breaks tooling.
 - Error messages: prefix with `den:` for traceability (e.g., `throw "den: multiple __functor definitions at ..."`)
-- Internal markers: double-underscore prefixed attrs (`__contentValues`, `__provider`, `__fn`) are pipeline internals. Don't add new ones without understanding the classification and structural key filtering in `key-classification.nix`.
+- Internal markers: double-underscore prefixed attrs (`__contentValues`, `__aspectChain`, `__fn`) are pipeline internals. Don't add new ones without understanding the classification and structural key filtering in `key-classification.nix`.
 - Commenting: comments should describe why not what, code should be self documenting as to what
 - Minimal changes: fix the bug, don't refactor surroundings
 - Diagnose before reverting: the fix is usually one targeted change

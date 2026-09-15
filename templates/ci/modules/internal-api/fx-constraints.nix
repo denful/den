@@ -268,7 +268,7 @@
       let
         ref = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         decl = den.lib.aspects.fx.constraints.exclude ref;
       in
@@ -283,7 +283,7 @@
       let
         ref = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         decl = den.lib.aspects.fx.constraints.exclude.global ref;
       in
@@ -306,11 +306,11 @@
       let
         ref = {
           name = "old";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         replacement = {
           name = "new";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           includes = [ ];
         };
         decl = den.lib.aspects.fx.constraints.substitute ref replacement;
@@ -326,11 +326,11 @@
       let
         ref = {
           name = "old";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         replacement = {
           name = "new";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           includes = [ ];
         };
         decl = den.lib.aspects.fx.constraints.substitute.global ref replacement;
@@ -369,7 +369,7 @@
         fx = den.lib.fx;
         ref = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         decl = den.lib.aspects.fx.constraints.exclude ref;
         comp = fx.bind (fx.send "chain-push" { identity = "parent"; }) (
@@ -407,7 +407,7 @@
         fx = den.lib.fx;
         ref = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         decl = den.lib.aspects.fx.constraints.exclude ref;
         comp = fx.bind (fx.send "chain-push" { identity = "a"; }) (
@@ -448,7 +448,7 @@
         fx = den.lib.fx;
         ref = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         decl = den.lib.aspects.fx.constraints.exclude.global ref;
         comp = fx.bind (fx.send "chain-push" { identity = "a"; }) (
@@ -490,7 +490,7 @@
         decl = den.lib.aspects.fx.constraints.filterBy (a: a.name != "drop");
         aspect = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         comp = fx.bind (fx.send "chain-push" { identity = "parent"; }) (
           _:
@@ -525,7 +525,7 @@
         decl = den.lib.aspects.fx.constraints.filterBy (a: a.name != "drop");
         aspect = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         comp = fx.bind (fx.send "chain-push" { identity = "a"; }) (
           _:
@@ -632,7 +632,7 @@
         fx = den.lib.fx;
         target = {
           name = "drop";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         parent = {
           name = "root";
@@ -641,12 +641,12 @@
           includes = [
             {
               name = "keep";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
             {
               name = "drop";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
           ];
@@ -691,11 +691,11 @@
         fx = den.lib.fx;
         targetA = {
           name = "a";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         targetB = {
           name = "b";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
         };
         parent = {
           name = "root";
@@ -708,17 +708,17 @@
           includes = [
             {
               name = "a";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
             {
               name = "b";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
             {
               name = "c";
-              meta.provider = [ ];
+              meta.aspect-chain = [ ];
               includes = [ ];
             }
           ];

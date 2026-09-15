@@ -153,6 +153,7 @@
           name = "sops";
           meta = {
             provider = [ ];
+            aspect-chain = [ ];
           };
           includes = [ ];
         };

@@ -14,7 +14,7 @@ let
 
   __functor = _self: allowed-names: {
     name = "unfree(${builtins.concatStringsSep "," allowed-names})";
-    meta.provider = [
+    meta.aspect-chain = [
       "den"
       "provides"
     ];

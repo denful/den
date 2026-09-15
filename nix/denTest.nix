@@ -155,7 +155,7 @@ let
                 let
                   displayName = if e.excluded then "~${e.name}" else e.name;
                   subs = buildTree (
-                    if e.isProvider then "${lib.concatStringsSep "/" e.provider}/${e.name}" else e.name
+                    if e.isProvider then "${lib.concatStringsSep "/" e.aspect-chain}/${e.name}" else e.name
                   ) entries;
                 in
                 if subs == [ ] then [ displayName ] else [ displayName ] ++ subs;
@@ -169,7 +169,7 @@ let
               let
                 root = builtins.head roots;
                 rootName =
-                  if root.isProvider then "${lib.concatStringsSep "/" root.provider}/${root.name}" else root.name;
+                  if root.isProvider then "${lib.concatStringsSep "/" root.aspect-chain}/${root.name}" else root.name;
               in
               [ root.name ] ++ buildTree rootName entries;
         in

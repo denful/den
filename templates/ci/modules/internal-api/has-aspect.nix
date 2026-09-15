@@ -623,7 +623,7 @@
 
     # Nested aspects accessed via freeform key traversal (e.g.,
     # den.aspects.disk.zfs-disk-single) lack name/meta but carry
-    # __provider. hasAspect must resolve these via __provider chain.
+    # __aspectChain. hasAspect must resolve these via __aspectChain chain.
     test-H2-nested-freeform-present = denTest (
       { den, ... }:
       {

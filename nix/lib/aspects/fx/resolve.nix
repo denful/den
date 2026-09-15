@@ -9,22 +9,14 @@ let
   inherit (import ./wrap-classes.nix { inherit lib den; }) wrapCollectedClasses;
   inherit (import ./assemble-pipes.nix { inherit lib den; }) assemblePipes;
   inherit (import ./spawn-node.nix { inherit lib den; }) mkSpawnNode;
-  routeEdges = import ./edges/route.nix { inherit lib den; };
   inherit (import ./edge-trace.nix { inherit lib den; })
-    extractEdgeTrace
     extractTopLevelEdges
     sortEdges
     ;
   inherit (import ./scope-walk.nix { inherit lib; }) subtreeScopes dedupByKey;
-  inherit (import ./edges/materialize.nix { inherit lib den; }) assembleSubtree;
   inherit (import ./edges/pi.nix { inherit lib; }) mkStaticPi;
   inherit (import ./edges/instantiate-edges.nix { inherit lib den; }) mkInstantiateEdges;
   inherit (import ./edges/edge.nix { inherit lib; }) scopeName edgeSortKey;
-  inherit (import ./edges/provides.nix { inherit lib den; })
-    applyProvidesEdges
-    dedupProvides
-    providesEdges
-    ;
   inherit (import ./edges/materialize-unified.nix { inherit lib den; }) materializeUnified;
   instantiateEdges = import ./edges/instantiate.nix { inherit lib; };
   handlers = den.lib.aspects.fx.handlers;
@@ -65,30 +57,9 @@ let
       perScope = wrappedPerScope;
     };
 
-  # Phase 2 (policy.provide → target classes) is now an edge constructor:
-  # edges/provides.nix applyProvidesEdges. The nest-into-source-bucket
-  # materialization + the (policyName/class/path) dedup live there (§B Decision 1).
-
-  # Phase 3: Apply routes. The first positional is the node spawn primitive
-  # (threaded with this pipeline's parent scope-tree state) used to resolve a
-  # complex-route forward SOURCE with full fleet visibility (replaces the old
-  # isolated fxResolve fallback).
-  applyRoutes =
-    spawnNode: ctx: scopeContexts: rootScopeId: scopeParent: scopeIsolated: scopeEntityKind: scopedRoutes: acc:
-    routeEdges.applyRoutes {
-      inherit
-        scopedRoutes
-        scopeContexts
-        scopeParent
-        scopeIsolated
-        scopeEntityKind
-        rootScopeId
-        spawnNode
-        ;
-      wrappedPerScope = acc.perScope;
-      classImports = acc.classImports;
-      inherit (handlers) buildForwardAspect;
-    };
+  # Phase 2 (policy.provide) and phase 3 (routes) are both edge constructors now,
+  # interleaved by ONE ordered-dispatch fold (edges/materialize-unified.nix
+  # materializeUnified) — there is no standalone phase2/phase3 fold in this file.
 
   # Phase 4: Apply entity instantiation.
   # Resolve the entity scope an instantiate spec targets.
@@ -693,8 +664,6 @@ let
         augmentedContexts:
         let
           allDeferred = (result.state.scopedDeferredIncludes or (_: { })) null;
-          inherit (den.lib.aspects.fx.keyClassification) classifyKeys;
-          inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList unwrapContentValuesAll;
           # Build enriched context for a scope by inheriting parent enrichment.
           # Walks up scopeParent to find enrichment keys not present in the
           # scope's own context.
@@ -735,46 +704,112 @@ let
               accImports
             else
               let
-                newEntries = lib.concatMap (
+                # Re-enter the pipeline for each drainable child, mirroring
+                # scope-widen.nix's in-pipeline drain. A flat key-lift off
+                # `d.child` cannot work here: every drainable entry is a
+                # parametric aspect (compile.nix routes __fn/__args-bearing
+                # aspects to compile-parametric, the only sender of "bind",
+                # the only sender of "defer"), so its content lives inside
+                # `__fn` and its own top-level keys are all structural.
+                walkedBuckets = lib.concatMap (
                   d:
                   let
-                    child = d.child;
-                    classified = classifyKeys null child;
+                    walked = mkPipeline { inherit class; } {
+                      self = d.child;
+                      ctx = scopeCtx;
+                    };
+                    # This walk never runs policy dispatch: installPolicies
+                    # (resolve-children.nix) skips any aspect without
+                    # __entityKind, and nothing on a deferred child's walk
+                    # ever attaches one (resolve-entity.nix is the only
+                    # site that does, reached only via the resolve-entity
+                    # effect). Since push-scope fires only from inside
+                    # policy dispatch, that also means this walk can never
+                    # fan into more than one scope — scope-forking and
+                    # policy dispatch share one gate (D1 F1, measured: 51
+                    # walk firings across the D1 suites, all n=1).
+                    #
+                    # What DOES happen on this path: a policy effect
+                    # (route/instantiate/provide/aspect-policy) or a
+                    # still-deferred nested include gets REGISTERED by the
+                    # walk's compile step without ever being DISPATCHED, and
+                    # that content was silently lost (D1 F1 — a pipe-arg-
+                    # deferred child carrying both direct class content and
+                    # a `resolve.to` policy delivered the direct half and
+                    # dropped the policy half with no diagnostic). Guard on
+                    # that residue instead: throw loud when one of the six
+                    # scoped-effect maps listed at `residueKinds` below holds
+                    # something for this walk, rather than deliver
+                    # `scopedClassImports` alone and lose the rest quietly.
+                    #
+                    # Six of the fourteen scope-partitioned maps
+                    # (pipeline.nix), not all of them. `scopedClassImports` is
+                    # the one delivered rather than guarded, and the
+                    # includes-chain, constraint-registry and emitted-loc maps
+                    # are bookkeeping rather than deliverable content. Three
+                    # maps that DO carry deliverable content are left out
+                    # because they cannot be reached on this walk — DERIVED by
+                    # reading their senders and consumers, not measured, and
+                    # that derivation is the guard's whole warrant:
+                    #   - scopedPipeEffects, scopedSpawns — written only by
+                    #     policy effect emission (policy/apply.nix), and this
+                    #     walk never dispatches policies;
+                    #   - scopedDeferredConditionals — cleared in-walk:
+                    #     resolve-children fires drain-conditionals at the
+                    #     sub-pipeline's own root and compile-conditional
+                    #     empties the scope's bucket.
+                    # A fourth policy-independent sender, or a push-scope path
+                    # that skips policy dispatch, re-opens exactly the class
+                    # this guard closes. Add the map to the list below.
+                    #
+                    # A deferred child whose own `includes` fans over an entity
+                    # arg is covered by the same guard: this walk has no entity
+                    # kind, so every entity arg there is misplaced and bind
+                    # rules the aspect inert. That verdict left no trace in any
+                    # effect map (`includeSeen` set, `scopedClassImports` simply
+                    # absent), which is indistinguishable from an aspect that
+                    # legitimately emits nothing — so bind records the verdict
+                    # itself into scopedInertAspects (handlers/inert.nix) and it
+                    # reads as residue below (D1 F1 arm C).
+                    # Per-scope values are lists for five of these
+                    # (scopedAppend) but scopedAspectPolicies is a merged
+                    # attrset keyed by policy name (scopedMerge, policy.nix)
+                    # — normalise both to a list before concatenating.
+                    residueOf =
+                      key:
+                      builtins.concatLists (
+                        map (v: if builtins.isList v then v else lib.attrValues v) (
+                          lib.attrValues ((walked.state.${key} or (_: { })) null)
+                        )
+                      );
+                    residueKinds = builtins.filter (k: residueOf k != [ ]) [
+                      "scopedAspectPolicies"
+                      "scopedRoutes"
+                      "scopedInstantiates"
+                      "scopedProvides"
+                      "scopedDeferredIncludes"
+                      "scopedInertAspects"
+                    ];
                   in
-                  lib.concatMap (
-                    k:
-                    let
-                      isPipe = den.quirks ? ${k};
-                      # Pipe keys keep one entry per definition (quirks accumulate);
-                      # class keys collapse into a single module (the module system merges).
-                      modules = if isPipe then unwrapContentValuesAll child.${k} else unwrapContentValuesList child.${k};
-                    in
-                    map (
-                      module:
-                      {
-                        __rawEntry = true;
-                        class = k;
-                        inherit module;
-                        ctx = scopeCtx;
-                        identity = child.name or "<deferred>";
-                        aspectPolicy = child.meta.collisionPolicy or null;
-                        globalPolicy = den.config.classModuleCollisionPolicy or "error";
-                        isContextDependent = false;
-                      }
-                      // lib.optionalAttrs isPipe { __isPipeEntry = true; }
-                    ) modules
-                  ) (classified.classKeys ++ classified.pipeKeys)
+                  if residueKinds != [ ] then
+                    throw "den: pipe-arg-deferred include '${d.child.name or "<deferred>"}' left undeliverable content (${lib.concatStringsSep ", " residueKinds}) while draining at scope '${scopeId}' — this drain walk does not dispatch policies, so registered effects are silently dropped rather than delivered"
+                  else
+                    lib.attrValues (walked.state.scopedClassImports null)
                 ) drainable;
               in
               builtins.foldl' (
-                acc: entry:
+                acc: byClass:
                 acc
                 // {
-                  ${scopeId} = (acc.${scopeId} or { }) // {
-                    ${entry.class} = ((acc.${scopeId} or { }).${entry.class} or [ ]) ++ [ entry ];
-                  };
+                  ${scopeId} = builtins.foldl' (
+                    a: cls:
+                    a
+                    // {
+                      ${cls} = (a.${cls} or [ ]) ++ byClass.${cls};
+                    }
+                  ) (acc.${scopeId} or { }) (builtins.attrNames byClass);
                 }
-              ) accImports newEntries
+              ) accImports walkedBuckets
           ) importsForPipes (builtins.attrNames allDeferred);
 
           # Materialize deferred node spawn markers (policy.spawn) over the
@@ -1022,7 +1057,7 @@ let
       # deterministic structural edges production invokes via assembleSubtree /
       # applyInstantiates (no drift surface). This corrects the legacy oracle's
       # spawn rewalk UNDERCOUNT. A lazy thunk — forced only by inspection / the
-      # delivery-edges + fx-unified-edges suites, never by normal resolve consumers.
+      # delivery-edges suite, never by normal resolve consumers.
       productionEdgeTrace = sortEdges (
         materialized.edges
         ++ topLevelEdgeParts.defaultFold
@@ -1033,7 +1068,15 @@ let
       );
     in
     {
-      imports = phase4.${class} or [ ];
+      # Terminal position for the unmatched-raw-ref-exclude diagnostic: both
+      # the constraint registry and policyClaimsByName are complete on
+      # result.state here, and nothing per-scope can decide the question (see
+      # unmatchedRawRefExcludes in handlers/constraint.nix). Attached to
+      # `imports` so it surfaces exactly when the resolved module set is
+      # consumed, not when a path-set or edge-trace reader touches the bundle.
+      imports = lib.foldl' (v: msg: lib.warn msg v) (phase4.${class} or [ ]) (
+        handlers.unmatchedRawRefExcludes result.state
+      );
       # Surfaced from the SAME result.state — this is thunked onto state.
       pathSetByScope = result.state.pathSetByScope null;
       # Per-scope ctx + entity-kind, so the entity surface can re-key the path
@@ -1042,139 +1085,6 @@ let
       inherit scopeContexts scopeEntityKind;
       # The production edge object (see productionEdgeTrace above).
       edgeTrace = productionEdgeTrace;
-      # One representation: unifiedEdges is an alias for the production edgeTrace.
-      unifiedEdges = productionEdgeTrace;
-      # The LEGACY end-state re-derivation (edge-trace.nix), WITH its `spawnEdges`
-      # rewalk arm (the spawn undercount). Kept as a distinct field so the
-      # differential suites can diff the production object against it. Nix attrs
-      # are lazy, so this is a thunk — forced only by the differential suites /
-      # debug inspection, never by normal resolve consumers.
-      legacyEdgeTrace = extractEdgeTrace {
-        inherit
-          scopeContexts
-          scopeParent
-          scopeIsolated
-          scopeEntityKind
-          scopedProvides
-          scopedRoutes
-          ;
-        scopedClassImports = scopedClassImportsRaw;
-        scopedSpawns = (result.state.scopedSpawns or (_: { })) null;
-        scopedInstantiates = (result.state.scopedInstantiates or (_: { })) null;
-        rootScopeId = result.state.rootScopeId;
-      };
-
-      # The Task-17 equivalence surface: BOTH the current phase2∘phase3 result AND
-      # the materializeUnified result over the SAME live seed (phase1) + the SAME
-      # provides/routes/spawn inputs the production phase folds consume. A lazy
-      # thunk (like edgeTrace / unifiedEdges) — forced only by the
-      # fx-materialize-unified suite, never by normal resolve consumers. This is the
-      # byte-equivalence proof for the ordered-dispatch engine: the suite deep-
-      # compares `.phaseFold` to `.unified` per topology. Not consumed by production.
-      materializeEquiv =
-        let
-          piTop = pi;
-          unifiedInputs = {
-            inherit pi;
-            seed = phase1;
-            inherit
-              ctx
-              scopedProvides
-              scopedRoutes
-              spawnNode
-              ;
-            inherit (handlers) buildForwardAspect;
-          };
-          # The OLD production path (phase2 provides ∘ phase3 routes), recomputed
-          # locally over the SAME live seed. Production now folds materializeUnified
-          # directly (above), so this independent recomputation is the equivalence
-          # ORACLE the fx-materialize-unified suite deep-compares against `.unified`.
-          oraclePhase2 = applyProvidesEdges ctx scopedProvides phase1;
-          oraclePhase3 =
-            applyRoutes spawnNode ctx augmentedScopeContexts result.state.rootScopeId scopeParent scopeIsolated
-              scopeEntityKind
-              scopedRoutes
-              oraclePhase2;
-        in
-        let
-          # The production dispatch order: ALL provides (dedup order) THEN ALL kept
-          # routes (orderedKeptRoutes order) — the phase2∘phase3 sequence.
-          provideId =
-            spec:
-            "provide:${spec.__providePolicyName or "<anon>"}/${spec.class}/${
-              lib.concatStringsSep "/" (spec.path or [ ])
-            }";
-          routeId =
-            spec:
-            "route:${spec.fromClass or "?"}>${spec.intoClass or "?"}@${spec.sourceScopeId or "?"}/${
-              lib.concatStringsSep "/" (spec.path or [ ])
-            }${lib.optionalString (spec.__complexForward or false) "#complex"}";
-          dispatchId = d: if d.kind == "provide" then provideId d.spec else routeId d.spec;
-          orderedProvideSpecs = dedupProvides (lib.concatLists (lib.attrValues scopedProvides));
-          orderedRouteSpecs = routeEdges.orderedKeptRoutes result.state.rootScopeId (
-            lib.concatLists (lib.attrValues scopedRoutes)
-          );
-          # Production dispatch: all provides (dedup order) then all kept routes.
-          phaseFoldDispatch = (map provideId orderedProvideSpecs) ++ (map routeId orderedRouteSpecs);
-          # The unified engine's dispatch order via the SAME identity functions.
-          unifiedDispatch = map dispatchId (materializeUnified unifiedInputs { exposeDispatch = true; });
-
-          # Task-18 capture: the SAME no-merge call with exposeEdges = true. The
-          # accumulator is byte-identical to `unified` (the `// { edges; }` only
-          # adds the capture key), and `.edges` carries the folded trace edges the
-          # fold dispatched. The suite proves capture fidelity by comparing these
-          # to the constructor-built provides+route edges over the same inputs.
-          unifiedWithEdges = materializeUnified unifiedInputs {
-            doFinalMerge = false;
-            exposeEdges = true;
-          };
-          # The constructor-built oracle: provides trace edges (dedup order) ++
-          # route trace edges (kept+ordered), the SAME edges materializeUnified
-          # builds internally before its toposort. Same SET as `.edges`, so a
-          # sort-key comparison proves capture fidelity.
-          piRoot = result.state.rootScopeId;
-          edgeName = scopeName {
-            scopeEntityKind = pi.scopeEntityKind or { };
-            inherit (pi) scopeContexts;
-          };
-          oracleEdges =
-            providesEdges {
-              name = edgeName;
-              inherit scopedProvides;
-            }
-            ++ routeEdges.routeEdges {
-              name = edgeName;
-              inherit (pi) scopeParent;
-              rootScopeId = piRoot;
-              rawRoutes = routeEdges.orderedKeptRoutes piRoot (lib.concatLists (lib.attrValues scopedRoutes));
-            };
-        in
-        {
-          inherit phaseFoldDispatch unifiedDispatch;
-          # phase2 ∘ phase3 over the live seed (the production order: all provides
-          # then all routes) — recomputed by the local oracle, since production now
-          # folds materializeUnified directly.
-          phaseFold = oraclePhase3;
-          # materializeUnified over the SAME seed, doFinalMerge = false (returns the
-          # raw accumulator, byte-comparable to phaseFold). This is the SAME call
-          # production uses (`materialized`).
-          unified = materializeUnified unifiedInputs { doFinalMerge = false; };
-          # Task-18 edge capture surface: the folded edges (with their accumulator)
-          # and the constructor-built oracle, for the fx-materialize-unified proof.
-          inherit unifiedWithEdges oracleEdges;
-          # The doFinalMerge = true variant, comparable to assembleSubtree over the
-          # phaseFold result (the final-extraction merge step, unchanged).
-          unifiedMerged = materializeUnified unifiedInputs { doFinalMerge = true; };
-          phaseFoldMerged = assembleSubtree {
-            root = result.state.rootScopeId;
-            pi = piTop // {
-              perScope = oraclePhase3.perScope;
-              classImports = oraclePhase3.classImports;
-              provides = scopedProvides;
-              routes = scopedRoutes;
-            };
-          };
-        };
     };
 
   # Back-compatible projection: imports only. Protects deferredModule consumers

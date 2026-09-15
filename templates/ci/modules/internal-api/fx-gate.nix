@@ -16,7 +16,7 @@
         pipeline = den.lib.aspects.fx.pipeline;
         aspect = {
           name = "my-aspect";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           includes = [ ];
         };
         comp = fx.send "gate" {
@@ -49,7 +49,7 @@
         pipeline = den.lib.aspects.fx.pipeline;
         aspect = {
           name = "dup-aspect";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           includes = [ ];
         };
         # Send gate twice — second should be blocked by dedup.
@@ -93,7 +93,7 @@
         pipeline = den.lib.aspects.fx.pipeline;
         aspect = {
           name = "excluded-aspect";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           includes = [ ];
         };
         nodeIdentity = den.lib.aspects.fx.identity.key aspect;
@@ -147,12 +147,12 @@
         pipeline = den.lib.aspects.fx.pipeline;
         aspect = {
           name = "original-aspect";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           includes = [ ];
         };
         replacement = {
           name = "replacement-aspect";
-          meta.provider = [ ];
+          meta.aspect-chain = [ ];
           includes = [ ];
         };
         nodeIdentity = den.lib.aspects.fx.identity.key aspect;

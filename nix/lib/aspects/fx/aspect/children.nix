@@ -7,6 +7,13 @@ let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
   inherit (import ./normalize.nix { inherit lib den; }) wrapChild isMeaningfulName;
+  # resolveClaim: the shared cycle-guarded self-or-ancestor raw-value claim
+  # lookup (also used by the constraint registry). registerPolicy reuses it
+  # rather than a same-scope-only filter — see its comment for why. Also
+  # shared with dispatch-policies.nix's raw-ref exclude resolution — see
+  # registerConstraints's excludeList comment for why that's deferred there
+  # rather than resolved here.
+  inherit (import ../handlers/constraint.nix { inherit lib den; }) resolveClaim;
 
   nameIndexed =
     state: base: idx: ctxId:
@@ -23,13 +30,17 @@ let
   # siblings don't dedup-collide at the gate.
   inherit (den.lib.aspects) isSyntheticName;
 
-  # Wrap a computation in chain-push/chain-pop of the given identity.
+  # Wrap a computation in chain-push/chain-pop of the given position. Takes
+  # the segment list alone and derives the rendered string from it — a single
+  # carrier for one fact, so the string can never name a different position
+  # than the list it was rendered from.
   chainWrap =
-    nodeIdentity: shouldPush: comp:
+    nodeSegments: shouldPush: comp:
     if shouldPush then
-      fx.bind (fx.send "chain-push" { identity = nodeIdentity; }) (
-        _: fx.bind comp (result: fx.bind (fx.send "chain-pop" null) (_: fx.pure result))
-      )
+      fx.bind (fx.send "chain-push" {
+        identity = identity.pathKey nodeSegments;
+        segments = nodeSegments;
+      }) (_: fx.bind comp (result: fx.bind (fx.send "chain-pop" null) (_: fx.pure result)))
     else
       comp;
 
@@ -51,13 +62,92 @@ let
       ctx = { };
     };
 
-  # Route a single __isPolicy value to the policy registry.
+  # Route a single __isPolicy value to the policy registry. A policy's bare
+  # `name` is the identity every other consumer already relies on (excludes,
+  # cross-scope fired-tracking, broadcast dedup) — changing it unconditionally
+  # would fix the collision below at the cost of every one of those. So the
+  # bare name stays the identity in the overwhelming common case (one
+  # registration per name per scope), and only a genuine collision — a
+  # second, DIFFERENT record claiming a name already taken — gets displaced
+  # to a chain-qualified identity instead of silently overwriting the first
+  # (scopedAspectPolicies merges by overwrite, one dict per scope).
+  #
+  # Claims are bucketed by bare name, not by definition position (Task 4c's
+  # registry for aspects): traced empirically, two aspects each declaring
+  # their own "policies.tools" merge at DIFFERENT option paths — each
+  # aspect's own submodule eval bakes its own name into `loc` — so a
+  # def-position bucket puts them in separate buckets and misses the
+  # collision entirely, even though both still land in one scope's
+  # scopedAspectPolicies. Whole-value equality is what actually tells "one
+  # shared policy referenced twice" (O5, must merge into one identity) apart
+  # from "two distinct same-named policies" (O4, must split).
+  #
+  # "Same scope" for that comparison means self-or-ancestor (foldScopeAncestors
+  # over scopeParent), not `e.scope == scope`: the late-policy dispatch
+  # (policy/schema.nix emitLateForSibling) merges a parent scope's
+  # registrations with a descendant sibling's BY THIS SAME ownerIdentity
+  # (`allAspectPolicies = scopedAspectPolicies.${parentScope} //
+  # scopedAspectPolicies.${sib.scopeId}`) — a same-scope-only filter let a
+  # host-scope "tools" and a distinct descendant-scope "tools" both keep the
+  # bare name and collide at that merge.
+  #
+  # A displaced identity is qualified with the claim's own index within its
+  # bucket, not just the parent chain: every claimant sharing one parent
+  # chain (e.g. three factory-built policies included as siblings) shares
+  # the SAME chain segments, so without the index the second and third (and
+  # every later) distinct claimant would collide with EACH OTHER under one
+  # identical qualified string.
   registerPolicy =
     p:
-    fx.send "register-aspect-policy" {
-      inherit (p) fn;
-      ownerIdentity = identity.key p;
-    };
+    fx.bind fx.effects.state.get (
+      state:
+      let
+        scope = state.currentScope;
+        scopeParentMap = (state.scopeParent or (_: { })) null;
+        bucketKey = "name:${p.name}";
+        claimRegistry = (state.policyClaimsByName or (_: { })) null;
+        claimedEntries = claimRegistry.${bucketKey} or [ ];
+        claimResult = resolveClaim scopeParentMap scope claimedEntries p;
+        inherit (claimResult) sameScopeEntries matchingClaim;
+        parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
+        parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
+        # Taken before this claim is appended, so the first displaced claim
+        # gets 1, the second 2, etc. — unique per claim, not just per parent.
+        claimIndex = builtins.length sameScopeEntries;
+        ownerIdentity =
+          if matchingClaim != null then
+            matchingClaim.identity
+          else if sameScopeEntries == [ ] then
+            p.name
+          else
+            identity.pathKey (parentChainSegments ++ [ "${p.name}#${toString claimIndex}" ]);
+        registerEffect = fx.send "register-aspect-policy" {
+          inherit (p) fn;
+          inherit ownerIdentity;
+        };
+      in
+      if matchingClaim != null then
+        registerEffect
+      else
+        fx.bind (fx.effects.state.modify (
+          st:
+          st
+          // {
+            policyClaimsByName =
+              _:
+              claimRegistry
+              // {
+                ${bucketKey} = claimedEntries ++ [
+                  {
+                    value = p;
+                    identity = ownerIdentity;
+                    inherit scope;
+                  }
+                ];
+              };
+          }
+        )) (_: registerEffect)
+    );
 
   isPolicy = v: builtins.isAttrs v && v.__isPolicy or false;
 
@@ -93,13 +183,27 @@ let
         state:
         let
           childName = withScope.name or "<anon>";
+          # __walkStamped records that the name below was invented from walk
+          # position, not authored — compile-static reads it to decide
+          # whether filling meta.aspect-chain here would double-encode the
+          # same position (once in the stamped name, once in the chain).
+          # A marker set here, rather than a shape compile-static infers from
+          # the name, can't be confused with an author's own name choice.
           child =
             if skipNameAnon then
               withScope
             else if !(isMeaningfulName childName) then
-              withScope // { name = nameAnon state idx (withScope.__ctxId or null); }
+              withScope
+              // {
+                name = nameAnon state idx (withScope.__ctxId or null);
+                __walkStamped = true;
+              }
             else if isSyntheticName childName then
-              withScope // { name = nameIndexed state childName idx (withScope.__ctxId or null); }
+              withScope
+              // {
+                name = nameIndexed state childName idx (withScope.__ctxId or null);
+                __walkStamped = true;
+              }
             else
               withScope;
         in
@@ -142,7 +246,12 @@ let
     aspect:
     let
       rawHandleWith = aspect.meta.handleWith or null;
-      rawExcludes = aspect.excludes or [ ];
+      # Flattened for the same reason `includes` is (fx/aspect.nix): `providerType`
+      # names a list of policy records as a valid element, so `excludes = [ [ p ] ]`
+      # type-checks. Unflattened it reached `identity.key` as a list, which yields
+      # "<anon>" and excludes nothing — the silent no-op #3c5b5227 closed for bare
+      # strings, still open over the shape that commit's own type admits.
+      rawExcludes = lib.flatten (aspect.excludes or [ ]);
       handleWithList =
         if rawHandleWith == null then
           [ ]
@@ -153,26 +262,43 @@ let
         else
           [ ];
       # Compute exclude identity, normalizing content wrappers that have
-      # __provider but no name (nested keys without _ prefix).
+      # __aspectChain but no name (nested keys without _ prefix).
       excludeIdentity =
         ref:
         if builtins.isAttrs ref && ref.__isPolicy or false then
           ref.name
-        else if builtins.isAttrs ref && ref ? __provider && !(ref ? name) then
+        else if builtins.isAttrs ref && ref ? __aspectChain && !(ref ? name) then
           let
-            prov = ref.__provider;
+            prov = ref.__aspectChain;
           in
           identity.key {
             name = if prov != [ ] then lib.last prov else "<anon>";
-            meta.provider = if prov != [ ] then lib.init prov else [ ];
+            meta.aspect-chain = if prov != [ ] then lib.init prov else [ ];
           }
         else
           identity.key ref;
-      excludeList = map (ref: {
-        type = "exclude";
-        scope = "subtree";
-        identity = excludeIdentity ref;
-      }) rawExcludes;
+      # A policy exclude's `identity` is still only a bare-name guess (kept
+      # as a fallback storage key — see the __isPolicy branch above): this
+      # aspect's own registerConstraints runs BEFORE its includes are
+      # walked (compile-static sequences registerConstraints ahead of
+      # resolve-children's emitIncludes), so the claim registry a raw-value
+      # lookup would need is measurably still empty here — traced empirically,
+      # `state.policyClaimsByName."name:<bucket>"` reads `[ ]` at this exact
+      # point even though the excluded record's own self-equality already
+      # compares true (`ref == ref`). rawRef carries the record itself so
+      # constraint.nix's isPolicyExcluded (shared by dispatch-policies.nix's
+      # initial dispatch and policy/schema.nix's late-sibling re-dispatch)
+      # can resolve it later, once dispatch has run past this aspect's own
+      # includes and the registry actually holds the claim.
+      excludeList = map (
+        ref:
+        {
+          type = "exclude";
+          scope = "subtree";
+          identity = excludeIdentity ref;
+        }
+        // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+      ) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
     in

@@ -18,7 +18,6 @@
   edgeTrace = import ./edge-trace.nix { inherit lib den; };
   edges = {
     edge = import ./edges/edge.nix { inherit lib; };
-    parity = import ./edges/parity.nix { inherit lib; };
     pi = import ./edges/pi.nix { inherit lib; };
     toposort = import ./edges/toposort.nix { inherit lib; };
     materialize = import ./edges/materialize.nix { inherit lib den; };

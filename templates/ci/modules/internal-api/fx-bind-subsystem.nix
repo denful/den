@@ -146,7 +146,7 @@
         child = {
           name = "deferred-child";
           meta = {
-            provider = [ "test" ];
+            aspect-chain = [ "test" ];
           };
         };
         # Capture the resolve-complete stub.
@@ -186,7 +186,7 @@
           stubDeferred = stub.meta.deferred;
           stubIncludes = stub.includes;
           # Provider from original meta should be preserved.
-          stubProvider = stub.meta.provider;
+          stubProvider = stub.meta.aspect-chain;
         };
         expected = {
           queuedCount = 1;

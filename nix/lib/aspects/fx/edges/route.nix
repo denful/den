@@ -7,15 +7,15 @@
 # hybrids decompose into mode + properties.
 #
 # This file owns BOTH route halves: SIMPLE routes (delivery edges, §B Decision 4)
-# and COMPLEX (__complexForward) routes (synthesize edges, §B Decision 2). The
-# `applyRoutes` fold dispatches between them; resolve.nix and spawn-node thread
-# their state in and get the assembled buckets back (the phase-3 materialization).
+# and COMPLEX (__complexForward) routes (synthesize edges, §B Decision 2).
+# materializeUnified (edges/materialize-unified.nix) dispatches between them per
+# route, interleaved with provides in one ordered-dispatch fold.
 #
 # Two projections share ONE classification (classifyRoute):
 #   - the trace-facing edge RECORD (identity + annotations, no content) consumed
 #     by the read-only oracle (edge-trace.nix) — §8 records identity, not content;
 #   - the MATERIALIZATION (the actual wrapped module list + target scope) consumed
-#     by the `applyRoutes` fold (applySimpleRouteEdge / applyComplexRouteEdge).
+#     by materializeUnified's fold (applySimpleRouteEdge / applyComplexRouteEdge).
 # Both derive from the same per-route cell decision, so oracle and production can
 # never disagree on which §B cell a route is.
 #
@@ -724,67 +724,15 @@ let
     in
     appendToClass acc route.intoClass (appendScopeIdOf scopeParent route) wrappedModules;
 
-  # The route fold: dedup + toposort routes, fold applying each (complex synthesize
-  # vs simple delivery edge). The ONLY consumer-facing route entry — resolve.nix
-  # and spawn-node thread their state in, get the assembled { classImports; perScope }
-  # back. Simple + complex routes are both delivery edges now; the phase-3 fold is
-  # the materialization of the route edge set in topo order.
-  applyRoutes =
-    {
-      scopedRoutes,
-      wrappedPerScope,
-      classImports,
-      scopeParent ? { },
-      scopeIsolated ? { },
-      scopeContexts ? { },
-      scopeEntityKind,
-      spawnNode ? null,
-      rootScopeId ? null,
-      buildForwardAspect ? null,
-    }:
-    let
-      allRoutes = orderedKeptRoutes rootScopeId (lib.concatLists (lib.attrValues scopedRoutes));
-    in
-    builtins.foldl'
-      (
-        acc: route:
-        if route.__complexForward or false then
-          applyComplexRouteEdge acc {
-            inherit
-              route
-              rootScopeId
-              scopeContexts
-              scopeParent
-              scopeEntityKind
-              spawnNode
-              buildForwardAspect
-              ;
-          }
-        else
-          applySimpleRouteEdge acc {
-            inherit
-              route
-              wrappedPerScope
-              scopeParent
-              scopeIsolated
-              ;
-          }
-      )
-      {
-        inherit classImports;
-        perScope = wrappedPerScope;
-      }
-      allRoutes;
 in
 {
-  # The resolver (applyRoutes) and the read-only oracle (materializeRouteEdge,
-  # routeEdges below) consume route.nix; the per-spec materializers + ordering
-  # helpers are ALSO surfaced (additive) so materializeUnified (Task 17) can
-  # interleave provides + routes in one ordered-dispatch fold while reusing the
-  # EXACT per-spec materialization applyRoutes uses.
+  # The read-only oracle (materializeRouteEdge, routeEdges below) and
+  # materializeUnified (edges/materialize-unified.nix) consume route.nix: the
+  # per-spec materializers + ordering helpers are surfaced so materializeUnified
+  # can interleave provides + routes in one ordered-dispatch fold, reusing the
+  # EXACT per-spec materialization these implement.
   inherit
     materializeRouteEdge
-    applyRoutes
     applyComplexRouteEdge
     applySimpleRouteEdge
     classifyRoute

@@ -24,7 +24,7 @@
 #   - the trace-facing edge RECORD (identity + annotations, no content) consumed
 #     by the read-only oracle (edge-trace.nix);
 #   - the MATERIALIZATION (the actual wrapped module appended to the source-scope
-#     bucket) consumed by resolve.nix's phase-2 fold, replacing applyProvides.
+#     bucket) consumed by materializeUnified's ordered-dispatch fold.
 { lib, den }:
 let
   inherit (import ./edge.nix { inherit lib; }) mkEdge collected rootTarget;
@@ -51,11 +51,9 @@ let
   #   ctx           — the pipeline base ctx (the wrap context for every provide).
   #   scopedProvides — sid → [ provide specs ] (the registered provides).
   #   acc           — { classImports; perScope; } (phase-1 output).
-  # Materialize ONE provides spec onto the accumulator. Factored out of the
-  # applyProvidesEdges fold (additive) so a single provides spec can be
-  # materialized in interleaved order by materializeUnified (Task 17) — the per-
-  # spec body is IDENTICAL, so applyProvidesEdges (= foldl' applyOneProvide) and
-  # the interleaved fold land byte-identical content.
+  # Materialize ONE provides spec onto the accumulator. Consumed in interleaved
+  # order by materializeUnified's ordered-dispatch fold (edges/materialize-
+  # unified.nix), which folds provides and routes together.
   applyOneProvide =
     ctx: prev: spec:
     let
@@ -90,13 +88,6 @@ let
         };
       };
     };
-
-  applyProvidesEdges =
-    ctx: scopedProvides: acc:
-    let
-      allProvides = dedupProvides (lib.concatLists (lib.attrValues scopedProvides));
-    in
-    builtins.foldl' (applyOneProvide ctx) acc allProvides;
 
   # ===== trace-facing provides edge constructor (§8 identity, no content) =
   # Renders the deduped provides specs as edge RECORDS for the oracle. Each is the
@@ -135,7 +126,6 @@ in
   inherit
     dedupProvides
     applyOneProvide
-    applyProvidesEdges
     providesEdges
     ;
 }

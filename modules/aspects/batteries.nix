@@ -13,7 +13,7 @@
         type = lib.types.submodule {
           freeformType = lib.types.attrsOf (
             (config.den.lib.aspects.mkAspectsType {
-              providerPrefix = [
+              origin = [
                 "den"
                 "batteries"
               ];

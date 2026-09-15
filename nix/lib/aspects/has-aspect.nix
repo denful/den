@@ -8,12 +8,12 @@ let
     ref:
     if (ref ? name) && (ref ? meta) then
       pathKey (aspectPath ref)
-    else if ref ? __provider then
-      # Nested aspect from freeform traversal — content merger sets __provider
+    else if ref ? __aspectChain then
+      # Nested aspect from freeform traversal — content merger sets __aspectChain
       # but not name/meta. Derive path key from the provider chain.
-      pathKey ref.__provider
+      pathKey ref.__aspectChain
     else
-      throw "hasAspect: ref must have `name`+`meta` or `__provider` (got ${builtins.typeOf ref}).";
+      throw "hasAspect: ref must have `name`+`meta` or `__aspectChain` (got ${builtins.typeOf ref}).";
 
   # Resolve tree via fx pipeline, returning the full result state. One run
   # yields both the pathSet (membership, for hasAspect) and resolvedNodes

@@ -71,6 +71,7 @@ let
     // handlers.compileStaticHandler
     // handlers.bindHandler
     // handlers.deferHandler
+    // handlers.recordInertHandler
     // handlers.drainHandler
     // handlers.scopeWidenHandler
     // handlers.classifyHandler
@@ -155,13 +156,34 @@ let
     pathSetByScope = _: { };
     # Full resolved nodes keyed by unique identity, for entity.aspects.
     resolvedNodes = _: { };
+    # Definition-position → list of { chain; value; } claims for the
+    # inline-chain fill (compile-static.nix). A list, not a single entry: one
+    # position can hold several distinct raw values (a factory called twice,
+    # or `base // { ... }` specialised twice), and each distinct value needs
+    # its own claim rather than losing to whichever sighting arrived first.
+    # Flat by design: a shared value's identity must not depend on which scope
+    # happened to walk it first.
+    chainByDefPos = _: { };
+    # Policy identity claims: bare name → list of { scope; value; identity; }
+    # claims, consulted by children.nix's registerPolicy to tell a shared
+    # den.policies.<name> (one registration, included twice into the same
+    # scope) apart from two distinct same-named policies registering into
+    # that same scope (which must each keep their own, chain-qualified,
+    # identity). Bucketed by name rather than definition position: a
+    # position-keyed bucket puts two aspects' own same-named
+    # `.policies.<name>` in separate buckets (each merges at a different
+    # option path) even though both still land in one scope's
+    # scopedAspectPolicies, which is exactly where they'd collide.
+    policyClaimsByName = _: { };
 
     # --- Scope-partitioned output state (handlers write here) ---
     scopedClassImports = _: { };
     scopedAspectPolicies = _: { };
     scopedDeferredIncludes = _: { };
+    scopedInertAspects = _: { };
     scopedDeferredConditionals = _: { };
     scopedIncludesChain = _: { };
+    scopedIncludesChainSegments = _: { };
     scopedConstraintRegistry = _: { };
     # Flat filter list only (excludes/substitutes are entity-scoped via
     # scopedConstraintRegistry; filters have no scoped registry).

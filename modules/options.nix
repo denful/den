@@ -20,6 +20,38 @@ let
   # lazily at eval time, so they safely use den.lib.schema.
   schemaLib = import ./../nix/lib/schema.nix { inherit inputs lib; };
 
+  # Element check for BOTH schema-tier collections. gen-schema has no
+  # per-collection `type` to route a bad element through, so the check that the
+  # aspect tier gets from `providerType` has to live here — and it has to be
+  # ONE check: the two collections take the same references, so a shape that
+  # excludes at the aspect tier must not throw at the schema tier.
+  #
+  # A bare string was the original defect at both. Unchecked, it reached
+  # children.nix's aspect walk and crashed with a raw Nix `expected a set but
+  # found a string` from propagateScope's `//` on the includes side, and on the
+  # excludes side `identity.key` reduced it to "<anon>", which matches no
+  # policy and so excluded nothing in silence.
+  #
+  # Recurses into nested lists because `providerType` names a list of policy
+  # records as a valid element and children.nix walks nested lists the same way
+  # at both tiers (`processInclude`, and `lib.flatten` over excludes since
+  # 6127cbc). Admits a function because a parametric aspect reference is one.
+  checkCollectionElement =
+    collection:
+    let
+      check =
+        v:
+        if builtins.isList v then
+          map check v
+        else if builtins.isAttrs v || lib.isFunction v then
+          v
+        else
+          throw "den: den.schema.<kind>.${collection}: expected a policy or aspect reference, got ${
+            if builtins.isString v then ''"${v}"'' else builtins.typeOf v
+          }";
+    in
+    check;
+
   classSchemaType = lib.types.submodule (
     { ... }:
     {
@@ -74,9 +106,11 @@ in
     collections = {
       includes = {
         default = [ ];
+        merge = acc: val: acc ++ map (checkCollectionElement "includes") val;
       };
       excludes = {
         default = [ ];
+        merge = acc: val: acc ++ map (checkCollectionElement "excludes") val;
       };
       isEntity = {
         default = false;

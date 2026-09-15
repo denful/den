@@ -7,13 +7,13 @@
 {
   flake.tests.fx-identity = {
 
-    test-aspectPath-with-provider = denTest (
+    test-aspectPath-with-chain = denTest (
       { den, ... }:
       let
         a = {
           name = "sub";
           meta = {
-            provider = [ "monitoring" ];
+            aspect-chain = [ "monitoring" ];
           };
         };
       in
@@ -26,7 +26,7 @@
       }
     );
 
-    test-aspectPath-no-provider = denTest (
+    test-aspectPath-no-chain = denTest (
       { den, ... }:
       let
         a = {
@@ -57,7 +57,7 @@
         a = {
           name = "drop";
           meta = {
-            provider = [ ];
+            aspect-chain = [ ];
           };
           includes = [ "x" ];
         };
