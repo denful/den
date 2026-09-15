@@ -65,10 +65,10 @@ registered class), *nested aspect keys*, or one of these structural keys:
 |-----|------|---------|
 | `<class>` | module / config | Config merged into entities of that class |
 | `includes` | `listOf provider` | Providers (aspects, sub-aspects, functions) pulled into this aspect |
-| `excludes` | `listOf unspecified` | Aspects or policies excluded from this subtree |
+| `excludes` | `listOf provider` | Aspects or policies excluded from this subtree |
 | `provides` / `_` | submodule | Sub-aspect namespace (`_` is an alias for `provides`) |
 | `policies` | policy registry | Named policy functions, activated by placing in `includes` |
-| `meta` | submodule | Attached metadata (`handleWith`, `provider`, `collisionPolicy`; `guard`/`aspects` for conditional aspects) |
+| `meta` | submodule | Attached metadata (`handleWith`, `aspect-chain`, `collisionPolicy`; `guard`/`aspects` for conditional aspects) |
 | `classes` | `lazyAttrsOf raw` | Class schemas declared by this aspect, merged into `den.classes` |
 | `name` / `description` | `str` | Aspect name and description |
 

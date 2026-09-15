@@ -152,7 +152,7 @@ When a bug involves content wrappers, check whether the forwarded (shallow-merge
 Look for structural markers that distinguish the working path from the broken path. In den's pipeline, common differentiators:
 
 - `__contentValues` — present on content wrappers from `aspectContentType`, absent on sub-aspects from `emitNestedAspect` and full aspects from `aspectSubmodule`
-- `__provider` — tracks the definition path through nested aspects
+- `__aspectChain` — tracks the definition path through nested aspects
 - `__providesForwarded` — keys forwarded from `provides` onto the aspect
 - `__fn` / `__args` — parametric wrappers
 - `__scopeHandlers` — context propagation
