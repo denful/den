@@ -176,7 +176,16 @@ in
         || throw "den.classes and den.quirks must not share keys, but found: ${builtins.concatStringsSep ", " overlap}";
       lib.mapAttrs (name: v: v // { inherit name; }) quirks;
   };
-  config.den.schema.conf = { };
+  # nixpkgs `lib` as a module argument for every schema kind. gen's module
+  # system deliberately ships no nixpkgs lib — it has its own types — so a
+  # schema module written `{ host, lib, ... }:` gets
+  # `module argument `lib' is not defined` unless den supplies it. That shape
+  # is den's documented one and predates gen-schema, so den injects it rather
+  # than asking gen to default to it or rewriting the docs.
+  #
+  # On `conf` because every kind imports it, so this is one site rather than
+  # one per kind.
+  config.den.schema.conf._module.args.lib = lib;
   config.den.schema.fleet = { };
   config.den.schema.host.imports = [ den.schema.conf ];
   config.den.schema.user.imports = [ den.schema.conf ];
