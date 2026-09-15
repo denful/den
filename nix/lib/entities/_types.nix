@@ -15,13 +15,51 @@ let
       inherit description default;
     };
 
-  # Shared aspect lookup with warning for missing aspects.
-  lookupAspect =
-    den: config:
-    if den.aspects ? ${config.name} then
-      den.aspects.${config.name}
+  # Shared aspect lookup: an entity takes EVERY candidate aspect that exists,
+  # most specific first, composed through `includes`.
+  #
+  # NOT "first match wins", and the reason is that existence cannot answer the
+  # question a first-match lookup needs to ask. `modules/aspects/definition.nix`
+  # registers a stub aspect per entity (`genAttrs classes (_: { })`) so an
+  # entity's class keys always exist, which means `den.aspects ? <entity name>`
+  # is TRUE for every declared entity whether or not anyone wrote that aspect
+  # — measured: a host declared with no aspect at all still answers true. A
+  # stub is also structurally indistinguishable from a written aspect (same
+  # keys, `name` defaulted from the attr path, no content), so no predicate
+  # over `den.aspects` can separate them.
+  #
+  # Composing sidesteps that entirely: a stub contributes empty class keys, so
+  # including one is a no-op, and nothing has to know which is which. It also
+  # gives the better semantics — a user's shared aspect and their host-specific
+  # one both apply, rather than the qualified one shadowing config the author
+  # can still see in their tree.
+  #
+  # A single present candidate is returned AS ITSELF rather than wrapped, so
+  # the overwhelmingly common case keeps its own identity, name and provenance
+  # exactly as before this existed.
+  lookupAspectBy =
+    den: candidates:
+    let
+      wanted = lib.unique candidates;
+      present = builtins.filter (n: den.aspects ? ${n}) wanted;
+    in
+    if present == [ ] then
+      lib.warn
+        "den.aspects.${lib.concatStringsSep " / den.aspects." wanted} not defined — entity gets empty aspect"
+        { }
+    else if builtins.length present == 1 then
+      den.aspects.${builtins.head present}
     else
-      lib.warn "den.aspects.${config.name} not defined — entity gets empty aspect" { };
+      {
+        # Angle-bracketed so den's own synthetic-name handling applies, and
+        # carrying the candidates so two entities composing different pairs
+        # cannot collide on one identity.
+        name = "<aspects:${lib.concatStringsSep "+" present}>";
+        includes = map (n: den.aspects.${n}) present;
+      };
+
+  # Single-candidate form, for a kind whose registry key is its only spelling.
+  lookupAspect = den: config: lookupAspectBy den [ config.name ];
 
   # Recursive merge without forcing leaf values. Unlike lib.types.anything this
   # does not inspect values deeply (no mapAttrsRecursiveCond), avoiding infinite
@@ -188,6 +226,7 @@ in
   inherit
     strOpt
     lookupAspect
+    lookupAspectBy
     deepMergeAttrs
     mainModuleOption
     resolveResultOption

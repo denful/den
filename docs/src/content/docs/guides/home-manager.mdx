@@ -151,6 +151,27 @@ den.aspects.tux.provides.igloo = { };
 See [Mutual provision](/guides/mutual/) for the full cross-entity routing
 patterns.
 
+There is also a **host-qualified aspect name**, which needs no routing — a
+`user@host` home applies `den.aspects."<user>@<host>"` in addition to
+`den.aspects.<user>`:
+
+```nix
+den.homes.x86_64-linux."tux@igloo" = { };
+
+# shared by every tux
+den.aspects.tux.homeManager.programs.git.enable = true;
+
+# only this home
+den.aspects."tux@igloo".homeManager.programs.git.userEmail = "tux@igloo.example";
+```
+
+Both apply, so the qualified aspect adds to the shared one rather than replacing
+it. The same two names also serve a user declared under a host
+(`den.hosts.<system>.igloo.users.tux`), so the aspects resolve identically whether
+`tux` is host-managed or a standalone home. Reach for `provides.<host>` when the
+content has to travel to a *different* entity, and the qualified name when it simply
+belongs to this one.
+
 #### Separate host and user configuration
 
 This pattern allows you to manage your host and user separately:

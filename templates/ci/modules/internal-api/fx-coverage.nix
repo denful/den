@@ -376,8 +376,12 @@
     test-self-provide-host-provider = denTest (
       { den, ... }:
       let
-        home = den.homes.x86_64-linux."tux@igloo";
-        provResult = home.aspect.provides.igloo or null;
+        # Read off the DECLARING aspect, not `home.aspect`: a home keyed
+        # `user@host` composes its qualified and bare aspects, so `home.aspect`
+        # is the composition wrapper and the provides live on the aspect that
+        # declared them. The invariant under test — self-provide propagating
+        # __scopeHandlers — is unchanged.
+        provResult = den.aspects.tux.provides.igloo or null;
       in
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };

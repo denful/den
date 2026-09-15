@@ -27,7 +27,11 @@
               (
                 { home, ... }:
                 {
-                  homeManager.home.keyboard.variant = home.name;
+                  # `userName`, because this cell is about a nested include
+                  # resolving `{ home, ... }` at all — not about what `name`
+                  # holds. The registry-key semantics of `home.name` are
+                  # pinned directly in public-api/flat-homes.nix.
+                  homeManager.home.keyboard.variant = home.userName;
                 }
               )
             ];
@@ -51,7 +55,7 @@
           keyboard = config.flake.homeConfigurations."tux@igloo".config.home.keyboard;
         };
         expected = {
-          homeSchema.name = "tux";
+          homeSchema.name = "tux@igloo";
           homeSchema.userName = "tux";
           homeSchema.hostName = "igloo";
           # A `user@host` home with no declared host carries synthetic host AND

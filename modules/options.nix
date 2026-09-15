@@ -180,32 +180,27 @@ in
   config.den.schema.fleet = { };
   config.den.schema.host.imports = [ den.schema.conf ];
   config.den.schema.user.imports = [ den.schema.conf ];
-  # `home`'s identity keys are declared AT THE KIND, not on the instance.
-  # gen-schema closes the identity-key set the moment the kind is a value, so
-  # an option contributed through `mkInstanceType`'s `extraModules` cannot be
-  # an identity key, and the reflected set drops `internal` options outright.
-  # Naming either from `_identity.keys` is a hard error rather than the silent
-  # success it used to be.
+  # `home` keys its identity on the registry key plus the system. `name` IS the
+  # registry key and gen-schema injects it as an identity key by construction,
+  # so only `system` needs declaring — and it has to be declared HERE because
+  # gen-schema closes the identity-key set the moment the kind is a value, and
+  # an option contributed through `mkInstanceType`'s `extraModules` arrives
+  # after that. Naming an undeclared key from `_identity.keys` is a hard error.
   #
-  # home is the only kind that needs its own keys: `name` is forced to the bare
-  # user name so `den.aspects.<user>` resolves, and two `user@host` homes on one
-  # system share that name. The registry key and the system are what actually
-  # tell them apart. Declared here, defined on the instance — identity is read
-  # off declarations, so the per-system value stays where it is computed.
+  # Declared here, defined on the instance: identity reflects declarations, so
+  # the per-system value stays where it is computed.
+  #
+  # `visible = false`, never `internal = true`: gen-schema's `isPrimitiveOption`
+  # drops an `internal` option from the identity set outright, so marking this
+  # internal would un-declare the very key `_identity.keys` names. It reads
+  # `internal` and `identity` and NOT `visible`, so this hides the key from
+  # rendered option docs while leaving it identity-eligible. That rests on
+  # `visible` not being read, which is an implementation fact rather than a
+  # documented contract — if gen-schema ever folds `visible` into the same
+  # presentation exclusion, this key silently leaves the identity set.
   config.den.schema.home.imports = [
     den.schema.conf
     {
-      # `visible = false`, never `internal = true`: gen-schema's
-      # `isPrimitiveOption` excludes an `internal` option from the identity set
-      # outright, so marking these internal would un-declare the very keys
-      # `_identity.keys` names. It reads `internal` and `identity` and NOT
-      # `visible`, so this keeps both out of rendered option docs while leaving
-      # them identity-eligible.
-      options.__scopeName = lib.mkOption {
-        type = lib.types.str;
-        visible = false;
-        description = "Registry key of this home, used as its scope and identity.";
-      };
       options.system = lib.mkOption {
         type = lib.types.str;
         visible = false;

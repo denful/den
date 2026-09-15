@@ -51,6 +51,49 @@ or `"darwin"` (from `*-darwin`); for homes it is `"homeManager"`. Override with
 that points to the [aspect](/explanation/aspects/) responsible for configuring it —
 by default `den.aspects.<name>`.
 
+### Host-qualified aspects
+
+A user-scoped entity looks for a **host-qualified** aspect as well as a bare one, and
+applies every match:
+
+| Entity | Aspects applied |
+|--------|-----------------|
+| user `tux` on host `igloo` | `den.aspects."tux@igloo"` and `den.aspects.tux` |
+| home `tux@igloo` | `den.aspects."tux@igloo"` and `den.aspects.tux` |
+| home `tux` | `den.aspects.tux` |
+
+Both apply, so shared configuration lives in `den.aspects.<user>` and host-specific
+additions in `den.aspects."<user>@<host>"` without either shadowing the other:
+
+```nix
+{
+  den.hosts.x86_64-linux.igloo.users.tux = { };
+  den.hosts.x86_64-linux.laptop.users.tux = { };
+
+  # Shared by every tux.
+  den.aspects.tux.homeManager.programs.git.enable = true;
+
+  # Only on igloo.
+  den.aspects."tux@igloo".homeManager.programs.git.userEmail = "tux@igloo.example";
+}
+```
+
+The same two names serve a host user and a standalone home, so a user's aspects resolve
+identically whether they are declared under a host or as a `user@host` home. This is
+composition, not override — to make one depend on the other, include it explicitly:
+
+```nix
+den.aspects."tux@igloo".includes = [ den.aspects.tux ];
+```
+
+<Aside title="Which name is which">
+A home declared as `den.homes.<system>."tux@igloo"` has `name = "tux@igloo"` — its
+registry key, which is what identifies it and what aspect content reading `home.name`
+sees. The user it configures is `home.userName` (`"tux"`), and the host it is bound to
+is `home.hostName` (`"igloo"`). Two homes for one user on different hosts share a
+`userName` and are told apart by `name`.
+</Aside>
+
 Users have a `classes` list declaring which home-environment classes they want to use
 (e.g., `classes = [ "homeManager" ]`).
 
