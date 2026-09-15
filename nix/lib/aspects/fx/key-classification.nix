@@ -110,4 +110,24 @@ let
 in
 {
   inherit isStructuralKey classifyKeys pipeRegistry;
+
+  # Removed, and it cannot be aliased faithfully: `isStructuralKey` derives the
+  # `__`-prefixed half BY RULE over an infinite domain, so no attrset can
+  # answer `?` for it, and Nix offers no way to intercept `?`. Re-exporting the
+  # listed half alone would answer false for every `__` key, which is precisely
+  # the silent-drop hazard closing the registry by rule removed.
+  #
+  # So this throws by name instead. It is a thunk, so `inherit`ing it stays
+  # quiet and the message lands at first use, which is where the caller is.
+  structuralKeysSet = throw ''
+    den: `keyClassification.structuralKeysSet` was removed.
+
+    The structural-key registry is now closed by RULE, not by a listed set: any `__`-prefixed key is structural the moment it exists. A set cannot express that.
+
+    Replace a membership test with the predicate:
+
+      structuralKeysSet ? k   ->   isStructuralKey k
+
+      inherit (den.lib.aspects.fx.keyClassification) isStructuralKey;
+  '';
 }
