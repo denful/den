@@ -28,6 +28,20 @@ let
       # context.  This mirrors config.resolved in options.nix which reads
       # _module.args for entity-kind keys.
       entity = ctx.${name} or null;
+      # The instance's own collections (`den.hosts.<sys>.<n>.includes`, and the
+      # same key on any other entity kind). Read here rather than per entity
+      # kind so every kind declaring `isEntity` honours the key at once, and
+      # read at all because the instance type is built with `strict = false`:
+      # its freeform type absorbed the key instead of raising "option does not
+      # exist", so it was accepted and dropped in silence (#663). `includes` is
+      # the activation key at the aspect, schema and default tiers, which is
+      # what makes the instance spelling the natural guess.
+      #
+      # Last in the include order, after the schema tier: an instance is the
+      # most specific site an entity's content can be written at, so its
+      # definitions merge over what its kind's schema supplies.
+      instanceCollection =
+        key: if entity == null || !builtins.isAttrs entity then [ ] else entity.${key} or [ ];
       entityDerivedBindings =
         if entity == null || !builtins.isAttrs entity then
           { }
@@ -69,8 +83,8 @@ let
         handleWith = null;
         aspect-chain = [ ];
       };
-      excludes = schemaExcludes;
-      includes = selfProvide ++ schemaIncludes;
+      excludes = schemaExcludes ++ instanceCollection "excludes";
+      includes = selfProvide ++ schemaIncludes ++ instanceCollection "includes";
       __entityKind = name;
       __scopeHandlers = scopeHandlers;
     };
