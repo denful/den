@@ -176,11 +176,47 @@ in
         || throw "den.classes and den.quirks must not share keys, but found: ${builtins.concatStringsSep ", " overlap}";
       lib.mapAttrs (name: v: v // { inherit name; }) quirks;
   };
-  config.den.schema.conf = { };
+  # nixpkgs `lib` as a module argument for every schema kind. gen's module
+  # system deliberately ships no nixpkgs lib — it has its own types — so a
+  # schema module written `{ host, lib, ... }:` gets
+  # `module argument `lib' is not defined` unless den supplies it. That shape
+  # is den's documented one and predates gen-schema, so den injects it rather
+  # than asking gen to default to it or rewriting the docs.
+  #
+  # On `conf` because every kind imports it, so this is one site rather than
+  # one per kind.
+  config.den.schema.conf._module.args.lib = lib;
   config.den.schema.fleet = { };
   config.den.schema.host.imports = [ den.schema.conf ];
   config.den.schema.user.imports = [ den.schema.conf ];
-  config.den.schema.home.imports = [ den.schema.conf ];
+  # `home` keys its identity on the registry key plus the system. `name` IS the
+  # registry key and gen-schema injects it as an identity key by construction,
+  # so only `system` needs declaring — and it has to be declared HERE because
+  # gen-schema closes the identity-key set the moment the kind is a value, and
+  # an option contributed through `mkInstanceType`'s `extraModules` arrives
+  # after that. Naming an undeclared key from `_identity.keys` is a hard error.
+  #
+  # Declared here, defined on the instance: identity reflects declarations, so
+  # the per-system value stays where it is computed.
+  #
+  # `visible = false`, never `internal = true`: gen-schema's `isPrimitiveOption`
+  # drops an `internal` option from the identity set outright, so marking this
+  # internal would un-declare the very key `_identity.keys` names. It reads
+  # `internal` and `identity` and NOT `visible`, so this hides the key from
+  # rendered option docs while leaving it identity-eligible. That rests on
+  # `visible` not being read, which is an implementation fact rather than a
+  # documented contract — if gen-schema ever folds `visible` into the same
+  # presentation exclusion, this key silently leaves the identity set.
+  config.den.schema.home.imports = [
+    den.schema.conf
+    {
+      options.system = lib.mkOption {
+        type = lib.types.str;
+        visible = false;
+        description = "platform system";
+      };
+    }
+  ];
   config.den.classes = {
     nixos.description = "NixOS system configuration";
     darwin.description = "nix-darwin system configuration";

@@ -2,29 +2,25 @@
   "nodes": {
     "den": {
       "locked": {
-        "lastModified": 1779389874,
-        "narHash": "sha256-Scr0VAw06OtEcxOfbpBXsSiCxn95bTm/DQQUMg/cWCo=",
-        "ref": "refs/heads/feat/den-diagram-extraction",
-        "rev": "2826f70fb538cb0ea8eb183a2a489f29b51a43f9",
-        "revCount": 624,
-        "type": "git",
-        "url": "file:///home/sini/Documents/repos/den"
+        "path": "../..",
+        "type": "path"
       },
       "original": {
         "path": "../..",
         "type": "path"
-      }
+      },
+      "parent": []
     },
     "den-diagram": {
       "inputs": {
         "nixpkgs": "nixpkgs"
       },
       "locked": {
-        "lastModified": 1779680820,
-        "narHash": "sha256-haGCYE7mpBT8c7NW92WCv/CDbb0HJQsWbMG/j4wHiW4=",
+        "lastModified": 1789505374,
+        "narHash": "sha256-McpH6Jk8nIEP4Z2ITypVK2wrMJo7dxC8WWWnP4WwysQ=",
         "owner": "denful",
         "repo": "den-diagram",
-        "rev": "18fe17c21343a49524644749324bf7904c51605a",
+        "rev": "3ba2e47fa936251d0bab3a37fc754363c682ea98",
         "type": "github"
       },
       "original": {

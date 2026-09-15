@@ -9,6 +9,7 @@ let
   inherit (import ./_types.nix { inherit lib den; })
     strOpt
     lookupAspect
+    lookupAspectBy
     deepMergeAttrs
     mainModuleOption
     resolveResultOption
@@ -163,8 +164,15 @@ let
               aspect = lib.mkOption {
                 description = "Aspect that configures this user.";
                 type = lib.types.raw; # no merging
-                defaultText = "den.aspects.<name>";
-                default = lookupAspect den config;
+                defaultText = "den.aspects.<name>@<host> or den.aspects.<name>";
+                # Host-qualified first, so one user can be configured per host
+                # without the bare aspect having to branch on `host.name`. Same
+                # two candidates a standalone home asks for, so a user's aspect
+                # resolves identically whether they are a host user or a home.
+                default = lookupAspectBy den [
+                  "${config.name}@${host.name}"
+                  config.name
+                ];
               };
               host = lib.mkOption {
                 default = host;

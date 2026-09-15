@@ -9,6 +9,7 @@ let
   inherit (import ./_types.nix { inherit lib den; })
     strOpt
     lookupAspect
+    lookupAspectBy
     deepMergeAttrs
     mainModuleOption
     resolveResultOption
@@ -123,15 +124,18 @@ let
                 inputs.home-manager.lib.homeManagerConfiguration;
           in
           {
-            # mkInstanceType defaults name to the registry key (e.g. "tux@igloo");
-            # den's name is the bare user name, so identity/description stay stable.
-            # That also makes `name` non-unique across homes (two `user@host` homes
-            # on one system share it), so the registry key is kept as the scope
-            # identity — see __scopeName in ./_types.nix.
-            config.name = lib.mkForce userName;
-            config.__scopeName = name;
+            # `name` is left as mkInstanceType's injected registry key (e.g.
+            # "tux@igloo"). gen-schema treats that key as an identity key by
+            # construction, so identity needs no shadow field: two `user@host`
+            # homes on one system differ in `name`, and the same key on two
+            # systems differs in `system`. `__scopeName` therefore needs no
+            # override here either — its default IS `config.name`.
+            #
+            # The bare user name lives on `userName`, and the two are different
+            # questions: the registry key identifies the home, `userName` says
+            # which user it configures. Aspect lookup below asks the second.
             config._identity.keys = [
-              "__scopeName"
+              "name"
               "system"
             ];
             config._module.args.host = hostCtx;
@@ -158,9 +162,26 @@ let
                 description = "Aspect that configures this home.";
                 type = lib.types.raw; # no merging
                 defaultText = "den.aspects.<name>";
-                default = lookupAspect den config;
+                # Registry key first, bare user name second. For a home keyed
+                # `tux@igloo` the key IS the host-qualified spelling, so these
+                # are the same two candidates a host user asks for and a user's
+                # aspect resolves identically either way. For a home keyed
+                # plainly `tux` the two collapse to one.
+                #
+                # `userName` must be in the list: reading the key ALONE would
+                # miss `den.aspects.tux` and take lookupAspectBy's warn path to
+                # an EMPTY aspect — which does not fail, it defers the failure
+                # to whatever that aspect was meant to set (measured:
+                # home-manager's own `home.username != ""`, five frames away).
+                default = lookupAspectBy den [
+                  config.name
+                  config.userName
+                ];
               };
-              description = strOpt "home description" "home.${config.name}@${config.system}";
+              # `userName`, so this string is unchanged by the `name` promotion:
+              # a description is presentation, not identity, and interpolating
+              # the registry key here would read "home.tux@igloo@x86_64-linux".
+              description = strOpt "home description" "home.${config.userName}@${config.system}";
               pkgs = lib.mkOption {
                 description = ''
                   nixpkgs instance used to build the home configuration.

@@ -30,7 +30,11 @@
     nix-effects.inputs.nixpkgs.follows = "nixpkgs";
     nix-effects.inputs.nix-unit.follows = "nix-unit";
 
-    gen-schema.url = "github:sini/gen-schema";
-    gen-schema.inputs.nixpkgs.follows = "nixpkgs";
+    # The gen HUB, not gen-schema directly: the hub binds every sibling's
+    # `gen-*` input with `follows`, so one input yields one revision per
+    # library. Pinning gen-schema here left its transitive closure to den and
+    # produced three revisions of gen-prelude in this lock.
+    gen.url = "github:sini/gen";
+    gen.inputs.nixpkgs.follows = "nixpkgs";
   };
 }

@@ -29,10 +29,50 @@
             ;
         };
         expected = {
-          name = "tux";
+          # `name` is the REGISTRY KEY, which is what identifies the home;
+          # `userName` is the user it configures. The two are different
+          # questions, and a home keyed `user@host` answers them differently.
+          name = "tux@igloo";
           userName = "tux";
           hostName = "igloo";
           system = "x86_64-linux";
+        };
+      }
+    );
+
+    # What ASPECT CONTENT sees, as opposed to what the instance reports above.
+    # `home.name` is the registry key at both, so a policy or class module
+    # keyed on it identifies the home; `home.userName` is the user it
+    # configures. Read through a class module rather than off the instance,
+    # because that is the surface a user's aspects actually consume.
+    test-flat-home-name-in-aspect-content = denTest (
+      { den, config, ... }:
+      {
+        den.homes.x86_64-linux."tux@igloo" = { };
+        den.aspects.tux.homeManager =
+          { home, ... }:
+          {
+            home = {
+              username = "tux";
+              homeDirectory = "/home/tux";
+              stateVersion = "25.05";
+              sessionVariables = {
+                SAW_NAME = home.name;
+                SAW_USERNAME = home.userName;
+              };
+            };
+          };
+
+        expr =
+          let
+            vars = config.flake.homeConfigurations."tux@igloo".config.home.sessionVariables;
+          in
+          {
+            inherit (vars) SAW_NAME SAW_USERNAME;
+          };
+        expected = {
+          SAW_NAME = "tux@igloo";
+          SAW_USERNAME = "tux";
         };
       }
     );

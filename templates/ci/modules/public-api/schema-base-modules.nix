@@ -3,6 +3,47 @@
 {
   flake.tests.schema-base-modules = {
 
+    # The shape the docs use — `lib` as a MODULE ARGUMENT, not from outer
+    # scope. gen's module system ships no nixpkgs lib (it has its own types),
+    # so den injects it on `den.schema.conf`, which every kind imports.
+    #
+    # Pinned because the rest of this file takes `lib` from outer scope, so the
+    # suite stayed green while every documented example was broken — a contract
+    # nothing executed. These two cells are the execution.
+    test-doc-shape-lib-as-module-arg-on-kind = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo = { };
+        den.schema.host =
+          { host, lib, ... }:
+          {
+            options.docShape = lib.mkOption { default = true; };
+          };
+        expr = den.hosts.x86_64-linux.igloo.docShape;
+        expected = true;
+      }
+    );
+
+    test-doc-shape-lib-as-module-arg-on-conf = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.conf =
+          { lib, ... }:
+          {
+            options.sharedByAllKinds = lib.mkOption { default = "shared"; };
+          };
+        expr = {
+          host = den.hosts.x86_64-linux.igloo.sharedByAllKinds;
+          user = den.hosts.x86_64-linux.igloo.users.tux.sharedByAllKinds;
+        };
+        expected = {
+          host = "shared";
+          user = "shared";
+        };
+      }
+    );
+
     test-host-schema-module-args = denTest (
       { den, lib, ... }:
       {

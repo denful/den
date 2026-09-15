@@ -174,7 +174,7 @@ Type: `attrsOf userType`
 | `name` | `str` | attr name | User configuration name |
 | `userName` | `str` | `name` | System account name |
 | `classes` | `listOf str` | `[ "user" ]` | Nix classes this user participates in |
-| `aspect` | `raw` | `den.aspects.<name>` | Resolved aspect attrset |
+| `aspect` | `raw` | `den.aspects.<name>@<host>` + `den.aspects.<name>` | Resolved aspect attrset. Both the host-qualified and bare aspect apply where both exist — see [Host-qualified aspects](/explanation/entities/#host-qualified-aspects) |
 | `host` | `raw` | parent host | The host this user belongs to |
 | `collisionPolicy` | `null \| enum` | `null` | Class module collision policy: `"error"`, `"den-wins"`, or `"class-wins"`. See [Class Modules](/explanation/class-modules/). |
 | `resolved` | `raw` | auto | Resolved aspect from context pipeline (see below) |
@@ -210,15 +210,15 @@ den.homes."tux@igloo" = {
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `name` | `str` | parsed name | Home configuration name (the part before `@` in a `user@host` key) |
-| `userName` | `str` | parsed name | User account name |
+| `name` | `str` | registry key | Home configuration name — the registry key as declared, e.g. `tux@igloo`. Identifies the home, and is what aspect content reading `home.name` sees |
+| `userName` | `str` | parsed name | User account name (the part before `@` in a `user@host` key) |
 | `hostName` | `null \| str` | parsed host | Bound host name, or `null` for unbound standalone homes (the part after `@`) |
 | `host` | `raw` | resolved host | Bound host entity, or `null` when standalone |
 | `user` | `raw` | resolved user | Bound user entity, or `null` when standalone |
 | `system` | `str` | parent key | Platform system |
 | `class` | `str` | `"homeManager"` | Home management class |
-| `aspect` | `raw` | `den.aspects.<name>` | Resolved aspect attrset |
-| `description` | `str` | auto | `home.name@system` |
+| `aspect` | `raw` | `den.aspects.<userName>@<hostName>` + `den.aspects.<userName>` | Resolved aspect attrset. Both the host-qualified and bare aspect apply where both exist — see [Host-qualified aspects](/explanation/entities/#host-qualified-aspects) |
+| `description` | `str` | auto | `home.<userName>@<system>` |
 | `pkgs` | `raw` | `inputs.nixpkgs.legacyPackages.$sys` | Nixpkgs instance |
 | `instantiate` | `raw` | `inputs.home-manager.lib.homeManagerConfiguration` | Builder |
 | `collisionPolicy` | `null \| enum` | `null` | Class module collision policy: `"error"`, `"den-wins"`, or `"class-wins"`. See [Class Modules](/explanation/class-modules/). |

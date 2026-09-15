@@ -84,7 +84,9 @@
           hasOsConfig = config.flake.homeConfigurations."tux@igloo".config.home.keyboard.model;
         };
         expected = {
-          homeSchema.name = "tux"; # re-uses same aspect as hosted HM.
+          # The instance's name is its registry key; `userName` below is the
+          # user it configures, and that is what selects the aspect it re-uses.
+          homeSchema.name = "tux@igloo";
           homeSchema.userName = "tux";
           homeSchema.hostName = "igloo";
           configuredUserName = "tux";
