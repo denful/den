@@ -180,7 +180,31 @@ in
   config.den.schema.fleet = { };
   config.den.schema.host.imports = [ den.schema.conf ];
   config.den.schema.user.imports = [ den.schema.conf ];
-  config.den.schema.home.imports = [ den.schema.conf ];
+  # `home`'s identity keys are declared AT THE KIND, not on the instance.
+  # gen-schema closes the identity-key set the moment the kind is a value, so
+  # an option contributed through `mkInstanceType`'s `extraModules` cannot be
+  # an identity key, and the reflected set drops `internal` options outright.
+  # Naming either from `_identity.keys` is a hard error rather than the silent
+  # success it used to be.
+  #
+  # home is the only kind that needs its own keys: `name` is forced to the bare
+  # user name so `den.aspects.<user>` resolves, and two `user@host` homes on one
+  # system share that name. The registry key and the system are what actually
+  # tell them apart. Declared here, defined on the instance — identity is read
+  # off declarations, so the per-system value stays where it is computed.
+  config.den.schema.home.imports = [
+    den.schema.conf
+    {
+      options.__scopeName = lib.mkOption {
+        type = lib.types.str;
+        description = "Registry key of this home, used as its scope and identity.";
+      };
+      options.system = lib.mkOption {
+        type = lib.types.str;
+        description = "platform system";
+      };
+    }
+  ];
   config.den.classes = {
     nixos.description = "NixOS system configuration";
     darwin.description = "nix-darwin system configuration";
