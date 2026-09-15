@@ -195,12 +195,20 @@ in
   config.den.schema.home.imports = [
     den.schema.conf
     {
+      # `visible = false`, never `internal = true`: gen-schema's
+      # `isPrimitiveOption` excludes an `internal` option from the identity set
+      # outright, so marking these internal would un-declare the very keys
+      # `_identity.keys` names. It reads `internal` and `identity` and NOT
+      # `visible`, so this keeps both out of rendered option docs while leaving
+      # them identity-eligible.
       options.__scopeName = lib.mkOption {
         type = lib.types.str;
+        visible = false;
         description = "Registry key of this home, used as its scope and identity.";
       };
       options.system = lib.mkOption {
         type = lib.types.str;
+        visible = false;
         description = "platform system";
       };
     }
