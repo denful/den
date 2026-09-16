@@ -64,11 +64,46 @@ let
   # Recursive merge without forcing leaf values. Unlike lib.types.anything this
   # does not inspect values deeply (no mapAttrsRecursiveCond), avoiding infinite
   # recursion when values reference other options (e.g. den.aspects).
+  # Concatenates lists rather than overwriting them, which `lib.recursiveUpdate`
+  # does because it treats a list as an opaque leaf. Two files each writing
+  # `den.hosts.<h>.includes` therefore kept one list and dropped the other in
+  # silence, while an attrset key under the same two definitions merged
+  # normally (measured: `users.alice` and `users.bob` both survive).
+  #
+  # Concatenation is the module system's own rule for a list-valued option
+  # (`listOf` merges by `concatLists`) and den's rule at the aspect tier
+  # (`aspectContentType`'s `deepMerge`), so this makes the entity registry
+  # agree with both rather than introduce a third behaviour. It matters most
+  # for the collection keys: `includes`, `excludes` and `classes` are the
+  # list-valued keys an entity carries, and all three accumulate everywhere
+  # else they appear.
   deepMergeAttrs = lib.mkOptionType {
     name = "deepMergeAttrs";
     description = "recursively merged attribute set";
     check = builtins.isAttrs;
-    merge = _loc: defs: builtins.foldl' (acc: def: lib.recursiveUpdate acc def.value) { } defs;
+    merge =
+      _loc: defs:
+      let
+        merge2 =
+          a: b:
+          a
+          // builtins.mapAttrs (
+            bk: bv:
+            if !(a ? ${bk}) then
+              bv
+            else if builtins.isAttrs a.${bk} && builtins.isAttrs bv then
+              merge2 a.${bk} bv
+            else if builtins.isList a.${bk} && builtins.isList bv then
+              # `bv` first: defs reach this merge in reverse declaration order,
+              # so `a` holds the LATER definition. Measured, not assumed, and
+              # it is the same ordering that makes the scalar arm below read as
+              # first-declaration-wins.
+              bv ++ a.${bk}
+            else
+              bv
+          ) b;
+      in
+      builtins.foldl' (acc: def: merge2 acc def.value) { } defs;
   };
 
   # Single shared production run: imports + per-scope path set from ONE fx.handle.
