@@ -10,7 +10,5 @@
     nixpkgs.url = "https://channels.nixos.org/nixos-unstable/nixexprs.tar.xz";
     import-tree.url = "github:vic/import-tree";
     den.url = "github:denful/den";
-    gen-schema.url = "github:sini/gen-schema";
-    gen-schema.inputs.nixpkgs.follows = "nixpkgs";
   };
 }

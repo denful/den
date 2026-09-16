@@ -15,26 +15,6 @@
         "type": "github"
       }
     },
-    "gen-schema": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1779986641,
-        "narHash": "sha256-KcZuS+hpaloICFcepNXNLpbehh6XoPjWPBteYpTqMRw=",
-        "owner": "sini",
-        "repo": "gen-schema",
-        "rev": "4bd0f6eb1799bf3c38eb3707419157b1f70eb1f5",
-        "type": "github"
-      },
-      "original": {
-        "owner": "sini",
-        "repo": "gen-schema",
-        "type": "github"
-      }
-    },
     "import-tree": {
       "locked": {
         "lastModified": 1778781969,
@@ -66,7 +46,6 @@
     "root": {
       "inputs": {
         "den": "den",
-        "gen-schema": "gen-schema",
         "import-tree": "import-tree",
         "nixpkgs": "nixpkgs"
       }
