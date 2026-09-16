@@ -119,6 +119,80 @@
       }
     );
 
+    # The same silent resolution, one arm over: two definitions of a key that
+    # is neither a mergeable attrset nor a list took the first and dropped the
+    # other. Pre-existing too, and weaker than the module system, which errors
+    # on a DECLARED option with conflicting definitions. An entity's freeform
+    # keys bypassed that.
+    test-scalar-conflict-refuses = denTest (
+      { den, config, ... }:
+      {
+        imports = [
+          { den.hosts.x86_64-linux.igloo.description = "first"; }
+          { den.hosts.x86_64-linux.igloo.description = "second"; }
+        ];
+
+        expr = config.den.hosts.x86_64-linux.igloo.description;
+        expectedError = {
+          type = "ThrownError";
+          msg = "den: conflicting definitions for `description`";
+        };
+      }
+    );
+
+    # A TYPE MISMATCH is the sharper case and the one a narrower predicate
+    # misses: requiring both sides to be scalars leaves a list against a
+    # string still resolving in silence.
+    test-type-mismatch-refuses = denTest (
+      { den, config, ... }:
+      {
+        imports = [
+          { den.hosts.x86_64-linux.igloo.tags = [ "a" ]; }
+          { den.hosts.x86_64-linux.igloo.tags = "scalar"; }
+        ];
+
+        expr = config.den.hosts.x86_64-linux.igloo.tags;
+        expectedError = {
+          type = "ThrownError";
+          msg = "den: conflicting definitions for `tags`";
+        };
+      }
+    );
+
+    # CONTROL: two definitions AGREEING is not a conflict. Without this the
+    # cells above pass for a predicate that refuses every repeated key,
+    # which would break any configuration that sets one twice harmlessly.
+    test-agreeing-definitions-are-not-a-conflict = denTest (
+      { den, config, ... }:
+      {
+        imports = [
+          { den.hosts.x86_64-linux.igloo.description = "same"; }
+          { den.hosts.x86_64-linux.igloo.description = "same"; }
+        ];
+
+        expr = config.den.hosts.x86_64-linux.igloo.description;
+        expected = "same";
+      }
+    );
+
+    # CONTROL: a function-valued key must not refuse. `==` on two functions is
+    # always false, so a predicate that compared them would reject two
+    # identical definitions of `instantiate` or a class module.
+    test-function-valued-keys-do-not-refuse = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo.nixos =
+          { ... }:
+          {
+            environment.etc."fn".text = "y";
+          };
+
+        expr = igloo.environment.etc ? "fn";
+        expected = true;
+      }
+    );
+
     # An attrset key merged correctly throughout, and still must. This is the
     # arm that localised the defect to list leaves rather than to the
     # collection keys or to the registry's recursion.

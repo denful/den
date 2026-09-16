@@ -77,6 +77,26 @@ let
   # for the collection keys: `includes`, `excludes` and `classes` are the
   # list-valued keys an entity carries, and all three accumulate everywhere
   # else they appear.
+  # A value the module system would have merged by equality had the key been
+  # declared. Functions and derivations are excluded: `==` on two functions is
+  # always false, so comparing them would refuse two identical definitions.
+  isPlainScalar =
+    v:
+    builtins.elem (builtins.typeOf v) [
+      "string"
+      "int"
+      "bool"
+      "float"
+      "null"
+    ];
+
+  # Values named by type, with the value itself only where rendering it is
+  # safe. `builtins.toJSON` on a derivation or a function throws, and one side
+  # of a conflict can be either, so a message that always rendered both would
+  # fail while reporting a failure.
+  show =
+    v: if isPlainScalar v then "`${builtins.toJSON v}`" else "a value of type ${builtins.typeOf v}";
+
   deepMergeAttrs = lib.mkOptionType {
     name = "deepMergeAttrs";
     description = "recursively merged attribute set";
@@ -99,6 +119,21 @@ let
               # it is the same ordering that makes the scalar arm below read as
               # first-declaration-wins.
               bv ++ a.${bk}
+            else if
+              # Either side a plain scalar means the two are not both mergeable
+              # shapes, so reaching here with different values is a genuine
+              # conflict: two scalars that differ, or a type mismatch such as a
+              # list against a string. Both silently resolved to one definition
+              # before this.
+              (isPlainScalar a.${bk} || isPlainScalar bv) && a.${bk} != bv
+            then
+              throw ''
+                den: conflicting definitions for `${bk}` on an entity.
+
+                ${show bv} and ${show a.${bk}} were both defined, and neither is a shape the other merges with. Attribute sets merge and lists concatenate; everything else has to agree.
+
+                Remove one definition, or give the two a key each.
+              ''
             else
               bv
           ) b;
