@@ -119,28 +119,37 @@ let
   # It defaults to `name`, so only kinds that rewrite `name` differ here.
   # Synthetic context values (e.g. a bare `{ name = ...; }` host) carry no
   # `__scopeName` and fall back to `name`.
+  # A ctx value that cannot be NAMED carries no identity: it can only render as
+  # its own type (`den=<set:den>`), which distinguishes nothing and splits one
+  # logical scope across two ids depending on which module args happened to be
+  # bound on the path. Such keys are dropped from the IDENTITY; they stay in the
+  # context itself, where binding still reads them.
+  nameScopeValue =
+    k: v:
+    if builtins.isAttrs v && v ? __scopeName then
+      v.__scopeName
+    else if builtins.isAttrs v && v ? name then
+      v.name
+    else if builtins.isString v then
+      v
+    else if builtins.isInt v || builtins.isFloat v then
+      toString v
+    else
+      null;
+
   mkScopeId =
     ctx:
     lib.concatStringsSep "," (
       lib.sort (a: b: a < b) (
-        map (
-          k:
-          let
-            v = ctx.${k};
-          in
-          "${k}=${
-            if builtins.isAttrs v && v ? __scopeName then
-              v.__scopeName
-            else if builtins.isAttrs v && v ? name then
-              v.name
-            else if builtins.isString v then
-              v
-            else if builtins.isInt v || builtins.isFloat v then
-              toString v
-            else
-              "<${builtins.typeOf v}:${k}>"
-          }"
-        ) (builtins.attrNames ctx)
+        builtins.filter (s: s != null) (
+          map (
+            k:
+            let
+              named = nameScopeValue k ctx.${k};
+            in
+            if named == null then null else "${k}=${named}"
+          ) (builtins.attrNames ctx)
+        )
       )
     );
 
