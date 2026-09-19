@@ -155,6 +155,15 @@ let
       # `den.reservedKeys` — both reachable through `._` exactly as the
       # declared options are.
       forwardable = lib.filterAttrs (k: _: !(isStructuralKey k)) providesChildren;
+      # A name held both as a provides child and as a direct key keeps its
+      # direct value and stays classified — it is the aspect's own content, and
+      # masking it would emit neither. `own ? k` alone cannot decide that: a
+      # re-merge (an alias, a nested-key alias, an `<angle/bracket>` include)
+      # sees the FORWARD an earlier merge wrote onto the top level and reads it
+      # as a direct definition, clearing the marker and classifying the child
+      # (#683). The earlier merge named its own forwards, so ask it.
+      priorForwards = lib.genAttrs (own.__providesForwarded or [ ]) (_: true);
+      isShadowed = k: (own ? ${k}) && !(priorForwards ? ${k});
       childKeys = builtins.filter isChildKey (builtins.attrNames own);
       functor = {
         __functor = _self: _args: {
@@ -164,7 +173,12 @@ let
       };
     in
     {
-      inherit providesChildren forwardable functor;
+      inherit
+        providesChildren
+        forwardable
+        functor
+        isShadowed
+        ;
       syntheticProvides = providesChildren // functor;
     };
 
@@ -234,8 +248,8 @@ let
       # usable in an includes list: wrapChild sees a zero-arg functor and calls
       # it, so the aspect below is built only when _ is actually included.
       underscore = mkUnderscore merged ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
-      inherit (underscore) providesChildren;
-      unshadowedProvides = builtins.filter (k: !(merged ? ${k})) (builtins.attrNames providesChildren);
+      inherit (underscore) providesChildren isShadowed;
+      unshadowedProvides = builtins.filter (k: !(isShadowed k)) (builtins.attrNames providesChildren);
     in
     # __functor makes merged aspects callable (aspect { host = ...; }).
     # Explicit functors (e.g. den.batteries.forward) take priority.
@@ -328,8 +342,8 @@ let
           normalizedFn = foldUnderscoreIntoProvides fn;
           aspectName = fn.name or (lib.last loc);
           underscore = mkUnderscore normalizedFn ((typeCfg.chain or typeCfg.origin) ++ [ aspectName ]);
-          inherit (underscore) forwardable;
-          unshadowedProvides = builtins.filter (k: !(normalizedFn ? ${k})) (builtins.attrNames forwardable);
+          inherit (underscore) forwardable isShadowed;
+          unshadowedProvides = builtins.filter (k: !(isShadowed k)) (builtins.attrNames forwardable);
         in
         forwardable
         // normalizedFn
@@ -728,10 +742,8 @@ let
           # single-def path is unaffected because a raw attrset carries none of
           # these keys.
           topUnderscore = mkUnderscore annotatedMerged provider;
-          inherit (topUnderscore) forwardable;
-          unshadowedProvides = builtins.filter (k: !(annotatedMerged ? ${k})) (
-            builtins.attrNames forwardable
-          );
+          inherit (topUnderscore) forwardable isShadowed;
+          unshadowedProvides = builtins.filter (k: !(isShadowed k)) (builtins.attrNames forwardable);
         in
         forwardable
         // annotatedMerged
