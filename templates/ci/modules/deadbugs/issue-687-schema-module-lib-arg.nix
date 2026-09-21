@@ -39,9 +39,21 @@
       { den, ... }:
       {
         den.hosts.x86_64-linux.igloo = { };
-        den.schema.fleet = { lib, ... }: lib.mkIf true { };
-        expr = builtins.isAttrs den.schema.fleet.options;
-        expected = true;
+        den.schema.fleet =
+          { lib, ... }:
+          # `optionalAttrs`, not `mkIf`: both force `lib` at the module's own
+          # WHNF, which is the defect shape, but a top-level `mkIf` carries only
+          # `config` and its `options` are dropped, so the cell would fail with
+          # `attribute 'probe' missing` rather than on the defect. Measured.
+          lib.optionalAttrs true {
+            options.probe = lib.mkOption { default = "kind-tree-ok"; };
+          };
+        # `options.<opt>.default`, never `attrNames`/`isAttrs` over `options`: a
+        # missing formal is a thunk, so the key set comes back intact over a kind
+        # that diverges only on use. The sharper read makes this cell carry its
+        # own liveness rather than borrowing it from the control below.
+        expr = den.schema.fleet.options.probe.default;
+        expected = "kind-tree-ok";
       }
     );
 
