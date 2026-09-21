@@ -17,7 +17,7 @@
 # consumer that does not declare the input — which is all but one of den's
 # templates. The hub's root takes the vestigial `{ }` and hands back the
 # resolved roster, so the fallback has something total to call.
-{ inputs, ... }:
+{ inputs, lib, ... }:
 let
   lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
   locked = lock.nodes.gen.locked;
@@ -32,4 +32,36 @@ let
   # taking the other arm.
   roster = if inputs ? gen then inputs.gen.lib.mkGenLibs { } else import genSrc { };
 in
-roster.schema
+let
+  base = roster.schema;
+
+  # nixpkgs `lib` as a BASE module argument, injected ONCE here rather than at
+  # each call site. nixpkgs' `evalModules` supplies `lib` to every module at
+  # every level; gen's ships no nixpkgs lib by construction, so supplying it is
+  # den's job. `_module.args` is NOT the channel: a module that forces `lib`
+  # while producing its own top-level attrset then reads the config fixpoint it
+  # is part of, which is an uncatchable infinite recursion naming neither the
+  # module nor the argument (#687).
+  #
+  # At the boundary, not the call sites, so a new `mkInstanceType` or
+  # `mkSchemaOption` call cannot forget it. den threaded four sites by hand
+  # first and that is exactly one edit away from reintroducing the defect.
+  #
+  # A caller's own `specialArgs` win, so a kind can still shadow `lib`.
+  withLib =
+    f: args:
+    f (
+      args
+      // {
+        specialArgs = {
+          inherit lib;
+        }
+        // (args.specialArgs or { });
+      }
+    );
+in
+base
+// {
+  mkInstanceType = kindValue: withLib (base.mkInstanceType kindValue);
+  mkSchemaOption = withLib base.mkSchemaOption;
+}
