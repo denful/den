@@ -1,6 +1,7 @@
 ---
-
-## name: den-debugging description: Systematic debugging workflow for den/nix issues. Use when encountering bug reports, test failures, regressions, or unexpected behavior in den's aspect pipeline, type system, or fx handlers. Also use when a user shares an error or describes broken behavior in their den config. Trigger on phrases like "bug report", "regression", "broken", "doesn't work", "used to work", "last-win", "not merging", "not included", "wrong behavior".
+name: den-debugging
+description: Reproduce, isolate and fix a bug in den — read the report, trace the code path, write a failing test, fix, validate. Use when a den config misbehaves, a CI cell fails, something used to work and no longer does, config goes missing or is not included, definitions last-win instead of merging, or a user shares an error from their own flake.
+---
 
 # Den Debugging Workflow
 
@@ -23,7 +24,7 @@ If the report contrasts two API paths (e.g., old syntax works but new syntax doe
 
 Read the relevant source files to understand the mechanism. Don't guess — follow the actual code path from the user's nix expression to the pipeline output.
 
-Refer to the entry point table in `CLAUDE.md`'s "Debugging and tracing" section for a mapping of symptoms to source files and specific tracing points in the pipeline handlers.
+`AGENTS.md`'s "Debugging and tracing" section lists the useful tracing points per handler — which binding to trace in `gate.nix`, `classify.nix`, `emit-classes.nix` and the rest, and what each one tells you.
 
 Use the Explore agent for broad searches when you're unsure which files are involved. Use direct Grep/Read for targeted lookups when you know the function name.
 
@@ -33,7 +34,9 @@ Write a minimal test that reproduces the bug **before** attempting any fix. This
 
 ### Test location and structure
 
-Tests live in `templates/ci/modules/features/`. Bug regression tests go in `deadbugs/` and follow the naming convention `issue-NNN-short-description.nix` when there's a GitHub issue, or `descriptive-name.nix` otherwise.
+Bug regression tests go in `templates/ci/modules/deadbugs/`, named `issue-NNN-short-description.nix` when there's a GitHub issue, `descriptive-name.nix` otherwise. (The other buckets — `public-api/`, `internal-api/`, `features/`, `deprecated/` — hold tests for behaviour that is not a regression.)
+
+The suite name is the **top-level** key under `flake.tests`, and it is the file's own subject, not its directory: `flake.tests.projected-hasaspect`, never `flake.tests.deadbugs.projected-hasaspect`. This matters beyond style — `just ci` splits its argument on the first dot, so a suite nested under `deadbugs.` makes `deadbugs` the suite and the rest a test-name filter that matches nothing, and a passing test reports as `❌ … 😢 0/1`.
 
 ### Test template
 
@@ -45,7 +48,7 @@ Tests live in `templates/ci/modules/features/`. Bug regression tests go in `dead
   ...
 }:
 {
-  flake.tests.deadbugs.my-bug-name = {
+  flake.tests.my-bug-name = {
 
     test-descriptive-name = denTest (
       { den, igloo, ... }:
@@ -80,17 +83,17 @@ Tests live in `templates/ci/modules/features/`. Bug regression tests go in `dead
 ### Run the test
 
 ```bash
-# Single test with trace (preferred — use just ci with dotted path)
-nix develop -c just ci deadbugs.my-bug-name.test-specific-case
+# Single test with trace (preferred — suite.cell, one dot)
+nix develop -c just ci my-bug-name.test-specific-case
 
 # Whole suite
-nix develop -c just ci deadbugs.my-bug-name
+nix develop -c just ci my-bug-name
 
 # Suite with full nix-unit output
-nix develop -c just ci-deep deadbugs.my-bug-name
+nix develop -c just ci-deep my-bug-name
 ```
 
-Confirm the test fails with the expected symptom before proceeding.
+Confirm the test fails with the expected symptom before proceeding — and read the failure on **stderr**, which is where `just ci` sends `❌`, the failure list and the summary. Stdout carries only `✅` lines, so `just ci … | tail` on a red run shows passes and nothing else.
 
 ### Working with user configs
 
@@ -118,14 +121,14 @@ Now that you have a failing test anchoring the expected behavior:
 Run the full CI suite before considering the fix complete:
 
 ```bash
-# Full suite (limit to 4 workers during agent sessions)
+# Full suite (ci.bash caps itself at 8 workers / 2 GiB each)
 nix develop -c just ci
 
 # Specific suite with traces
 nix develop -c just ci suite.test
 ```
 
-The summary line at the end shows pass/fail counts. All tests must pass.
+All cells must pass. Read the count off **stderr** — `😢 pass/total` on a red run, `🎉` on a green one — and check the exit code unpiped, because a `| tail` sees only the `✅` lines on stdout and reads red as green.
 
 ### Format before committing
 
@@ -165,7 +168,7 @@ Add `builtins.trace` calls temporarily to see what values flow through the pipel
 innerValue = builtins.trace "innerValue keys: ${builtins.toJSON (builtins.attrNames innerValue)}" innerValue;
 ```
 
-Remove traces before committing. See `CLAUDE.md`'s "Debugging and tracing" section for the most useful tracing points in the pipeline handlers.
+Remove traces before committing. See `AGENTS.md`'s "Debugging and tracing" section for the most useful tracing points in the pipeline handlers.
 
 ### Structured tracing in tests
 

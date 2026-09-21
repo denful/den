@@ -1,3 +1,4 @@
 *.qcow2
 AGENT*
+!AGENTS.md
 .worktrees

@@ -1,6 +1,7 @@
 {
   perSystem.treefmt.settings.global.excludes = [
     ".claude/**"
+    ".agents/**"
     ".github/*TEMPLATE*/*"
     ".github/CODEOWNERS"
     "docs/*"
