@@ -73,5 +73,38 @@
         };
       }
     );
+
+    # THIRD ARM, and the one the reporter's own flake actually takes. The same
+    # module passes when a declared option is read and refuses when `id_hash`
+    # is forced, because identity reflection reaches the kind's option set
+    # through `identityKeysForKind`, whose `merge.evalModuleTree` takes no
+    # `specialArgs` — so the base argument never arrives and the module falls
+    # back to `_module.args`. Every other cell here reads a declared option,
+    # which is why a green suite did not see it.
+    test-lib-arg-under-identity-reflection = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo = { };
+        den.schema.host.imports = [
+          ({ lib, config, ... }: lib.mkIf (config.class == "nixos") { hostName = lib.mkForce "gated"; })
+        ];
+        expr = builtins.isString den.hosts.x86_64-linux.igloo.id_hash;
+        expected = true;
+      }
+    );
+
+    # CONTROL: the same module, reading a declared option instead. Green today.
+    # If this ever reds, the cell above stopped measuring identity reflection.
+    test-lib-arg-declared-option-read = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo = { };
+        den.schema.host.imports = [
+          ({ lib, config, ... }: lib.mkIf (config.class == "nixos") { hostName = lib.mkForce "gated"; })
+        ];
+        expr = den.hosts.x86_64-linux.igloo.hostName;
+        expected = "gated";
+      }
+    );
   };
 }
