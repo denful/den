@@ -77,10 +77,11 @@
     # THIRD ARM, and the one the reporter's own flake actually takes. The same
     # module passes when a declared option is read and refuses when `id_hash`
     # is forced, because identity reflection reaches the kind's option set
-    # through `identityKeysForKind`, whose `merge.evalModuleTree` takes no
-    # `specialArgs` — so the base argument never arrives and the module falls
-    # back to `_module.args`. Every other cell here reads a declared option,
-    # which is why a green suite did not see it.
+    # through `identityKeysForKind`, whose `merge.evalModuleTree` took no
+    # `specialArgs` at gen-schema 9c141ecc, the rev this tree pins, so the base
+    # argument never arrived and the module fell back to `_module.args`. Fixed
+    # upstream at 8a6d3f6, which the hub does not yet carry. Every other cell
+    # here reads a declared option, which is why a green suite did not see it.
     test-lib-arg-under-identity-reflection = denTest (
       { den, ... }:
       {
