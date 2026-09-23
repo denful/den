@@ -78,6 +78,16 @@ let
     in
     builtins.any inScope allEntries;
 
+  # A nested sub-aspect reference (`den.aspects.foo.bar`) is a content wrapper
+  # carrying only `__aspectChain`; identity.key would name it `<anon>` and the
+  # lookup would always miss.
+  refKey =
+    ref:
+    if !(ref ? name) && ref ? __aspectChain then
+      identity.pathKey ref.__aspectChain
+    else
+      identity.key ref;
+
   # The pathSet handed in is the scope-restricted union (scopedPathSet over
   # currentScope + ancestors, #613) — an entity's own + inherited membership.
   # It is not class-partitioned, so forClass approximates as forAnyClass (may
@@ -87,19 +97,19 @@ let
     __functor =
       _: ref:
       let
-        k = identity.key ref;
+        k = refKey ref;
       in
       pathSet ? ${k} && !excludeCheck k;
     forClass =
       _: ref:
       let
-        k = identity.key ref;
+        k = refKey ref;
       in
       pathSet ? ${k} && !excludeCheck k;
     forAnyClass =
       ref:
       let
-        k = identity.key ref;
+        k = refKey ref;
       in
       pathSet ? ${k} && !excludeCheck k;
   };
@@ -128,7 +138,7 @@ let
       hasAspect =
         ref:
         let
-          k = identity.key ref;
+          k = refKey ref;
         in
         pathSet ? ${k} && !excludeCheck k;
     }
