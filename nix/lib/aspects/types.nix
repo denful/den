@@ -468,7 +468,10 @@ let
             d
             // {
               value =
-                d.value
+                # A wrapper publishes `_` as a read view of its own `provides`.
+                # The submodule's `_` alias would take it as a second `provides`
+                # definition and double every provides leaf.
+                (if (d.value._ or { }) ? __functor then builtins.removeAttrs d.value [ "_" ] else d.value)
                 # Only narrow what exists: a navigated child carries __aspectChain
                 # with no __contentValues, and inventing an empty one here makes
                 # the wrapper re-flatten to nothing instead of failing loudly.
