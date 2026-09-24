@@ -242,5 +242,21 @@
       }
     );
 
+    # A diagram labels a scope edge with the policy that created the child
+    # scope; every policy that fired at the parent is the wrong answer.
+    test-capture-fleet-scope-source-policy = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        expr = (den.lib.capture.captureFleet { }).scopeSourcePolicy;
+        expected = {
+          "system=x86_64-linux" = "flake-to-systems";
+          "host=igloo,system=x86_64-linux" = "system-to-os-outputs";
+          "host=igloo,system=x86_64-linux,user=tux" = "host-to-hm-users";
+        };
+      }
+    );
+
   };
 }
