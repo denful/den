@@ -1,13 +1,18 @@
 name: Versioned docs
 on:
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Tag to publish; a tag's own workflow file predates later fixes, so republish from main"
+        required: false
   push:
     tags: ["*"]
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.number }}
+  group: ${{ github.workflow }}-${{ inputs.tag || github.ref }}-${{ github.event.number }}
   cancel-in-progress: true
 env:
   NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
+  TAG: ${{ inputs.tag || github.ref_name }}
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -16,17 +21,19 @@ jobs:
       - uses: cachix/install-nix-action@v31
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: actions/checkout@v6
+        with:
+          ref: ${{ env.TAG }}
       - name: Build
         run: nix-shell --run 'just docs-build'
       - name: Version
         run: |
           pushd docs
-          grep -rlZE '(src|href)="/' dist | xargs -0 -n 1 sed -i 's#\(src\|href\)="/#\1="/${{github.ref_name}}/#g'
+          grep -rlZE '(src|href)="/' dist | xargs -0 -n 1 sed -i "s#\(src\|href\)=\"/#\1=\"/$TAG/#g"
           mkdir -p versioned
-          mv dist versioned/${{github.ref_name}}
+          mv dist "versioned/$TAG"
           popd
       - uses: actions/upload-artifact@v4
         with:
-          name: docs-${{github.ref_name}}
+          name: docs-${{ env.TAG }}
           path: ./docs/versioned
           overwrite: true
