@@ -4,15 +4,18 @@ on:
     branches: [main]
     paths: ["**/*.nix"]
   pull_request:
-    types: [labeled, opened, synchronize, reopened, review_requested, ready_for_review]
+    types: [labeled, opened, synchronize, reopened, ready_for_review]
     paths: ["**/*.nix"]
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  # never cancel main builds: back-to-back merges would leave main untested
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # never cancel main builds: back-to-back merges would leave main untested.
+  # On PRs cancel only for new commits: a run cancelled for the same commit
+  # before its matrix expands leaves literal `${{ matrix.* }}` checks failed
+  # forever, so label/review events queue behind the running build instead.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.event.action == 'synchronize' }}
 env:
   NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
