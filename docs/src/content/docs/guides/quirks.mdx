@@ -76,6 +76,78 @@ opens them.
 No pipe policy needed — same-scope aggregation works out of the box.
 If no producers emit data, the consumer receives `[]`.
 
+## Scoping: who sees what
+
+Every entity resolves in its own **scope**: one per host, one per user on
+that host, one per standalone home. A quirk value lands in the pool of the
+scope whose aspect emitted it, and a consumer reads the pool of the scope
+whose aspect it belongs to. The class does not matter. A `nixos` module on a
+**user** aspect reads the user's pool, even though its config ends up in the
+host's NixOS system.
+
+With `den.hosts.x86_64-linux.igloo.users = { tux = { }; alice = { }; }`
+and a quirk `q`:
+
+| Emitted on | Read by | Sees | Why |
+|---|---|---|---|
+| `igloo` | `igloo.nixos` | igloo's values | same scope |
+| `tux` | `tux.homeManager` or `tux.nixos` | tux's values | same scope |
+| `tux` | `igloo.nixos` | **nothing** | user data stays in the user scope |
+| `alice` | `tux.homeManager` | **nothing** | sibling scopes are isolated |
+| `igloo` | `tux.homeManager` | **nothing**, unless a host policy binds the pipe (below) | host data does not flow down by default |
+
+```mermaid
+flowchart TB
+  subgraph H["host scope: igloo"]
+    HP[("igloo pool")]
+    HC["igloo.nixos reads q"]
+    HP --> HC
+  end
+  subgraph T["user scope: tux"]
+    TP[("tux pool")]
+    TC["tux.homeManager / tux.nixos read q"]
+    TP --> TC
+  end
+  subgraph A["user scope: alice"]
+    AP[("alice pool")]
+  end
+  TP -- "pipe.expose (user-scope policy)" --> HP
+  HP -. "host-scope pipe.from, only if tux emits nothing on q" .-> TP
+  TP x-- "isolated: siblings never see each other" --x AP
+```
+
+Solid arrows are how data moves; the dotted one is the conditional host-to-user
+hand-off described below.
+
+**User quirks never appear in the host's pool on their own.** To send them
+up, add a policy with `pipe.expose` at user scope:
+
+```nix
+den.policies.expose-q = { user, ... }:
+  [ (den.lib.policy.pipe.from "q" [ den.lib.policy.pipe.expose ]) ];
+den.schema.user.includes = [ den.policies.expose-q ];
+```
+
+The host's pool is then its own values plus every exposing user's.
+
+**Host values reach a user only through a host-scope pipe policy**, and only
+for a user scope that emits nothing of its own on that quirk:
+
+```nix
+den.policies.bind-q = { host, ... }:
+  [ (den.lib.policy.pipe.from "q" [ ]) ];   # even with no stages
+den.schema.host.includes = [ den.policies.bind-q ];
+```
+
+With `bind-q`, `tux.homeManager` sees igloo's values. If tux's own aspects
+also emit `q`, tux sees **only** its own values and the host's are not
+merged in. When a user needs both, deliver the host data under a second name
+(`pipe.as`) or read it from `host` directly.
+
+Across hosts, and between users on different hosts, data moves only through
+`pipe.collect`, `pipe.collectAll` and `pipe.broadcast` (see
+[Cross-Scope Pipes](/guides/quirks-cross-scope/)).
+
 ## Pipe policies: filter, transform, fold
 
 When you need to process data before consumers see it, use pipe policies.
@@ -166,168 +238,10 @@ pipe.from "items" [
 
 ## Cross-scope flow
 
-### Upward: `pipe.expose`
-
-Push child-scope data to the parent. A user's preferences reach the host:
-
-```nix
-den.quirks.prefs = { description = "User preferences"; };
-
-den.aspects.tux = {
-  prefs = [{ editor = "vim"; }];
-};
-
-den.aspects.igloo = {
-  includes = [ den.aspects.host-consumer ];
-};
-
-den.aspects.host-consumer = {
-  nixos = { prefs, ... }: {
-    networking.hostName =
-      lib.concatMapStringsSep "-" (p: p.editor) prefs;
-  };
-};
-
-den.policies.expose-prefs = { host, user, ... }:
-  let inherit (den.lib.policy) pipe; in
-  [ (pipe.from "prefs" [ pipe.expose ]) ];
-
-den.default.includes = [ den.policies.expose-prefs ];
-```
-
-Result: host consumer sees `[{ editor = "vim"; }]`.
-
-Exposed data merges with host-local data. If the host aspect also emits
-`prefs`, consumers see both host-local and exposed user entries.
-
-Transform stages run before expose:
-
-```nix
-pipe.from "items" [
-  (pipe.filter (i: i.keep))
-  (pipe.transform (i: { label = "x-${i.name}"; }))
-  pipe.expose
-]
-```
-
-### Lateral: `pipe.collect`
-
-Harvest data from sibling scopes. Siblings are scopes sharing the same
-parent in the scope tree. This is how you do cross-host aggregation:
-
-```nix
-den.hosts.x86_64-linux.igloo.users.tux = {};
-den.hosts.x86_64-linux.iceberg.users.alice = {};
-
-den.quirks.http-backends = {
-  description = "HTTP backends";
-};
-
-den.aspects.iceberg = {
-  http-backends = { addr = "10.0.0.2"; port = 80; };
-};
-
-den.aspects.igloo = {
-  includes = [ den.aspects.lb-consumer ];
-  http-backends = { addr = "10.0.0.1"; port = 8080; };
-};
-
-den.aspects.lb-consumer = {
-  nixos = { http-backends, lib, ... }: {
-    networking.hostName =
-      lib.concatMapStringsSep "," (b: "${b.addr}:${toString b.port}")
-        http-backends;
-  };
-};
-
-den.policies.fleet-backends = { host, ... }:
-  let inherit (den.lib.policy) pipe; in
-  [ (pipe.from "http-backends" [
-      (pipe.collect ({ host, ... }: true))
-    ])
-  ];
-
-den.schema.host.includes = [ den.policies.fleet-backends ];
-```
-
-The predicate in `pipe.collect` filters which sibling scopes to harvest from.
-Entity kind matching ensures only scopes of the right kind are included.
-
-### Collect with provenance
-
-Track where collected data came from:
-
-```nix
-pipe.from "http-backends" [
-  (pipe.collect ({ host, ... }: true))
-  pipe.withProvenance
-]
-```
-
-Consumers receive `[{ value = <data>; source = <context>; }]` where `source`
-is the full context attrset (`{ host = ...; }`) of the source scope.
-
-### Collect with filtering
-
-Stages after `pipe.collect` operate on the combined pool:
-
-```nix
-pipe.from "http-backends" [
-  (pipe.collect ({ host, ... }: true))
-  (pipe.filter (b: b.port != 8080))
-]
-```
-
-### Fleet-wide: `pipe.broadcast`
-
-Push a scope's own pipe value to **every other scope** matching a predicate —
-in one stage, in any direction (user→user, user→host, host→user, fleet-wide).
-The push dual of `pipe.expose`: instead of one parent receiving, every matching
-scope receives.
-
-A common shape: every user publishes a device record, and every user's home
-sees the whole fleet's roster:
-
-```nix
-den.hosts.x86_64-linux.igloo.users.tux = {};
-den.hosts.x86_64-linux.iceberg.users.alice = {};
-
-# Both users get a home-manager home (see the Home Manager guide):
-den.schema.user.classes = lib.mkDefault [ "homeManager" ];
-
-den.quirks.peer-dev = {
-  description = "per-user device records";
-};
-
-den.aspects.tux = {
-  peer-dev = [ { who = "tux@igloo"; } ];
-  homeManager = { peer-dev, lib, ... }: {
-    home.sessionVariables.PEERS =
-      lib.concatStringsSep "," (map (p: p.who) peer-dev);
-  };
-};
-den.aspects.alice = {
-  peer-dev = [ { who = "alice@iceberg"; } ];
-  homeManager = { peer-dev, lib, ... }: {
-    home.sessionVariables.PEERS =
-      lib.concatStringsSep "," (map (p: p.who) peer-dev);
-  };
-};
-
-# Every user scope broadcasts its own peer-dev to all other user scopes.
-den.policies.broadcast-peers = { host, user, ... }:
-  let inherit (den.lib.policy) pipe; in
-  [ (pipe.from "peer-dev" [ (pipe.broadcast ({ user, ... }: true)) ]) ];
-
-den.schema.user.includes = [ den.policies.broadcast-peers ];
-```
-
-`PEERS` on both tux's and alice's homes now lists **both** users — each scope
-sees its own emits plus everything broadcast to it. Transform stages before
-`pipe.broadcast` apply to the value as it leaves; config-dependent thunks are
-resolved against the *source* host's config when they cross hosts. Note the
-asymmetry: a broadcaster pushes its own raw emits only — data exposed *up* into
-it (e.g. a host broadcaster's users' `pipe.expose` data) does not ride along.
+Moving data between scopes -- `pipe.expose` (child to parent),
+`pipe.collect` (siblings), `pipe.collectAll` (fleet-wide pull) and
+`pipe.broadcast` (fleet-wide push) -- has its own page:
+[Cross-Scope Pipes](/guides/quirks-cross-scope/).
 
 ## Targeted delivery with `pipe.to`
 
@@ -358,7 +272,7 @@ den.policies.postgres-secrets = { host, ... }:
   [ (pipe.from "secrets" [
       (pipe.filter (_: false))          # discard the pool
       (pipe.append { db-password = "/run/secrets/pg-pass"; })
-      (pipe.for lib.mergeAttrsList)     # merge into a single attrset
+      (pipe.for (vs: [ (lib.mergeAttrsList vs) ]))  # merge; must stay a list
       (pipe.to [ den.aspects.postgres ])
     ])
   ];
@@ -366,18 +280,20 @@ den.policies.postgres-secrets = { host, ... }:
 den.schema.host.includes = [ den.policies.postgres-secrets ];
 ```
 
-The consumer receives a single merged attrset instead of a list:
+The consumer receives a one-element list holding the merged attrset:
 
 ```nix
 den.aspects.postgres = {
   nixos = { secrets, ... }: {
-    services.postgresql.settings.password_file = secrets.db-password;
+    services.postgresql.settings.password_file =
+      (builtins.head secrets).db-password;
   };
 };
 ```
 
-This pattern works because `pipe.for` replaces the list with the fold
-result, and `pipe.to` delivers only to the named aspect.
+This pattern works because `pipe.for` replaces the list with its result, and
+`pipe.to` delivers only to the named aspect. The function given to `pipe.for`
+must return a **list**: returning the attrset itself fails with an error.
 
 ## Derived quirks with `pipe.as`
 
@@ -397,9 +313,11 @@ den.aspects.web = {
 };
 
 den.aspects.monitor = {
-  nixos = { monitoring-targets, lib, ... }: {
-    networking.hostName =
-      lib.concatStringsSep "," monitoring-targets;
+  nixos = { monitoring-targets, ... }: {
+    services.prometheus.scrapeConfigs = [{
+      job_name = "backends";
+      static_configs = [{ targets = monitoring-targets; }];
+    }];
   };
 };
 
@@ -452,10 +370,35 @@ den.policies.targeted-derived = { host, ... }:
 (`pipe.as "same-pipe"`) throws an error.
 </Aside>
 
+## Context-parametric producers
+
+A quirk value can be a function of the scope's context (`host`, `user`,
+`environment`, or any other bound entity). Den calls it at the **producing**
+scope, before the value moves anywhere, so consumers and other hosts receive
+a plain record:
+
+```nix
+den.aspects.node-exporter = {
+  nixos.services.prometheus.exporters.node.enable = true;
+  prometheus-targets = { host, ... }: {
+    hostname = host.name;
+    addr = host.addr;
+    exporters = [ { job = "node"; port = 9100; } ];
+  };
+};
+```
+
+Each host that includes `node-exporter` emits a record about itself. A
+`collect` on the monitoring host then gathers one record per peer. Only
+arguments that the scope binds count as context. A function that also asks
+for `config` (or any other module argument) is a config-dependent thunk,
+described next.
+
 ## Config-dependent thunks
 
-Quirk values can depend on a host's NixOS `config`. Declare a function
-taking `{ config, ... }` as the quirk value:
+Quirk values can depend on the evaluated config of the class that produced
+them — NixOS, nix-darwin, home-manager, or any registered class. Declare a
+function taking `{ config, ... }` as the quirk value:
 
 ```nix
 den.aspects.my-service = {
@@ -466,11 +409,39 @@ den.aspects.my-service = {
 };
 ```
 
+`config` is always the **producer's** config, wherever the value is consumed.
+A quirk on a host aspect reads the host's NixOS config; a quirk on a user
+aspect reads that user's home-manager config — even when a host's `nixos`
+module consumes it through `pipe.expose`:
+
+```nix
+den.policies.expose-dev =
+  { user, ... }: [ (den.lib.policy.pipe.from "dev" [ den.lib.policy.pipe.expose ]) ];
+den.schema.user.includes = [ den.policies.expose-dev ];
+
+# user-produced: `config` is tux's home-manager config
+den.aspects.tux.dev = { config, ... }: [ "u:${config.home.username}" ];
+
+# host-consumed: receives [ "u:tux" ]
+den.aspects.igloo.nixos = { dev, ... }: {
+  networking.domain = builtins.head dev;
+};
+```
+
+A home-manager producer can also take `osConfig` to read the config of the
+host it lives on:
+
+```nix
+den.aspects.tux.host-marks = { osConfig, ... }: [ "mark-${osConfig.networking.hostName}" ];
+```
+
 Local thunks are resolved lazily inside `evalModules`. Cross-host thunks
-(via `pipe.collect`) are resolved eagerly against the source host's config.
+(via `pipe.collect` or `pipe.broadcast`) are resolved eagerly against the
+source's config.
 
 ## See also
 
 - [Quirks & Pipes explanation](/explanation/quirks-and-pipes/) — conceptual overview
 - [den.quirks reference](/reference/quirks/) — option types and pipe builder API
-- [Tests as examples](https://github.com/denful/den/tree/main/templates/ci/modules/public-api) — `pipes.nix`, `pipe-policy.nix`, `pipe-scope.nix`
+- [Quirk Recipes](/guides/quirk-recipes/) — language aspects feeding editors, per-aspect persistence, shared overlays
+- [Tests as examples](https://github.com/denful/den/tree/main/templates/ci/modules/public-api) — `pipes.nix`, `pipe-policy.nix`, `pipe-scope.nix`, `pipe-config-scope.nix`, `pipe-broadcast.nix`

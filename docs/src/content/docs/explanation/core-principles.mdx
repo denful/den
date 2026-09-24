@@ -111,26 +111,26 @@ This is how everything works in Den. Policies drive entity topology,
 and schema includes activate aspects at each entity kind:
 
 ```nix
-# inherit (den.lib) policy;  # brings `policy.resolve.to` shorthand into scope
-# Activate the host's own aspect for all hosts
-den.schema.host.includes = [ ({ host }: den.aspects.${host.aspect}) ];
+# inherit (den.lib) policy;
+# Every entity's `.aspect` (default: `den.aspects.<name>`) is its entry point;
+# the pipeline resolves it without any include.
 
-# host -> users: fan-out policy
+# host -> users: fan-out policy (modules/policies/core.nix, simplified)
 den.policies.host-to-users = { host, ... }:
-  map (user: policy.resolve.to "user" { inherit host user; })
+  map (user: policy.resolve.shared { inherit user; })
     (lib.attrValues host.users);
+den.schema.host.includes = [ den.policies.host-to-users ];
 
-# Activate user aspects
-den.schema.user.includes = [ ({ host, user }: den.aspects.${user.aspect}) ];
-
-# conditional: only if HM is enabled for user and host
-den.policies.user-to-hm-user = { host, user, ... }:
-  lib.optional (host.hm.enable && lib.elem "homeManager" user.classes)
-    (policy.resolve.to "hm-user" { inherit host user; });
+# conditional: home-manager only for users listing the class
+# (nix/lib/home-env.nix, simplified)
+den.policies.host-to-hm-users = { host, ... }:
+  lib.optionals host.home-manager.enable (
+    map (user: policy.resolve { inherit user; })
+      (lib.filter (u: lib.elem "homeManager" u.classes) (lib.attrValues host.users)));
 
 # host -> wsl-host: same data shape, different entity kind
 den.policies.host-to-wsl-host = { host, ... }:
-  lib.optional host.wsl.enable
+  lib.optional (host.class == "nixos" && host.wsl.enable)
     (policy.resolve.to "wsl-host" { inherit host; });
 ```
 
@@ -139,7 +139,7 @@ den.policies.host-to-wsl-host = { host, ... }:
 <Aside title="Real world examples">
 Minimal real-life example: [wsl support](https://github.com/denful/den/blob/main/modules/aspects/batteries/wsl.nix)
 
-[home-env](https://github.com/denful/den/blob/main/nix/lib/home-env.nix#L97) is how Den implements homeManager/hjem/maid support
+[home-env](https://github.com/denful/den/blob/main/nix/lib/home-env.nix) is how Den implements homeManager/hjem/maid support
 
 [flake-parts perSystem classes](https://github.com/denful/den/blob/main/templates/flake-parts-modules/modules/classes/files.nix)
 

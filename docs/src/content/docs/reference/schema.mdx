@@ -144,6 +144,12 @@ den.hosts.myhost = {
 | `collisionPolicy` | `null \| enum` | `null` | Class module collision policy for this entity: `"error"`, `"den-wins"`, or `"class-wins"`. See [Class Modules](/explanation/class-modules/). |
 | `instantiate` | `raw` | auto | OS builder function |
 | `intoAttr` | `listOf str` | auto | Flake output path |
+| `home-manager.enable` | `bool` | some user lists `"homeManager"` in `classes` | Enable the [`homeManager` class](/reference/batteries/#homemanager-class) on this host |
+| `home-manager.module` | `deferredModule` | `inputs.home-manager.<class>Modules.home-manager` | Home Manager OS module to import |
+| `hjem.enable` / `hjem.module` | | same pattern, for `"hjem"` | [`hjem` class](/reference/batteries/#hjem-class) |
+| `nix-maid.enable` / `nix-maid.module` | | same pattern, for `"maid"` (NixOS only) | [`maid` class](/reference/batteries/#maid-class) |
+| `wsl.enable` | `bool` | `false` | Enable NixOS-WSL on a `nixos` host ([`wsl` class](/reference/batteries/#wsl-class)) |
+| `wsl.module` | `deferredModule` | `inputs.nixos-wsl.nixosModules.default` | NixOS-WSL module to import |
 | `*` | `den.schema.host` options | | Options from base module |
 | `*` |  | | free-form attributes |
 

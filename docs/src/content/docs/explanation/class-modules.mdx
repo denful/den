@@ -110,6 +110,58 @@ No outer parametric wrapper needed -- context flows through the pipeline's scope
 }
 ```
 
+## Flake inputs and specialArgs
+
+A class module often needs something from outside the module system: a flake
+input's module, a package from another nixpkgs, a value you would normally
+pass through `specialArgs`. In den you rarely need `specialArgs`; pick the
+first option that fits.
+
+**1. Close over the input in the file that defines the aspect.** Den's own
+modules receive `inputs` like any flake-parts module, so the aspect can use it
+directly. This covers most cases, including importing an input's module:
+
+```nix
+# modules/disko.nix
+{ inputs, ... }: {
+  den.aspects.disko.nixos = {
+    imports = [ inputs.disko.nixosModules.disko ];
+  };
+}
+```
+
+**2. Ask for `inputs` (or `den`, `lib`) as a module argument.** Include the
+[`flake-scope`](/reference/batteries/#denbatteriesflake-scope) battery once,
+and every class module (NixOS, darwin, home-manager, …) can take them:
+
+```nix
+den.default.includes = [ den.batteries.flake-scope ];
+
+den.aspects.tux.homeManager = { inputs, pkgs, ... }: {
+  home.packages = [ inputs.my-tool.packages.${pkgs.stdenv.hostPlatform.system}.default ];
+};
+```
+
+With flake-parts, [`inputs'`](/reference/batteries/#denbatteriesinputs) does
+the same with the system already selected (`inputs'.my-tool.packages.default`).
+
+**3. Home-manager `extraSpecialArgs`.** For a value only home modules should
+see, set it from the host's NixOS config; every user's home on that host
+receives it:
+
+```nix
+den.aspects.igloo.nixos.home-manager.extraSpecialArgs.site = "example.com";
+den.aspects.tux.homeManager = { site, ... }: { /* … */ };
+```
+
+**4. A real `specialArgs`.** Only when a module must see an argument during
+`imports` resolution (where module arguments are not available yet), override
+the host's `instantiate` to pass it; see
+[flake outputs](/reference/output/).
+
+Entity data (`host`, `user`, `home`) never needs any of this: den injects it
+into class modules directly, as described above.
+
 ## The Ellipsis Convention
 
 <Aside type="caution">

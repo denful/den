@@ -1,0 +1,579 @@
+---
+title: "Case Study: Visualising a Fleet with den-diagram"
+description: Wire den's capture layer to den-diagram in a flake, then read six generated diagrams of the diagram-demo and fleet-demo templates.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+The flake wiring is adapted from the diagrams module of a production
+multi-host flake. Every diagram on this page was generated from the
+[`diagram-demo`](https://github.com/denful/den/tree/main/templates/diagram-demo)
+and [`fleet-demo`](https://github.com/denful/den/tree/main/templates/fleet-demo)
+templates with [den-diagram](https://github.com/denful/den-diagram), with
+only the colour directives filtered out so the site theme applies. None of
+them was drawn by hand.
+</Aside>
+
+## Why diagram a den config
+
+A den configuration is spread over many small files: aspects include other
+aspects, policies fire when their context arguments are present, scopes nest
+per host and user, and pipes move data between hosts. The resulting
+`nixosConfiguration` is correct or it is not, but it does not tell you how it
+was assembled. A diagram answers the questions you would otherwise answer
+with `nix repl` and `builtins.trace`:
+
+- **Which aspects reach this host?** And which were excluded or replaced
+  on the way.
+- **Where did this class module come from?** Which chain of includes put a
+  `nixos` module into a host.
+- **How do scopes nest?** Which users exist on which hosts, and under which
+  environment.
+- **Which policies fired?** At which scope, and what they resolved.
+- **Who feeds whom?** Which hosts emit into a pipe and which collect from it.
+
+The diagrams are generated from the same pipeline run that builds the
+configuration, so they cannot drift from it.
+
+## The two-step pattern in a flake
+
+Diagrams take two steps. [`den.lib.capture`](/reference/diag/#trace-capture)
+runs the fx pipeline with tracing handlers and records what happened.
+den-diagram turns that record into a graph IR, filters it, and renders it.
+den does not depend on den-diagram; a flake that wants diagrams adds it as
+an input:
+
+```nix
+# flake.nix
+inputs.den-diagram.url = "github:denful/den-diagram";
+```
+
+The module below is the smallest useful wiring. It captures the whole fleet
+once and exposes Mermaid source as plain strings under `flake.diagrams`, so
+`nix eval --raw` prints a diagram without building anything:
+
+```nix
+# modules/diagrams.nix
+{ den, lib, inputs, ... }:
+let
+  diagram = inputs.den-diagram.lib;
+  render = diagram.renderers { };
+
+  # One pipeline run for the whole flake: every scope, host and user.
+  fleetCapture = den.lib.capture.captureFleet { };
+
+  hosts = lib.concatMap builtins.attrValues (builtins.attrValues den.hosts);
+
+  hostViews =
+    host:
+    let
+      # Cut one host's subtree out of the fleet capture.
+      g = diagram.projectScope {
+        inherit fleetCapture;
+        kind = "host";
+        inherit (host) name;
+        direction = "TD";
+      };
+    in
+    {
+      "${host.name}-aspects" = render.toMermaid (diagram.graph.aspectsOnly g);
+      "${host.name}-nixos" = render.toMermaid (diagram.graph.classSlice "nixos" g);
+    };
+in
+{
+  flake.diagrams = {
+    scope-topology = render.toScopeTopologyMermaid fleetCapture;
+    policy-resolution = render.toPolicyResolutionMapMermaid fleetCapture;
+    pipe-flow = render.toPipeFlowMermaid fleetCapture;
+    pipe-sequence = render.toPipeSequenceMermaid fleetCapture;
+  }
+  // lib.mergeAttrsList (map hostViews hosts);
+}
+```
+
+Three choices in it are worth copying:
+
+- **Capture once.** `captureFleet` walks the whole scope tree from the flake
+  root. Per-host graphs come from `projectScope` over that one capture rather
+  than from a fresh pipeline run per host.
+- **Renderers are pure.** `diagram.renderers { }` needs no `pkgs`, so the
+  Mermaid source can live outside `perSystem`. Only turning it into SVG needs
+  `pkgs` and mermaid-cli.
+- **Filters before renderers.** `aspectsOnly` and `classSlice "nixos"` are
+  functions from graph to graph. They compose, and any renderer takes their
+  result. The [reference](/reference/diag/#filters) lists them all.
+
+### Going further: SVGs, galleries and a write script
+
+The production flake this is modelled on keeps the same capture and adds the
+export side of den-diagram. A `renderContext` bundles a theme, Mermaid
+settings and SVG builders; `export.entityEntries` expands a list of view
+definitions into one Markdown and one SVG derivation per view; and
+`export.mkWriteScript` copies the lot into the repository:
+
+```nix
+perSystem = { pkgs, ... }:
+  let
+    rc = diagram.renderContext {
+      inherit pkgs;
+      theme = diagram.themeFromBase16 { inherit pkgs; scheme = "catppuccin-mocha"; };
+      mermaidConfig.layout = "elk";
+    };
+
+    hostEntries = lib.concatMap (host:
+      let entity = hostGraphs.${host.name}; in   # projectScope, as above
+      diagram.export.entityEntries { inherit pkgs rc; } {
+        inherit entity;
+        inherit (host) name;
+        dir = "hosts/${host.name}";
+        viewDefs = rc.views.host ++ rc.views.classViews [ "nixos" "homeManager" ];
+      }) hosts;
+  in
+  {
+    # legacyPackages, not packages: the eval cache walks packages.*,
+    # and that would force the fleet capture on every evaluation.
+    legacyPackages.diagrams = diagram.export.entriesToPackages hostEntries // {
+      write-diagrams = diagram.export.mkWriteScript pkgs {
+        entries = hostEntries;
+        destExpr = ''"$(${pkgs.git}/bin/git rev-parse --show-toplevel)"'';
+      };
+    };
+  };
+```
+
+It also writes a `TOPOLOGY.md` that embeds the fleet views inline, so GitHub
+renders them. For that it drops the `%%{init: …}%%` line den-diagram puts at
+the top of each diagram, so the Mermaid source falls back to the viewer's own
+theme. The two templates do the same in full: `diagram-demo` renders every
+host, user and home view, and `fleet-demo` assembles its README from the
+fleet views.
+
+## A gallery
+
+The diagrams below are the output of the module above, run against the two
+templates. `diagram-demo` has three hosts (`laptop`, `server`, `devbox`) under
+den's default scope tree. `fleet-demo` builds its own tree, flake → fleet →
+environment → host → user, and shares data between hosts through two pipes.
+
+One change was made to each source before embedding it here. den-diagram
+colours every node and cluster itself, and this site styles diagrams from its
+own palette, so the `%%{init}%%`, `classDef` and `style` lines were filtered
+out. The shapes, edges and labels are exactly as generated.
+
+### The scope tree
+
+```mermaid
+graph TD
+  home_alice_system_x86_64_linux["home: alice"]
+  host_devbox_system_x86_64_linux["host: devbox"]
+  host_devbox_system_x86_64_linux_user_alice(["user: alice"])
+  host_devbox_system_x86_64_linux_user_bob(["user: bob"])
+  host_laptop_system_x86_64_linux["host: laptop"]
+  host_laptop_system_x86_64_linux_user_alice(["user: alice"])
+  host_server_system_x86_64_linux["host: server"]
+  host_server_system_x86_64_linux_user_deploy(["user: deploy"])
+  system_x86_64_linux["flake-system: system=x86_64-linux"]
+
+  system_x86_64_linux --> home_alice_system_x86_64_linux
+  system_x86_64_linux --> host_devbox_system_x86_64_linux
+  host_devbox_system_x86_64_linux --> host_devbox_system_x86_64_linux_user_alice
+  host_devbox_system_x86_64_linux --> host_devbox_system_x86_64_linux_user_bob
+  system_x86_64_linux --> host_laptop_system_x86_64_linux
+  host_laptop_system_x86_64_linux --> host_laptop_system_x86_64_linux_user_alice
+  system_x86_64_linux --> host_server_system_x86_64_linux
+  host_server_system_x86_64_linux --> host_server_system_x86_64_linux_user_deploy
+```
+
+`toScopeTopologyMermaid` draws the scopes the pipeline created in
+`diagram-demo`. Every host and standalone home hangs off the per-system
+scope, and each user gets a scope of their own under each host that declares
+them. `alice` appears twice because she is a user on two hosts. Those are
+two scopes, each with its own context.
+
+<details>
+<summary>How this was generated</summary>
+
+```sh
+# in a copy of templates/diagram-demo with the module above as modules/diagrams.nix
+nix eval --raw .#diagrams.scope-topology \
+  | grep -Ev '^\s*(%%\{init|classDef|style )'
+```
+
+The same source, with its theme, is in the template's own
+`nix build ./templates/diagram-demo#fleet-scope-topology`.
+
+</details>
+
+### Which aspects reach a host
+
+```mermaid
+graph TD
+  devbox([devbox]):::root
+
+  subgraph ctx_user_bob["user: bob"]
+  user___policy_hm_user_detect__0_[/"user/<policy:hm-user-detect>[0]"\]:::user___policy_hm_user_detect__0__c
+  bob{{"bob"}}:::bob_c
+  dev_tools["dev-tools"]:::dev_tools_c
+  gnome["gnome"]:::gnome_c
+  hm_user_detect_user_bob["hm-user-detect"]:::hm_user_detect_user_bob_c
+  os_to_host_user_bob["os-to-host"]:::os_to_host_user_bob_c
+  den__batteries__primary_user_bob_devbox__user_bob{{"den/batteries/primary-user(bob@devbox)"}}:::den__batteries__primary_user_bob_devbox__user_bob_c
+  user_to_host_user_bob["user-to-host"]:::user_to_host_user_bob_c
+  bob --> dev_tools
+  bob --> gnome
+  bob --> den__batteries__primary_user_bob_devbox__user_bob
+  end
+  subgraph ctx_user_alice["user: alice"]
+  user___policy_hm_user_detect__1_[/"user/<policy:hm-user-detect>[1]"\]:::user___policy_hm_user_detect__1__c
+  alice{{"alice"}}:::alice_c
+  alice__to_hosts["alice/to-hosts"]:::alice__to_hosts_c
+  hm_user_detect_user_alice["hm-user-detect"]:::hm_user_detect_user_alice_c
+  os_to_host_user_alice["os-to-host"]:::os_to_host_user_alice_c
+  user_to_host_user_alice["user-to-host"]:::user_to_host_user_alice_c
+
+  end
+  subgraph ctx_host_devbox["host: devbox"]
+  monitoring__alerting[/"monitoring/alerting"\]:::monitoring__alerting_c
+  backup{{"backup"}}:::backup_c
+  desktop["desktop"]:::desktop_c
+  virtualization__docker[/"virtualization/docker"\]:::virtualization__docker_c
+  gdm["gdm"]:::gdm_c
+  host_to_hm_users["host-to-hm-users"]:::host_to_hm_users_c
+  host_to_users["host-to-users"]:::host_to_users_c
+  monitoring["monitoring"]:::monitoring_c
+  networking["networking"]:::networking_c
+  monitoring__nginx_exporter[/"monitoring/nginx-exporter"\]:::monitoring__nginx_exporter_c
+  monitoring__node_exporter[/"monitoring/node-exporter"\]:::monitoring__node_exporter_c
+  os_to_host_host_devbox["os-to-host"]:::os_to_host_host_devbox_c
+  virtualization__podman[/"virtualization/podman"\]:::virtualization__podman_c
+  den__batteries__primary_user_alice_devbox_{{"batteries/primary-user(alice@devbox)"}}:::den__batteries__primary_user_alice_devbox__c
+  den__batteries__primary_user_bob_devbox__host_devbox{{"den/batteries/primary-user(bob@devbox)"}}:::den__batteries__primary_user_bob_devbox__host_devbox_c
+  regreet["regreet"]:::regreet_c
+  server["server"]:::server_c
+  tailscale["tailscale"]:::tailscale_c
+  virtualization["virtualization"]:::virtualization_c
+  workstation["workstation"]:::workstation_c
+  desktop --> gdm
+  desktop -.->|replaced| regreet
+  devbox --> den__batteries__primary_user_alice_devbox_
+  devbox --> den__batteries__primary_user_bob_devbox__host_devbox
+  devbox --> server
+  devbox --> workstation
+  server --> monitoring__alerting
+  server --> backup
+  server -.-x virtualization__docker
+  server --> monitoring
+  server --> monitoring__nginx_exporter
+  server --> monitoring__node_exporter
+  server -.-x tailscale
+  workstation --> desktop
+  workstation --> networking
+  workstation --> virtualization__podman
+  workstation -.-x tailscale
+  workstation --> virtualization
+  end
+```
+
+`aspectsOnly` over `devbox`, which includes both the `workstation` and the
+`server` role. The dashed `-x` edges are exclusions: `devbox` removes
+`tailscale` and `virtualization/docker` with `constraints.exclude`, and the
+diagram still shows who tried to include them. The `replaced` edge is
+`constraints.substitute` swapping the `regreet` greeter for `gdm`. Hexagons
+are parametric aspects, trapezoids are sub-aspects reached through
+`provides`, and the loose nodes (`host-to-users`, `os-to-host`, …) are the
+policies that fired in each scope.
+
+<details>
+<summary>How this was generated</summary>
+
+```sh
+# in a copy of templates/diagram-demo with the module above as modules/diagrams.nix
+nix eval --raw .#diagrams.devbox-aspects \
+  | grep -Ev '^\s*(%%\{init|classDef|style )'
+```
+
+The template's own `nix build ./templates/diagram-demo#devbox-aspects` renders
+the same graph left to right, in its theme and with the ELK layout.
+
+</details>
+
+### One class at a time
+
+```mermaid
+graph TD
+  devbox([devbox]):::root
+
+  subgraph ctx_user_bob["user: bob"]
+  bob{{"bob"}}:::bob_c
+  gnome["gnome"]:::gnome_c
+  den__batteries__primary_user_bob_devbox__user_bob{{"den/batteries/primary-user(bob@devbox)"}}:::den__batteries__primary_user_bob_devbox__user_bob_c
+  bob --> gnome
+  bob --> den__batteries__primary_user_bob_devbox__user_bob
+  end
+  subgraph ctx_user_alice["user: alice"]
+  alice{{"alice"}}:::alice_c
+  alice__to_hosts["alice/to-hosts"]:::alice__to_hosts_c
+
+  end
+  subgraph ctx_host_devbox["host: devbox"]
+  monitoring__alerting[/"monitoring/alerting"\]:::monitoring__alerting_c
+  backup{{"backup"}}:::backup_c
+  desktop["desktop"]:::desktop_c
+  gdm["gdm"]:::gdm_c
+  monitoring["monitoring"]:::monitoring_c
+  networking["networking"]:::networking_c
+  monitoring__nginx_exporter[/"monitoring/nginx-exporter"\]:::monitoring__nginx_exporter_c
+  monitoring__node_exporter[/"monitoring/node-exporter"\]:::monitoring__node_exporter_c
+  virtualization__podman[/"virtualization/podman"\]:::virtualization__podman_c
+  den__batteries__primary_user_alice_devbox_{{"batteries/primary-user(alice@devbox)"}}:::den__batteries__primary_user_alice_devbox__c
+  den__batteries__primary_user_bob_devbox__host_devbox{{"den/batteries/primary-user(bob@devbox)"}}:::den__batteries__primary_user_bob_devbox__host_devbox_c
+  server["server"]:::server_c
+  virtualization["virtualization"]:::virtualization_c
+  workstation["workstation"]:::workstation_c
+  desktop --> gdm
+  devbox --> den__batteries__primary_user_alice_devbox_
+  devbox --> den__batteries__primary_user_bob_devbox__host_devbox
+  devbox --> server
+  devbox --> workstation
+  server --> monitoring__alerting
+  server --> backup
+  server --> monitoring
+  server --> monitoring__nginx_exporter
+  server --> monitoring__node_exporter
+  workstation --> desktop
+  workstation --> networking
+  workstation --> virtualization__podman
+  workstation --> virtualization
+  virtualization -.->|provides| virtualization__podman
+  monitoring -.->|provides| monitoring__node_exporter
+  monitoring -.->|provides| monitoring__nginx_exporter
+  monitoring -.->|provides| monitoring__alerting
+  end
+```
+
+`classSlice "nixos"` keeps the aspects whose `nixos` content reached
+`devbox`, plus the chain of includes above each one. That answers "where did
+this NixOS module come from": follow the arrows back from a node to the host.
+The excluded and replaced aspects are gone, as are the policies, and the
+dotted `provides` edges show which parent aspect a sub-aspect was taken from.
+
+<details>
+<summary>How this was generated</summary>
+
+```sh
+# in a copy of templates/diagram-demo with the module above as modules/diagrams.nix
+nix eval --raw .#diagrams.devbox-nixos \
+  | grep -Ev '^\s*(%%\{init|classDef|style )'
+```
+
+The template's own `nix build ./templates/diagram-demo#devbox-class-nixos`
+renders the same slice left to right.
+
+</details>
+
+### Which policies fired, and where
+
+```mermaid
+graph TD
+  flake(["flake"])
+  environment_prod_fleet_fleet{{"environment: prod"}}
+  environment_prod_fleet_fleet_host_lb_prod["host: lb-prod"]
+  environment_prod_fleet_fleet_host_lb_prod_user_alice(["user: alice"])
+  environment_prod_fleet_fleet_host_web_prod_1["host: web-prod-1"]
+  environment_prod_fleet_fleet_host_web_prod_1_user_alice(["user: alice"])
+  environment_prod_fleet_fleet_host_web_prod_2["host: web-prod-2"]
+  environment_prod_fleet_fleet_host_web_prod_2_user_alice(["user: alice"])
+  environment_staging_fleet_fleet{{"environment: staging"}}
+  environment_staging_fleet_fleet_host_web_staging["host: web-staging"]
+  environment_staging_fleet_fleet_host_web_staging_user_alice(["user: alice"])
+  environment_staging_fleet_fleet_host_web_staging_user_bob(["user: bob"])
+  fleet_fleet(["fleet: fleet"])
+  system_x86_64_linux["flake-system: system=x86_64-linux"]
+
+  fleet_fleet -->|fleet-to-envs| environment_prod_fleet_fleet
+  environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_lb_prod
+  environment_prod_fleet_fleet_host_lb_prod -->|env-users| environment_prod_fleet_fleet_host_lb_prod_user_alice
+  environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_web_prod_1
+  environment_prod_fleet_fleet_host_web_prod_1 -->|env-users| environment_prod_fleet_fleet_host_web_prod_1_user_alice
+  environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_web_prod_2
+  environment_prod_fleet_fleet_host_web_prod_2 -->|env-users| environment_prod_fleet_fleet_host_web_prod_2_user_alice
+  fleet_fleet -->|fleet-to-envs| environment_staging_fleet_fleet
+  environment_staging_fleet_fleet -->|env-to-hosts| environment_staging_fleet_fleet_host_web_staging
+  environment_staging_fleet_fleet_host_web_staging -->|env-users| environment_staging_fleet_fleet_host_web_staging_user_alice
+  environment_staging_fleet_fleet_host_web_staging -->|env-users| environment_staging_fleet_fleet_host_web_staging_user_bob
+  flake -->|to-fleet| fleet_fleet
+  flake -->|flake-to-systems| system_x86_64_linux
+```
+
+`toPolicyResolutionMapMermaid` is the scope tree of `fleet-demo` with the
+policies on the edges: each edge names the policy that created the scope it
+points to. At the root, `to-fleet` creates the fleet and `flake-to-systems`
+the per-system scope. `fleet-to-envs` fans the fleet out into environments
+and `env-to-hosts` places each host in one. Users come from a registry, not
+from `den.hosts`: `env-users` grants `alice` (group `admin`) every host, and
+`bob` (group `deploy`) only the staging one. Nothing hangs from
+`flake-system`: den still creates the per-system scope, but `fleet-demo`
+places its hosts under `fleet` instead.
+
+<details>
+<summary>How this was generated</summary>
+
+```sh
+# in a copy of templates/fleet-demo with the module above as modules/diagrams.nix
+nix eval --raw .#diagrams.policy-resolution \
+  | grep -Ev '^\s*(%%\{init|classDef|style )'
+```
+
+Byte-identical after the same filter to the template's own
+`nix build ./templates/fleet-demo#fleet-policy-resolution`.
+
+</details>
+
+### Who feeds whom
+
+```mermaid
+graph LR
+  subgraph env_prod["prod"]
+    lb_prod(["lb-prod (hostfile→host-addrs)"])
+    web_prod_1(["web-prod-1 (nginx→http-backends, hostfile→host-addrs)"])
+    web_prod_2(["web-prod-2 (nginx→http-backends, hostfile→host-addrs)"])
+  end
+  subgraph env_staging["staging"]
+    web_staging(["web-staging (nginx→http-backends, hostfile→host-addrs)"])
+  end
+
+  web_prod_1 -->|http-backends| lb_prod
+  web_prod_2 -->|http-backends| lb_prod
+  web_prod_1 -->|host-addrs| lb_prod
+  web_prod_2 -->|host-addrs| lb_prod
+  lb_prod -->|host-addrs| web_prod_1
+  web_prod_2 -->|host-addrs| web_prod_1
+  lb_prod -->|host-addrs| web_prod_2
+  web_prod_1 -->|host-addrs| web_prod_2
+
+  linkStyle 0 stroke:#fa4549,stroke-width:2px
+  linkStyle 1 stroke:#fa4549,stroke-width:2px
+  linkStyle 2 stroke:#2da44e,stroke-width:2px
+  linkStyle 3 stroke:#2da44e,stroke-width:2px
+  linkStyle 4 stroke:#2da44e,stroke-width:2px
+  linkStyle 5 stroke:#2da44e,stroke-width:2px
+  linkStyle 6 stroke:#2da44e,stroke-width:2px
+  linkStyle 7 stroke:#2da44e,stroke-width:2px
+```
+
+`toPipeFlowMermaid` draws the two pipes of `fleet-demo`, grouped by the
+environment that bounds them. `http-backends` runs one way, from the `nginx`
+hosts into the load balancer. `host-addrs` runs between every pair of prod
+hosts, because each emits its address and each collects its peers'. Each node
+label lists which aspect emitted into which pipe. `web-staging` emits into
+both pipes but has no edges, because it is the only host in `staging`: the
+pipes stop at the environment boundary.
+
+<details>
+<summary>How this was generated</summary>
+
+```sh
+# in a copy of templates/fleet-demo with the module above as modules/diagrams.nix
+nix eval --raw .#diagrams.pipe-flow \
+  | grep -Ev '^\s*(%%\{init|classDef|style )'
+```
+
+Byte-identical after the same filter to the template's own
+`nix build ./templates/fleet-demo#fleet-pipe-flow`.
+
+</details>
+
+### The same pipes as a sequence
+
+```mermaid
+sequenceDiagram
+    box prod
+    participant lb_prod as lb-prod
+    participant web_prod_1 as web-prod-1
+    participant web_prod_2 as web-prod-2
+    end
+    box staging
+    participant web_staging as web-staging
+    end
+
+    Note over lb_prod: hostfile → host-addrs
+    Note over web_prod_1: hostfile → host-addrs
+    Note over web_prod_2: hostfile → host-addrs
+    Note over web_staging: hostfile → host-addrs
+    web_prod_1 -->> lb_prod: host-addrs
+    web_prod_2 -->> lb_prod: host-addrs
+    lb_prod -->> web_prod_1: host-addrs
+    web_prod_2 -->> web_prod_1: host-addrs
+    lb_prod -->> web_prod_2: host-addrs
+    web_prod_1 -->> web_prod_2: host-addrs
+
+    Note over web_prod_1: nginx → http-backends
+    Note over web_prod_2: nginx → http-backends
+    Note over web_staging: nginx → http-backends
+    web_prod_1 -->> lb_prod: http-backends
+    web_prod_2 -->> lb_prod: http-backends
+```
+
+`toPipeSequenceMermaid` shows the same data as emit and collect steps, one
+lifeline per host, boxed by environment. It reads well when a pipe has many
+producers and one consumer. The order of the arrows is not an evaluation
+order: `pipe.collect` gathers peer emissions as an unordered list.
+
+<details>
+<summary>How this was generated</summary>
+
+```sh
+# in a copy of templates/fleet-demo with the module above as modules/diagrams.nix
+nix eval --raw .#diagrams.pipe-sequence \
+  | grep -Ev '^\s*(%%\{init|classDef|style )'
+```
+
+Byte-identical after the same filter to the template's own
+`nix build ./templates/fleet-demo#fleet-pipe-sequence`.
+
+</details>
+
+## Producing them yourself
+
+Both templates already expose their views as packages, one Markdown file per
+view (and an SVG next to it, suffixed `-mmd-svg`). From a checkout of den:
+
+```sh
+# list what a template exposes
+nix eval --override-input den . ./templates/diagram-demo#packages.x86_64-linux \
+  --apply builtins.attrNames
+
+# one view, as Markdown with a mermaid block
+nix build --override-input den . ./templates/diagram-demo#devbox-aspects && cat result
+
+# the rendered SVG of the same view
+nix build --override-input den . ./templates/diagram-demo#devbox-aspects-mmd-svg
+
+# every view, written into the template directory
+nix run ./templates/diagram-demo#write-diagrams
+nix run ./templates/fleet-demo#write-diagrams
+```
+
+In your own flake, add the `den-diagram` input and the module from
+[the two-step pattern](#the-two-step-pattern-in-a-flake), then:
+
+```sh
+nix eval .#diagrams --apply builtins.attrNames         # the views you have
+nix eval --raw .#diagrams.<host>-aspects > host.mmd
+mmdc -i host.mmd -o host.svg                           # mermaid-cli, if you want an image
+```
+
+For the fleet views, `fleetCapture` is all you need, and it already holds
+every host. For a single host with nothing else in the flake, the
+[reference](/reference/diag/#two-step-pattern) shows the lower-level
+`captureWithPathsWith` + `diagram.context` form.
+
+## See also
+
+- [Diagrams](/explanation/diagrams/): the capture, graph, filter and render stages
+- [den.lib.capture & den-diagram](/reference/diag/): every filter, renderer and export helper
+- [Fleet Demo](/tutorials/fleet-demo/): the template behind the fleet diagrams
+- [Cross-Scope Pipes](/guides/quirks-cross-scope/): what the pipe diagrams are drawing
+- [Policies reference](/reference/policies/): `resolve.to` and the policies in the resolution map
+- [den-diagram](https://github.com/denful/den-diagram): the rendering library

@@ -32,38 +32,53 @@ flowchart LR
 
 ## Quick start
 
-The simplest usage renders a host's full aspect graph as Mermaid:
+Capture the fleet once in den, then cut out the scope you want to draw:
 
 ```nix
-diag.toMermaid (diag.hostContext { inherit host; })
+diag = inputs.den-diagram.lib;
+fleetCapture = den.lib.capture.captureFleet { };
+
+# one host's subtree, including its users
+g = diag.projectScope { inherit fleetCapture; kind = "host"; name = "igloo"; };
+
+diag.toMermaid g
 ```
 
 Add a filter for a coarser overview:
 
 ```nix
-diag.toMermaid (diag.graph.simplified (diag.hostContext { inherit host; }))
+diag.toMermaid (diag.graph.simplified g)
 ```
 
 Or slice to a single class:
 
 ```nix
-diag.toMermaid (diag.graph.classSlice "nixos" (diag.hostContext { inherit host; }))
+diag.toMermaid (diag.graph.classSlice "nixos" g)
 ```
 
-## Convenience wrappers
+## Building graphs
 
-Three wrappers build graph IR from common entity kinds without manually calling `den.lib.resolveEntity`:
-
-- **`hostContext { host; classes?; direction?; }`** -- resolves from the host root. Defaults to `["nixos" "homeManager" "user"]` plus any user-declared classes.
-- **`userContext { host; user; classes?; direction?; }`** -- resolves from the user root. Defaults to `["homeManager" "user"]`.
-- **`homeContext { home; classes?; direction?; }`** -- resolves from a standalone home. Defaults to `["homeManager"]`.
-
-For fully custom entities, use the generic `context` directly:
+- **`projectScope { fleetCapture; kind; name; direction?; }`** -- the graph
+  as seen from one scope of a fleet capture: the scope and all its
+  descendants. `kind` is any entity kind (`host`, `user`, `environment`, …).
+  This is the usual entry point, since one `captureFleet` serves every view.
+- **`context { entries; ctxTrace?; pathsByClass?; name; direction?; }`** --
+  builds a graph from a standalone capture of a single root:
 
 ```nix
-root = den.lib.resolveEntity "user" { inherit host user; };
-g = diag.context { inherit root; name = user.name; classes = [ "homeManager" ]; };
+captured = den.lib.capture.captureWithPathsWith {
+  classes = [ "homeManager" ];
+  root = den.lib.resolveEntity "user" { inherit host user; };
+  ctx = { inherit host user; };
+};
+g = diag.context {
+  inherit (captured) entries ctxTrace;
+  name = user.name;
+};
 ```
+
+The [diagram case study](/tutorials/case-study-diagrams/) wires this into a
+flake and shows the generated output.
 
 ## Filters and views
 
@@ -75,7 +90,7 @@ A few representative filters under `diag.graph` give the flavour:
 - **`classSlice "nixos"`** -- the ancestor closure of aspects active in a single class, for answering "what contributes to my NixOS config?".
 - **`flattenEntityKinds`** -- a fold that removes entity-kind subgraph grouping when the boxes get noisy.
 
-These are illustrative, not the full set. See the [`den.lib.diag` reference](/reference/diag/) for the complete catalogue of predicate, closure, reshape, fold, and composite filters.
+These are illustrative, not the full set. See the [diagram reference](/reference/diag/) for the complete catalogue of predicate, closure, reshape, fold, and composite filters.
 
 ## Renderers
 
@@ -85,7 +100,7 @@ A renderer turns the filtered IR into a diagram string in some target format. Be
 - **`toDot`** -- GraphViz DOT, better suited to large graphs and PDF export.
 - **`toScopeEdgesMermaid`** -- a sequence-family renderer that draws scope topology edges.
 
-Den ships many more (C4, sankey, treemap, mindmap, state, JSON, and fleet-wide variants). See the [`den.lib.diag` reference](/reference/diag/) for the full list grouped by family.
+Den ships many more (C4, sankey, treemap, mindmap, state, JSON, and fleet-wide variants). See the [diagram reference](/reference/diag/) for the full list grouped by family.
 
 Every renderer has a `*With` variant (e.g. `toMermaidWith`) that accepts theme and config overrides. The `renderers` constructor builds a complete set with shared settings:
 
@@ -121,7 +136,7 @@ For generating SVG derivations (e.g. for a docs site), use `renderContext` toget
 ```nix
 rc = diag.renderContext { inherit pkgs theme; mermaidConfig = elkCfg; };
 entries = diag.export.entityEntries { inherit pkgs rc diag; } {
-  entity = diag.hostContext { inherit host; };
+  entity = diag.projectScope { inherit fleetCapture; kind = "host"; inherit (host) name; };
   name = host.name;
   dir = "hosts/${host.name}";
   viewDefs = rc.views.host;
@@ -132,7 +147,7 @@ The `renderContext` bundles pre-configured renderers (`rc.render`, `rc.renderDen
 
 ## See also
 
-- [`den.lib.diag` reference](/reference/diag) -- complete list of wrappers, filters, renderers, themes, and export helpers
+- [diagram reference](/reference/diag) -- complete list of wrappers, filters, renderers, themes, and export helpers
 - [Aspects](/explanation/aspects) -- how aspects compose
 - [Entities](/explanation/entities) -- the entity kinds that diagrams trace
 - [Policies](/explanation/policies) -- policy fan-out visible in diagram views

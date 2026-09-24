@@ -23,7 +23,7 @@ hero:
       variant: minimal
 ---
 
-import { Steps, LinkButton, Card, CardGrid } from '@astrojs/starlight/components';
+import { Steps, LinkButton, Card, CardGrid, LinkCard } from '@astrojs/starlight/components';
 
 ## Testimonials
 
@@ -119,6 +119,17 @@ flowchart BT
 </div>
 
 
+## Explore by example
+
+<CardGrid>
+  <LinkCard title="Case Study: Kubernetes from a NixOS Fleet" href="/tutorials/case-study-kubernetes/" description="One source of truth for hosts, BGP and the cluster manifests that depend on them." />
+  <LinkCard title="Case Study: Access Control & Environments" href="/guides/acl-environments/" description="Derive who logs in where, and with which groups, from one group graph." />
+  <LinkCard title="Quirk Recipes" href="/guides/quirk-recipes/" description="Language aspects that configure every editor, per-aspect persistence, shared overlays." />
+  <LinkCard title="Aspect Settings" href="/guides/aspect-settings/" description="Typed per-host tunables declared next to the aspect that reads them." />
+  <LinkCard title="Fleet Demo" href="/tutorials/fleet-demo/" description="Environments, many hosts and cross-host data in a runnable template." />
+  <LinkCard title="MicroVM" href="/tutorials/microvm/" description="Guests as den entities: extending the pipeline with a new kind." />
+</CardGrid>
+
 ## Den as a *library*
 
 <CardGrid>
@@ -156,7 +167,7 @@ flowchart LR
 <Steps>
 1. **Schema** -- `den.hosts` and `den.homes` declare machines, users, and their properties with `den.schema` modules and extensible freeform types.
 2. **Aspects** -- `den.aspects.*` bundles per-class configs (`nixos`, `darwin`, `homeManager`, or any custom class) with `.includes` and `.provides` forming a DAG.
-3. **Resolution pipeline** -- `den.policies` fan out from entity kinds (`{host}` → `{host, user}`, `{home}`) and bind behavior. Batteries register derived entity kinds like `hm-host`, `hm-user`, `wsl-host`.
+3. **Resolution pipeline** -- `den.policies` fan out from entity kinds (`{host}` → `{host, user}`, `{home}`) and bind behavior. Batteries add their own classes (`homeManager`, `hjem`, `wsl`, …) and, where needed, derived entity kinds such as `wsl-host`.
 4. **Resolution** -- Context-aware dispatch: functions receive entity data automatically based on their argument shape. [Class modules](/explanation/class-modules/) can access both Den context and NixOS module args in a single function.
 5. **Output** -- Each host/home is instantiated via `nixpkgs.lib.nixosSystem`, `darwin.lib.darwinSystem`, or `home-manager.lib.homeManagerConfiguration`.
 </Steps>

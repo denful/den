@@ -20,7 +20,7 @@ NixOS module systems. But you can define **custom classes** that forward their
 contents into a target submodule path on another class.
 
 This is how Den implements:
-- The `user` class (forwards to `users.users.<name>` on the OS)
+- The `user` class (routes to `users.users.<name>` on the OS, via `den.lib.policy.route`)
 - Home Manager integration (forwards `homeManager` to `home-manager.users.<name>`)
 - hjem integration (forwards `hjem` to `hjem.users.<name>`)
 - nix-maid integration (forwards `maid` to `users.users.<name>.maid`)
@@ -37,7 +37,7 @@ den.batteries.forward {
   fromClass = user: "user";
   intoClass = user: host.class;
   intoPath  = user: [ "users" "users" user.userName ];
-  fromAspect = user: den.aspects.${user.aspect};
+  fromAspect = user: user.aspect;
 }
 ```
 
@@ -49,12 +49,20 @@ den.batteries.forward {
 | `intoPath = item: path or args: path` | Target attribute path in the target class |
 | `fromAspect = item: aspect` | The aspect to read the custom class from |
 
+For the built-in `user` class, that looks like:
+
+```mermaid
+flowchart LR
+  A["den.aspects.alice.user = { extraGroups = [ wheel ]; }"] --> C[("user class content")]
+  C -- "forward / route: intoClass = host.class, intoPath = users.users.alice" --> N["nixos: users.users.alice.extraGroups = [ wheel ]"]
+```
+
 <Aside title="Lower-level alternative: den.classes + route">
 
 The `forward` battery is the ergonomic way to build a custom class. Under the
-hood, Den's own built-in classes (`os`, `user`, `homeManager`, `hjem`, `maid`)
-register the class name with `den.classes.<name>` and move its content with a
-`den.lib.policy.route` policy. You can do the same directly:
+hood, Den's own `os`, `user`, and `wsl` classes register the class name with
+`den.classes.<name>` and move its content with a `den.lib.policy.route`
+policy (`homeManager`, `hjem`, and `maid` use `forward`). You can do the same directly:
 
 ```nix
 { den, ... }:
@@ -115,7 +123,7 @@ let
       fromClass = _: "container";
       intoClass = _: host.class;
       intoPath  = _: [ "virtualisation" "oci-containers" "containers" user.userName ];
-      fromAspect = _: den.aspects.${user.aspect};
+      fromAspect = _: user.aspect;
     };
 in {
   den.schema.user.includes = [ fwd ];
@@ -221,212 +229,8 @@ guard = { config, ... }: _item: lib.mkIf (config.programs.vim.enable);
 
 </Aside>
 
-## User contributed examples
+## More examples
 
-### Example: Alias a Class into the Target Root
-
-This pattern is useful when you want a class to behave like an alias for another
-class while keeping a separate name in your aspects.
-
-```nix
-hmAlias =
-  { class, aspect-chain }:
-  den.batteries.forward {
-    each = lib.singleton class;
-    fromClass = _: "hm";
-    intoClass = _: "homeManager";
-    intoPath = _: [ ];
-    fromAspect = _: lib.head aspect-chain;
-    adaptArgs = { config, ... }: { osConfig = config; };
-  };
-
-den.aspects.tux = {
-  includes = [ hmAlias ];
-  hm =
-    { osConfig, ... }:
-    {
-      programs.fish.enable = true;
-      home.keyboard.model = osConfig.networking.hostName;
-    };
-};
-```
-
-This forwards `hm.*` directly into `homeManager.*`. A more interesting use case is the following:
-
-
-### Example: Platform specific `hm` classes
-
-This pattern is useful when you need HM to distinguish between
-different OS Platforms, because some packages only build in
-Darwin and not NixOS.
-
-
-```nix
-hmPlatforms =
-  { class, aspect-chain }:
-  den.batteries.forward {
-    each = [ "Linux" "Darwin" "Aarch64" "64bit" ];
-    fromClass = platform: "hm${platform}";
-    intoClass = _: "homeManager";
-    intoPath = _: [ ];
-    fromAspect = _: lib.head aspect-chain;
-    guard = { pkgs, ... }: platform: lib.mkIf pkgs.stdenv."is${platform}";
-    adaptArgs = { config, ... }: { osConfig = config; };
-  };
-
-den.aspects.tux = {
-  includes = [ hmPlatforms ];
-
-  hmLinux = { pkgs, ... }: {
-    home.packages = [ pkgs.wl-clipboard-rs ];
-  };
-
-  hmDarwin = { pkgs, ... }: {
-    home.packages = [ pkgs.iterm2 ];
-  };
-};
-```
-
-### Example: Config across `nixos` and `darwin` classes.
-
-The `os` forward class ([provided by Den](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-class.nix)) can be useful for settings that must be forwarded to both on NixOS and MacOS.
-
-> Requested by @Risa-G at [#222](https://github.com/denful/den/discussions/222)
-
-```nix
-# The os class ships enabled by default. Den's built-in implementation
-# (modules/aspects/batteries/os-class.nix) uses den.classes + a route policy
-# rather than the forward battery, but this is an equivalent re-implementation.
-os-class = { class, aspect-chain }: den.batteries.forward {
-  each = [ "nixos" "darwin" ];
-  fromClass = _: "os";
-  intoClass = lib.id;
-  intoPath = _: [ ]; # top-level
-  fromAspect = _: lib.head aspect-chain;
-};
-
-# Built-ins wire themselves; for a custom class you would add:
-# den.schema.host.includes = [ os-class ];
-
-den.aspects.my-laptop = {
-  os.networking.hostName = "Yavanna"; # on both NixOS and MacOS
-};
-```
-
-### Example: Role based configuration between users and hosts
-
-A dynamic class for matching roles between users and hosts.
-
-```nix
-roleClass =
-  { host, user }:
-  { class, aspect-chain }:
-  den.batteries.forward {
-    each = lib.intersectLists (host.roles or []) (user.roles or []);
-    fromClass = lib.id;
-    intoClass = _: host.class;
-    intoPath = _: [ ];
-    fromAspect = _: lib.head aspect-chain;
-  };
-
-den.schema.user.includes = [ roleClass ];
-
-den.hosts.x86_64-linux.igloo = {
-  roles = [ "devops" "gaming" ];
-  users = {
-    alice.roles = [ "gaming" ];
-    bob.roles = [ "devops" ];
-  };
-};
-
-den.aspects.alice = {
-  # enabled when host supports gaming role
-  gaming = { pkgs, ... }: { programs.steam.enable = true; };
-
-  # enabled when host supports devops role
-  devops = { pkgs, ... }: { virtualisation.podman.enable = true; };
-};
-```
-
-### Example: A git class that checks enable.
-
-```nix
-gitClass =
-  { class, aspect-chain }:
-  den.batteries.forward {
-    each = lib.singleton true;
-    fromClass = _: "git";
-    intoClass = _: "homeManager";
-    intoPath = _: [ "programs" "git" ];
-    fromAspect = _: lib.head aspect-chain;
-    guard = { config, ... }: _: lib.mkIf config.programs.git.enable;
-  };
-
-den.aspects.tux = {
-  includes = [ gitClass ];
-  git.userEmail = "root@linux.com";
-};
-```
-
-This will set at host: `home-manager.users.tux.programs.git.userEmail`
-
-### Example: A `nix` class that propagates settings to NixOS and HomeManager
-
-This can be used when you don't want NixOS and HomeManager to share the
-same pkgs but still configure both at the same time. 
-> Contributed by @musjj
-
-```nix
-nixClass =
-  { class, aspect-chain }:
-  den.batteries.forward {
-    each = [ "nixos" "homeManager" ];
-    fromClass = _: "nix";
-    intoClass = lib.id;
-    intoPath = _: [ "nix" "settings" ];
-    fromAspect = _: lib.head aspect-chain;
-    adaptArgs = lib.id;
-  };
-
-# enable class for all users:
-den.schema.user.includes = [ nixClass ];
-
-# custom aspect that uses the `nix` class.
-nix-allowed = { user, ... }: { nix.allowed-users = [ user.userName ]; };
-
-# included at users who can fix things with nix.
-den.aspects.tux.includes = [ nix-allowed ];
-```
-
-### Example: An impermanence class
-
-> Suggested by @Doc-Steve
-
-The following example, creates a forwarding class that is propagated only
-when `environment.persistance` option is available in the host (the impermanence module was imported in host)
-
-One cool thing about these custom classes is that aspects can simply define
-settings at the new class, without having to worry if the options they depend or
-some capability is enabled.
-
-The forward-guard itself is reponsible checking in only one place, instead of having `mkIf` in a lot of places.
-
-```nix
-# Custom `persys` forwards config into nixos.environment.persistance."/nix/persist/system"
-# only if environment.persistance option is present.
-persys = { class, aspect-chain }: den.batteries.forward {
-  each = lib.singleton true;
-  fromClass = _item: "persys";
-  intoClass = _item: class;
-  intoPath = _item:
-    { config, ... }: # access intoClass module arguments:
-    [ "environment" "persistance" config.impermanence.persistence-dir ];
-  fromAspect = _item: lib.head aspect-chain;
-  guard = { options, ... }@osArgs: options ? environment.persistance;
-};
-
-den.hosts.my-laptop.includes = [ persys ];
-
-# becomes nixos.environment.persistance."/nix/persist/system".hideMounts = true;
-den.aspects.my-laptop.persys.hideMounts = true;
-```
+Community-contributed classes (aliases, platform-specific `hm` classes,
+role matching, guarded forwards, an impermanence class) are collected on
+[Custom Class Examples](/guides/custom-class-examples/).
