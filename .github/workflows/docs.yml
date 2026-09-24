@@ -6,14 +6,16 @@ on:
     branches-ignore: [main]
     paths: ["docs/**"]
   pull_request:
-    types: [labeled, opened, synchronize, reopened, review_requested, ready_for_review]
+    types: [labeled, opened, synchronize, reopened, ready_for_review]
     paths: ["docs/**"]
   pull_request_review:
     types: [submitted]
 # group per ref so concurrent PRs don't cancel each other's docs builds
 concurrency:
   group: docs-${{ github.ref }}
-  cancel-in-progress: true
+  # cancel only for new code; same-commit events (labels, reviews) queue so
+  # a superseded run can't leave stale failed checks on the current head
+  cancel-in-progress: ${{ github.event_name == 'push' || github.event.action == 'synchronize' }}
 env:
   NIX_PATH: "nixpkgs=https://channels.nixos.org/nixpkgs-unstable/nixexprs.tar.xz"
 jobs:
