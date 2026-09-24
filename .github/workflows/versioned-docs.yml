@@ -21,7 +21,7 @@ jobs:
       - name: Version
         run: |
           pushd docs
-          rg '(src|href)="/' dist -l -0 | xargs -0 -n 1 sed -i 's#\(src\|href\)="/#\1="/${{github.ref_name}}/#g'
+          grep -rlZE '(src|href)="/' dist | xargs -0 -n 1 sed -i 's#\(src\|href\)="/#\1="/${{github.ref_name}}/#g'
           mkdir -p versioned
           mv dist versioned/${{github.ref_name}}
           popd
