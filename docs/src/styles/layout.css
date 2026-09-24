@@ -1,0 +1,289 @@
+/*
+ * Typographic and surface layer.
+ *
+ * Every colour here resolves through `--sl-color-*`, so the whole layer follows
+ * whichever palette is active. Nothing in this file may hardcode a hex value.
+ *
+ * Den sets headings and UI chrome in Victor Mono. Monospace runs roughly 15%
+ * wider than sans at the same size, so Starlight's default type scale — tuned
+ * for a sans stack — overshoots badly here. The heading rules below pull the
+ * scale back and tighten tracking to compensate.
+ */
+
+:root {
+  /* Routes Starlight's own mono usages (code, pre, kbd) through the loaded
+     webfont, replacing per-element font-family assignments in custom.css. */
+  --sl-font-mono: var(--font-jetbrains-mono);
+  --sl-content-width: 50rem;
+
+  /* Heading sizes are set through Starlight's own tokens rather than on the
+     heading elements. Anchor links live in a `.sl-heading-wrapper` that carries
+     the heading font-size, and their end-of-line padding and negative margin
+     are both `em`-relative to it; sizing the heading element directly desyncs
+     those two `em` bases and the icon overlaps the text. */
+  --sl-text-h1: clamp(2rem, 4.5vw, 3rem);
+  --sl-text-h2: clamp(1.5rem, 3vw, 2rem);
+  --sl-text-h3: clamp(1.2rem, 2.2vw, 1.5rem);
+  --sl-line-height-headings: 1.15;
+
+  /* Starlight points this at gray-5, which reads as a filled block in running
+     prose. gray-6 sits at the hairline level, so the chip reads as a bordered
+     inline span rather than a highlight. */
+  --sl-color-bg-inline-code: var(--sl-color-gray-6);
+}
+
+/* ── Headings ─────────────────────────────────────────────────────────── */
+
+.sl-markdown-content :is(h1, h2, h3, h4),
+.hero h1 {
+  font-weight: 400;
+}
+
+.sl-markdown-content h1,
+.hero h1 {
+  letter-spacing: -0.03em;
+}
+
+.sl-markdown-content h2 {
+  letter-spacing: -0.02em;
+}
+
+.sl-markdown-content h3 {
+  letter-spacing: -0.01em;
+}
+
+/* Section breathing room. Applied to the anchor wrapper as well as the bare
+   heading: when a heading is wrapped it is `display: inline`, so margin set on
+   the element itself does nothing. Kept in `em` so it tracks the heading size. */
+.sl-markdown-content :is(h2, .sl-heading-wrapper.level-h2) {
+  margin-top: 2em;
+}
+
+/* Inline code inside a heading inherits the heading's size instead of the
+   body code size, which otherwise overflows the line box. */
+.sl-markdown-content :is(h1, h2, h3, h4) code {
+  font-size: 0.9em;
+  padding: 0 0.2em;
+  border: 0;
+  background: none;
+  color: var(--sl-color-accent-high);
+}
+
+/* Victor Mono's italic is a cursive script face, so any `em` that inherits it
+   reads as a different typeface and is hard to scan. Emphasis is carried by the
+   accent colour and a soft rule instead — legible, still stylised, and it
+   follows the active palette.
+
+   The selector list mirrors the Victor Mono assignment in custom.css: the
+   problem is not "em in a heading" but "em anywhere Victor Mono applies", which
+   also covers `strong`, `th` and aside titles. Keep the two lists in step. */
+:is(
+    .copy,
+    .site-title,
+    .tab-link,
+    header,
+    strong,
+    article.card p.title,
+    .starlight-aside__title,
+    .expressive-code .title,
+    h1, h2, h3, h4, h5, h6, th
+  ) em,
+.hero h1 em {
+  font-style: normal;
+  color: var(--sl-color-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 2px;
+  text-underline-offset: 0.22em;
+  text-decoration-color: color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+}
+
+/* Lead paragraph: the opening line of a page carries the summary. */
+.sl-markdown-content > p:first-of-type {
+  font-size: 1.05rem;
+  color: var(--sl-color-gray-1);
+}
+
+/* ── Surfaces ─────────────────────────────────────────────────────────── */
+
+/* Inline code is the densest repeated element in these pages, so its border
+   carries only a trace of accent — enough to warm it against the surrounding
+   greys without turning every identifier into a highlight. */
+.sl-markdown-content code:not(:where(.not-content *)) {
+  border: 1px solid color-mix(in srgb, var(--sl-color-accent) 22%, var(--sl-color-hairline));
+  border-radius: 2px;
+  padding: 0.1em 0.3em;
+  font-size: 0.875em;
+}
+
+.sl-markdown-content pre {
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 4px;
+}
+
+.expressive-code .frame {
+  border: 1px solid var(--sl-color-hairline-light) !important;
+  border-radius: 4px !important;
+  box-shadow: none !important;
+  overflow: hidden;
+}
+
+.expressive-code .frame pre {
+  border: 0 !important;
+  border-radius: 0 !important;
+}
+
+.expressive-code .frame.has-title:not(.is-terminal) .header {
+  background: var(--sl-color-bg-nav) !important;
+  border-color: var(--sl-color-hairline-light) !important;
+}
+
+.sl-markdown-content .card {
+  border-color: var(--sl-color-hairline-light);
+  border-radius: 4px;
+  background:
+    linear-gradient(
+      180deg,
+      color-mix(in srgb, var(--sl-color-accent) 5%, transparent),
+      transparent 60%
+    ),
+    var(--sl-color-bg);
+}
+
+/* Card titles wrap to three lines at the inherited heading size. */
+.sl-markdown-content .card .title {
+  font-size: var(--sl-text-lg);
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+  color: var(--sl-color-white);
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────── */
+
+/* Starlight fills the current entry solid. A tint plus a leading accent rule
+   marks position without dominating the column. */
+#starlight__sidebar a[aria-current='page'],
+#starlight__sidebar a[aria-current='page']:hover {
+  background: color-mix(in srgb, var(--sl-color-accent) 10%, transparent);
+  color: var(--sl-color-accent-high);
+  box-shadow: inset 2px 0 0 var(--sl-color-accent);
+}
+
+/* ── Accent usage ─────────────────────────────────────────────────────── */
+
+/* Places that were uniformly grey and read as chrome rather than content.
+   All of these resolve through --sl-color-accent, so they follow the palette;
+   kept to tints and 2px rules so the accent stays a highlight, not a fill. */
+
+::selection {
+  background: color-mix(in srgb, var(--sl-color-accent) 28%, transparent);
+}
+
+/*
+ * Expressive Code text markers. These are authored deliberately in the code
+ * fence meta (`\`\`\`console "_nixos"` wraps that text in <mark>), but Expressive
+ * Code derives their colour from the syntax theme rather than the palette, so
+ * they land as a flat grey box and read as an accident rather than a highlight.
+ *
+ * Declared at both :root and .expressive-code. In dark mode Expressive Code
+ * sets these on :root, but its light-mode rules re-declare them on the
+ * .expressive-code element itself — a nearer ancestor than :root, which wins
+ * for descendants whatever the layer, so a :root-only override silently
+ * reverted to grey on light palettes.
+ */
+:root,
+.expressive-code {
+  --ec-tm-markBg: color-mix(in srgb, var(--sl-color-accent) 18%, transparent);
+  --ec-tm-markBrdCol: color-mix(in srgb, var(--sl-color-accent) 55%, transparent);
+  --ec-tm-insBg: color-mix(in srgb, var(--sl-color-green) 16%, transparent);
+  --ec-tm-insBrdCol: color-mix(in srgb, var(--sl-color-green) 50%, transparent);
+  --ec-tm-delBg: color-mix(in srgb, var(--sl-color-red) 16%, transparent);
+  --ec-tm-delBrdCol: color-mix(in srgb, var(--sl-color-red) 50%, transparent);
+}
+
+
+/* Numbered steps: the bullet is the eye's anchor when following a tutorial. */
+.sl-markdown-content .sl-steps > li::before {
+  color: var(--sl-color-accent-high);
+  background-color: color-mix(in srgb, var(--sl-color-accent) 16%, var(--sl-color-bg));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--sl-color-accent) 45%, transparent);
+}
+
+.sl-markdown-content .sl-steps > li::after {
+  background-color: color-mix(in srgb, var(--sl-color-accent) 22%, var(--sl-color-hairline));
+}
+
+/* List markers, kept well below text contrast so they punctuate rather than compete. */
+.sl-markdown-content :is(ul, ol):not(:where(.not-content *, .sl-steps)) > li::marker {
+  color: color-mix(in srgb, var(--sl-color-accent) 70%, transparent);
+}
+
+.sl-markdown-content hr:not(:where(.not-content *)) {
+  border: 0;
+  height: 1px;
+  background: linear-gradient(
+    to right,
+    color-mix(in srgb, var(--sl-color-accent) 55%, transparent),
+    var(--sl-color-hairline) 55%,
+    transparent
+  );
+}
+
+/* Table of contents: mark position the same way the sidebar does. */
+.right-sidebar-panel a[aria-current='true'] {
+  color: var(--sl-color-accent-high);
+  box-shadow: inset 2px 0 0 var(--sl-color-accent);
+}
+
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  border-inline-start-color: var(--sl-color-accent);
+  color: var(--sl-color-gray-1);
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  color: var(--sl-color-white);
+  border-block-end: 2px solid color-mix(in srgb, var(--sl-color-accent) 55%, transparent);
+}
+
+.sl-markdown-content kbd:not(:where(.not-content *)) {
+  border: 1px solid color-mix(in srgb, var(--sl-color-accent) 40%, transparent);
+  background: color-mix(in srgb, var(--sl-color-accent) 8%, var(--sl-color-bg-inline-code));
+}
+
+.sl-markdown-content .sl-anchor-link {
+  color: var(--sl-color-accent);
+}
+
+/* ── Links ────────────────────────────────────────────────────────────── */
+
+.sl-markdown-content a:not(:where(.not-content *)) {
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+/* ── Long-form reading ────────────────────────────────────────────────── */
+
+/* Explanation and reference pages often open a paragraph with a bold lead-in
+   naming what it is about; promoting that to a visible entry point gives dense
+   prose a scannable structure without touching the prose itself. */
+.sl-markdown-content p > strong:first-child {
+  color: var(--sl-color-white);
+  font-weight: 600;
+}
+
+/* Starlight's default blockquote reads as an aside; give it a surface so a
+   quoted block reads as part of the argument. */
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  background: color-mix(in srgb, var(--sl-color-accent) 4%, transparent);
+  padding: 0.75rem 1rem;
+  border-radius: 0 4px 4px 0;
+}
+
+/* Dense reference tables: let them breathe and keep the header legible when a
+   long row wraps. */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  font-size: 0.9em;
+}
+
+.sl-markdown-content :is(td, th):not(:where(.not-content *)) {
+  padding: 0.4em 0.7em;
+}

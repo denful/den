@@ -5,16 +5,23 @@
   "scripts": {
     "dev": "astro dev",
     "start": "astro dev",
-    "build": "astro build",
+    "check": "astro check",
+    "build": "astro check && astro build",
     "preview": "astro preview",
     "astro": "astro"
   },
   "dependencies": {
-    "@astrojs/starlight": "^0.37.7",
-    "@catppuccin/starlight": "^1.1.1",
-    "astro": "^5.18.1",
-    "astro-mermaid": "^1.4.0",
-    "mermaid": "^11.14.0",
-    "sharp": "^0.34.5"
+    "@astrojs/markdown-remark": "^7.3.1",
+    "@astrojs/starlight": "^0.42.1",
+    "@catppuccin/starlight": "^2.1.0",
+    "astro": "^7.3.3",
+    "astro-mermaid": "^2.1.0",
+    "mermaid": "^11.17.2",
+    "sharp": "^0.35.4",
+    "starlight-links-validator": "^0.26.0"
+  },
+  "devDependencies": {
+    "@astrojs/check": "^0.9.10",
+    "typescript": "^6.0.3"
   }
 }
