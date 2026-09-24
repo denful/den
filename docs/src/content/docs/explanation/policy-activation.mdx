@@ -205,6 +205,18 @@ fixed-point iteration:
 6. **Converge** — when a round adds no new enrichment keys, emit all
    collected effects.
 
+```mermaid
+flowchart TD
+  C["1. Collect active policies (direct, schema, default includes)"] --> S{"2. All required args present in context?"}
+  S -- "no" --> W["wait: may fire in a later round"]
+  S -- "yes" --> F["3. Fire: collect effects"]
+  F --> E{"4. Effects add new context keys?"}
+  E -- "yes, round < 10" --> S
+  E -- "yes, round = 10" --> X["throw: den: enrichment cycle"]
+  E -- "no" --> V["6. Converge: emit collected effects"]
+  W -.-> E
+```
+
 This fixed-point iteration means policies can depend on context that
 other policies provide. The loop is capped at 10 iterations; if new keys
 are still appearing past that, the pipeline throws a `den: enrichment

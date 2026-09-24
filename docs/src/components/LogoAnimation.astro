@@ -2,7 +2,7 @@
 ---
 
 <div class="logo-animation">
-  <canvas width="400" height="400"></canvas>
+  <canvas width="400" height="400" role="img" aria-label="den logo: circuit traces forming a house"></canvas>
 </div>
 
 <style>
@@ -16,6 +16,7 @@
     display: block;
     width: 100%;
     height: auto;
+    aspect-ratio: 1;
   }
 
   @media (min-width: 50rem) {
@@ -27,475 +28,284 @@
 </style>
 
 <script>
-  const canvas = document.querySelector('.logo-animation canvas') as HTMLCanvasElement;
+  // The den logo, drawn from its geometry: traces grow from the peak node,
+  // split, and merge into the inner house; then pulses flow down to the
+  // terminals. Coordinates are in the original 1024px artwork's space.
+  type Pt = { x: number; y: number };
+  type Sampled = { pts: Pt[]; dist: number[]; len: number };
+
+  const canvas = document.querySelector('.logo-animation canvas') as HTMLCanvasElement | null;
   if (canvas) {
     const ctx = canvas.getContext('2d')!;
+    const SIZE = 400;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    canvas.width = SIZE * dpr;
+    canvas.height = SIZE * dpr;
 
-    const tiers = [15, 95, 175, 255, 335];
-    const gridOffset = 45;
-    const originX = canvas.width / 2;
+    const S = 0.74;
+    const CX = 492;
+    const CY = 400;
+    const P = (x: number, y: number): Pt => ({ x: (x - CX) * S + SIZE / 2, y: (y - CY) * S + SIZE / 2 });
 
-    let colors = { blue: '#8aadf4', purple: '#c6a0f6', white: '#ffffff' };
+    const TOP = '#0aa2f5';
+    const BOTTOM = '#6b5be6';
+    const STROKE = 17 * S;
+    const RING_R = 14 * S;
+    const PEAK_R = 19 * S;
 
-    function readColors() {
-      const style = getComputedStyle(document.documentElement);
-      colors = {
-        blue: style.getPropertyValue('--sl-color-blue').trim() || '#8aadf4',
-        purple: style.getPropertyValue('--sl-color-purple').trim() || '#c6a0f6',
-        white: style.getPropertyValue('--sl-color-white').trim() || '#ffffff',
-      };
-    }
-
-    readColors();
-
-    interface TopologyLine {
-      sx: number; sy: number; ex: number; ey: number;
-      points: { x: number; y: number; dist: number }[];
-      totalLen: number; depth: number; progress: number;
-      speed: number; isPrime: boolean;
-      splitDepth: number; // how many splits occurred above this line
-    }
-
-    interface Photon {
-      line: TopologyLine;
-      progress: number;
-      speed: number;
-    }
-
-    interface SpawnRing {
-      x: number;
-      y: number;
-      progress: number; // 0→1, ring expands and fades
-      speed: number;
-    }
-
-    const themeObserver = new MutationObserver((mutations) => {
-      for (const m of mutations) {
-        if (m.attributeName === 'data-theme') {
-          readColors();
-          break;
+    // Rounded corners: each interior vertex becomes a sampled quadratic fillet.
+    function smooth(raw: Pt[], radius: number): Pt[] {
+      const out: Pt[] = [raw[0]];
+      for (let i = 1; i < raw.length - 1; i++) {
+        const a = raw[i - 1], v = raw[i], b = raw[i + 1];
+        const la = Math.hypot(v.x - a.x, v.y - a.y);
+        const lb = Math.hypot(b.x - v.x, b.y - v.y);
+        const r = Math.min(radius, la / 2, lb / 2);
+        const p0 = { x: v.x - ((v.x - a.x) / la) * r, y: v.y - ((v.y - a.y) / la) * r };
+        const p2 = { x: v.x + ((b.x - v.x) / lb) * r, y: v.y + ((b.y - v.y) / lb) * r };
+        for (let s = 0; s <= 8; s++) {
+          const t = s / 8, u = 1 - t;
+          out.push({ x: u * u * p0.x + 2 * u * t * v.x + t * t * p2.x, y: u * u * p0.y + 2 * u * t * v.y + t * t * p2.y });
         }
       }
-    });
-    themeObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+      out.push(raw[raw.length - 1]);
+      return out;
+    }
 
-    const STATE_DRAW_TOPOLOGY = 1;
-    const STATE_PHOTON_WALK = 2;
-    const STATE_PRE_REWIND_WAIT = 3;
-    const STATE_REWIND = 4;
-    const STATE_POST_REWIND_WAIT = 5;
+    function sample(raw: [number, number][]): Sampled {
+      const pts = smooth(raw.map(([x, y]) => P(x, y)), 16 * S);
+      const dist = [0];
+      for (let i = 1; i < pts.length; i++) dist.push(dist[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      return { pts, dist, len: dist[dist.length - 1] };
+    }
 
-    let activeLines: TopologyLine[] = [];
-    let establishedTopologyLines: TopologyLine[] = [];
-    let lineRegistry = new Set<string>();
-    let activePhotons: Photon[] = [];
-    let spawnRings: SpawnRing[] = [];
+    function at(s: Sampled, d: number): Pt {
+      if (d <= 0) return s.pts[0];
+      if (d >= s.len) return s.pts[s.pts.length - 1];
+      let i = 1;
+      while (s.dist[i] < d) i++;
+      const r = (d - s.dist[i - 1]) / (s.dist[i] - s.dist[i - 1]);
+      return { x: s.pts[i - 1].x + (s.pts[i].x - s.pts[i - 1].x) * r, y: s.pts[i - 1].y + (s.pts[i].y - s.pts[i - 1].y) * r };
+    }
 
-    let animationId = 0;
-    let currentAnimationState = STATE_DRAW_TOPOLOGY;
-    let canSpawnPhotons = false;
-    let photonShutdownTimeoutId: ReturnType<typeof setTimeout>;
-    let rewindWaitTimeoutId: ReturnType<typeof setTimeout>;
-    let postRewindWaitTimeoutId: ReturnType<typeof setTimeout>;
-    let isVisible = true;
+    const peak = P(508, 183);
+    const innerPeak = P(508, 287);
+    const terminals = {
+      leftOuter: P(298, 606),
+      leftInner: P(404, 606),
+      right: P(684, 606),
+      eave: P(683, 408),
+    };
 
-    const easeOutCubic = (x: number) => 1 - Math.pow(1 - x, 3);
+    const geo = {
+      outerL: sample([[508, 183], [350, 300], [338, 325], [338, 428]]),
+      outerR: sample([[508, 183], [668, 300], [683, 325], [683, 408]]),
+      legA: sample([[338, 428], [300, 470], [298, 490], [298, 606]]),
+      legB: sample([[338, 428], [404, 490]]),
+      innerL: sample([[508, 287], [410, 370], [404, 388], [404, 606]]),
+      innerR: sample([[508, 287], [603, 370], [607, 388], [607, 432], [675, 496], [684, 514], [684, 606]]),
+    };
 
-    function shuffleArray<T>(array: T[]): T[] {
-      for (let i = array.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [array[i], array[j]] = [array[j], array[i]];
+    // Draw-phase schedule (ms). `from`/`to` trim the ends that sit under a ring.
+    type Trace = { s: Sampled; t0: number; dur: number; from: number; to: number };
+    const traces: Trace[] = [
+      { s: geo.outerL, t0: 350, dur: 900, from: PEAK_R, to: 0 },
+      { s: geo.outerR, t0: 350, dur: 850, from: PEAK_R, to: RING_R },
+      { s: geo.legA, t0: 1250, dur: 550, from: 0, to: RING_R },
+      { s: geo.legB, t0: 1250, dur: 380, from: 0, to: 0 },
+      { s: geo.innerL, t0: 950, dur: 950, from: 0, to: RING_R },
+      { s: geo.innerR, t0: 950, dur: 1350, from: 0, to: RING_R },
+    ];
+    type Ring = { p: Pt; r: number; t0: number };
+    const rings: Ring[] = [
+      { p: peak, r: PEAK_R, t0: 0 },
+      { p: terminals.eave, r: RING_R, t0: 1200 },
+      { p: terminals.leftOuter, r: RING_R, t0: 1800 },
+      { p: terminals.leftInner, r: RING_R, t0: 1900 },
+      { p: terminals.right, r: RING_R, t0: 2300 },
+    ];
+    const RING_DUR = 320;
+    const DRAW_END = 2700;
+    const FLOW_END = DRAW_END + 11000;
+    const FADE_END = FLOW_END + 700;
+    const CYCLE = FADE_END + 500;
+
+    // Pulse routes, top to bottom. legB merges into the inner left wall at y=490.
+    function concat(parts: { s: Sampled; from?: number }[]): Sampled {
+      const pts: Pt[] = [];
+      for (const { s, from = 0 } of parts) {
+        const start = s.dist.findIndex((d) => d >= from);
+        pts.push(...s.pts.slice(Math.max(0, start)));
       }
-      return array;
+      const dist = [0];
+      for (let i = 1; i < pts.length; i++) dist.push(dist[i - 1] + Math.hypot(pts[i].x - pts[i - 1].x, pts[i].y - pts[i - 1].y));
+      return { pts, dist, len: dist[dist.length - 1] };
+    }
+    const mergeD = geo.innerL.dist[geo.innerL.pts.findIndex((p) => p.y >= P(0, 490).y)];
+    const routes: { s: Sampled; end: Pt }[] = [
+      { s: concat([{ s: geo.outerL, from: PEAK_R }, { s: geo.legA }]), end: terminals.leftOuter },
+      { s: concat([{ s: geo.outerL, from: PEAK_R }, { s: geo.legB }, { s: geo.innerL, from: mergeD }]), end: terminals.leftInner },
+      { s: concat([{ s: geo.outerR, from: PEAK_R }]), end: terminals.eave },
+      { s: geo.innerL, end: terminals.leftInner },
+      { s: geo.innerR, end: terminals.right },
+    ];
+
+    type Pulse = { route: (typeof routes)[number]; d: number; speed: number };
+    type Burst = { p: Pt; age: number };
+    let pulses: Pulse[] = [];
+    let bursts: Burst[] = [];
+    let nextPulse = 0;
+
+    const ease = (x: number) => 1 - Math.pow(1 - Math.min(1, Math.max(0, x)), 3);
+
+    let gradient: CanvasGradient;
+    function makeGradient() {
+      gradient = ctx.createLinearGradient(0, P(0, 170).y, 0, P(0, 620).y);
+      gradient.addColorStop(0, TOP);
+      gradient.addColorStop(1, BOTTOM);
     }
 
-    function getGlobalGradient() {
-      const grad = ctx.createLinearGradient(0, tiers[0], 0, tiers[tiers.length - 1]);
-      grad.addColorStop(0, colors.blue);
-      grad.addColorStop(1, colors.purple);
-      return grad;
-    }
-
-    function getBezierXY(t: number, sx: number, sy: number, cp1x: number, cp1y: number, cp2x: number, cp2y: number, ex: number, ey: number) {
-      const u = 1 - t;
-      return {
-        x: u * u * u * sx + 3 * u * u * t * cp1x + 3 * u * t * t * cp2x + t * t * t * ex,
-        y: u * u * u * sy + 3 * u * u * t * cp1y + 3 * u * t * t * cp2y + t * t * t * ey,
-      };
-    }
-
-    function generatePathPoints(sx: number, sy: number, ex: number, ey: number) {
-      const pts: { x: number; y: number; dist: number }[] = [];
-      const cp1x = sx, cp1y = sy + (ey - sy) * 0.45;
-      const cp2x = ex, cp2y = ey - (ey - sy) * 0.45;
-      const steps = 30;
-      let totalLen = 0;
-      pts.push({ x: sx, y: sy, dist: 0 });
-      for (let i = 1; i <= steps; i++) {
-        const t = i / steps;
-        const p = getBezierXY(t, sx, sy, cp1x, cp1y, cp2x, cp2y, ex, ey);
-        const prev = pts[i - 1];
-        totalLen += Math.hypot(p.x - prev.x, p.y - prev.y);
-        pts.push({ x: p.x, y: p.y, dist: totalLen });
-      }
-      return { points: pts, totalLength: totalLen };
-    }
-
-    function drawNode(x: number, y: number, depth: number) {
-      const pulse = Math.sin(Date.now() / 350) * 0.8;
+    function strokePart(s: Sampled, d0: number, d1: number) {
+      if (d1 <= d0) return;
       ctx.beginPath();
-      ctx.arc(x, y, Math.max(2, 3.5 - depth * 0.3) + pulse, 0, Math.PI * 2);
-      ctx.fillStyle = colors.white;
-      ctx.shadowBlur = 6;
-      ctx.shadowColor = depth % 2 ? colors.purple : colors.blue;
-      ctx.fill();
-      ctx.shadowBlur = 0;
+      const a = at(s, d0);
+      ctx.moveTo(a.x, a.y);
+      for (let i = 0; i < s.pts.length; i++) {
+        if (s.dist[i] <= d0) continue;
+        if (s.dist[i] >= d1) break;
+        ctx.lineTo(s.pts[i].x, s.pts[i].y);
+      }
+      const b = at(s, d1);
+      ctx.lineTo(b.x, b.y);
+      ctx.stroke();
     }
 
-    function drawCurveTrace(points: { x: number; y: number; dist: number }[], totalLen: number, progress: number, depth: number, isLineTrace: boolean, splitDepth = 0) {
-      const targetDist = Math.max(0, easeOutCubic(progress) * totalLen);
-      let currentPt = points[0];
+    function drawRing(r: Ring, k: number) {
+      if (k <= 0) return;
       ctx.beginPath();
-      ctx.moveTo(points[0].x, points[0].y);
+      ctx.arc(r.p.x, r.p.y, r.r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * ease(k));
+      ctx.stroke();
+    }
 
-      for (let i = 1; i < points.length; i++) {
-        if (points[i].dist <= targetDist) {
-          ctx.lineTo(points[i].x, points[i].y);
-          currentPt = points[i];
-        } else {
-          const p1 = points[i - 1], p2 = points[i];
-          const ratio = (targetDist - p1.dist) / (p2.dist - p1.dist);
-          currentPt = { x: p1.x + (p2.x - p1.x) * ratio, y: p1.y + (p2.y - p1.y) * ratio };
-          ctx.lineTo(currentPt.x, currentPt.y);
-          break;
-        }
+    function frame(t: number, dt: number) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      ctx.clearRect(0, 0, SIZE, SIZE);
+      ctx.globalAlpha = t > FLOW_END ? Math.max(0, 1 - (t - FLOW_END) / (FADE_END - FLOW_END)) : 1;
+      ctx.strokeStyle = gradient;
+      ctx.lineWidth = STROKE;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      for (const tr of traces) {
+        const k = ease((t - tr.t0) / tr.dur);
+        strokePart(tr.s, tr.from, tr.from + (tr.s.len - tr.from - tr.to) * k);
       }
+      ctx.lineWidth = STROKE * 0.8;
+      for (const r of rings) drawRing(r, (t - r.t0) / RING_DUR);
 
-      if (isLineTrace) {
-        ctx.strokeStyle = getGlobalGradient();
-        ctx.lineWidth = Math.max(1.5, 5 - splitDepth * 1.2);
-        ctx.lineCap = 'round';
+      // The inner house appears as a new scope: a brief expanding ring at its peak.
+      const spawn = (t - 900) / 500;
+      if (spawn > 0 && spawn < 1) {
+        ctx.save();
+        ctx.globalAlpha *= 1 - spawn;
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(innerPeak.x, innerPeak.y, 6 + spawn * 26, 0, Math.PI * 2);
         ctx.stroke();
-      }
-      return currentPt;
-    }
-
-    // Track placed nodes per tier for convergence targeting
-    const tierNodes: Map<number, number[]> = new Map();
-
-    function registerNode(tierIdx: number, x: number) {
-      if (!tierNodes.has(tierIdx)) tierNodes.set(tierIdx, []);
-      const nodes = tierNodes.get(tierIdx)!;
-      if (!nodes.includes(x)) nodes.push(x);
-    }
-
-    function findNearbyNode(tierIdx: number, x: number, maxDist: number): number | null {
-      const nodes = tierNodes.get(tierIdx);
-      if (!nodes || nodes.length === 0) return null;
-      let closest: number | null = null;
-      let closestDist = Infinity;
-      for (const nx of nodes) {
-        const d = Math.abs(nx - x);
-        if (d > 0 && d <= maxDist && d < closestDist) {
-          closest = nx;
-          closestDist = d;
-        }
-      }
-      return closest;
-    }
-
-    function branch(x: number, y: number, depth: number, isPrime = false, parentSplitDepth = 0) {
-      if (depth >= tiers.length - 1) return;
-      const nextY = tiers[depth + 1];
-      const nextTierIdx = depth + 1;
-
-      registerNode(depth, x);
-
-      let availableOffsets = [-gridOffset, 0, gridOffset];
-      const currentOffset = x - originX;
-
-      const maxLimit = 180;
-      if (currentOffset <= -maxLimit) {
-        availableOffsets = [0, gridOffset];
-      } else if (currentOffset >= maxLimit) {
-        availableOffsets = [-gridOffset, 0];
+        ctx.restore();
       }
 
-      // Bias toward center at shallow depths to keep multi-root subtrees coherent
-      let offsets: number[];
-      if (depth <= 1 && Math.abs(currentOffset) > gridOffset) {
-        const inward = currentOffset > 0 ? -gridOffset : gridOffset;
-        offsets = shuffleArray([inward, 0, ...availableOffsets.filter(o => o !== inward && o !== 0)]);
-      } else {
-        offsets = shuffleArray([...availableOffsets]);
+      if (t > DRAW_END && t < FLOW_END && t >= nextPulse) {
+        pulses.push({ route: routes[Math.floor(Math.random() * routes.length)], d: 0, speed: 0.16 + Math.random() * 0.08 });
+        nextPulse = t + 380 + Math.random() * 520;
       }
 
-      let numChildren = 1;
-
-      if (depth === 0) {
-        numChildren = Math.random() > 0.5 ? 2 : (Math.random() > 0.3 ? 3 : 1);
-      } else if (depth === tiers.length - 2) {
-        numChildren = Math.random() > 0.4 ? 2 : 1;
-      } else {
-        const r = Math.random();
-        if (!isPrime && r < 0.15) {
-          numChildren = 0;
-        } else if (r > 0.40) {
-          numChildren = 2;
-        } else {
-          numChildren = 1;
-        }
-      }
-
-      if (numChildren === 0) return;
-
-      const selected = offsets.slice(0, Math.min(numChildren, offsets.length));
-      const isSplit = selected.length > 1;
-      const childSplitDepth = parentSplitDepth + (isSplit ? 1 : 0);
-      let primeAssigned = false;
-
-      selected.forEach((off) => {
-        let ex = x + off;
-
-        // Convergence: chance to target an existing node at the next tier
-        if (depth >= 1 && Math.random() < 0.35) {
-          const nearby = findNearbyNode(nextTierIdx, ex, gridOffset * 1.5);
-          if (nearby !== null) {
-            ex = nearby; // converge to existing node
-          }
-        }
-
-        const regKey = `${x},${y}->${ex},${nextY}`;
-
-        let assignPrime = false;
-        if (isPrime && !primeAssigned) {
-          assignPrime = true;
-          primeAssigned = true;
-        }
-
-        if (!lineRegistry.has(regKey)) {
-          registerNode(nextTierIdx, ex);
-          const pathData = generatePathPoints(x, y, ex, nextY);
-          activeLines.push({
-            sx: x, sy: y, ex: ex, ey: nextY,
-            points: pathData.points, totalLen: pathData.totalLength,
-            depth: depth, progress: 0,
-            speed: 0.012 - depth * 0.001,
-            isPrime: assignPrime,
-            splitDepth: childSplitDepth,
-          });
-          lineRegistry.add(regKey);
-        }
-      });
-    }
-
-    function renderLoop() {
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-      const nodesToDraw = new Map<string, { x: number; y: number; d: number }>();
-
-      switch (currentAnimationState) {
-        case STATE_DRAW_TOPOLOGY:
-          for (let i = activeLines.length - 1; i >= 0; i--) {
-            const a = activeLines[i];
-            a.progress += a.speed;
-            if (a.progress >= 1) {
-              a.progress = 1;
-              establishedTopologyLines.push(a);
-              branch(a.ex, a.ey, a.depth + 1, a.isPrime, a.splitDepth);
-
-              // Context expansion: find unvisited grid positions at this
-              // depth and spawn a new independent root from one
-              if (a.depth >= 1 && a.depth <= tiers.length - 3) {
-                const spawnY = tiers[a.depth + 1];
-                const visited = new Set([
-                  ...establishedTopologyLines.filter(e => e.ey === spawnY).map(e => e.ex),
-                  ...activeLines.filter(e => e.ey === spawnY).map(e => e.ex),
-                ]);
-                const unvisited: number[] = [];
-                for (let gx = originX - 180; gx <= originX + 180; gx += gridOffset) {
-                  if (!visited.has(gx)) unvisited.push(gx);
-                }
-                if (unvisited.length > 0 && Math.random() < 0.15) {
-                  const spawnX = unvisited[Math.floor(Math.random() * unvisited.length)];
-                  registerNode(a.depth + 1, spawnX);
-                  branch(spawnX, spawnY, a.depth + 1, false);
-                  spawnRings.push({ x: spawnX, y: spawnY, progress: 0, speed: 0.03 });
-                }
-              }
-
-              activeLines.splice(i, 1);
-            }
-          }
-          if (activeLines.length === 0) {
-            currentAnimationState = STATE_PHOTON_WALK;
-            canSpawnPhotons = true;
-            photonShutdownTimeoutId = setTimeout(() => { canSpawnPhotons = false; }, 6000);
-          }
-          break;
-
-        case STATE_PHOTON_WALK:
-          if (canSpawnPhotons && Math.random() < 0.08) {
-            const leafLines = establishedTopologyLines.filter((l: TopologyLine) =>
-              !establishedTopologyLines.some((c: TopologyLine) => c.sx === l.ex && c.sy === l.ey)
-            );
-
-            if (leafLines.length > 0) {
-              activePhotons.push({
-                line: leafLines[Math.floor(Math.random() * leafLines.length)],
-                progress: 1, speed: 0.02 + Math.random() * 0.02,
-              });
-            }
-          }
-          for (let i = activePhotons.length - 1; i >= 0; i--) {
-            const p = activePhotons[i];
-            p.progress -= p.speed;
-            if (p.progress <= 0) {
-              const parents = establishedTopologyLines.filter((l: TopologyLine) => l.ex === p.line.sx && l.ey === p.line.sy);
-              if (parents.length > 0) {
-                p.line = parents[Math.floor(Math.random() * parents.length)];
-                p.progress = 1;
-              } else {
-                activePhotons.splice(i, 1);
-              }
-            } else {
-              const pos = drawCurveTrace(p.line.points, p.line.totalLen, p.progress, p.line.depth, false);
-              ctx.beginPath();
-              ctx.arc(pos.x, pos.y, 3 - p.line.depth * 0.3, 0, Math.PI * 2);
-              ctx.fillStyle = colors.white;
-              ctx.shadowBlur = 15;
-              ctx.shadowColor = p.line.depth % 2 ? colors.purple : colors.blue;
-              ctx.fill();
-              ctx.shadowBlur = 0;
-            }
-          }
-          if (!canSpawnPhotons && activePhotons.length === 0) {
-            currentAnimationState = STATE_PRE_REWIND_WAIT;
-            rewindWaitTimeoutId = setTimeout(() => { currentAnimationState = STATE_REWIND; }, 1000);
-          }
-          break;
-
-        case STATE_REWIND: {
-          let stillMoving = false;
-          for (let i = establishedTopologyLines.length - 1; i >= 0; i--) {
-            const l = establishedTopologyLines[i];
-            const hasChildren = establishedTopologyLines.some((c: TopologyLine) => c.sx === l.ex && c.sy === l.ey && c.progress > 0);
-
-            if (!hasChildren) {
-              l.progress -= 0.025;
-              stillMoving = true;
-              if (l.progress <= 0) {
-                establishedTopologyLines.splice(i, 1);
-              }
-            } else {
-              stillMoving = true;
-            }
-          }
-          if (!stillMoving) {
-            currentAnimationState = STATE_POST_REWIND_WAIT;
-            postRewindWaitTimeoutId = setTimeout(generate, 800);
-          }
-          break;
-        }
-      }
-
-      // Draw root nodes for all starting positions
-      if (establishedTopologyLines.length > 0 || activeLines.length > 0) {
-        const roots = tierNodes.get(0);
-        if (roots) {
-          roots.forEach(rx => nodesToDraw.set(`${rx}_${tiers[0]}`, { x: rx, y: tiers[0], d: 0 }));
-        }
-      }
-
-      [...establishedTopologyLines, ...activeLines].forEach((l) => {
-        drawCurveTrace(l.points, l.totalLen, l.progress, l.depth, true, l.splitDepth);
-        nodesToDraw.set(`${l.sx}_${l.sy}`, { x: l.sx, y: l.sy, d: l.depth });
-
-        if (l.progress >= 1) {
-          nodesToDraw.set(`${l.ex}_${l.ey}`, { x: l.ex, y: l.ey, d: l.depth + 1 });
-        }
-      });
-
-      nodesToDraw.forEach((n) => drawNode(n.x, n.y, n.d));
-
-      for (let i = spawnRings.length - 1; i >= 0; i--) {
-        const ring = spawnRings[i];
-        ring.progress += ring.speed;
-        if (ring.progress >= 1) {
-          spawnRings.splice(i, 1);
+      for (let i = pulses.length - 1; i >= 0; i--) {
+        const p = pulses[i];
+        p.d += p.speed * dt;
+        if (p.d >= p.route.s.len - RING_R) {
+          bursts.push({ p: p.route.end, age: 0 });
+          pulses.splice(i, 1);
           continue;
         }
-        const radius = 4 + ring.progress * 20;
-        const alpha = 1 - ring.progress;
+        const pos = at(p.route.s, p.d);
+        ctx.save();
+        // Pulses always sit on a coloured trace, so a white core reads in both themes.
+        ctx.fillStyle = '#ffffff';
+        ctx.shadowBlur = 14;
+        ctx.shadowColor = pos.y < SIZE / 2 ? TOP : BOTTOM;
         ctx.beginPath();
-        ctx.arc(ring.x, ring.y, radius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 255, 255, ${alpha * 0.7})`;
-        ctx.lineWidth = 1.5 * (1 - ring.progress);
-        ctx.shadowBlur = 10 * alpha;
-        ctx.shadowColor = colors.purple;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
+        ctx.arc(pos.x, pos.y, STROKE * 0.32, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
       }
 
-      animationId = requestAnimationFrame(renderLoop);
-    }
-
-    function generate() {
-      cancelAnimationFrame(animationId);
-      clearTimeout(photonShutdownTimeoutId);
-      clearTimeout(rewindWaitTimeoutId);
-      clearTimeout(postRewindWaitTimeoutId);
-
-      activeLines = [];
-      establishedTopologyLines = [];
-      lineRegistry.clear();
-      tierNodes.clear();
-      activePhotons = [];
-      spawnRings = [];
-      currentAnimationState = STATE_DRAW_TOPOLOGY;
-
-      const rr = Math.random();
-      const numRoots = rr < 0.4 ? 1 : rr < 0.8 ? 2 : 3;
-      const rootSpread = gridOffset * 2;
-      const rootPositions: number[] = [];
-      if (numRoots === 1) {
-        rootPositions.push(originX);
-      } else if (numRoots === 2) {
-        rootPositions.push(originX - rootSpread / 2, originX + rootSpread / 2);
-      } else {
-        rootPositions.push(originX - rootSpread, originX, originX + rootSpread);
-      }
-      rootPositions.forEach((rx, i) => {
-        registerNode(0, rx);
-        branch(rx, tiers[0], 0, i === 0);
-      });
-
-      animationId = requestAnimationFrame(renderLoop);
-    }
-
-    const visibilityObserver = new IntersectionObserver(
-      (entries) => {
-        const nowVisible = entries[0].isIntersecting;
-        if (nowVisible && !isVisible) {
-          isVisible = true;
-          animationId = requestAnimationFrame(renderLoop);
-        } else if (!nowVisible && isVisible) {
-          isVisible = false;
-          cancelAnimationFrame(animationId);
+      for (let i = bursts.length - 1; i >= 0; i--) {
+        const b = bursts[i];
+        b.age += dt / 600;
+        if (b.age >= 1) {
+          bursts.splice(i, 1);
+          continue;
         }
-      },
-      { threshold: 0 }
-    );
-    visibilityObserver.observe(canvas);
+        ctx.save();
+        ctx.globalAlpha *= 1 - b.age;
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = BOTTOM;
+        ctx.beginPath();
+        ctx.arc(b.p.x, b.p.y, RING_R + 4 + b.age * 18, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
 
-    document.addEventListener('astro:before-swap', () => {
-      cancelAnimationFrame(animationId);
-      clearTimeout(photonShutdownTimeoutId);
-      clearTimeout(rewindWaitTimeoutId);
-      clearTimeout(postRewindWaitTimeoutId);
-      themeObserver.disconnect();
-      visibilityObserver.disconnect();
-    }, { once: true });
+    makeGradient();
 
-    generate();
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      frame(DRAW_END, 0);
+    } else {
+      let start = performance.now();
+      let last = start;
+      let rafId = 0;
+      let pausedAt = 0;
+
+      const loop = (now: number) => {
+        let t = now - start;
+        if (t >= CYCLE) {
+          start = now;
+          t = 0;
+          pulses = [];
+          bursts = [];
+          nextPulse = 0;
+        }
+        frame(t, Math.min(now - last, 50));
+        last = now;
+        rafId = requestAnimationFrame(loop);
+      };
+      rafId = requestAnimationFrame(loop);
+
+      const visibility = new IntersectionObserver(([entry]) => {
+        if (!entry.isIntersecting && rafId) {
+          cancelAnimationFrame(rafId);
+          rafId = 0;
+          pausedAt = performance.now();
+        } else if (entry.isIntersecting && !rafId) {
+          const now = performance.now();
+          start += now - pausedAt;
+          last = now;
+          rafId = requestAnimationFrame(loop);
+        }
+      });
+      visibility.observe(canvas);
+
+      document.addEventListener(
+        'astro:before-swap',
+        () => {
+          cancelAnimationFrame(rafId);
+          visibility.disconnect();
+        },
+        { once: true },
+      );
+    }
   }
 </script>

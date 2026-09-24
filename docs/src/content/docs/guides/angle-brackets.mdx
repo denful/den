@@ -44,7 +44,7 @@ The `<name>` expression resolves through these paths in order:
    (when the segment after `den` names a registered battery), e.g.
    `<den/primary-user>`.
 2. **`<den.x.y>`** -- otherwise resolves to `config.den.x.y` (any `den.*` path),
-   e.g. `<den.lib.parametric>`.
+   e.g. `<den.lib.policy.pipe>`.
 3. **`<aspect>`** -- resolves to `config.den.aspects.aspect` (when `aspect` exists in `den.aspects`).
 4. **`<aspect/sub>`** -- resolves to the `sub` key of that aspect.
 5. **`<namespace/aspect>`** -- resolves into a namespace, `config.den.ful.namespace.aspect`.

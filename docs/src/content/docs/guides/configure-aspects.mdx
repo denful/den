@@ -218,6 +218,10 @@ patterns above are a permanent API for existing usage.
 }
 ```
 
+To use flake inputs inside class modules (`inputs` as a module argument, an
+input's NixOS module, home-manager `extraSpecialArgs`), see
+[Flake inputs and specialArgs](/explanation/class-modules/#flake-inputs-and-specialargs).
+
 <Aside type="caution">
 Owned configs from `den.default` are deduplicated across pipeline stages.
 Parametric functions in `den.default.includes` are evaluated at every context

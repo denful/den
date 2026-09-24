@@ -166,6 +166,10 @@ den.aspects.igloo = {
 
 ### Standalone HomeManager - Host Specific Configuration
 
+:::note
+Content pushed from the host side (host policies, `provides.<user>` on the host, `host-aspects`) does not reach a standalone `user@host` home. Put host-specific config on the user side, as below. See [Standalone Home Manager](/guides/standalone-home-manager/).
+:::
+
 If you have two standalone homes sharing same user aspect, you can provide host specific
 configuration even if the Host is not a NixOS system managed by you.
 

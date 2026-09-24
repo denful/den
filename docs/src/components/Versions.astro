@@ -15,7 +15,7 @@
         addVersion("main");
       };
 
-      const addVersion = version => {
+      const addVersion = (version: string) => {
         const name = version.replace("docs-", "");
         const value = (name === "main") ? "/" : "/"+name;
         const opt = document.createElement("option");
@@ -27,7 +27,7 @@
 
       fetch('/versions.json')
         .then(r => r.json()).catch(e => [])
-        .then(r => { init(); return r.map(v => v.name) })
+        .then(r => { init(); return r.map((v: { name: string }) => v.name) })
         .then(r => r.forEach(addVersion));
     }
   };

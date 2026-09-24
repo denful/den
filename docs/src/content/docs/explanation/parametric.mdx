@@ -66,6 +66,15 @@ When a parametric aspect at some scope **S** destructures an **entity-kind** arg
    misplacement are indistinguishable without whole-fleet context, so a warning
    would fire on correct code).
 
+```mermaid
+flowchart TD
+  S["aspect at scope S destructures an entity kind, e.g. user"] --> Q1{"kind already in S's context?"}
+  Q1 -- yes --> B["bind once, emit at S"]
+  Q1 -- no --> Q2{"kind is a schema descendant of S?"}
+  Q2 -- yes --> FO["fan out once per descendant, each emits at S"]
+  Q2 -- no --> IN["inert: contributes nothing, no warning"]
+```
+
 <Aside type="caution" title="The silent-inert footgun">
 Because case 3 is silent, a parametric aspect that destructures an entity kind
 **not reachable from where it is included** simply does nothing — no error, no
@@ -92,7 +101,7 @@ use the [flat-form class module](/explanation/class-modules/) pattern instead.
 # host is a pipeline arg — the whole aspect is parametric
 den.aspects.laptop = { host, ... }: {
   nixos.networking.hostName = host.name;
-  homeManager.programs.git.userName = host.hostName;
+  homeManager.home.sessionVariables.HOST = host.hostName;
 };
 ```
 
@@ -123,7 +132,7 @@ form: the pipeline promotes it to parametric and fans it out per descendant.
 # exactly like the aspect-level { user, ... }: form.
 den.aspects.desktop = {
   nixos = { user, ... }: {
-    services.xdg.portal.extraPortals = [ "${user.userName}-portal" ];
+    users.users.${user.userName}.extraGroups = [ "video" "input" ];
   };
 };
 ```

@@ -148,7 +148,21 @@ See [Pipes guide](/guides/quirks/) for hands-on examples of all pipe stages.
 
 Quirk data is **scope-local** by default. Each entity (host, user, home)
 has its own scope, and producers within that scope contribute to that
-scope's pool.
+scope's pool. Which pool a value lands in, and which pool a consumer reads,
+is decided by the **aspect's** scope, not by its class: a `nixos` module on a
+user aspect reads the user's pool.
+
+Nothing crosses a scope boundary by itself:
+
+- a user's values do not reach its host unless a policy exposes them
+  (`pipe.expose`);
+- a host's values reach a user only when a host-scope pipe policy binds that
+  quirk, and only if the user emits nothing of its own on it;
+- sibling scopes (two users, two hosts) never see each other's values except
+  through `pipe.collect`, `pipe.collectAll` or `pipe.broadcast`.
+
+The [guide's scoping table](/guides/quirks/#scoping-who-sees-what) lists
+each case.
 
 ```mermaid
 flowchart TD
@@ -222,13 +236,16 @@ include order.
 
 ## Config-dependent thunks
 
-Quirk values can depend on a host's `config` (e.g., reading a port from
-NixOS options). These are collected as bare functions and resolved lazily:
+Quirk values can depend on the evaluated `config` of the class that
+produced them (e.g., reading a port from NixOS options, or a username from
+home-manager). These are collected as bare functions and resolved against
+the **producer's** config, wherever they are consumed:
 
-- **Local thunks**: Resolved inside `evalModules` using the entity's own
-  config fixpoint.
-- **Cross-host thunks** (via `pipe.collect`): Resolved eagerly against
-  the source host's instantiated config.
+- **Local thunks**: Resolved inside `evalModules` against the producing
+  class and scope's config — a user's quirk sees its home-manager config
+  (plus the host's as `osConfig`), a host's quirk sees the host config.
+- **Cross-host thunks** (via `pipe.collect` or `pipe.broadcast`): Resolved
+  eagerly against the source's instantiated config.
 
 ```nix
 den.aspects.my-service = {

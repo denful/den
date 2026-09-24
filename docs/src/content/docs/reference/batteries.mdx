@@ -16,7 +16,7 @@ NixOS/Darwin/home-manager modules to hosts and users that include them.
 Batteries fall into two categories:
 
 - **Opt-in** -- you include them explicitly in `den.default.includes`, `den.aspects.<name>.includes`, or `den.schema.<kind>.includes`.
-- **Auto-activated** -- Den activates them via built-in policies. They define new classes or integration layers that work without explicit inclusion.
+- **Auto-activated** -- Den activates them via built-in policies. They define new classes or integration layers that work without explicit inclusion. These are **not** values under `den.batteries` -- there is nothing to include; their headings below name the class they add.
 
 ---
 
@@ -24,7 +24,7 @@ Batteries fall into two categories:
 
 ### `den.batteries.define-user`
 
-Creates OS-level user accounts (`users.users.<name>`) with `isNormalUser` and `home` directory. Also sets `home.username` and `home.homeDirectory` for Home Manager. Works on NixOS, Darwin, and standalone Home Manager.
+Creates OS-level user accounts (`users.users.<name>`) with a `home` directory (`/Users/<name>` on Darwin, `/home/<name>` elsewhere), plus `isNormalUser` on NixOS. Also sets `home.username` and `home.homeDirectory` for Home Manager. Works on NixOS, Darwin, and standalone Home Manager homes.
 
 **Opt-in.**
 
@@ -50,11 +50,11 @@ den.default.includes = [ den.batteries.hostname ];
 [`modules/aspects/batteries/hostname.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/hostname.nix)
 </Aside>
 
-### `den.batteries.os-class`
+### `os` class
 
-Provides an `os` convenience class that forwards its contents into both `nixos` and `darwin` classes. This lets you write platform-agnostic host configuration without duplicating it across classes.
+Provides an `os` convenience class whose contents land in the host's own OS class -- `nixos` on NixOS hosts, `darwin` on Darwin hosts. This lets you write platform-agnostic host configuration without duplicating it across classes.
 
-**Auto-activated** for both host and user entity kinds.
+**Auto-activated.** The `os-to-host` policy is in `den.default`, so it fires in every scope that binds a host -- `os` content on a user aspect reaches that user's host too. Hosts of any other class (and standalone homes) ignore `os` content.
 
 ```nix
 den.aspects.my-host = {
@@ -66,11 +66,11 @@ den.aspects.my-host = {
 [`modules/aspects/batteries/os-class.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/os-class.nix)
 </Aside>
 
-### `den.batteries.os-user`
+### `user` class
 
-Provides a `user` class that forwards settings into the host's `users.users.<userName>` at OS level. Instead of writing the full `nixos.users.users.alice` path, you write directly into the `user` class.
+Provides a `user` class that forwards settings into the host's `users.users.<userName>` at OS level. Instead of writing the full `nixos.users.users.alice` path, you write directly into the `user` class. Inside a `user` module, `config` is the host's OS config, also available as `osConfig`.
 
-**Auto-activated** for the user entity kind.
+**Auto-activated** through the `user-to-host` policy in `den.default`. `user` is the default of `users.<name>.classes`, so a user gets it unless you replace that list.
 
 ```nix
 den.aspects.alice.user = { pkgs, ... }: {
@@ -176,15 +176,23 @@ den.aspects.laptop.includes = [
 [`modules/aspects/batteries/vm-autologin.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/vm-autologin.nix)
 </Aside>
 
-### `den.batteries.wsl`
+### `wsl` class
 
-Enables WSL support on NixOS using the NixOS-WSL project. Adds a `wsl-host` entity kind and forwards the `wsl` class into the host's NixOS configuration.
+Enables WSL support on NixOS using the NixOS-WSL project. For an enabled host it imports the NixOS-WSL module, sets `wsl.enable = true`, resolves a `wsl-host` entity, and routes the `wsl` class into the host's `wsl.*` options.
 
-**Auto-activated** when `host.wsl.enable = true`. Requires `inputs.nixos-wsl`.
+**Auto-activated** when `host.wsl.enable = true` on a `nixos` host. Requires `inputs.nixos-wsl`, or set `host.wsl.module` to the NixOS-WSL module yourself.
 
 ```nix
 den.hosts.x86_64-linux.igloo.wsl.enable = true;
+
+# or on every host (only nixos hosts are affected)
+den.schema.host.wsl.enable = true;
+
+# `wsl` class content becomes the host's `wsl.*` NixOS options
+den.aspects.igloo.wsl.startMenuLaunchers = true;
 ```
+
+`den.batteries.primary-user` sets `wsl.defaultUser` through this class.
 
 <Aside title="Source" icon="github">
 [`modules/aspects/batteries/wsl.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/wsl.nix)
@@ -192,7 +200,7 @@ den.hosts.x86_64-linux.igloo.wsl.enable = true;
 
 ### `den.batteries.forward`
 
-A generic forwarding primitive that creates custom Nix classes by routing module contents from one class into a target submodule path. This is how `os-user`, `homeManager`, `hjem`, and `maid` integrations are implemented internally.
+A generic forwarding primitive that creates custom Nix classes by routing module contents from one class into a target submodule path. The `homeManager`, `hjem`, and `maid` integrations use it internally. (The `os`, `user`, and `wsl` classes use the lighter `den.lib.policy.route` instead -- see [Policies](/reference/policies/).)
 
 **Opt-in.** Used when building custom classes. See the [Custom Classes](/guides/custom-classes/) guide.
 
@@ -212,9 +220,9 @@ den.batteries.forward {
 
 ### `den.batteries.import-tree`
 
-Recursively imports plain `.nix` files, auto-detecting class from directory name conventions (`_nixos/`, `_darwin/`, `_homeManager/`). Useful for migrating existing configurations.
+Recursively imports plain `.nix` files, taking the class from the directory name: every `_<class>/` directory under the given root (`_nixos/`, `_darwin/`, `_homeManager/`, or any other class) is imported into `<class>`. Useful for migrating existing configurations.
 
-**Opt-in.** Requires `inputs.import-tree`.
+**Opt-in.** Requires `inputs.import-tree`. The `provides.host`/`user`/`home` forms look in `<root>/<entity name>/`, so `./hosts` above reads `./hosts/<host>/_nixos/` and so on.
 
 ```nix
 # Import per host
@@ -225,6 +233,11 @@ den.schema.host.includes = [
 # Import per user
 den.schema.user.includes = [
   (den.batteries.import-tree.provides.user ./users)
+];
+
+# Import per standalone home
+den.schema.home.includes = [
+  (den.batteries.import-tree.provides.home ./homes)
 ];
 
 # Import for a specific aspect
@@ -239,9 +252,10 @@ den.aspects.laptop.includes = [
 
 ### `den.batteries.flake-scope`
 
-Exposes `lib`, `inputs`, and `den` to aspect pipeline functions -- the
-generic (non-flake-parts) counterpart of `inputs'`/`self'`. A parametric
-aspect can then destructure these alongside entity args:
+Exposes `lib`, `inputs`, and `den` to aspect pipeline functions **and** to
+class modules (`nixos`, `homeManager`, …) -- the generic (non-flake-parts)
+counterpart of `inputs'`/`self'`. A parametric aspect or a class module can
+then destructure these alongside entity args:
 
 ```nix
 den.default.includes = [ den.batteries.flake-scope ];
@@ -267,11 +281,22 @@ win silently over the flake-scope ones.
 
 ## Home Environments
 
-### `den.batteries.home-manager`
+The three home environments share one activation rule: a host enables one when at least one of its users lists the class in `users.<name>.classes`. Writing a `homeManager` (or `hjem`, `maid`) key on an aspect is **not** enough -- `classes` defaults to `[ "user" ]`.
 
-Integrates [home-manager](https://github.com/nix-community/home-manager) as a user environment class. Defines the `hm-host` entity kind, imports the appropriate home-manager NixOS or Darwin module, and merges `home-manager.users.<name>` from each user's `homeManager` class.
+```nix
+den.hosts.x86_64-linux.igloo.users.alice.classes = [ "homeManager" ];
 
-**Auto-activated** when users have `homeManager` classes. Requires `inputs.home-manager`.
+# or for every user
+den.schema.user.classes = lib.mkDefault [ "homeManager" ];
+```
+
+Each adds a pair of host options under its option path (`home-manager`, `hjem`, `nix-maid`): `enable` (defaults to "some user has the class") and `module` (defaults to the module from the flake input). Set `module` to use a pinned or patched module, or to supply one without the flake input.
+
+### `homeManager` class
+
+Integrates [home-manager](https://github.com/nix-community/home-manager) as a user environment class. Imports the appropriate home-manager NixOS or Darwin module and merges `home-manager.users.<name>` from each user's `homeManager` class. Inside a `homeManager` module, `osConfig` is the host's config.
+
+**Auto-activated** on NixOS and Darwin hosts (see above). Requires `inputs.home-manager` unless `host.home-manager.module` is set. Aspects in `den.schema.hm-host.includes` are included on every host that enables home-manager.
 
 ```nix
 den.aspects.alice.homeManager = {
@@ -283,14 +308,14 @@ den.aspects.alice.homeManager = {
 [`modules/aspects/batteries/home-manager.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/home-manager.nix)
 </Aside>
 
-### `den.batteries.hjem`
+### `hjem` class
 
 Integrates [hjem](https://github.com/feel-co/hjem) as an alternative home environment. Imports hjem's NixOS or Darwin module and merges `hjem.users.<name>` from each user's `hjem` class.
 
-**Auto-activated** when users have `hjem` classes. Requires `inputs.hjem`.
+**Auto-activated** on NixOS and Darwin hosts (see above). Requires `inputs.hjem` unless `host.hjem.module` is set.
 
 ```nix
-den.aspects.alice.hjem = {
+den.aspects.alice.hjem = { pkgs, ... }: {
   packages = [ pkgs.ripgrep ];
 };
 ```
@@ -299,11 +324,11 @@ den.aspects.alice.hjem = {
 [`modules/aspects/batteries/hjem.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/hjem.nix)
 </Aside>
 
-### `den.batteries.maid`
+### `maid` class
 
-Integrates [maid](https://github.com/maid-nix/maid) as an alternative home environment. NixOS only. Merges configuration into `users.users.<name>.maid` for each user's `maid` class.
+Integrates [nix-maid](https://github.com/viperML/nix-maid) as an alternative home environment. NixOS only. Merges configuration into `users.users.<name>.maid` for each user's `maid` class.
 
-**Auto-activated** when users have `maid` classes. Requires `inputs.nix-maid`.
+**Auto-activated** on NixOS hosts (see above). Requires `inputs.nix-maid` unless `host.nix-maid.module` is set.
 
 ```nix
 den.aspects.alice.maid = {
@@ -321,7 +346,7 @@ den.aspects.alice.maid = {
 
 ### `den.batteries.unfree`
 
-Allows specific unfree packages by name via `nixpkgs.config.allowUnfreePredicate`. Works for any class (`nixos`, `darwin`, `homeManager`). The predicate builder is automatically included in `den.default`.
+Allows specific unfree packages by name via `nixpkgs.config.allowUnfreePredicate`. Emits into `nixos`, `darwin`, and `homeManager`. When included on a user, the names are also allowed on the host's OS config, so `home-manager.useGlobalPkgs = true` and users with only the `user` class work too. The predicate builder is automatically included in `den.default`.
 
 **Opt-in.** Takes a list of package names as argument.
 

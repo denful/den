@@ -127,6 +127,8 @@ let
       scopeParent = (st.scopeParent or (_: { })) null;
       scopeContexts = (st.scopeContexts or (_: { })) null;
       scopeEntityKind = (st.scopeEntityKind or (_: { })) null;
+      # Child scope -> name of the policy whose effect created it.
+      scopeSourcePolicy = (st.scopeSourcePolicy or (_: { })) null;
       scopedPipeEffects = (st.scopedPipeEffects or (_: { })) null;
       scopedClassImports = (st.scopedClassImports or (_: { })) null;
       # Phase 2: pipe production/consumption from trace handlers.

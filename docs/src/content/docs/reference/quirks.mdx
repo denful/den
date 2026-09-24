@@ -70,6 +70,18 @@ Values can be attrsets, lists, or any Nix value. List values are
 auto-flattened: if a producer emits `[a, b]`, each element is a separate
 entry in the pool.
 
+Function values are interpreted, not carried:
+
+- a function whose arguments are all bound in the scope (`{ host, ... }:`,
+  or one taking no named arguments such as `_:` or `final: prev:`) is
+  **called** with the scope context, and its result is the value;
+- a function asking for anything else (`config`, `pkgs`, …) is a
+  [config-dependent thunk](#config-dependent-thunks).
+
+To deliver a function itself (an overlay, a helper), wrap it:
+`_: [ overlay ]`. A bare `final: prev:` overlay would be called with the
+scope context and break.
+
 ## Consuming quirk data
 
 Class modules receive quirk data by naming the quirk in their function
@@ -82,7 +94,13 @@ nixos = { firewall, lib, config, ... }: {
 };
 ```
 
-The quirk arg receives a list of all values collected in the current scope.
+The quirk arg receives a list of all values collected in the consuming
+aspect's scope (host, user or home), whatever the class. Values from other
+scopes arrive only through pipes: `pipe.expose` (child to parent),
+`pipe.collect` / `pipe.collectAll` (pull from other scopes) and
+`pipe.broadcast` (push to other scopes). A host-scope pipe policy for a quirk
+also hands the host's pool to user scopes that emit nothing of their own on
+it. See [Scoping](/guides/quirks/#scoping-who-sees-what).
 If no producers emitted data, it's `[]`. Delivery uses the same
 `wrapClassModule` mechanism as entity context args.
 
@@ -162,8 +180,8 @@ pipe.append { name = "default"; }
 
 ### `pipe.for fn`
 
-Replace the entire list. The function receives the full list and returns a
-new list. **At most one `pipe.for` per pipe per scope** — multiple `pipe.for`
+Replace the entire list. The function receives the full list and must return
+a new **list** (returning an attrset fails with an error; wrap it as `[ x ]`). **At most one `pipe.for` per pipe per scope** — multiple `pipe.for`
 on the same pipe throws an error.
 
 ```nix
@@ -223,9 +241,11 @@ sibling's context attrset.
 pipe.collect ({ host, ... }: true)
 ```
 
-Entity kind filtering is automatic: the predicate's required args are
-checked against schema entity kinds. Only scopes whose entity kind
-args match are considered.
+Entity kind filtering is automatic: a scope is considered only when its
+**own** entity kind is among the predicate's required args. `({ host, ... }: …)`
+matches host scopes and never user scopes, even though a user scope's context
+also holds `host`. A predicate with no entity args (`_: true`) matches no
+entity scope.
 
 `pipe.collect` is non-terminal — transform stages can follow it:
 
@@ -285,7 +305,10 @@ pipe.to [ den.aspects.networking ]
 
 ### `pipe.withProvenance`
 
-Tag each entry with its source scope context. Consumers receive
+Tag each entry with its source scope context. With `pipe.withProvenance` in
+the chain, `pipe.filter` and `pipe.transform` also see unresolved
+config-dependent thunks (the plain path lets them pass through), so avoid
+mixing it with config-thunk producers on one pipe. Consumers receive
 `{ value; source; }` records where `source` is the full context attrset
 of the originating scope. Works with both local quirks and collected
 data — local entries get the current scope as their source.
@@ -304,11 +327,18 @@ pipe.from "http-backends" [
 Quirk values that are functions taking `{ config, ... }` are detected as
 config-dependent thunks.
 
-- **Local scope**: Marked for deferred resolution inside `evalModules`.
-  The thunk is resolved against the entity's own config fixpoint.
-- **Cross-host** (via `pipe.collect`): Resolved eagerly against the source
-  host's instantiated config, with scope context args (`host`, `user`, etc.)
-  available alongside `config` and `lib`.
+- **Producer config**: `config` is the config of the class and scope that
+  *produced* the value, not the consumer's. A host-produced value reads the
+  host's NixOS/darwin config; a user-produced value reads that user's
+  home-manager config, even when consumed in the host's `nixos` module.
+- **Nested classes**: a producer in a nested class (home-manager) also
+  receives the owning host's config under the class's `parentArg`
+  (`osConfig`).
+- **Local scope**: Marked for deferred resolution inside `evalModules`,
+  against the producer's config in the same fixpoint.
+- **Cross-host** (via `pipe.collect` or `pipe.broadcast`): Resolved eagerly
+  against the source's instantiated config, with scope context args (`host`,
+  `user`, etc.) available alongside `config` and `lib`.
 
 ```nix
 den.aspects.my-service = {
@@ -316,6 +346,11 @@ den.aspects.my-service = {
     ports = [ config.services.my-service.port ];
   };
 };
+
+# home-manager producer
+den.aspects.tux.dev = { config, osConfig, ... }: [
+  "${config.home.username}@${osConfig.networking.hostName}"
+];
 ```
 
 ---

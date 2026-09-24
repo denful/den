@@ -46,11 +46,15 @@ diagram.toMermaid g
 
 ### `graph.build { entries, rootName, ctxTrace?, direction? }`
 
-Core IR builder. Transforms a list of structured trace entries into a graph record containing `nodes`, `edges`, `stages`, `stageEdges`, `rootId`, `rootName`, and `direction`. This is the lowest-level constructor -- convenience wrappers call it internally.
+Core IR builder. Transforms a list of structured trace entries into a graph record containing `nodes`, `edges`, `stages`, `stageEdges`, `rootId`, `rootName`, and `direction`. This is the lowest-level constructor -- `projectScope` and `context` call it internally.
 
-### `graph.ofHost args`
+### `projectScope { fleetCapture, kind, name, direction? }`
 
-Thin wrapper around `hostContext` that strips auxiliary fields (`rootAspect`, `pathSets`, `classes`), returning a plain graph record.
+The graph as seen from one scope of a `den.lib.capture.captureFleet` result: the scope and all its descendants. `kind` is any entity kind (`host`, `user`, `environment`, …). The usual entry point for per-entity views.
+
+### `context { entries, ctxTrace?, pathsByClass?, name, direction? }`
+
+Builds a graph from a standalone capture (`captureWithPathsWith` and friends) of a single root.
 
 ### `graph.ofNamespace { name?, aspects?, direction?, filter? }`
 
@@ -64,7 +68,7 @@ All filters are available on the `graph` attrset (e.g., `diagram.graph.aspectsOn
 
 | Filter | Signature | Description |
 |---|---|---|
-| `userDeclaredOnly` | `graph -> graph` | Nodes with `hasClass = true` -- user-authored aspects only |
+| `userDeclaredOnly` | `graph -> graph` | User-authored aspects: those with class content, plus aspects that include them (policies excluded) |
 | `pipelineOnly` | `graph -> graph` | Wrapper/plumbing nodes only -- reveals resolution machinery |
 | `crossClassOnly` | `graph -> graph` | Nodes contributing to 2+ classes -- bridge aspects |
 | `orphansAndLeaves` | `graph -> graph` | Nodes with no incoming edges (orphans) or no outgoing edges (leaves) |

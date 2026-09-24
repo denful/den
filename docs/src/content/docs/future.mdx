@@ -1,0 +1,110 @@
+---
+title: "Future: den on gen"
+description: What gen is, how den uses it today through gen-schema, and what rebuilding den on pure gen is meant to unlock.
+---
+
+import { Aside, CardGrid, LinkCard } from '@astrojs/starlight/components';
+
+<CardGrid>
+  <LinkCard title="gen.wtf" href="https://gen.wtf/" description="The gen documentation site." />
+  <LinkCard title="sini/gen" href="https://github.com/sini/gen" description="The gen hub: library roster, architecture, trust and benchmark records." />
+</CardGrid>
+
+## What gen is
+
+[gen](https://gen.wtf/) is a set of small, independently versioned Nix
+libraries for building configuration frameworks. Each library owns one
+concern and names it after the literature it comes from: typed registries
+(gen-schema), module merging (gen-merge), type checking (gen-types), lazy
+attribute-grammar evaluation over a scope graph (gen-scope), graph queries
+(gen-graph), selectors (gen-select), rule dispatch (gen-dispatch),
+incremental re-evaluation (gen-memo) and more. The libraries talk through
+plain functions and attrsets, so each can be used on its own.
+
+None of them knows what NixOS is. den is gen's primary consumer.
+
+## Today: gen-schema under den's entities
+
+den already runs on one gen library. The typed registries behind
+`den.hosts`, `den.homes` and every `den.schema.<kind>` are **gen-schema
+instance types** (`mkInstanceType`, `mkSchemaOption` in
+[`nix/lib/schema.nix`](https://github.com/denful/den/blob/main/nix/lib/schema.nix)).
+That is where two things you use every day come from:
+
+- **Kinds with shared options.** `den.schema.host` is a gen-schema kind, and
+  each host is an instance of it.
+- **Content-addressed identity.** Every entity carries an `id_hash`
+  derived from its content. den compares entities by it instead of Nix `==`:
+  `den.lib.policy.for` matches on it, and the resolution pipeline uses it to
+  tell entities apart.
+
+den declares no flake inputs of its own. It loads gen through the gen hub:
+your flake's `inputs.gen` if you declare one, otherwise the revision pinned
+in den's CI lock. Everything else (the aspect pipeline, policies, quirks,
+the effects trampoline) is den's own code on top of `nixpkgs.lib`.
+
+## Next: den rebuilt on pure gen
+
+The plan is a den built fresh on gen instead of alongside it. In that
+design:
+
+- **aspects, hosts and users are nodes** in one graph;
+- **relationships are edges** you can query: a host has a user, a host
+  includes an aspect, a quirk flows from one scope to another;
+- **policies are rules over that graph**, dispatched by gen-dispatch rather
+  than by a hand-written iteration loop;
+- **one evaluation layer** (gen-scope) computes everything on demand.
+
+<Aside type="caution" title="Planned, not shipped">
+This section describes a design in progress. Names, APIs and timelines are
+not settled, and nothing here is available in den today.
+</Aside>
+
+## What it unlocks
+
+**Composition without nixpkgs.** Every gen library is free of `nixpkgs.lib`,
+and gen's pure module system (gen-merge + gen-types) reproduces
+`lib.evalModules` merging. nixpkgs enters only at the end, when a host's
+modules are handed to `nixosSystem` or its equivalents. On den's own
+composition shapes, gen's
+[2026-07-04 audit](https://gen.wtf/benchmarks/) measured the pure stack at
+1.6× to 2.8× faster than the nixpkgs stack, with 1.5× to 3.6× fewer
+allocations and linear scaling on both.
+
+**Questions become queries.** "Which hosts include this aspect?", "who reads
+this quirk?", "why is this user on that host?" are today answered by
+evaluating the fleet and reading traces. In a graph they are traversals
+(gen-graph) and selector matches by identity (gen-select), and a diagram is
+a view of data that already exists.
+
+**Incremental re-evaluation.** gen-memo decides what can be reused between
+evaluations, and gen-merge re-evaluates warm: gen's gated measurement puts a
+warm re-evaluation at roughly 0.17× the thunks and allocations of a cold
+one, byte-identical to it.
+
+**Sharing across similar hosts.** gen-class computes the configuration core
+that a class of near-identical hosts share, byte for byte. Rebuilding a
+member from that core measures at roughly 0.17× the thunks of a full
+re-merge, so large fleets stop paying for the same merge once per host.
+
+**Settings with provenance.** gen-settings (experimental) resolves layered
+defaults (fleet, environment, host) and records which layer each value came
+from. This is the piece that the
+[Aspect Settings](/guides/aspect-settings/) pattern approximates by hand
+today.
+
+## What stays the same
+
+The output is still ordinary NixOS, nix-darwin and home-manager modules. gen
+checks its merge behaviour against nixpkgs' module system byte for byte on
+every change, so the modules you write today are the modules a gen-based den
+builds. What changes is how den decides which modules each host gets, and
+how much you can ask it about that decision.
+
+## Follow along
+
+- [gen.wtf](https://gen.wtf/): the documentation, including why gen exists,
+  its trust record and its benchmarks
+- [sini/gen](https://github.com/sini/gen): the hub repository and library
+  roster
+- [Community](/community/): where den development is discussed

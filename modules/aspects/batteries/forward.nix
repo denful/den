@@ -18,9 +18,9 @@ let
 
 
     This is exactly how `homeManager` class support is implemented in Den.
-    See home-manager/hm-integration.nix.
+    See nix/lib/home-env.nix.
 
-    Den also provides the mentioned `user` class (`den.batteries.os-user`) for setting 
+    Den also provides the mentioned `user` class (modules/aspects/batteries/os-user.nix) for setting 
     NixOS/Darwin options under `users.users.<userName>` at os-level.
 
     Any other user-environments like `nix-maid` or `hjem` or user-custom classes
@@ -29,7 +29,7 @@ let
     Note: `den.batteries.forward` returns an aspect that needs to be included for
     the new class to exist.
 
-    See templates/ci/modules/guarded-forward.nix, templates/ci/modules/forward-from-custom-class.nix
+    See templates/ci/modules/public-api/guarded-forward.nix, templates/ci/modules/public-api/forward-from-custom-class.nix
     See also: https://github.com/denful/den/issues/160
   '';
 
