@@ -30,11 +30,7 @@ let
       description = "The NixOS-WSL module";
       type = lib.types.deferredModule;
       defaultText = lib.literalExpression "inputs.nixos-wsl.nixosModules.default";
-      default =
-        if inputs ? nixos-wsl then
-          inputs.nixos-wsl.nixosModules.default
-        else
-          { };
+      default = if inputs ? nixos-wsl then inputs.nixos-wsl.nixosModules.default else { };
     };
   };
 
