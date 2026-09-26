@@ -114,7 +114,7 @@ let
     }) systemNames
   );
 
-  all.includes = builtins.attrValues (flakeBased // systemBased);
+  all.imports = builtins.attrValues (flakeBased // systemBased);
 
   flake =
     { lib, config, ... }:
