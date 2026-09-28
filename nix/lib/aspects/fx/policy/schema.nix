@@ -158,7 +158,7 @@ let
 
   # Emit late policy effects into a single sibling scope.
   emitLateForSibling =
-    parentScope: parentFiredPolicies: scopedAspectPolicies: firedPerScope: sib:
+    parentScope: parentFiredPolicies: scopedAspectPolicies: firedPerScope: seen: sib:
     let
       # Runtime-include policies are subtree-scoped: a policy registered via a
       # scope's own includes applies only to that scope's subtree, never to
@@ -193,6 +193,7 @@ let
           ) (builtins.attrNames policyArgs);
         in
         !(alreadyFired ? ${name})
+        && !(seen ? ${name})
         && !(parentFiredPolicies ? ${name})
         # `self`-guarded policies fire only at their own registration scope
         # (during the initial dispatch); they must never re-fire at descendant
@@ -232,25 +233,46 @@ let
         fx.pure null
       else
         fx.bind
-          (fx.send "push-scope" {
-            scopedCtx = sib.scopedCtx;
-            entityClass = sib.entityClass;
-            inherit parentScope;
-          })
+          (fx.bind
+            (fx.send "push-scope" {
+              scopedCtx = sib.scopedCtx;
+              entityClass = sib.entityClass;
+              inherit parentScope;
+            })
+            (
+              { scopeHandlers, ... }:
+              let
+                # Strip `class` from propagated scope handlers — class is an
+                # internal routing key and must not appear in __scopeKeys
+                # (which take.exactly uses for exact-match detection).
+                # class remains available via scope.provide for handler probing.
+                userFacingHandlers = builtins.removeAttrs scopeHandlers [ "class" ];
+              in
+              fx.bind (fx.effects.scope.provide scopeHandlers (
+                emitPolicyEffectsThen late (
+                  policyEmitIncludes late.includeEffects { parentScopeHandlers = userFacingHandlers; }
+                )
+              )) (_: fx.send "restore-scope" { inherit parentScope; })
+            )
+          )
+          # The late includes may carry `provides` of their own, registering
+          # policies at `sib` after its dispatch already ran — without this
+          # re-pass a `to-hosts` reached through `<host>.provides.<user>` is
+          # silently dropped.
           (
-            { scopeHandlers, ... }:
-            let
-              # Strip `class` from propagated scope handlers — class is an
-              # internal routing key and must not appear in __scopeKeys
-              # (which take.exactly uses for exact-match detection).
-              # class remains available via scope.provide for handler probing.
-              userFacingHandlers = builtins.removeAttrs scopeHandlers [ "class" ];
-            in
-            fx.bind (fx.effects.scope.provide scopeHandlers (
-              emitPolicyEffectsThen late (
-                policyEmitIncludes late.includeEffects { parentScopeHandlers = userFacingHandlers; }
-              )
-            )) (_: fx.send "restore-scope" { inherit parentScope; })
+            _:
+            fx.bind fx.effects.state.get (
+              state':
+              let
+                scopedAspectPolicies' = (state'.scopedAspectPolicies or (_: { })) null;
+                seen' = seen // allAspectPolicies;
+                fresh = lib.filterAttrs (name: _: !(seen' ? ${name})) (scopedAspectPolicies'.${sib.scopeId} or { });
+              in
+              if fresh == { } then
+                fx.pure null
+              else
+                emitLateForSibling parentScope parentFiredPolicies scopedAspectPolicies' firedPerScope seen' sib
+            )
           )
     );
 
@@ -285,7 +307,7 @@ let
         builtins.foldl' (
           acc: sib:
           fx.bind acc (
-            _: emitLateForSibling parentScope parentFiredPolicies scopedAspectPolicies firedPerScope sib
+            _: emitLateForSibling parentScope parentFiredPolicies scopedAspectPolicies firedPerScope { } sib
           )
         ) (fx.pure null) siblingMetas
       )
