@@ -186,6 +186,11 @@ den.policies.fleet-backends = { host, ... }:
 Now `igloo` sees entries from both hosts. Entity kind filtering, filter
 stages, and `pipe.withProvenance` work the same as with `pipe.collect`.
 
+`pipe.broadcast` reaches across systems too, pushing from the senders
+instead of pulling at the receivers; `pipe.expose` does not. See
+[Crossing system boundaries](/guides/quirks-cross-scope#crossing-system-boundaries)
+for when to use each.
+
 ### Bridging specific systems
 
 The predicate receives each candidate's context, and every host carries

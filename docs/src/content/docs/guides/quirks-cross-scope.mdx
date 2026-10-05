@@ -282,6 +282,54 @@ resolved against the *source* host's config when they cross hosts. Note the
 asymmetry: a broadcaster pushes its own raw emits only — data exposed *up* into
 it (e.g. a host broadcaster's users' `pipe.expose` data) does not ride along.
 
+## Crossing system boundaries
+
+Hosts on different systems sit under different `flake-system` scopes, so
+`pipe.collect` never reaches across them. Two stages do:
+
+| Method | Who decides | Use when |
+|---|---|---|
+| `pipe.collectAll` | the **receiver** picks its sources | one consumer policy aggregates a roster; sources need no policy of their own |
+| `pipe.broadcast` | the **sender** picks its receivers | producers control where their data goes, or receivers differ per sender |
+
+Both give every host the fleet's entries when the predicate matches all hosts.
+
+**Pull** with `collectAll`, one policy on the receivers:
+
+```nix
+den.policies.fleet-backends = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "http-backends" [
+      (pipe.collectAll ({ host, ... }: true))
+    ]) ];
+```
+
+Sources can be narrowed with the predicate, as in
+[Bridging specific systems](#bridging-specific-systems). Collected data
+includes what each source's users exposed up into it.
+
+**Push** with `broadcast`, one policy on the senders:
+
+```nix
+den.policies.share-backends = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "http-backends" [
+      (pipe.broadcast ({ host, ... }: true))
+    ]) ];
+```
+
+The predicate filters receivers, and because it is a closure over the
+sender's context it can route per sender (see the recipe below). A broadcast
+carries the sender's raw emits only, not data its users exposed into it.
+
+<Aside type="caution" title="pipe.expose does not bridge systems">
+Exposing host data up to `flake-system` and collecting between the system
+scopes looks like it should join the subtrees, but `pipe.expose` only moves
+data up: nothing carries the system-level pool back down to the hosts, so a
+host consumer still sees only its own system. Use `collectAll` or
+`broadcast` instead.
+</Aside>
+
 ## Recipe: per-user mesh and hub
 
 A broadcast predicate is an ordinary closure, so it can compare the receiving

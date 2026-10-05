@@ -497,6 +497,119 @@
       }
     );
 
+    # broadcast is the push dual of collectAll, so it also crosses systems.
+    test-pipe-broadcast-cross-system = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.aarch64-linux.iceberg.users.alice = { };
+
+        den.quirks.http-backends = {
+          description = "HTTP backends";
+        };
+
+        den.policies.share-backends =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "http-backends" [
+              (pipe.broadcast ({ host, ... }: true))
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.share-backends ];
+
+        den.aspects.iceberg.http-backends = {
+          addr = "10.0.0.2";
+          port = 80;
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.haproxy ];
+          http-backends = {
+            addr = "10.0.0.1";
+            port = 80;
+          };
+        };
+
+        den.aspects.haproxy = {
+          nixos =
+            { http-backends, lib, ... }:
+            {
+              networking.domain = lib.concatMapStringsSep "," (b: b.addr) (
+                lib.sort (a: b: a.addr < b.addr) http-backends
+              );
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "10.0.0.1,10.0.0.2";
+      }
+    );
+
+    # expose moves data up to each flake-system scope, but nothing carries it back
+    # down to the hosts, so this does not bridge systems.
+    test-pipe-expose-collect-system-level = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.aarch64-linux.iceberg.users.alice = { };
+
+        den.quirks.http-backends = {
+          description = "HTTP backends";
+        };
+
+        den.policies.expose-backends =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [ (pipe.from "http-backends" [ pipe.expose ]) ];
+
+        den.policies.system-collect =
+          { system, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "http-backends" [
+              (pipe.collect ({ system, ... }: true))
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.expose-backends ];
+        den.schema.flake-system.includes = [ den.policies.system-collect ];
+
+        den.aspects.iceberg.http-backends = {
+          addr = "10.0.0.2";
+          port = 80;
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.haproxy ];
+          http-backends = {
+            addr = "10.0.0.1";
+            port = 80;
+          };
+        };
+
+        den.aspects.haproxy = {
+          nixos =
+            { http-backends, lib, ... }:
+            {
+              networking.domain = lib.concatMapStringsSep "," (b: b.addr) (
+                lib.sort (a: b: a.addr < b.addr) http-backends
+              );
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "10.0.0.1";
+      }
+    );
+
     # Collect + filter composition.
     test-pipe-collect-filter = denTest (
       { den, igloo, ... }:
