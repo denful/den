@@ -14,9 +14,10 @@ import { Aside } from '@astrojs/starlight/components';
 ## What is a fleet?
 
 A **fleet** is the set of hosts resolved together in a single pipeline
-run. All hosts declared in a Den flake form a fleet automatically —
-they become sibling scopes in a shared scope tree, and `pipe.collect`
-can reach across them for cross-host data flow.
+run. All hosts declared in a Den flake form a fleet automatically and
+share one scope tree. Hosts of the same system are sibling scopes, which
+`pipe.collect` reaches across; `pipe.collectAll` reaches hosts on every
+system.
 
 ## The scope tree
 
@@ -44,7 +45,10 @@ The built-in flake policies drive this tree:
 
 All hosts of the same system are **siblings** — they share the same
 `flake-system` parent scope. This is the key relationship that enables
-`pipe.collect`.
+`pipe.collect`. Hosts on different systems have different parents, so
+they are **not** siblings: an `x86_64-linux` host and an `aarch64-linux`
+host cannot see each other through `pipe.collect`. See
+[Across systems](#across-systems-pipecollectall).
 
 ## Cross-host data flow
 
@@ -148,6 +152,69 @@ den.aspects.haproxy = {
   };
 };
 ```
+
+### Across systems: `pipe.collectAll`
+
+`pipe.collect` stops at the `flake-system` boundary. With hosts on two
+systems:
+
+```mermaid
+flowchart TD
+  flake["flake (root)"]
+  flake --> x86["flake-system {system=x86_64-linux}"]
+  flake --> arm["flake-system {system=aarch64-linux}"]
+  x86 --> igloo["host {host=igloo}"]
+  arm --> iceberg["host {host=iceberg}"]
+```
+
+`igloo` and `iceberg` are not siblings, so a `pipe.collect` on `igloo`
+sees only its own entry. `pipe.collectAll` takes the same predicate but
+matches scopes anywhere in the tree:
+
+```nix
+den.hosts.x86_64-linux.igloo.users.tux = {};
+den.hosts.aarch64-linux.iceberg.users.alice = {};
+
+den.policies.fleet-backends = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "http-backends" [
+      (pipe.collectAll ({ host, ... }: true))
+    ])
+  ];
+```
+
+Now `igloo` sees entries from both hosts. Entity kind filtering, filter
+stages, and `pipe.withProvenance` work the same as with `pipe.collect`.
+
+`pipe.broadcast` reaches across systems too, pushing from the senders
+instead of pulling at the receivers; `pipe.expose` does not. See
+[Crossing system boundaries](/guides/quirks-cross-scope#crossing-system-boundaries)
+for when to use each.
+
+### Bridging specific systems
+
+The predicate receives each candidate's context, and every host carries
+its `system`, so selecting by `host.system` bridges chosen
+`flake-system` subtrees and leaves the rest out:
+
+```nix
+den.hosts.x86_64-linux.igloo.users.tux = {};
+den.hosts.aarch64-linux.iceberg.users.alice = {};
+den.hosts.aarch64-darwin.floe.users.bob = {};
+
+den.policies.linux-backends = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "http-backends" [
+      (pipe.collectAll ({ host, ... }:
+        builtins.elem host.system [ "x86_64-linux" "aarch64-linux" ]))
+    ])
+  ];
+```
+
+`igloo` and `iceberg` see each other's backends; `floe` is excluded. Any
+host attribute works the same way, so the bridge can follow tags or
+environments instead of systems. To make hosts siblings structurally
+rather than per policy, see [Fleet entity grouping](#fleet-entity-grouping).
 
 ## Config-dependent cross-host data
 
