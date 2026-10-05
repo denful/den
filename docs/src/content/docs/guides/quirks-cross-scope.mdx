@@ -137,6 +137,10 @@ at all. To collect from other users, write `({ user, ... }: true)`.
 </Aside>
 
 "Siblings" follows the scope tree, which makes `collect` a natural boundary.
+By default, hosts sit under a `flake-system` scope per system, so a host's
+siblings are the hosts on the **same system**: an `x86_64-linux` host and an
+`aarch64-linux` host never see each other through `collect` (see
+[Bridging specific systems](#bridging-specific-systems)).
 If hosts are resolved under a grouping entity (for example an `environment`
 kind whose policy fans out to its hosts), a host's siblings are the hosts in
 the **same** environment, so a `collect` scopes itself to that environment
@@ -202,6 +206,30 @@ The same stage works from a non-host scope: a policy taking `{ cluster, ... }`
 with `(pipe.collectAll ({ host, ... }: true))` gives the cluster's own class
 modules every host's records. (`host.addr` here is a user-defined
 `den.schema.host` option.)
+
+### Bridging specific systems
+
+The predicate receives each candidate's context, and every host carries its
+`system`, so selecting on `host.system` joins chosen `flake-system` subtrees
+and leaves the rest out:
+
+```nix
+den.hosts.x86_64-linux.igloo.users.tux = {};
+den.hosts.aarch64-linux.iceberg.users.alice = {};
+den.hosts.aarch64-darwin.floe.users.bob = {};
+
+den.policies.linux-backends = { host, ... }:
+  let inherit (den.lib.policy) pipe; in
+  [ (pipe.from "http-backends" [
+      (pipe.collectAll ({ host, ... }:
+        builtins.elem host.system [ "x86_64-linux" "aarch64-linux" ]))
+    ])
+  ];
+```
+
+`igloo` and `iceberg` see each other's backends; `floe` does not take part.
+Any host attribute works the same way, so the bridge can follow tags or
+environments instead of systems.
 
 ## Fleet-wide: `pipe.broadcast`
 

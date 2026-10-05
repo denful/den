@@ -331,6 +331,172 @@
       }
     );
 
+    # Hosts on different systems sit under different flake-system scopes, so
+    # they are not siblings: collect stays within igloo's system.
+    test-pipe-collect-cross-system = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.aarch64-linux.iceberg.users.alice = { };
+
+        den.quirks.http-backends = {
+          description = "HTTP backends";
+        };
+
+        den.policies.fleet-backends =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "http-backends" [
+              (pipe.collect ({ host, ... }: true))
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.fleet-backends ];
+
+        den.aspects.iceberg.http-backends = {
+          addr = "10.0.0.2";
+          port = 80;
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.haproxy ];
+          http-backends = {
+            addr = "10.0.0.1";
+            port = 80;
+          };
+        };
+
+        den.aspects.haproxy = {
+          nixos =
+            { http-backends, lib, ... }:
+            {
+              networking.domain = lib.concatMapStringsSep "," (b: b.addr) http-backends;
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "10.0.0.1";
+      }
+    );
+
+    test-pipe-collectAll-cross-system = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.aarch64-linux.iceberg.users.alice = { };
+
+        den.quirks.http-backends = {
+          description = "HTTP backends";
+        };
+
+        den.policies.fleet-backends =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "http-backends" [
+              (pipe.collectAll ({ host, ... }: true))
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.fleet-backends ];
+
+        den.aspects.iceberg.http-backends = {
+          addr = "10.0.0.2";
+          port = 80;
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.haproxy ];
+          http-backends = {
+            addr = "10.0.0.1";
+            port = 80;
+          };
+        };
+
+        den.aspects.haproxy = {
+          nixos =
+            { http-backends, lib, ... }:
+            {
+              networking.domain = lib.concatMapStringsSep "," (b: b.addr) (
+                lib.sort (a: b: a.addr < b.addr) http-backends
+              );
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "10.0.0.1,10.0.0.2";
+      }
+    );
+
+    # Bridges specific flake-system subtrees: the predicate selects by host.system.
+    test-pipe-collectAll-bridge-systems = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.aarch64-linux.iceberg.users.alice = { };
+        den.hosts.aarch64-darwin.floe.users.bob = { };
+
+        den.quirks.http-backends = {
+          description = "HTTP backends";
+        };
+
+        den.policies.linux-backends =
+          { host, ... }:
+          let
+            inherit (den.lib.policy) pipe;
+          in
+          [
+            (pipe.from "http-backends" [
+              (pipe.collectAll (
+                { host, ... }:
+                builtins.elem host.system [
+                  "x86_64-linux"
+                  "aarch64-linux"
+                ]
+              ))
+            ])
+          ];
+
+        den.schema.host.includes = [ den.policies.linux-backends ];
+
+        den.aspects.iceberg.http-backends = {
+          addr = "10.0.0.2";
+          port = 80;
+        };
+
+        den.aspects.floe.http-backends = {
+          addr = "10.0.0.3";
+          port = 80;
+        };
+
+        den.aspects.igloo = {
+          includes = [ den.aspects.haproxy ];
+          http-backends = {
+            addr = "10.0.0.1";
+            port = 80;
+          };
+        };
+
+        den.aspects.haproxy = {
+          nixos =
+            { http-backends, lib, ... }:
+            {
+              networking.domain = lib.concatMapStringsSep "," (b: b.addr) (
+                lib.sort (a: b: a.addr < b.addr) http-backends
+              );
+            };
+        };
+
+        expr = igloo.networking.domain;
+        expected = "10.0.0.1,10.0.0.2";
+      }
+    );
+
     # Collect + filter composition.
     test-pipe-collect-filter = denTest (
       { den, igloo, ... }:
