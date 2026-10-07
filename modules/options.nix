@@ -120,6 +120,12 @@ in
         default = false;
         merge = acc: val: acc || val;
       };
+      # Selects the kind's closed instance type (gen-schema's strict freeform)
+      # instead of the open one; see `den.lib.strict`.
+      isStrict = {
+        default = false;
+        merge = acc: val: acc || val;
+      };
     };
     computed = collections: defs: {
       isEntity =
@@ -133,6 +139,7 @@ in
               "excludes"
               "isEntity"
               "isolated"
+              "isStrict"
               "parent"
               "collisionPolicy"
             ];

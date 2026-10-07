@@ -226,4 +226,20 @@ declared via schema options:
 The module applies strict typing to the `host`, `user`, `home`, `aspect`, and
 `flake` schema kinds. Strict mode is useful for larger configurations where you
 want to catch typos and enforce a consistent entity interface. Setting an
-undeclared attribute throws a `STRICT MODE` error naming the missing option.
+undeclared attribute is refused with an error naming the key and the kind.
+
+Strictness belongs to a kind, so it can be enabled for one kind at a time by
+assigning `den.lib.strict` to that kind's schema entry (it sets the entry's
+`isStrict` collection):
+
+```nix
+{ den, ... }:
+{
+  den.schema.host = den.lib.strict;
+  # equivalently: den.schema.host.isStrict = true;
+}
+```
+
+A strict kind's instances are built closed instead of open: the freeform type is
+replaced, never merged with a second one. Assign `den.lib.strict` to the entry
+itself; it is not a module, so it does not belong in the entry's `imports`.

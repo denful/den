@@ -28,7 +28,7 @@
         expr = den.hosts.x86_64-linux.igloo.arbitrary;
         expectedError = {
           type = "ThrownError";
-          msg = "Attempted to set the option \"arbitrary\" in \"den.hosts.x86_64-linux.igloo\"";
+          msg = "STRICT MODE: \"arbitrary\" is not declared on host .instance at den.hosts.x86_64-linux.igloo,";
         };
       }
     );
@@ -43,7 +43,7 @@
         expr = den.hosts.x86_64-linux.igloo.users.tux.arbitrary;
         expectedError = {
           type = "ThrownError";
-          msg = "Attempted to set the option \"arbitrary\" in \"den.hosts.x86_64-linux.igloo.users.tux\"";
+          msg = "STRICT MODE: \"arbitrary\" is not declared on user .instance at den.hosts.x86_64-linux.igloo.users.tux,";
         };
       }
     );
@@ -73,7 +73,7 @@
         expr = config.flake.arbitray;
         expectedError = {
           type = "ThrownError";
-          msg = "Attempted to set the option \"arbitray\" in \"flake\"";
+          msg = "The option `flake.arbitray' does not exist";
         };
       }
     );
@@ -81,8 +81,8 @@
     test-strict-mode-flake-customisable = denTest (
       { den, config, ... }:
       {
+        den.schema.flake.isStrict = true;
         den.schema.flake.imports = [
-          den.lib.strict
           {
             options.arbitrary = lib.mkOption {
               type = lib.types.str;
@@ -107,7 +107,7 @@
           expr = den.hosts.x86_64-linux.igloo.arbitrary;
           expectedError = {
             type = "ThrownError";
-            msg = "Attempted to set the option \"arbitrary\" in \"den.hosts.x86_64-linux.igloo\"";
+            msg = "STRICT MODE: \"arbitrary\" is not declared on host .instance at den.hosts.x86_64-linux.igloo,";
           };
         }
       );
@@ -122,7 +122,7 @@
           expr = den.hosts.x86_64-linux.igloo.users.tux.arbitrary;
           expectedError = {
             type = "ThrownError";
-            msg = "Attempted to set the option \"arbitrary\" in \"den.hosts.x86_64-linux.igloo.users.tux\"";
+            msg = "STRICT MODE: \"arbitrary\" is not declared on user .instance at den.hosts.x86_64-linux.igloo.users.tux,";
           };
         }
       );

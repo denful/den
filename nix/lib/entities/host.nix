@@ -54,7 +54,7 @@ let
   hostType =
     system:
     schemaLib.mkInstanceType {
-      strict = false;
+      strict = den.schema.host.isStrict;
       extraModules = [
         (resolvedCtxModule "host")
         (
@@ -146,7 +146,7 @@ let
   userType =
     host:
     schemaLib.mkInstanceType {
-      strict = false;
+      strict = den.schema.user.isStrict;
       extraModules = [
         (resolvedCtxModule "user")
         (

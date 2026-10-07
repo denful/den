@@ -883,8 +883,11 @@ let
         # this is not a place that reads absence as root.
         ownChain = if config.meta.aspect-chain == null then [ ] else config.meta.aspect-chain;
         childProviderPrefix = ownChain ++ [ config.name ];
+        # A strict aspect kind is closed: gen-schema's strict freeform replaces the open one
+        # rather than being merged with it.
+        strict = den ? schema && den.schema ? aspect && den.schema.aspect.isStrict;
       in
-      {
+      lib.optionalAttrs (!strict) {
         freeformType = lib.types.lazyAttrsOf (
           aspectKeyType (
             typeCfg
@@ -893,10 +896,13 @@ let
             }
           )
         );
+      }
+      // {
         imports = [
           (lib.mkAliasOptionModule [ "_" ] [ "provides" ])
           (den.schema.aspect or { })
-        ];
+        ]
+        ++ lib.optional strict (den.lib.schema.mkStrictModule "aspect");
         options = {
           name = lib.mkOption {
             description = "Aspect name";

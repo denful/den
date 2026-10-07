@@ -53,7 +53,7 @@ let
   homeType =
     system:
     schemaLib.mkInstanceType {
-      strict = false;
+      strict = den.schema.home.isStrict;
       extraModules = [
         (resolvedCtxModule "home")
         (
