@@ -59,7 +59,7 @@
         expr = den.aspects.igloo.arbitrary;
         expectedError = {
           type = "ThrownError";
-          msg = "Attempted to set the option \"arbitrary\" in \"den.aspects.igloo\"";
+          msg = "STRICT MODE: \"arbitrary\".* not declared on aspect .instance at den.aspects.igloo,";
         };
       }
     );
@@ -137,7 +137,7 @@
           expr = den.aspects.test.arbitrary;
           expectedError = {
             type = "ThrownError";
-            msg = "Attempted to set the option \"arbitrary\" in \"den.aspects.test\"";
+            msg = "STRICT MODE: \"arbitrary\" is not declared on aspect .instance at den.aspects.test,";
           };
         }
       );
@@ -152,7 +152,7 @@
           expr = config.flake.arbitrary;
           expectedError = {
             type = "ThrownError";
-            msg = "STRICT MODE";
+            msg = "The option `flake.arbitrary' does not exist";
           };
         }
       );
