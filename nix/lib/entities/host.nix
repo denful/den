@@ -140,7 +140,8 @@ let
             };
           }
         )
-      ];
+      ]
+      ++ schemaLib.strictCompatModules den.schema.host.isStrict;
     } den.schema.host;
 
   userType =
@@ -181,7 +182,8 @@ let
             };
           }
         )
-      ];
+      ]
+      ++ schemaLib.strictCompatModules den.schema.user.isStrict;
     } den.schema.user;
 in
 {

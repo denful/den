@@ -902,7 +902,8 @@ let
           (lib.mkAliasOptionModule [ "_" ] [ "provides" ])
           (den.schema.aspect or { })
         ]
-        ++ lib.optional strict (den.lib.schema.mkStrictModule "aspect");
+        ++ lib.optional strict (den.lib.schema.mkStrictModule "aspect")
+        ++ den.lib.schema.strictCompatModules strict;
         options = {
           name = lib.mkOption {
             description = "Aspect name";

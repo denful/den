@@ -19,6 +19,7 @@ let
   # routing through den.lib here would close that cycle. Entity types consume it
   # lazily at eval time, so they safely use den.lib.schema.
   schemaLib = import ./../nix/lib/schema.nix { inherit inputs lib; };
+  strictEntry = import ./../nix/lib/strict.nix { };
 
   # Element check for BOTH schema-tier collections. gen-schema has no
   # per-collection `type` to route a bad element through, so the check that the
@@ -146,6 +147,15 @@ in
             stripped = if builtins.isAttrs v then builtins.removeAttrs v collectionKeys else v;
           in
           !builtins.isAttrs stripped || stripped != { }
+        ) defs;
+      # `imports = [ den.lib.strict ]` is the spelling from when it was a module.
+      isStrict =
+        collections.isStrict
+        || builtins.any (
+          d:
+          builtins.isAttrs d.value
+          && builtins.elem strictEntry (d.value.imports or [ ])
+          && lib.warn "den: `den.schema.<kind>.imports = [ den.lib.strict ]` is deprecated — use `den.schema.<kind> = den.lib.strict` or `den.schema.<kind>.isStrict = true`" true
         ) defs;
     };
   };

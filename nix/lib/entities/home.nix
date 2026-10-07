@@ -238,7 +238,8 @@ let
             };
           }
         )
-      ];
+      ]
+      ++ schemaLib.strictCompatModules den.schema.home.isStrict;
     } den.schema.home;
 in
 {
