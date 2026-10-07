@@ -241,5 +241,11 @@ assigning `den.lib.strict` to that kind's schema entry (it sets the entry's
 ```
 
 A strict kind's instances are built closed instead of open: the freeform type is
-replaced, never merged with a second one. Assign `den.lib.strict` to the entry
-itself; it is not a module, so it does not belong in the entry's `imports`.
+replaced, never merged with a second one. den reads `isStrict` for `host`,
+`user`, `home`, `aspect` and `flake`. A registry of your own kind follows it
+when its entry type passes `strict = den.schema.<kind>.isStrict` to
+`den.lib.schema.mkInstanceType` (see the
+[ACL guide](/guides/acl-environments/#1-schema)).
+
+The older spelling `den.schema.<kind>.imports = [ den.lib.strict ]` still
+works, but it is deprecated and warns.

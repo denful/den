@@ -62,9 +62,9 @@ entity, and the registry exposes introspection attrs (e.g. `_kindNames`,
 | Option | Type | Description |
 |--------|------|-------------|
 | `den.schema.conf` | `deferredModule` | Applied to host, user, and home |
-| `den.schema.host` | `deferredModule` | Applied to all hosts (imports `conf`) |
-| `den.schema.user` | `deferredModule` | Applied to all users (imports `conf`) |
-| `den.schema.home` | `deferredModule` | Applied to all homes (imports `conf`) |
+| `den.schema.host` | `deferredModule` | Applied to all hosts (inherits `conf`) |
+| `den.schema.user` | `deferredModule` | Applied to all users (inherits `conf`) |
+| `den.schema.home` | `deferredModule` | Applied to all homes (inherits `conf`) |
 | `den.schema.aspect` | `deferredModule` | Applied to **all aspects** (imported into every aspect submodule) -- where `den.lib.strict` is applied for [strict mode](/explanation/entities/#strict-mode) |
 
 ```nix
@@ -85,6 +85,8 @@ merge and consumed by the resolution pipeline:
 | `excludes` | `listOf raw` | `[]` | Aspects/policies suppressed for every entity of this kind |
 | `isEntity` | `bool` | computed | Whether the kind is a real entity (fan-out/policy target). Computed as `true` when the entry carries any content beyond collection keys; set it explicitly for content-free entity kinds (e.g. `den.schema.flake-parts.isEntity = true`) |
 | `isolated` | `bool` | `false` | Mark this kind's scopes as isolated -- when an ancestor collects its subtree, it cannot cross into an isolated scope (the isolated scope still collects its own content) |
+| `isStrict` | `bool` | `false` | Build this kind's instances closed: an undeclared attribute is refused instead of stored. `den.lib.strict` is the entry `{ isStrict = true; }`. See [strict mode](/explanation/entities/#strict-mode) |
+| `inherits` | `listOf kind` | `[]` | Kinds whose declarations this kind includes, e.g. `den.schema.host.inherits = [ den.schema.conf ]`. Importing a kind value (`imports = [ den.schema.conf ]`) still works, but it is deprecated and warns |
 | `parent` | `nullOr str` | `null` | The enclosing entity kind (e.g. `user.parent = "host"`). Defines the entity schema DAG the pipeline uses for descendant fan-out and [class-module arg promotion](/explanation/parametric/#where-parametric-args-work) |
 | `collisionPolicy` | `nullOr enum` | `null` | Class-module collision policy for every entity of this kind (see [Class Modules](/explanation/class-modules/)) |
 

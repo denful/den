@@ -217,6 +217,60 @@ $ nix run .#igloo -- switch
 $ nix run .#igloo -- switch --dry
 ```
 
+## `den.lib.strict`
+
+<Aside title="Source" icon="github">
+[`nix/lib/strict.nix`](https://github.com/denful/den/blob/main/nix/lib/strict.nix)
+</Aside>
+
+The schema entry `{ isStrict = true; }`. Assign it to a kind to build that
+kind's instances closed, so an undeclared attribute is refused instead of
+stored. See [strict mode](/explanation/entities/#strict-mode).
+
+```nix
+den.schema.host = den.lib.strict;
+# equivalently: den.schema.host.isStrict = true;
+```
+
+den reads `isStrict` for `host`, `user`, `home`, `aspect` and `flake`.
+`inputs.den.flakeModules.strict` sets all five.
+
+The refusal depends on the kind:
+
+- `host`, `user`, `home` and `aspect` throw gen-schema's error, which names every
+  undeclared key at once:
+  `STRICT MODE: "arbitrary" is not declared on host (instance at den.hosts.x86_64-linux.igloo, …)`.
+- `flake` is a plain submodule with no freeform type, so it fails with the module
+  system's own error: ``The option `flake.arbitrary' does not exist``.
+
+## `den.lib.schema`
+
+<Aside title="Source" icon="github">
+[`nix/lib/schema.nix`](https://github.com/denful/den/blob/main/nix/lib/schema.nix)
+</Aside>
+
+gen-schema, resolved through the gen hub. den wraps `mkInstanceType` and
+`mkSchemaOption` to inject nixpkgs `lib` as a module argument. The rest is
+gen-schema's API unchanged, for example `mkStrictModule`.
+
+### `den.lib.schema.mkInstanceType options kind`
+
+Builds the instance type of a schema kind, for registries of your own:
+
+```nix
+registryUserType = den.lib.schema.mkInstanceType {
+  strict = den.schema.user.isStrict;
+  extraModules = [ ({ name, ... }: { options.userName.default = name; }) ];
+} den.schema.user;
+```
+
+`options` takes only `extraModules`, `strict` and `specialArgs`. Pass
+`strict = den.schema.<kind>.isStrict` so the registry follows the kind's strict
+mode; when omitted, gen-schema reads the kind value's own `strict`, not den's
+`isStrict`. Importing a kind into a plain `types.submodule` still works, but
+that submodule stays open even when the kind is strict. See the
+[ACL guide](/guides/acl-environments/#1-schema) for a full registry.
+
 ## Deprecated functions
 
 Several `den.lib` functions are deprecated — the pipeline now handles
