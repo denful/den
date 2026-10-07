@@ -155,7 +155,12 @@ in
           d:
           builtins.isAttrs d.value
           && builtins.elem strictEntry (d.value.imports or [ ])
-          && lib.warn "den: `den.schema.<kind>.imports = [ den.lib.strict ]` is deprecated — use `den.schema.<kind> = den.lib.strict` or `den.schema.<kind>.isStrict = true`" true
+          && lib.warn ''
+            den: `imports = [ den.lib.strict ]` on a schema entry is deprecated (in ${d.file or "an unknown file"}).
+            den.lib.strict is now a schema entry, not a module. Migrate:
+              - den.schema.<kind>.imports = [ den.lib.strict ];
+              + den.schema.<kind>.isStrict = true;   # or: den.schema.<kind> = den.lib.strict;
+          '' true
         ) defs;
     };
   };

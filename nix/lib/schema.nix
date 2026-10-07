@@ -76,9 +76,12 @@ base
     if isInstanceOptions a then
       withLib base.mkInstanceType a
     else
-      lib.warn
-        "den: `den.lib.schema.mkInstanceType kind { … }` is deprecated — pass the options first: mkInstanceType { … } kind"
-        (opts: withLib base.mkInstanceType opts a);
+      lib.warn ''
+        den: `den.lib.schema.mkInstanceType` called kind-first for kind '${a.kind or "?"}' is deprecated.
+        gen-schema takes the options first. Swap the arguments:
+          - den.lib.schema.mkInstanceType den.schema.${a.kind or "<kind>"} { … }
+          + den.lib.schema.mkInstanceType { … } den.schema.${a.kind or "<kind>"}
+      '' (opts: withLib base.mkInstanceType opts a);
   mkSchemaOption = withLib base.mkSchemaOption;
 
   # `den.schema.<kind>.imports = [ den.lib.strict ]` (deprecated) lands `isStrict` on every
