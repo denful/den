@@ -52,7 +52,7 @@ let
 
   homeType =
     system:
-    schemaLib.mkInstanceType den.schema.home {
+    schemaLib.mkInstanceType {
       strict = false;
       extraModules = [
         (resolvedCtxModule "home")
@@ -239,7 +239,7 @@ let
           }
         )
       ];
-    };
+    } den.schema.home;
 in
 {
   inherit homesOption;

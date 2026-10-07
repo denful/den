@@ -62,6 +62,6 @@ let
 in
 base
 // {
-  mkInstanceType = kindValue: withLib (base.mkInstanceType kindValue);
+  mkInstanceType = withLib base.mkInstanceType;
   mkSchemaOption = withLib base.mkSchemaOption;
 }

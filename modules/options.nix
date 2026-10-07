@@ -178,8 +178,8 @@ in
   };
   config.den.schema.conf = { };
   config.den.schema.fleet = { };
-  config.den.schema.host.imports = [ den.schema.conf ];
-  config.den.schema.user.imports = [ den.schema.conf ];
+  config.den.schema.host.inherits = [ den.schema.conf ];
+  config.den.schema.user.inherits = [ den.schema.conf ];
   # `home` keys its identity on the registry key plus the system. `name` IS the
   # registry key and gen-schema injects it as an identity key by construction,
   # so only `system` needs declaring — and it has to be declared HERE because
@@ -198,8 +198,8 @@ in
   # `visible` not being read, which is an implementation fact rather than a
   # documented contract — if gen-schema ever folds `visible` into the same
   # presentation exclusion, this key silently leaves the identity set.
+  config.den.schema.home.inherits = [ den.schema.conf ];
   config.den.schema.home.imports = [
-    den.schema.conf
     {
       options.system = lib.mkOption {
         type = lib.types.str;
