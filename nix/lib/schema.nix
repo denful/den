@@ -59,9 +59,41 @@ let
         // (args.specialArgs or { });
       }
     );
+
+  # gen-schema takes the options first; the kind-first order is the deprecated
+  # spelling. The options are a closed key set, so anything else is a kind.
+  instanceOptionKeys = [
+    "extraModules"
+    "strict"
+    "specialArgs"
+  ];
+  isInstanceOptions = a: builtins.all (k: builtins.elem k instanceOptionKeys) (builtins.attrNames a);
 in
 base
 // {
-  mkInstanceType = kindValue: withLib (base.mkInstanceType kindValue);
+  mkInstanceType =
+    a:
+    if isInstanceOptions a then
+      withLib base.mkInstanceType a
+    else
+      lib.warn ''
+        den: `den.lib.schema.mkInstanceType` called kind-first for kind '${a.kind or "?"}' is deprecated.
+        gen-schema takes the options first. Swap the arguments:
+          - den.lib.schema.mkInstanceType den.schema.${a.kind or "<kind>"} { … }
+          + den.lib.schema.mkInstanceType { … } den.schema.${a.kind or "<kind>"}
+      '' (opts: withLib base.mkInstanceType opts a);
   mkSchemaOption = withLib base.mkSchemaOption;
+
+  # `den.schema.<kind>.imports = [ den.lib.strict ]` (deprecated) lands `isStrict` on every
+  # instance, which a closed kind would refuse.
+  strictCompatModules =
+    strict:
+    lib.optional strict {
+      options.isStrict = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        internal = true;
+        visible = false;
+      };
+    };
 }

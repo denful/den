@@ -53,8 +53,8 @@ let
 
   hostType =
     system:
-    schemaLib.mkInstanceType den.schema.host {
-      strict = false;
+    schemaLib.mkInstanceType {
+      strict = den.schema.host.isStrict;
       extraModules = [
         (resolvedCtxModule "host")
         (
@@ -140,13 +140,14 @@ let
             };
           }
         )
-      ];
-    };
+      ]
+      ++ schemaLib.strictCompatModules den.schema.host.isStrict;
+    } den.schema.host;
 
   userType =
     host:
-    schemaLib.mkInstanceType den.schema.user {
-      strict = false;
+    schemaLib.mkInstanceType {
+      strict = den.schema.user.isStrict;
       extraModules = [
         (resolvedCtxModule "user")
         (
@@ -181,8 +182,9 @@ let
             };
           }
         )
-      ];
-    };
+      ]
+      ++ schemaLib.strictCompatModules den.schema.user.isStrict;
+    } den.schema.user;
 in
 {
   inherit hostsOption;

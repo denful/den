@@ -110,20 +110,23 @@ let
     default = [ ];
   };
 
-  environmentType = types.submodule (
-    { name, config, ... }:
-    {
-      freeformType = types.attrsOf types.anything;
-      imports = [ den.schema.environment ];
-      config._module.args.environment = config;
-      options = {
-        name = mkOption { type = types.str; default = name; };
-        domain = mkOption { type = types.str; };
-        timezone = mkOption { type = types.str; default = "UTC"; };
-        system-access-groups = groupNames;
-      };
-    }
-  );
+  environmentType = den.lib.schema.mkInstanceType {
+    strict = den.schema.environment.isStrict;
+    extraModules = [
+      (
+        { name, config, ... }:
+        {
+          config._module.args.environment = config;
+          options = {
+            name = mkOption { type = types.str; default = name; };
+            domain = mkOption { type = types.str; };
+            timezone = mkOption { type = types.str; default = "UTC"; };
+            system-access-groups = groupNames;
+          };
+        }
+      )
+    ];
+  } den.schema.environment;
 
   groupType = types.submodule {
     options = {
@@ -135,27 +138,30 @@ let
 
   # Mirrors den's own user entity shape so batteries such as define-user
   # find userName, classes and aspect.
-  userType = types.submodule (
-    { name, config, ... }:
-    {
-      freeformType = types.attrsOf types.anything;
-      imports = [ den.schema.user ];
-      config._module.args.user = config;
-      options = {
-        name = mkOption { type = types.str; default = name; };
-        userName = mkOption { type = types.str; default = name; };
-        classes = mkOption {
-          type = types.listOf types.str;
-          default = [ "homeManager" ];
-        };
-        aspect = mkOption {
-          type = types.raw;
-          default = den.aspects.${name} or { };
-        };
-        groups = groupNames;
-      };
-    }
-  );
+  userType = den.lib.schema.mkInstanceType {
+    strict = den.schema.user.isStrict;
+    extraModules = [
+      (
+        { name, config, ... }:
+        {
+          config._module.args.user = config;
+          options = {
+            name = mkOption { type = types.str; default = name; };
+            userName = mkOption { type = types.str; default = name; };
+            classes = mkOption {
+              type = types.listOf types.str;
+              default = [ "homeManager" ];
+            };
+            aspect = mkOption {
+              type = types.raw;
+              default = den.aspects.${name} or { };
+            };
+            groups = groupNames;
+          };
+        }
+      )
+    ];
+  } den.schema.user;
 in
 {
   options.acl = {
@@ -177,9 +183,12 @@ in
 }
 ```
 
-`imports = [ den.schema.environment ]` and `imports = [ den.schema.user ]`
-make any `den.schema.environment.imports` / `den.schema.user.imports` you add
-later apply to registry entries too.
+`den.lib.schema.mkInstanceType { … } den.schema.<kind>` builds the registry
+entry type from the kind itself, so any `den.schema.environment.imports` /
+`den.schema.user.imports` you add later apply to registry entries too, and
+passing `strict = den.schema.<kind>.isStrict` closes the entries whenever
+the kind is [strict](/explanation/entities/#strict-mode). A plain
+`types.submodule` that imports the kind stays open.
 
 ### 2. Resolution
 
