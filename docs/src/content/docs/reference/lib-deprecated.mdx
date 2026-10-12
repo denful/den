@@ -132,6 +132,35 @@ Wrap `aspect` to require `{ host, user }`.
 
 Wrap `aspect` to require `{ home }`.
 
+## `den.schema.<kind>.imports = [ den.lib.strict ]`
+
+`den.lib.strict` used to be a module. It is now a schema entry, so assign it
+to the kind instead of importing it:
+
+```nix
+# Deprecated — still makes the kind strict, and warns.
+den.schema.host.imports = [ den.lib.strict ];
+
+# Current
+den.schema.host = den.lib.strict;
+```
+
+Only a `den.lib.strict` listed directly in the entry's `imports` is
+recognised. One reached through a nested import is not.
+
+## `den.lib.schema.mkInstanceType kind options`
+
+gen-schema now takes the options first. The kind-first order still works, and
+it warns:
+
+```nix
+# Deprecated
+den.lib.schema.mkInstanceType den.schema.user { extraModules = [ … ]; };
+
+# Current
+den.lib.schema.mkInstanceType { extraModules = [ … ]; } den.schema.user;
+```
+
 ## `den.lib.resolveStage`
 
 <Aside type="note" title="Renamed, not deprecated">

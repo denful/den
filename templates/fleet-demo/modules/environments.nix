@@ -9,32 +9,35 @@
   ...
 }:
 let
-  environmentType = lib.types.submodule (
-    { name, config, ... }:
-    {
-      freeformType = lib.types.attrsOf lib.types.anything;
-      imports = [ den.schema.environment ];
-      config._module.args.environment = config;
-      options = {
-        name = lib.mkOption {
-          type = lib.types.str;
-          default = name;
-          description = "Environment name";
-        };
-        domain-name = lib.mkOption {
-          type = lib.types.str;
-          default = "local";
-          description = "Domain name for this environment";
-        };
-        aspect = lib.mkOption {
-          type = lib.types.raw;
-          default = if den.aspects ? ${name} then den.aspects.${name} else { };
-          defaultText = "den.aspects.<name>";
-          description = "Aspect that configures this environment";
-        };
-      };
-    }
-  );
+  environmentType = den.lib.schema.mkInstanceType {
+    strict = false;
+    extraModules = [
+      (
+        { name, config, ... }:
+        {
+          config._module.args.environment = config;
+          options = {
+            name = lib.mkOption {
+              type = lib.types.str;
+              default = name;
+              description = "Environment name";
+            };
+            domain-name = lib.mkOption {
+              type = lib.types.str;
+              default = "local";
+              description = "Domain name for this environment";
+            };
+            aspect = lib.mkOption {
+              type = lib.types.raw;
+              default = if den.aspects ? ${name} then den.aspects.${name} else { };
+              defaultText = "den.aspects.<name>";
+              description = "Aspect that configures this environment";
+            };
+          };
+        }
+      )
+    ];
+  } den.schema.environment;
 
   # Extend host schema with environment + networking fields.
   extendHostSchema =

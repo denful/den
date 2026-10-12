@@ -89,7 +89,12 @@ let
     lib.mkOption {
       default = { };
       defaultText = lib.literalExpression "{ }";
-      type = (manySubmodule lib [ (den.schema.flake or { }) ]);
+      type =
+        if den ? schema && den.schema ? flake && den.schema.flake.isStrict then
+          # Closed: no freeform type, so an undeclared key is refused as a missing option.
+          lib.types.submodule { imports = [ den.schema.flake ] ++ den.lib.schema.strictCompatModules true; }
+        else
+          manySubmodule lib [ (den.schema.flake or { }) ];
     };
 
   flakeBased = builtins.listToAttrs (

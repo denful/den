@@ -19,6 +19,7 @@ let
   # routing through den.lib here would close that cycle. Entity types consume it
   # lazily at eval time, so they safely use den.lib.schema.
   schemaLib = import ./../nix/lib/schema.nix { inherit inputs lib; };
+  strictEntry = import ./../nix/lib/strict.nix { };
 
   # Element check for BOTH schema-tier collections. gen-schema has no
   # per-collection `type` to route a bad element through, so the check that the
@@ -120,6 +121,12 @@ in
         default = false;
         merge = acc: val: acc || val;
       };
+      # Selects the kind's closed instance type (gen-schema's strict freeform)
+      # instead of the open one; see `den.lib.strict`.
+      isStrict = {
+        default = false;
+        merge = acc: val: acc || val;
+      };
     };
     computed = collections: defs: {
       isEntity =
@@ -133,12 +140,27 @@ in
               "excludes"
               "isEntity"
               "isolated"
+              "isStrict"
               "parent"
               "collisionPolicy"
             ];
             stripped = if builtins.isAttrs v then builtins.removeAttrs v collectionKeys else v;
           in
           !builtins.isAttrs stripped || stripped != { }
+        ) defs;
+      # `imports = [ den.lib.strict ]` is the spelling from when it was a module.
+      isStrict =
+        collections.isStrict
+        || builtins.any (
+          d:
+          builtins.isAttrs d.value
+          && builtins.elem strictEntry (d.value.imports or [ ])
+          && lib.warn ''
+            den: `imports = [ den.lib.strict ]` on a schema entry is deprecated (in ${d.file or "an unknown file"}).
+            den.lib.strict is now a schema entry, not a module. Migrate:
+              - den.schema.<kind>.imports = [ den.lib.strict ];
+              + den.schema.<kind>.isStrict = true;   # or: den.schema.<kind> = den.lib.strict;
+          '' true
         ) defs;
     };
   };
@@ -178,8 +200,8 @@ in
   };
   config.den.schema.conf = { };
   config.den.schema.fleet = { };
-  config.den.schema.host.imports = [ den.schema.conf ];
-  config.den.schema.user.imports = [ den.schema.conf ];
+  config.den.schema.host.inherits = [ den.schema.conf ];
+  config.den.schema.user.inherits = [ den.schema.conf ];
   # `home` keys its identity on the registry key plus the system. `name` IS the
   # registry key and gen-schema injects it as an identity key by construction,
   # so only `system` needs declaring — and it has to be declared HERE because
@@ -198,8 +220,8 @@ in
   # `visible` not being read, which is an implementation fact rather than a
   # documented contract — if gen-schema ever folds `visible` into the same
   # presentation exclusion, this key silently leaves the identity set.
+  config.den.schema.home.inherits = [ den.schema.conf ];
   config.den.schema.home.imports = [
-    den.schema.conf
     {
       options.system = lib.mkOption {
         type = lib.types.str;
