@@ -55,5 +55,36 @@
       }
     );
 
+    # The parent kind's collections hold the same references. They do not
+    # apply to a host instance (as before #717); these pin that they evaluate.
+    test-conf-excludes-aspect-ref = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.unwanted.nixos.networking.domain = "unwanted.example";
+        den.aspects.igloo.includes = [ den.aspects.unwanted ];
+
+        den.schema.conf.excludes = [ den.aspects.unwanted ];
+
+        expr = igloo.networking.domain;
+        expected = "unwanted.example";
+      }
+    );
+
+    test-conf-includes-aspect-ref = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.wanted.nixos.networking.domain = "wanted.example";
+
+        den.schema.conf.includes = [ den.aspects.wanted ];
+
+        expr = igloo.networking.domain;
+        expected = null;
+      }
+    );
+
   };
 }
