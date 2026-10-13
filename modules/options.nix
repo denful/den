@@ -105,13 +105,18 @@ in
   options.den.homes = types.homesOption;
   options.den.schema = schemaLib.mkSchemaOption {
     collections = {
+      # includes / excludes are policy over aspects, not the kind's shape: their
+      # elements may reach back into the instances the kind types (#719), so
+      # gen-schema must not read them into the kind's identity.
       includes = {
         default = [ ];
         merge = acc: val: acc ++ map (checkCollectionElement "includes") val;
+        identity = false;
       };
       excludes = {
         default = [ ];
         merge = acc: val: acc ++ map (checkCollectionElement "excludes") val;
+        identity = false;
       };
       isEntity = {
         default = false;
