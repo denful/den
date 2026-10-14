@@ -30,7 +30,14 @@ let
     withSystem system (
       { inputs', ... }:
       {
-        ${class}._module.args.inputs' = inputs';
+        # Imported under a key, so the module system keeps one copy when more than one
+        # of the parts below matches (a `user@host` home is both a home and a user).
+        ${class}.imports = [
+          {
+            key = "den.batteries.inputs'/${system}";
+            _module.args.inputs' = inputs';
+          }
+        ];
       }
     );
 
