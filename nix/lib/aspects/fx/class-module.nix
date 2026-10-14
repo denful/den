@@ -271,7 +271,7 @@ let
                     }
                   );
                 in
-                if builtins.isList result then result else [ result ]
+                (v.__post or (r: r)) (if builtins.isList result then result else [ result ])
             else
               [ v ]
           ) values;

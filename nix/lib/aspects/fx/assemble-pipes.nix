@@ -238,9 +238,9 @@ let
   #   seed       scopeId -> raw -> wrapped (tag a fresh value at a given scope —
   #                                         fold/append/for re-tag, collect tags
   #                                         each value with its SOURCE scope)
-  #   passthrough wrapped -> bool         (skip filter/transform — the plain
-  #                                         path passes __configThunk markers
-  #                                         through unchanged; provenance never:
+  #   passthrough wrapped -> bool         (defer filter/transform — the plain
+  #                                         path composes them onto __configThunk
+  #                                         markers' __post; provenance never:
   #                                         the legacy provenance interpreter had
   #                                         no __configThunk guard, preserved
   #                                         bug-for-bug — do not "fix")
@@ -275,9 +275,13 @@ let
       seed = functor.seed currentScopeId;
     in
     if t == "filter" then
-      builtins.filter (v: passthrough v || stage.fn (unwrap v)) values
+      map (v: if passthrough v then deferStage (builtins.filter stage.fn) v else v) (
+        builtins.filter (v: passthrough v || stage.fn (unwrap v)) values
+      )
     else if t == "transform" then
-      map (v: if passthrough v then v else rewrap v (stage.fn (unwrap v))) values
+      map (
+        v: if passthrough v then deferStage (map stage.fn) v else rewrap v (stage.fn (unwrap v))
+      ) values
     else if t == "fold" then
       [ (seed (builtins.foldl' (acc: v: stage.fn acc (unwrap v)) stage.init values)) ]
     else if t == "append" then
@@ -287,8 +291,18 @@ let
     else
       values;
 
+  # A config thunk marker cannot be filtered or transformed until evalModules
+  # resolves it, so the stage is composed onto its `__post` instead: the
+  # resolved values go through the same stages the plain values did.
+  deferStage =
+    f: marker:
+    marker
+    // {
+      __post = values: f ((marker.__post or (v: v)) values);
+    };
+
   # Plain-path single-stage application (identity functor, no provenance tag).
-  # Config thunk markers (__configThunk) pass through filter/transform unchanged.
+  # Config thunk markers (__configThunk) carry filter/transform stages in `__post`.
   applyStage = applyStageWith idFunctor null;
 
   # Apply all transform stages from a pipe effect.
