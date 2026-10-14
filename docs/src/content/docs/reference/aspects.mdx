@@ -14,7 +14,7 @@ import { Aside } from '@astrojs/starlight/components';
 ## `den.aspects`
 
 An attribute set of aspects. Each aspect key names an aspect; its value is
-an aspect set containing per-class deferred modules and optional `includes` and `provides`:
+an aspect set containing per-class deferred modules and optional `includes` and nested aspects:
 
 ```nix
 den.aspects = {
@@ -66,7 +66,7 @@ registered class), *nested aspect keys*, or one of these structural keys:
 | `<class>` | module / config | Config merged into entities of that class |
 | `includes` | `listOf provider` | Providers (aspects, sub-aspects, functions) pulled into this aspect |
 | `excludes` | `listOf provider` | Aspects or policies excluded from this subtree |
-| `provides` / `_` | submodule | Sub-aspect namespace (`_` is an alias for `provides`) |
+| `provides` / `_` | submodule | Legacy sub-aspect namespace (`_` is an alias); `<aspect>.provides.<name>` is also reachable as `<aspect>.<name>`. Still required for the cross-entity keys `to-users`, `to-hosts`, and `<host>` on a user aspect. Included as a value, `<aspect>._` includes every depth-1 child aspect |
 | `policies` | policy registry | Named policy functions, activated by placing in `includes` |
 | `meta` | submodule | Attached metadata (`handleWith`, `aspect-chain`, `collisionPolicy`; `guard`/`aspects` for conditional aspects) |
 | `classes` | `lazyAttrsOf raw` | Class schemas declared by this aspect, merged into `den.classes` |

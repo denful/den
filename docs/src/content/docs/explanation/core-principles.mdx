@@ -200,7 +200,7 @@ No conditionals, no `mkIf`, no `enable` -- the context shape **is** the conditio
 
 ## Composition via Includes
 
-Aspects form a directed acyclic graph through `includes` and form a tree of related aspects using `provides`.
+Aspects form a directed acyclic graph through `includes` and form a tree of related aspects by nesting (`den.aspects.<aspect>.<name>`).
 
 ```nix
 den.aspects.workstation = {

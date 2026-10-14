@@ -25,7 +25,7 @@ do I use?". This page answers it by goal.
 | change the host from a user aspect | the `user` class for the user's own account; `provides.<host>` or `provides.to-hosts` for anything else, never untargeted `nixos` ([#694](https://github.com/denful/den/issues/694)) | [Where Does My Config Land?](/explanation/where-config-lands/#have-a-user-contribute-to-the-hosts-os) |
 | write a new class that lands inside another (`user` → `users.users.<name>`) | `den.classes.<name>` plus a `policy.route` policy | [Custom Nix Classes](/guides/custom-classes/) |
 | share data (ports, addresses, extension lists) rather than modules | a quirk, plus pipes if it must cross scopes | [Quirks & Pipes](/guides/quirks/) |
-| offer optional parts of an aspect for others to pick | sub-aspects under `provides` / `_` | [Configure Aspects](/guides/configure-aspects/#provides) |
+| offer optional parts of an aspect for others to pick | nested aspects, `den.aspects.<aspect>.<name>` | [Configure Aspects](/guides/configure-aspects/#nested-aspects) |
 | stop an aspect or policy from applying in a subtree | `excludes` | [Policy reference](/reference/policies/#deactivation) |
 
 ## Three pairs people mix up
