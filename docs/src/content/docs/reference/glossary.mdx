@@ -9,7 +9,7 @@ Den introduces several domain-specific terms. This glossary defines them in Den'
 
 ### aspect
 
-A composable attrset containing per-class modules (`nixos`, `homeManager`, `darwin`, etc.), an `includes` list, and `provides` sub-aspects. Aspects are the primary organizational unit in Den -- each one groups related configuration across multiple module systems under a single name.
+A composable attrset containing per-class modules (`nixos`, `homeManager`, `darwin`, etc.), an `includes` list, and nested aspects (`den.aspects.<aspect>.<name>`). Aspects are the primary organizational unit in Den -- each one groups related configuration across multiple module systems under a single name.
 
 See: [Aspects](/explanation/aspects/)
 
@@ -75,7 +75,7 @@ See: [Policies](/explanation/policies/)
 
 ### provides
 
-Overloaded term with two distinct meanings. On an aspect, `provides` defines named sub-aspects that dependents can include (aliased `_`). At the top level, `den.provides` is an alias for `den.batteries`, the reusable aspect providers shipped with Den.
+Overloaded term with two distinct meanings. On an aspect, `provides` (aliased `_`) is the legacy namespace for nested aspects, still required for the cross-entity keys `to-users`, `to-hosts`, and `<host>` on a user aspect; other nested aspects are written directly. At the top level, `den.provides` is an alias for `den.batteries`, the reusable aspect providers shipped with Den.
 
 See: [Aspects](/explanation/aspects/), [Batteries](/reference/batteries/)
 

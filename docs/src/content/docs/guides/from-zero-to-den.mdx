@@ -223,7 +223,7 @@ This is all that is happening at `modules/den.nix`.
 
 7. Include re-usable features from other, generic aspects.
 
-    One of the advantages of Den aspects is that they can easily form a DAG via `.includes` and `.provides`. 
+    One of the advantages of Den aspects is that they can easily form a DAG via `.includes`, and nest into a tree of named sub-aspects. 
 
     Den aspects are parametric: they are functions taking a context. A context like `{host}` is simply an attribute set that holds the `igloo` host definition from our examples. These are **arguments** to real Nix functions, NOT `_module.args` nor `specialArgs`. This is why these values can be used for conditional includes.
 

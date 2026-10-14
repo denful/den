@@ -26,7 +26,7 @@ den.aspects.gaming = { host, user }: {
   homeManager = { pkgs, ... }: { /* ... */ };
 
   includes = [ den.aspects.performance ];   # aspects compose
-  provides.emulation = { nixos = { /* ... */ }; };  # and nest
+  emulation = { nixos = { /* ... */ }; };           # and nest
 };
 ```
 
