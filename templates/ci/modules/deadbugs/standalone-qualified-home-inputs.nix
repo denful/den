@@ -98,7 +98,9 @@
             home.packages = [ inputs'.nixpkgs.legacyPackages.hello ];
           };
 
-        expr = builtins.elem "hello" (map lib.getName config.flake.homeConfigurations.tux.config.home.packages);
+        expr = builtins.elem "hello" (
+          map lib.getName config.flake.homeConfigurations.tux.config.home.packages
+        );
         expected = true;
       }
     );
