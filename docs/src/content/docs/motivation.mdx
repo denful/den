@@ -93,6 +93,33 @@ Den, tries to answer some specific issues regarding NixOS/nix-Darwin configurati
 
   `{ omfnix, ... }: { omfnix.niri.nixos = ...; }`
 
+## From traversals to effects to a graph
+
+Den was extracted from real configurations. Every setup with several hosts and
+users ended up doing the same thing: a `mapAttrs` over users, with the resulting
+attrsets installed into each host's config. Den started as an abstraction over
+that iteration of the infra *structure*: a declarative surface language on top,
+and the procedural code that traverses the topology kept as general as possible.
+In that sense Den is a data transformation pipeline, not a fixpoint the way the
+NixOS module system is. [Are `aspect-oriented`, `context-aware` just buzzwords? (#355)](https://github.com/denful/den/discussions/355)
+and the [v0.9.0 release notes](https://github.com/denful/den/releases/tag/v0.9.0)
+(declarative context definitions, `den.ctx`) cover this view in more depth.
+
+Up to v0.10 the implementation was plain maps and traversals. As people used Den
+for infra far more complex than a few hosts and homes, two needs appeared:
+generalizing beyond hosts and homes to new kinds of entities (fleets, microVMs and
+so on), and correctness, including passing values between entities and typing
+them with schemas. Den's core moved onto [nix-effects](/explanation/effects/), and
+its public API and design were kept while the implementation underneath changed.
+Work on organizing that effects kernel also led to related projects such as
+[dnzl](https://github.com/denful/dnzl), [nest](https://github.com/denful/nest)
+and [zen](https://github.com/denful/zen).
+
+The next step treats the problem as logic programs over a graph of facts. The
+[gen](https://gen.wtf/) libraries are graph-based libraries meant to replace the
+effects kernel; the public API and domain language stay the same. See
+[Future: den on gen](/future/) for what that design is and what it unlocks.
+
 
 ## Den is about sharing functions to configs.
 
