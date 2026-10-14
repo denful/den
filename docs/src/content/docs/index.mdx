@@ -135,7 +135,7 @@ flowchart BT
 <CardGrid>
   <Card title="Aspect-Oriented" icon="puzzle">
     [Aspects](/explanation/aspects/) bundle NixOS, Darwin, home-manager, or [custom class](/guides/custom-classes/) config in one composable unit.
-    Includes form a DAG. Provides create sub-aspects. One concern, all platforms.
+    Includes form a DAG. Aspects nest. One concern, all platforms.
   </Card>
   <Card title="Pure Effects Pipeline" icon="right-arrow">
     Built on [algebraic effects](/explanation/effects/) via `nix-effects`. Aspects compile to computations, handlers own resolution strategy. [Policies](/explanation/policies/) drive entity topology and bind behavior. Everything is extensible.
@@ -166,7 +166,7 @@ flowchart LR
 
 <Steps>
 1. **Schema** -- `den.hosts` and `den.homes` declare machines, users, and their properties with `den.schema` modules and extensible freeform types.
-2. **Aspects** -- `den.aspects.*` bundles per-class configs (`nixos`, `darwin`, `homeManager`, or any custom class) with `.includes` and `.provides` forming a DAG.
+2. **Aspects** -- `den.aspects.*` bundles per-class configs (`nixos`, `darwin`, `homeManager`, or any custom class) with `.includes` forming a DAG and nested aspects forming a tree.
 3. **Resolution pipeline** -- `den.policies` fan out from entity kinds (`{host}` → `{host, user}`, `{home}`) and bind behavior. Batteries add their own classes (`homeManager`, `hjem`, `wsl`, …) and, where needed, derived entity kinds such as `wsl-host`.
 4. **Resolution** -- Context-aware dispatch: functions receive entity data automatically based on their argument shape. [Class modules](/explanation/class-modules/) can access both Den context and NixOS module args in a single function.
 5. **Output** -- Each host/home is instantiated via `nixpkgs.lib.nixosSystem`, `darwin.lib.darwinSystem`, or `home-manager.lib.homeManagerConfiguration`.

@@ -16,7 +16,7 @@ An **aspect** is a composable unit of configuration that bundles modules
 for one or more Nix classes (`nixos`, `darwin`, `homeManager`, or custom)
 in a single attrset. Aspects declare *what behavior applies* — one
 concern, all platforms. They compose via `includes` (DAG edges) and
-`provides` (named sub-aspects).
+nest: any key that is not a class or structural key is itself an aspect.
 
 ```nix
 den.aspects.gaming = { host, user }: {
@@ -91,9 +91,13 @@ den.aspects.igloo.includes = [
 ];
 ```
 
-### Provides
+### Nested aspects
 
-Named sub-aspects scoped to this aspect, accessible via `den.aspects.igloo.name`:
+Any key on an aspect that is not a class key (`nixos`, `homeManager`, …) or a
+structural key (`includes`, `meta`, …) is itself an aspect, reachable as
+`den.aspects.<aspect>.<name>`. Names are yours to choose and nest to any
+depth. In the example below, `igloo` is a host name and `gpu` is a name
+chosen for the nested aspect; neither is API:
 
 ```nix
 den.aspects.igloo.gpu = { host, ... }:
@@ -101,6 +105,36 @@ den.aspects.igloo.gpu = { host, ... }:
     nixos.hardware.nvidia.enable = true;
   };
 ```
+
+A nested aspect is not applied just because its parent is. It has to be
+included; see [Naming and inclusion](/guides/configure-aspects/#naming-and-inclusion).
+
+`host.gpu` is not built in. `host` is the host's entity record, and `gpu`
+is an attribute you put there yourself, either as a free-form attribute on
+the host declaration:
+
+```nix
+den.hosts.x86_64-linux.igloo.gpu = "nvidia";
+```
+
+or as a typed option on every host through the host schema:
+
+```nix
+den.schema.host = { lib, ... }: {
+  options.gpu = lib.mkOption {
+    type = lib.types.nullOr lib.types.str;
+    default = null;
+  };
+};
+```
+
+With the schema option every host has `gpu`, so test `host.gpu != null`
+rather than `host ? gpu`. See
+[Freeform attributes](/explanation/entities/#freeform-attributes).
+
+Older configurations nest under `provides` (alias `_`), as in
+`den.aspects.<aspect>.provides.<name>`. That spelling still evaluates to the
+same aspect, but it is legacy; write the direct form.
 
 ## Resolution
 
@@ -116,7 +150,7 @@ single `deferredModule` containing all NixOS configuration.
 
 ## See also
 
-- [Configure Aspects](/guides/configure-aspects/) — practical guide to owned configs, includes, provides
+- [Configure Aspects](/guides/configure-aspects/) — practical guide to owned configs, includes, nesting
 - [Parametric Aspects](/explanation/parametric/) — context-aware dispatch via argument introspection
 - [Resolution Pipeline](/explanation/context-pipeline/) — how aspects feed into the full pipeline
 - [den.aspects reference](/reference/aspects/) — full option documentation

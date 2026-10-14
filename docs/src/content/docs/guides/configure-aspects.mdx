@@ -1,6 +1,6 @@
 ---
 title: Configure Aspects
-description: Owned configs, includes, provides, and den.default.
+description: Owned configs, includes, nested aspects, and den.default.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -63,7 +63,7 @@ aspects receive `host`/`user`/`home` context.
 
 ## Aspect Basics
 
-In addition to per-class modules, an aspect has an `includes` list referencing other aspects, and `provides` for sub-aspects in same category:
+In addition to per-class modules, an aspect has an `includes` list referencing other aspects, and can hold nested aspects under keys of its own:
 
 ```nix
 { den, ... }: {
@@ -85,7 +85,7 @@ In addition to per-class modules, an aspect has an `includes` list referencing o
   den.aspects.gaming = {
     darwin = ...;
     nixos = ...;
-    provides.emulation = {
+    emulation = {
       darwin = ...;
       nixos = ...;
     };
@@ -144,10 +144,11 @@ into these functions, so they can inspect the host features and provide
 configuration accordingly.
 
 
-## Provides
+## Nested aspects
 
-`provides` creates named sub-aspects accessible via `den.aspects.<name>.<sub>`
-(the `provides.` prefix is optional on access; `_` is an alias for `provides`):
+Any key on an aspect that is not a class key or a structural key (`includes`,
+`excludes`, `meta`, `policies`, …) is a nested aspect, reachable as
+`den.aspects.<aspect>.<name>`:
 
 ```nix
 den.aspects.tools.editors = {
@@ -159,7 +160,7 @@ den.aspects.tools.editors = {
 den.aspects.alice.includes = [ den.aspects.tools.editors ];
 ```
 
-`provides` can also be parametric functions:
+Nested aspects can also be parametric functions:
 
 ```nix
 den.aspects.alice.work-vpn = { host, user, ... }:
@@ -168,7 +169,62 @@ den.aspects.alice.work-vpn = { host, user, ... }:
   };
 ```
 
-### Cross-entity provides
+`host.hasVpn` is an attribute you set on the host, not a built-in one; see
+[Freeform attributes](/explanation/entities/#freeform-attributes).
+
+Older configurations write `den.aspects.<aspect>.provides.<name>` (or
+`._.<name>`). That nesting still works and yields the same aspect at
+`den.aspects.<aspect>.<name>`, but it is legacy; write the direct form. The
+cross-entity keys `to-users`, `to-hosts`, and `<host>` on a user aspect
+(below) are the exception: they are read only from `provides`.
+
+### Naming and inclusion
+
+In `den.aspects.<path>`, every segment is a name you choose, nested to any
+depth. This is a valid aspect:
+
+```nix
+den.aspects.foo.bar.baz.nixos = { config, ... }: { /* ... */ };
+```
+
+Declaring an aspect does not apply it. It reaches a host only when the host's
+resolution tree includes it, by one of these routes:
+
+```nix
+# 1. From the host's own aspect
+den.aspects.<host>.includes = [ den.aspects.foo.bar.baz ];
+
+# 2. From a policy that injects it, activated somewhere in the tree
+den.policies.<policy> = { host, ... }: [ (den.lib.policy.include den.aspects.foo.bar.baz) ];
+den.schema.host.includes = [ den.policies.<policy> ];
+
+# 3. For every host, through the host kind
+den.schema.host.includes = [ den.aspects.foo.bar.baz ];
+
+# 4. Globally, for every host, user, and home
+den.default.includes = [ den.aspects.foo.bar.baz ];
+```
+
+Including a parent does not include its children. To include all of an
+aspect's direct children at once, include `den.aspects.<aspect>._`:
+
+```nix
+den.aspects.foo = {
+  nixos = { /* not included by foo._ */ };
+  bar.nixos = { /* included */ };
+  bar.baz.nixos = { /* not included: a grandchild */ };
+};
+
+den.aspects.<host>.includes = [ den.aspects.foo._ ];
+```
+
+`<aspect>._` includes each depth-1 child aspect, including legacy
+`provides` children, and nothing else: not the aspect's own class keys, and
+not grandchildren (use `den.aspects.foo.bar._` for those). The same `_` used
+as an attribute path, as in `den.aspects.<aspect>._.<name>`, is the legacy
+alias for `provides.<name>`.
+
+## Cross-entity provides
 
 Three special `provides` keys route configuration across entity boundaries.
 They fire automatically during the tree walk — no manual policy wiring needed:
