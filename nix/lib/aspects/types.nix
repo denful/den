@@ -293,6 +293,19 @@ let
   # parametric branch has made no such split: every merged aspect carries
   # __functor, so lib.isFunction there would demote ordinary aspect-valued defs
   # to includes. Only a bare lambda can reach the module system as a module.
+  # A parametric definition coerced into an include is still the aspect's own
+  # body: its `excludes` belong to the aspect, not to an anonymous child of it.
+  # The marker tells constraint registration to use the owning aspect's chain.
+  ownBody =
+    f:
+    if builtins.isAttrs f then
+      f // { __ownBody = true; }
+    else
+      {
+        __functor = _: f;
+        __ownBody = true;
+      };
+
   coerceFnDefsWith =
     isFn:
     map (
@@ -301,7 +314,7 @@ let
         d
         // {
           value = {
-            includes = [ d.value ];
+            includes = [ (ownBody d.value) ];
           };
         }
       else
@@ -536,7 +549,7 @@ let
                   d
                   // {
                     value = {
-                      includes = [ d.value.__fn ];
+                      includes = [ (ownBody d.value.__fn) ];
                     };
                   }
                 ) parametrics
@@ -973,7 +986,7 @@ let
     in
     lib.types.coercedTo (lib.types.addCheck lib.types.raw (
       v: builtins.isFunction v && !isSubmoduleFn v && lib.functionArgs v != { }
-    )) (fn: { includes = [ fn ]; }) pt;
+    )) (fn: { includes = [ (ownBody fn) ]; }) pt;
 
   aspectsType =
     typeCfg:

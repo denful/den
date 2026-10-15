@@ -256,7 +256,8 @@ let
       { param, state }:
       let
         inherit (state) currentScope;
-        ownerChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
+        ownerChain =
+          param.ownerChain or (((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ]);
         scope = param.scope or "subtree";
       in
       if param.type == "filter" then
