@@ -18,7 +18,7 @@ let
   # and den.lib's map includes schema-util which reads den.schema._kindNames —
   # routing through den.lib here would close that cycle. Entity types consume it
   # lazily at eval time, so they safely use den.lib.schema.
-  schemaLib = import ./../nix/lib/schema.nix { inherit inputs lib; };
+  schemaLib = import ./../nix/lib/schema.nix { inherit inputs lib den; };
   strictEntry = import ./../nix/lib/strict.nix { };
 
   # Element check for BOTH schema-tier collections. gen-schema has no

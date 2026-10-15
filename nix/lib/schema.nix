@@ -17,7 +17,12 @@
 # consumer that does not declare the input — which is all but one of den's
 # templates. The hub's root takes the vestigial `{ }` and hands back the
 # resolved roster, so the fallback has something total to call.
-{ inputs, lib, ... }:
+{
+  inputs,
+  lib,
+  den,
+  ...
+}:
 let
   lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
   locked = lock.nodes.gen.locked;
@@ -68,20 +73,36 @@ let
     "specialArgs"
   ];
   isInstanceOptions = a: builtins.all (k: builtins.elem k instanceOptionKeys) (builtins.attrNames a);
+
+  # Every entity kind's instances carry `resolved` (and `__scopeName`,
+  # `collisionPolicy`), which `hasAspect` on `den.schema.conf` reads. Injected
+  # at the boundary, where the kind name is known, so a custom kind's registry
+  # gets them exactly as host, user and home do instead of inheriting a
+  # `hasAspect` that throws. Prepended, so a kind's own extraModules (home's
+  # `__scopeName`) still override.
+  inherit (import ./entities/_types.nix { inherit lib den; }) resolvedCtxModule;
+  withResolved =
+    opts: kindValue:
+    if kindValue.isEntity or false then
+      opts // { extraModules = [ (resolvedCtxModule kindValue.kind) ] ++ (opts.extraModules or [ ]); }
+    else
+      opts;
+  mkInstanceTypeFor =
+    opts: kindValue: withLib base.mkInstanceType (withResolved opts kindValue) kindValue;
 in
 base
 // {
   mkInstanceType =
     a:
     if isInstanceOptions a then
-      withLib base.mkInstanceType a
+      mkInstanceTypeFor a
     else
       lib.warn ''
         den: `den.lib.schema.mkInstanceType` called kind-first for kind '${a.kind or "?"}' is deprecated.
         gen-schema takes the options first. Swap the arguments:
           - den.lib.schema.mkInstanceType den.schema.${a.kind or "<kind>"} { … }
           + den.lib.schema.mkInstanceType { … } den.schema.${a.kind or "<kind>"}
-      '' (opts: withLib base.mkInstanceType opts a);
+      '' (opts: mkInstanceTypeFor opts a);
   mkSchemaOption = withLib base.mkSchemaOption;
 
   # `den.schema.<kind>.imports = [ den.lib.strict ]` (deprecated) lands `isStrict` on every
