@@ -100,6 +100,20 @@ in
       }
     );
 
+    # without any exclude, every host's per-host content reaches a flake-scope
+    # class: the aspect's identity must not collapse two hosts' modules into one
+    test-flake-scope-class-keeps-every-host = denTest (
+      { den, config, ... }:
+      fleet den
+      // {
+        expr = config.flake.central;
+        expected = [
+          "monitor-iceberg"
+          "monitor-igloo"
+        ];
+      }
+    );
+
     # schema and host aspect include the same parametric aspect: one identity,
     # so it is included once (a list-typed option would otherwise hold it twice)
     test-schema-and-host-include-dedup = denTest (
