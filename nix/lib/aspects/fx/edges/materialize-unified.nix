@@ -169,6 +169,43 @@ let
       # whose route fold's `wrappedPerScope` is captured ONCE at fold start. Complex
       # forwards read the EVOLVING acc (getCollectedSource reads acc.perScope).
       wrappedPerScope = seed.perScope;
+
+      # A class alias is a simple route that only re-labels a class within its own
+      # scope (`os-to-host`: os → nixos at path [] in place). Its output belongs to
+      # the target class, so every OTHER simple route reading that class at that
+      # scope must see it. Otherwise a route that collects `nixos` (e.g. a guest's
+      # delivery) silently drops everything authored in `os`. Aliases themselves
+      # keep reading the original data, so none can read its own output.
+      isClassAlias =
+        r:
+        !(r.__complexForward or false)
+        && (r.path or [ ]) == [ ]
+        && !(r.collectSubtree or false)
+        && !(r.appendToParent or false)
+        && !(r.reinstantiate or false)
+        && (r.instantiate or null) == null
+        && (r.adapterKey or null) == null
+        && (r.adapterModule or null) == null
+        && (r.guard or null) == null
+        && r.intoClass != "flake"
+        && r.intoClass != r.fromClass;
+      aliasedPerScope = builtins.foldl' (
+        perScope: r:
+        let
+          sid = r.sourceScopeId;
+          aliased = wrappedPerScope.${sid}.${r.fromClass} or [ ];
+        in
+        if aliased == [ ] then
+          perScope
+        else
+          perScope
+          // {
+            ${sid} = (perScope.${sid} or { }) // {
+              ${r.intoClass} = (perScope.${sid}.${r.intoClass} or [ ]) ++ aliased;
+            };
+          }
+      ) wrappedPerScope (builtins.filter isClassAlias orderedRoutes);
+
       acc = builtins.foldl' (
         prev: pair:
         if pair.kind == "provide" then
@@ -188,7 +225,8 @@ let
         else
           applySimpleRouteEdge prev {
             route = pair.spec;
-            inherit wrappedPerScope scopeParent scopeIsolated;
+            wrappedPerScope = if isClassAlias pair.spec then wrappedPerScope else aliasedPerScope;
+            inherit scopeParent scopeIsolated;
           }
       ) seed orderedPairs;
 
