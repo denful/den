@@ -14,7 +14,6 @@ let
     mainModuleOption
     resolveResultOption
     pathSetByScopeOption
-    resolvedCtxModule
     preprocessHosts
     ;
 
@@ -55,7 +54,6 @@ let
     schemaLib.mkInstanceType {
       strict = den.schema.home.isStrict;
       extraModules = [
-        (resolvedCtxModule "home")
         (
           { name, config, ... }:
           let
