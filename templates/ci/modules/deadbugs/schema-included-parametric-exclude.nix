@@ -100,6 +100,34 @@ in
       }
     );
 
+    # a parametric host aspect's own body is walked as a child of the aspect;
+    # its excludes are still the aspect's and cover the whole host scope
+    test-parametric-host-aspect-excludes = denTest (
+      {
+        den,
+        config,
+        iceberg,
+        ...
+      }:
+      lib.recursiveUpdate (fleet den) {
+        den.aspects.iceberg =
+          { host, ... }:
+          {
+            excludes = [ den.aspects.kuma.observed ];
+          };
+      }
+      // {
+        expr = {
+          iceberg = iceberg.environment.etc ? kuma;
+          central = config.flake.central;
+        };
+        expected = {
+          iceberg = false;
+          central = [ "monitor-igloo" ];
+        };
+      }
+    );
+
     # without any exclude, every host's per-host content reaches a flake-scope
     # class: the aspect's identity must not collapse two hosts' modules into one
     test-flake-scope-class-keeps-every-host = denTest (
