@@ -43,13 +43,11 @@ in
         imports = [ organizations ];
         expr = {
           inherit (config.den.organizations.acme) name label owner;
-          hasAspect = config.den.organizations.acme ? hasAspect;
         };
         expected = {
           name = "acme";
           label = "Acme";
           owner = "ops";
-          hasAspect = true;
         };
       }
     );

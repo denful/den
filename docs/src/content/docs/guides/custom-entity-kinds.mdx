@@ -37,8 +37,8 @@ Declare your kind the same way, then add its own options:
 }
 ```
 
-Anything on `den.schema.conf` — your own shared options, and den's
-`hasAspect` — now lands on every organization, as it does on every host.
+Every option on `den.schema.conf`, including your own shared options, now lands
+on every organization, as it does on every host.
 Shared defaults go on `conf`; kind-specific ones on the kind. `inherits` takes
 a list, so a kind can build on another kind as well:
 `inherits = [ den.schema.conf den.schema.site ]`.
@@ -73,8 +73,8 @@ with `den.lib.schema.mkInstanceType`:
 }
 ```
 
-Each instance gets `name` (its registry key), the kind's options, everything
-inherited from `conf`, and `hasAspect`.
+Each instance gets `name` (its registry key), the kind's options, and the
+options inherited from `conf`.
 
 Pass `strict = den.schema.<kind>.isStrict` so the registry follows the kind's
 [strict mode](/explanation/entities/#strict-mode): with
