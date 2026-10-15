@@ -238,17 +238,10 @@ let
   #   seed       scopeId -> raw -> wrapped (tag a fresh value at a given scope —
   #                                         fold/append/for re-tag, collect tags
   #                                         each value with its SOURCE scope)
-  #   passthrough wrapped -> bool         (skip filter/transform — the plain
-  #                                         path passes __configThunk markers
-  #                                         through unchanged; provenance never:
-  #                                         the legacy provenance interpreter had
-  #                                         no __configThunk guard, preserved
-  #                                         bug-for-bug — do not "fix")
   idFunctor = {
     unwrap = v: v;
     rewrap = _old: raw: raw;
     seed = _scope: raw: raw;
-    passthrough = v: v ? __configThunk;
   };
   pvFunctor = {
     unwrap = v: v.__pv;
@@ -257,8 +250,30 @@ let
       __pv = raw;
       __ps = scope;
     };
-    passthrough = _v: false;
   };
+
+  # A config thunk marker (bare or provenance-tagged) is a value that does not
+  # exist until evalModules resolves it, so no stage can read it here.
+  isDeferred = v: v ? __configThunk || (v ? __pv && v.__pv ? __configThunk);
+
+  # Run a list stage now, or — when any value is still deferred — defer the
+  # whole stage: the values travel as one group marker whose `__post` is the
+  # stage, applied by the class-module wrapper to the resolved list. Every
+  # value stage goes through here, so a deferred value sees exactly the stages
+  # a plain one does, in order (filter, transform, fold, append, for,
+  # withProvenance).
+  deferredStage =
+    f: values:
+    if builtins.any isDeferred values then
+      [
+        {
+          __configThunk = true;
+          __group = values;
+          __post = f;
+        }
+      ]
+    else
+      f values;
 
   # Apply a single filter/transform/fold/append/for stage to a value list,
   # interpreted through `functor`. `currentScopeId` is the scope new values
@@ -267,28 +282,26 @@ let
     functor: currentScopeId: values: stage:
     let
       t = stage.__pipeStage or "";
-      inherit (functor)
-        unwrap
-        rewrap
-        passthrough
-        ;
+      inherit (functor) unwrap rewrap;
       seed = functor.seed currentScopeId;
     in
-    if t == "filter" then
-      builtins.filter (v: passthrough v || stage.fn (unwrap v)) values
-    else if t == "transform" then
-      map (v: if passthrough v then v else rewrap v (stage.fn (unwrap v))) values
-    else if t == "fold" then
-      [ (seed (builtins.foldl' (acc: v: stage.fn acc (unwrap v)) stage.init values)) ]
-    else if t == "append" then
-      values ++ [ (seed stage.value) ]
-    else if t == "for" then
-      map seed (stage.fn (map unwrap values))
-    else
-      values;
+    deferredStage (
+      values:
+      if t == "filter" then
+        builtins.filter (v: stage.fn (unwrap v)) values
+      else if t == "transform" then
+        map (v: rewrap v (stage.fn (unwrap v))) values
+      else if t == "fold" then
+        [ (seed (builtins.foldl' (acc: v: stage.fn acc (unwrap v)) stage.init values)) ]
+      else if t == "append" then
+        values ++ [ (seed stage.value) ]
+      else if t == "for" then
+        map seed (stage.fn (map unwrap values))
+      else
+        values
+    ) values;
 
   # Plain-path single-stage application (identity functor, no provenance tag).
-  # Config thunk markers (__configThunk) pass through filter/transform unchanged.
   applyStage = applyStageWith idFunctor null;
 
   # Apply all transform stages from a pipe effect.
@@ -474,10 +487,10 @@ let
           } stage.fn
         )
       else if t == "withProvenance" then
-        map (v: {
+        deferredStage (map (v: {
           value = v.__pv;
           source = scopeContexts.${v.__ps};
-        }) values
+        })) values
       else
         applyStageWith functor currentScopeId values stage
     ) taggedInitial relevantStages;

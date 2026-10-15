@@ -305,10 +305,7 @@ pipe.to [ den.aspects.networking ]
 
 ### `pipe.withProvenance`
 
-Tag each entry with its source scope context. With `pipe.withProvenance` in
-the chain, `pipe.filter` and `pipe.transform` also see unresolved
-config-dependent thunks (the plain path lets them pass through), so avoid
-mixing it with config-thunk producers on one pipe. Consumers receive
+Tag each entry with its source scope context. Consumers receive
 `{ value; source; }` records where `source` is the full context attrset
 of the originating scope. Works with both local quirks and collected
 data — local entries get the current scope as their source.
@@ -335,7 +332,10 @@ config-dependent thunks.
   receives the owning host's config under the class's `parentArg`
   (`osConfig`).
 - **Local scope**: Marked for deferred resolution inside `evalModules`,
-  against the producer's config in the same fixpoint.
+  against the producer's config in the same fixpoint. The pipe's stages
+  (`filter`, `transform`, `fold`, `append`, `for`, `withProvenance`) still
+  apply: a stage that meets a deferred value is deferred with it and runs on
+  the resolved list.
 - **Cross-host** (via `pipe.collect` or `pipe.broadcast`): Resolved eagerly
   against the source's instantiated config, with scope context args (`host`,
   `user`, etc.) available alongside `config` and `lib`.
