@@ -76,13 +76,35 @@ let
         __args = lib.functionArgs child;
       };
 
+  # A navigated nested aspect carries __aspectChain (its full path) but may have
+  # no name yet. Derive name + meta.aspect-chain from it so the aspect resolves
+  # to its OWN identity (e.g. apps/gaming/steam) regardless of inclusion path.
+  # Without this it falls through nameless and children.nix renames it to
+  # <parent>/<anon>:<idx>, so the same aspect included via two paths gets two
+  # identities: it fails to dedup, and an exclude naming it never matches.
+  withChainIdentity =
+    child:
+    let
+      prov = child.__aspectChain or [ ];
+    in
+    if builtins.isAttrs child && !(child ? name) && prov != [ ] then
+      child
+      // {
+        name = lib.last prov;
+        meta.aspect-chain = lib.init prov;
+      }
+    else
+      child;
+
   wrapChild =
     child:
     if lib.isFunction child then
       if builtins.isAttrs child && child ? name && child ? includes && builtins.isList child.includes then
         child
       else if builtins.isAttrs child then
-        wrapFunctorChild child
+        # A parametric nested aspect is a functor-bearing wrapper; it needs its
+        # chain identity here too, or a schema-level include of it is anonymous.
+        wrapFunctorChild (withChainIdentity child)
       else
         wrapBareFn child
     # Content wrapper from aspectContentType (has __contentValues but no name
@@ -90,26 +112,13 @@ let
     # into includes so the pipeline resolves them.  listOf doesn't call
     # providerType.merge per-element, so inner wrappers in includes lists
     # arrive here unprocessed.
-    # A navigated nested aspect carries __aspectChain (its full path) but may have
-    # no __contentValues (single-def keys forward their raw value directly).
-    # Either way, when it has no name yet, derive name + meta.aspect-chain from
-    # __aspectChain so it resolves to its OWN identity (e.g. apps/gaming/steam)
-    # regardless of inclusion path. Without this it falls through nameless and
-    # children.nix renames it to <parent>/<anon>:<idx>, so the same aspect
-    # included via two paths gets two identities and fails to dedup.
     else if
       builtins.isAttrs child && (child ? __contentValues || child ? __aspectChain) && !(child ? name)
     then
       let
-        prov = child.__aspectChain or [ ];
-        provName = if prov != [ ] then lib.last prov else null;
         fns = builtins.filter isParametricContent (child.__contentValues or [ ]);
       in
-      child
-      // lib.optionalAttrs (provName != null) {
-        name = provName;
-        meta.aspect-chain = lib.init prov;
-      }
+      withChainIdentity child
       // lib.optionalAttrs (fns != [ ]) {
         includes = (child.includes or [ ]) ++ map (d: d.value) fns;
       }
