@@ -203,7 +203,25 @@ in
         || throw "den.classes and den.quirks must not share keys, but found: ${builtins.concatStringsSep ", " overlap}";
       lib.mapAttrs (name: v: v // { inherit name; }) quirks;
   };
-  config.den.schema.conf = { };
+  # An instance's own `includes` / `excludes` are read by `resolveEntity` for
+  # every kind, so `conf` declares them for every kind that inherits it. Left
+  # undeclared, only the open instance type accepted them and a strict kind
+  # refused den's own instance-level key. `listOf raw` is not a primitive type,
+  # so gen-schema keeps both out of the instance identity.
+  config.den.schema.conf.imports = [
+    {
+      options.includes = lib.mkOption {
+        description = "Aspects and policies included for this instance only.";
+        type = lib.types.listOf lib.types.raw;
+        default = [ ];
+      };
+      options.excludes = lib.mkOption {
+        description = "Aspects and policies excluded from this instance's subtree.";
+        type = lib.types.listOf lib.types.raw;
+        default = [ ];
+      };
+    }
+  ];
   config.den.schema.fleet = { };
   config.den.schema.host.inherits = [ den.schema.conf ];
   config.den.schema.user.inherits = [ den.schema.conf ];
