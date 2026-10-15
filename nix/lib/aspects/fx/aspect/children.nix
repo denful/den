@@ -302,9 +302,33 @@ let
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
     in
-    fx.bind (fx.seq (map (c: fx.send "register-constraint" (c // { inherit owner; })) allConstraints)) (
-      _: registerIncludedPolicyExcludes aspect
+    fx.bind (ownerChainOverride aspect) (
+      ownerChain:
+      fx.bind (fx.seq (
+        map (
+          c:
+          fx.send "register-constraint" (
+            c // { inherit owner; } // lib.optionalAttrs (ownerChain != null) { inherit ownerChain; }
+          )
+        ) allConstraints
+      )) (_: registerIncludedPolicyExcludes aspect)
     );
+
+  # A coerced parametric body (types.nix ownBody) is walked as a child of its
+  # aspect, one chain segment deeper; its constraints are the aspect's own, so
+  # they register at the aspect's chain. null keeps the handler's default.
+  ownerChainOverride =
+    aspect:
+    if aspect.__ownBody or false then
+      fx.bind fx.effects.state.get (
+        state:
+        let
+          chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
+        in
+        fx.pure (if chain == [ ] then null else lib.init chain)
+      )
+    else
+      fx.pure null;
 
   # A policy listed in an aspect's `includes` fires only at the scope's dispatch,
   # after the aspect's static includes have already passed the gate, and its
