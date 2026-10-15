@@ -1,0 +1,154 @@
+---
+title: Define Your Own Entity Kind
+description: Add an entity kind with the same structure as host, user and home — a shared base, a typed registry, and policies that resolve it.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+<Aside title="Source" icon="github">
+[`modules/options.nix`](https://github.com/denful/den/blob/main/modules/options.nix) --
+[`custom-entity-kind.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/custom-entity-kind.nix) (every snippet on this page, as tests)
+</Aside>
+
+`host`, `user` and `home` are not special-cased: each is a key of `den.schema`
+that inherits a shared base, plus a registry of instances that a policy resolves
+into the pipeline. A kind of your own — an `organization`, an `environment`, a
+`site` — is built the same way, in three steps.
+
+## 1. The kind: inherit the shared base
+
+`den.schema.conf` is the base every built-in kind inherits. den declares:
+
+```nix
+den.schema.host.inherits = [ den.schema.conf ];
+den.schema.user.inherits = [ den.schema.conf ];
+den.schema.home.inherits = [ den.schema.conf ];
+```
+
+Declare your kind the same way, then add its own options:
+
+```nix
+{ den, lib, ... }:
+{
+  den.schema.organization = {
+    inherits = [ den.schema.conf ];
+    options.label = lib.mkOption { type = lib.types.str; };
+  };
+}
+```
+
+Anything on `den.schema.conf` — your own shared options, and den's
+`hasAspect` — now lands on every organization, as it does on every host.
+Shared defaults go on `conf`; kind-specific ones on the kind. `inherits` takes
+a list, so a kind can build on another kind as well:
+`inherits = [ den.schema.conf den.schema.site ]`.
+
+<Aside type="note">
+Writing a key under `den.schema` is what registers a kind. The other attributes
+an entry accepts (`includes`, `excludes`, `parent`, `isStrict`, …) are listed in
+the [`den.schema` reference](/reference/schema/#denschema).
+</Aside>
+
+## 2. The registry: instances of the kind
+
+Instances live in an option you declare. Build its element type from the kind
+with `den.lib.schema.mkInstanceType`:
+
+```nix
+{ den, lib, ... }:
+{
+  options.den.organizations = lib.mkOption {
+    type = lib.types.attrsOf (
+      den.lib.schema.mkInstanceType {
+        strict = den.schema.organization.isStrict;
+      } den.schema.organization
+    );
+    default = { };
+  };
+
+  config.den.organizations = {
+    acme.label = "Acme";
+    globex.label = "Globex";
+  };
+}
+```
+
+Each instance gets `name` (its registry key), the kind's options, everything
+inherited from `conf`, and `hasAspect`.
+
+Pass `strict = den.schema.<kind>.isStrict` so the registry follows the kind's
+[strict mode](/explanation/entities/#strict-mode): with
+`den.schema.organization.isStrict = true`, a typo such as
+`den.organizations.acme.lable` is refused instead of stored.
+
+<Aside type="caution" title="Not a plain submodule">
+`types.submodule { imports = [ den.schema.organization ]; }` still evaluates,
+but importing a kind value is deprecated and warns, and such a submodule stays
+open even when the kind is strict. Use `mkInstanceType`, as den's own entities
+do.
+</Aside>
+
+## 3. Resolution: make each instance an entity
+
+A registry holds data. To make each instance an entity — a scope in the
+pipeline, with its kind's `includes` and policies — resolve it from a policy:
+
+```nix
+{ den, lib, config, ... }:
+{
+  # flake -> organization: one entity scope per instance
+  den.policies.to-organizations =
+    _:
+    lib.mapAttrsToList (
+      _: organization: den.lib.policy.resolve.to "organization" { inherit organization; }
+    ) config.den.organizations;
+
+  den.schema.flake.includes = [ den.policies.to-organizations ];
+}
+```
+
+The binding name (`organization`) is the kind name, so aspects and policies
+take it as an argument the way they take `host`:
+
+```nix
+den.aspects.org-dns =
+  { organization, ... }:
+  {
+    dns.records.${organization.name} = organization.label;
+  };
+
+# fires once for every organization
+den.schema.organization.includes = [ den.aspects.org-dns ];
+```
+
+From here the kind behaves like the built-in ones: `den.schema.organization.includes`
+and `excludes` apply to every instance, policies guarded on `{ organization, ... }`
+fire per instance, and content can be collected with
+[`policy.instantiate`](/reference/policies/#policyinstantiate-spec) (the
+[terranix demo](/tutorials/terranix-demo/) collects a custom class the same
+way).
+
+## Nesting under another kind
+
+To place a kind *inside* another entity the way `user` sits under `host`, set its
+parent and resolve it from the parent's scope instead of from the flake:
+
+```nix
+den.schema.site.parent = "organization";
+
+den.policies.organization-to-sites =
+  { organization, ... }:
+  map (site: den.lib.policy.resolve.to "site" { inherit site; }) organization.sites;
+
+den.schema.organization.includes = [ den.policies.organization-to-sites ];
+```
+
+`parent` places the kind in the entity DAG used for descendant fan-out and for
+[class-module argument promotion](/explanation/parametric/#where-parametric-args-work),
+so a `site` scope also sees `organization`.
+
+## See also
+
+- [`den.schema` reference](/reference/schema/#denschema) — every attribute a kind entry accepts
+- [Entities](/explanation/entities/) — how entities and scopes work
+- [Case Study: Access Control & Environments](/guides/acl-environments/) — a full custom registry (`environment`) wired into host and user resolution

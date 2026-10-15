@@ -198,6 +198,7 @@ export default defineConfig({
 							collapsed: true,
 							items: [
 								{ label: 'Custom Nix Classes', slug: 'guides/custom-classes' },
+								{ label: 'Define Your Own Entity Kind', slug: 'guides/custom-entity-kinds', badge: { text: 'new', variant: 'success' } },
 								{ label: 'Share with Namespaces', slug: 'guides/namespaces' },
 								{ label: 'Angle Brackets Syntax', slug: 'guides/angle-brackets' },
 							],
