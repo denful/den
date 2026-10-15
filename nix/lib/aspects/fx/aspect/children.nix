@@ -302,7 +302,52 @@ let
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
     in
-    fx.seq (map (c: fx.send "register-constraint" (c // { inherit owner; })) allConstraints);
+    fx.bind (fx.seq (map (c: fx.send "register-constraint" (c // { inherit owner; })) allConstraints)) (
+      _: registerIncludedPolicyExcludes aspect
+    );
+
+  # A policy listed in an aspect's `includes` fires only at the scope's dispatch,
+  # after the aspect's static includes have already passed the gate, and its
+  # exclude would then reach only what the policy itself includes. So an
+  # `exclude` it returns is registered here as well, beside the aspect's own
+  # `excludes`: before any include is gated, with the includer's subtree as
+  # reach. A policy whose arguments this scope does not supply yet is left to
+  # its dispatch.
+  registerIncludedPolicyExcludes =
+    aspect:
+    let
+      policies = builtins.filter isPolicy (lib.flatten (aspect.includes or [ ]));
+    in
+    if policies == [ ] then
+      fx.pure null
+    else
+      fx.bind fx.effects.state.get (
+        state:
+        let
+          scope = state.currentScope or null;
+          scopeCtx = if scope == null then { } else ((state.scopeContexts or (_: { })) null).${scope} or { };
+          ctx0 = scopeCtx // den.lib.aspects.fx.aspect.ctxFromHandlers (aspect.__scopeHandlers or { });
+          ctx = ctx0 // {
+            self = ctx0.self or ctx0;
+          };
+          effectsOf =
+            p: if den.lib.synthesizePolicies.resolveArgsSatisfied p.fn ctx then lib.toList (p.fn ctx) else [ ];
+          excludes = builtins.filter (e: builtins.isAttrs e && (e.__policyEffect or "") == "exclude") (
+            builtins.concatMap effectsOf policies
+          );
+        in
+        fx.seq (
+          map (
+            e:
+            fx.send "register-constraint" {
+              type = "exclude";
+              scope = "subtree";
+              identity = identity.key e.value;
+              owner = "policy";
+            }
+          ) excludes
+        )
+      );
 in
 {
   inherit emitIncludes registerConstraints chainWrap;
