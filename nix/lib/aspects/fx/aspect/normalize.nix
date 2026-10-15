@@ -96,25 +96,19 @@ let
     else
       child;
 
+  # A content wrapper (aspectContentType) is functor-bearing, so the function
+  # branch below would claim it; but its functor only re-applies the merged
+  # aspect and hides the parametric functions inside `__contentValues`. Those
+  # must reach the pipeline as includes, resolved with the scope's entity
+  # arguments, or their content is keyed by the wrapper alone and collapses
+  # across hosts wherever several hosts merge into one evaluation.
+  isContentWrapper =
+    child:
+    builtins.isAttrs child && (child ? __contentValues || child ? __aspectChain) && !(child ? name);
+
   wrapChild =
     child:
-    if lib.isFunction child then
-      if builtins.isAttrs child && child ? name && child ? includes && builtins.isList child.includes then
-        child
-      else if builtins.isAttrs child then
-        # A parametric nested aspect is a functor-bearing wrapper; it needs its
-        # chain identity here too, or a schema-level include of it is anonymous.
-        wrapFunctorChild (withChainIdentity child)
-      else
-        wrapBareFn child
-    # Content wrapper from aspectContentType (has __contentValues but no name
-    # yet).  Inject identity from __aspectChain and extract parametric functions
-    # into includes so the pipeline resolves them.  listOf doesn't call
-    # providerType.merge per-element, so inner wrappers in includes lists
-    # arrive here unprocessed.
-    else if
-      builtins.isAttrs child && (child ? __contentValues || child ? __aspectChain) && !(child ? name)
-    then
+    if isContentWrapper child then
       let
         fns = builtins.filter isParametricContent (child.__contentValues or [ ]);
       in
@@ -122,6 +116,13 @@ let
       // lib.optionalAttrs (fns != [ ]) {
         includes = (child.includes or [ ]) ++ map (d: d.value) fns;
       }
+    else if lib.isFunction child then
+      if builtins.isAttrs child && child ? name && child ? includes && builtins.isList child.includes then
+        child
+      else if builtins.isAttrs child then
+        wrapFunctorChild child
+      else
+        wrapBareFn child
     else
       child;
 in
