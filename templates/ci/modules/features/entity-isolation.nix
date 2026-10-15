@@ -175,6 +175,97 @@
       }
     );
 
+    test-isolated-delivery-includes-os-class = denTest (
+      {
+        den,
+        lib,
+        igloo,
+        ...
+      }:
+      let
+        guestEntity = {
+          name = "guest";
+          system = "x86_64-linux";
+          class = "nixos";
+          intoAttr = [ ];
+          users = { };
+          aspect = den.aspects.guest-aspect;
+        };
+        # Fires inside the guest scope (resolve includes): sourceScopeId
+        # defaults to the guest scope = collection root. Gated against
+        # re-fire in nested sub-scopes where it would self-deliver.
+        deliverPolicy = den.lib.policy.mkPolicy "deliver-iso" (
+          { ... }@args:
+          lib.optionals (!(args ? user) && !(args ? home)) [
+            (den.lib.policy.route {
+              fromClass = "nixos";
+              intoClass = "nixos";
+              collectSubtree = true;
+              appendToParent = true;
+              path = [
+                "microvm"
+                "vms"
+                "guest"
+                "config"
+              ];
+            })
+          ]
+        );
+        # Freeform slot on the parent so delivered content has a landing path.
+        microvmSlot =
+          { lib, ... }:
+          {
+            options.microvm.vms = lib.mkOption {
+              type = lib.types.attrsOf (
+                lib.types.submodule {
+                  options.config = lib.mkOption {
+                    type = lib.types.submoduleWith {
+                      modules = [
+                        { config._module.freeformType = lib.types.lazyAttrsOf lib.types.anything; }
+                      ];
+                    };
+                    default = { };
+                  };
+                }
+              );
+              default = { };
+            };
+          };
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.iso-kind = {
+          isEntity = true;
+          parent = "host";
+          isolated = true;
+          # As a real guest kind does: its curated includes carry den.default's
+          # os-to-host, so the class alias registers in the guest scope.
+          includes = [ den.policies.os-to-host ];
+        };
+        den.policies.resolve-iso-child =
+          { host, ... }:
+          lib.optionals (host.name == "igloo") [
+            (den.lib.policy.resolve.to.withIncludes "iso-kind" [ deliverPolicy ] {
+              iso-kind = guestEntity;
+            })
+          ];
+        den.schema.host.includes = [ den.policies.resolve-iso-child ];
+        den.aspects.igloo.nixos.imports = [ microvmSlot ];
+        # Authored in the cross-platform `os` class: os-to-host routes it into the
+        # guest's nixos, which the delivery route must carry to the parent slot.
+        den.aspects.guest-aspect.os.boot.kernelModules = [ "guest-only-module" ];
+
+        expr = {
+          delivered = lib.elem "guest-only-module" igloo.microvm.vms.guest.config.boot.kernelModules;
+          leaked = lib.elem "guest-only-module" igloo.boot.kernelModules;
+        };
+        expected = {
+          delivered = true;
+          leaked = false;
+        };
+      }
+    );
+
     # A host-rooted collectSubtree route must NOT pull content from an isolated
     # descendant: parent and guest both author a shared `side-chan` class; only
     # the parent's own side-chan content may reach the route target path.
