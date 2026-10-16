@@ -417,12 +417,15 @@
         # The validator throws inside warnings when error policy is active.
         validatorFn = lib.setFunctionArgs result.validator result.validatorAdvertisedArgs;
         validatorResult = validatorFn {
-          config._module.args = {
-            host = "from-specialArgs";
+          options = {
+            warnings = { };
+            _module.args.value = {
+              host = "from-specialArgs";
+            };
           };
         };
         # Force the warnings to trigger the throw.
-        callResult = builtins.tryEval (builtins.deepSeq validatorResult.warnings true);
+        callResult = builtins.tryEval (builtins.deepSeq validatorResult.warnings.condition true);
       in
       {
         expr = callResult.success;

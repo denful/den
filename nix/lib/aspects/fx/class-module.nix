@@ -9,14 +9,16 @@ let
   # (_module.args collisions).
   # Build a collision-check validator module from a policy resolver and
   # the list of den arg names to check. Returns a module function that
-  # probes config._module.args for each name and emits warnings/errors.
+  # probes the _module.args option for each name and emits warnings/errors.
   mkCollisionValidator =
     policy: denArgNames: moduleArgs:
     let
       collisionChecks = lib.concatMap (
         name:
         let
-          mArgs = moduleArgs.config._module.args or { };
+          # The option, not config._module.args: under a freeformType, config
+          # is only available once `warnings` below has been merged.
+          mArgs = moduleArgs.options._module.args.value or { };
           hasReal =
             (builtins.tryEval (builtins.seq (mArgs.${name} or null) (mArgs ? ${name}))).value or false;
           p = policy name;
@@ -34,9 +36,14 @@ let
             "den: class module arg '${name}' collision — den-wins, module-system value shadowed"
           ]
       ) denArgNames;
+      # A target without a `warnings` option (e.g. a freeform settings
+      # submodule) gets the report as eval-time warnings instead.
+      report =
+        collisionChecks != [ ]
+        && (moduleArgs.options ? warnings || lib.foldr lib.warn false collisionChecks);
     in
     {
-      warnings = collisionChecks;
+      warnings = lib.mkIf report collisionChecks;
     };
 
   resolveCollisionPolicy =
@@ -330,7 +337,7 @@ let
             in
             warnedModule (classWinsDen // moduleArgs // resolvedDen);
           validatorAdvertisedArgs = effectiveRemainingArgs // {
-            config = true;
+            options = true;
           };
           validator = mkCollisionValidator policy denArgNames;
           advertisedArgs = effectiveRemainingArgs // lib.genAttrs classWinsNames (_: true);
@@ -371,7 +378,7 @@ let
     }
     // lib.optionalAttrs (result.wrapped && ctx != { }) {
       inherit validator;
-      validatorAdvertisedArgs.config = true;
+      validatorAdvertisedArgs.options = true;
       advertisedArgs = lib.genAttrs denArgNames (_: true);
     };
 
