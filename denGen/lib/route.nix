@@ -60,7 +60,9 @@ denGen: {
         in
         map (e: e.value.name) (builtins.filter (e: (e.__effect or null) == "exclude" && e.value ? name) (builtins.concatMap fire (builtins.filter ready pols)));
       dropEx = ex: builtins.filter (a: !builtins.elem a.name ex);
-      hostEx = excludedAt hostArgs (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "host");
+      # schema.<kind>.excludes aspect refs: authoritative over includes (reference/schema.mdx, policies.mdx:245)
+      schemaEx = kind: map (b: b.name) (builtins.filter (b: builtins.isAttrs b && b ? name && !(b.__isPolicy or false) && !(b ? __builtin)) (sch.${kind}.excludes or [ ]));
+      hostEx = schemaEx "host" ++ excludedAt hostArgs (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "host");
       hostCl = dropEx hostEx (hostBase ++ tuCl ++ adds hostArgs (schemaPols "host"));
       # user hasAspect: policy-free closure of default+host+user (policy-added aspects excluded, else cycle)
       userStatic = u: defaultCl ++ hostBase ++ tuCl ++ provCl u ++ (let r = aspects."${u}@${host.name}" or aspects.${u} or null; in if r == null then [ ] else cl r);
@@ -74,7 +76,7 @@ denGen: {
         in
         let
           pols = builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user";
-          base = dropEx (hostEx ++ excludedAt (argsOf u) pols) ((if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) pols);
+          base = dropEx (hostEx ++ schemaEx "user" ++ excludedAt (argsOf u) pols) ((if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) pols);
         in
         base ++ routes (argsOf u) (defaultCl ++ base);
       # Aspect policies of the host closure fire at user scope; include effects add aspects (inline class attrs -> synthetic "<policy>#<i>").
