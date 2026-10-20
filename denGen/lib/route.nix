@@ -5,6 +5,8 @@ denGen: {
     aspects: host: users:
     let
       cl = denGen.closure aspects;
+      # a host with no declared aspect contributes nothing (users are treated the same below)
+      hostCl = if aspects ? ${host.name} then cl aspects.${host.name} else [ ];
       userEnt = u: host.users.${u} // { inherit host; };
       argsOf = u: { inherit host; user = userEnt u; };
       nixosOf = args: a: if a.content ? nixos then [ (denGen.content.classModule args a.content.nixos) ] else [ ];
@@ -21,7 +23,7 @@ denGen: {
         let
           fire = p: let r = p.fn (builtins.intersectAttrs (builtins.functionArgs p.fn) (argsOf u)); in if builtins.isList r then r else [ r ];
           ready = p: builtins.all (n: (argsOf u) ? ${n}) (builtins.attrNames (denGen.genLib.filterAttrs (_: opt: !opt) (builtins.functionArgs p.fn)));
-          eff = builtins.concatMap (p: builtins.genList (i: { inherit p i; e = builtins.elemAt (fire p) i; }) (builtins.length (fire p))) (builtins.filter ready (builtins.concatMap (a: a.policyIncs) (cl aspects.${host.name})));
+          eff = builtins.concatMap (p: builtins.genList (i: { inherit p i; e = builtins.elemAt (fire p) i; }) (builtins.length (fire p))) (builtins.filter ready (builtins.concatMap (a: a.policyIncs) hostCl));
           inc = x:
             if (x.e.__effect or null) != "include" then [ ]
             else if x.e.value ? name then cl aspects.${x.e.value.name}
@@ -63,6 +65,6 @@ denGen: {
         else
           [ inputs.home-manager.nixosModules.home-manager ]
           ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ userClosure u); }) hmUsers;
-      modules = builtins.concatMap (nixosOf { inherit host; }) (builtins.filter (a: !needsUser a) defaultCl ++ cl aspects.${host.name}) ++ builtins.concatMap forUser users;
+      modules = builtins.concatMap (nixosOf { inherit host; }) (builtins.filter (a: !needsUser a) defaultCl ++ hostCl) ++ builtins.concatMap forUser users;
     };
 }
