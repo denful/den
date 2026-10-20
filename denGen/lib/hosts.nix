@@ -10,7 +10,14 @@ denGen: {
             host: h:
             inputs.nixpkgs.lib.nixosSystem {
               inherit system;
-              modules = (denGen.route world.aspects host (builtins.attrNames (h.users or { }))).modules;
+              modules =
+                let
+                  us = h.users or { };
+                  r = denGen.route world.aspects host (builtins.attrNames us);
+                  # shortcut: empty user classes falls back to schema default; no per-user override of schema.
+                  hmClasses = u: if us.${u}.classes != [ ] then us.${u}.classes else world.schema.user.classes or [ ];
+                in
+                r.modules ++ r.hm inputs (builtins.filter (u: builtins.elem "homeManager" (hmClasses u)) (builtins.attrNames us));
             }
           ) hs
         ) world.hosts

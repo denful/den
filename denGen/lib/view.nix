@@ -9,6 +9,7 @@ denGen: {
         keySemantics = cat "class" {
           nixos = null;
           user = null;
+          homeManager = null;
         };
       };
       mkAspects =

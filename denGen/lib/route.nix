@@ -25,6 +25,17 @@ denGen: {
     in
     {
       inherit userModules;
+      # home-manager.users.<u> gets default's then the user closure's homeManager parts; HM nixos module once, only if some user opts in.
+      hm =
+        inputs: hmUsers:
+        let
+          hmOf = u: a: if a.content ? homeManager then [ (denGen.content.classModule { inherit host; user = u; } a.content.homeManager) ] else [ ];
+        in
+        if hmUsers == [ ] then
+          [ ]
+        else
+          [ inputs.home-manager.nixosModules.home-manager ]
+          ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ userClosure u); }) hmUsers;
       modules = builtins.concatMap (nixosOf { inherit host; }) (defaultCl ++ cl aspects.${host}) ++ builtins.concatMap forUser users;
     };
 }
