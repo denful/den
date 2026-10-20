@@ -1,6 +1,6 @@
 denGen: {
   flakeModule =
-    { lib, config, ... }:
+    { lib, config, inputs, ... }:
     {
       options.flake = lib.mkOption {
         type = lib.types.lazyAttrsOf lib.types.raw;
@@ -11,5 +11,6 @@ denGen: {
         default = { };
       };
       config._module.args.den = denGen.evalDen config.den;
+      config.flake.nixosConfigurations = denGen.hosts config._module.args.den inputs;
     };
 }
