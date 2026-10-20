@@ -65,7 +65,7 @@ let
                   base = lib.head (lib.splitString "@" name);
                   args = { home = h // { inherit name system; }; user = h // { inherit system; name = base; userName = base; }; };
                   dcl = cl den.aspects.default;
-                  scope = lib.concatMap (n: lib.optionals (den.aspects ? ${n}) (cl den.aspects.${n})) (lib.unique [ name base ]);
+                  scope = denGen.schemaCl den.schema den.aspects true "home" ++ lib.concatMap (n: lib.optionals (den.aspects ? ${n}) (cl den.aspects.${n})) (lib.unique [ name base ]);
                 in
                 lib.concatMap (a: lib.optional (a.content ? homeManager) (denGen.content.classModule args a.content.homeManager)) (
                   dcl ++ scope ++ denGen.routes dcl [ ] args (dcl ++ scope)

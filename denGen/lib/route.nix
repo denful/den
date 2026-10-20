@@ -1,6 +1,21 @@
 # Per-host nixos module list: host closure first, then users, each aspect's user part before its nixos part (design-gen.md §3.8-9).
 # `host` is the host entity (view.nix); users' entities come from host.users.
 denGen: {
+  # schema.<kind>.includes elements join a closure: refs via their closure, inline attrs as anon aspects (policy elements fire separately).
+  # a named element missing from the registry is skipped (host: builtin atoms live there) unless `strict`.
+  # shortcut: inline attrs carry no includes of their own; elements do not enter activation membership (hasAspect).
+  schemaCl =
+    sch: aspects: strict: kind:
+    let
+      cl = denGen.closure aspects;
+      flat = x: if builtins.isList x then builtins.concatMap flat x else [ x ];
+      one = i: x:
+        if !builtins.isAttrs x || denGen.isPol x then [ ]
+        else if x ? name then (if aspects ? ${x.name} then cl aspects.${x.name} else if strict then throw "den: schema.${kind}.includes: unknown aspect `${x.name}`" else [ ])
+        else if denGen.inlineAttrs x then [ { name = "schema.${kind}#${toString i}"; content = x; includes = [ ]; quirks = { }; policyIncs = [ ]; } ]
+        else [ ];
+    in
+    builtins.concatLists (denGen.genLib.imap0 one (flat (sch.${kind}.includes or [ ])));
   # policy.route: fromClass content of the scope closure re-delivered as intoClass content (reference/policies.mdx route).
   # shortcut: only user/home scope fires routes; path != [] needs attrset (non-function) content.
   routes =
@@ -22,20 +37,7 @@ denGen: {
     let
       cl = denGen.closure aspects;
       # a host with no declared aspect contributes nothing (users are treated the same below)
-      # schema.<kind>.includes elements join a closure: refs via their closure, inline attrs as anon aspects (policy elements fire separately).
-      # a named element missing from the registry is skipped (host: builtin atoms live there) unless `strict`.
-      # shortcut: inline attrs carry no includes of their own; elements do not enter activation membership (hasAspect).
-      schemaCl =
-        strict: kind:
-        let
-          flat = x: if builtins.isList x then builtins.concatMap flat x else [ x ];
-          one = i: x:
-            if !builtins.isAttrs x || denGen.isPol x then [ ]
-            else if x ? name then (if aspects ? ${x.name} then cl aspects.${x.name} else if strict then throw "den: schema.${kind}.includes: unknown aspect `${x.name}`" else [ ])
-            else if denGen.inlineAttrs x then [ { name = "schema.${kind}#${toString i}"; content = x; includes = [ ]; quirks = { }; policyIncs = [ ]; } ]
-            else [ ];
-        in
-        builtins.concatLists (denGen.genLib.imap0 one (flat (sch.${kind}.includes or [ ])));
+      schemaCl = denGen.schemaCl sch aspects;
       schemaRefs = schemaCl false "host";
       # schema.hm-host.includes (batteries.mdx): only on hosts with an HM user, applied in `hm`
       hmHostCl = schemaCl true "hm-host";
@@ -116,7 +118,7 @@ denGen: {
       userClosure =
         u:
         let
-          base = act.members (userScope u);
+          base = act.members (userScope u) ++ schemaCl true "user";
         in
         base ++ routes (argsOf u) (defaultCl ++ base);
       # Aspect policies of the host closure fire at user scope; include effects add aspects (inline class attrs -> synthetic "<policy>#<i>").
