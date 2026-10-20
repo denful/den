@@ -12,7 +12,7 @@ denGen: {
     let
       # fn aspects/includes are class content: each declared class key projects its own part of the fn result
       classes = builtins.filter (k: denGen.gen.aspects.keyCategory cnf k == "class") (builtins.attrNames cnf.keySemantics);
-      bare = f: lib.genAttrs classes (cls: lib.setFunctionArgs (args: (f (builtins.intersectAttrs (lib.functionArgs f) args)).${cls} or { }) (lib.functionArgs f));
+      bare = f: lib.genAttrs classes (cls: lib.setFunctionArgs (args: { imports = [ ((f (builtins.intersectAttrs (lib.functionArgs f) args)).${cls} or { }) ]; }) (lib.functionArgs f));
       # structural keys are never nested aspects; other keys go through Gen keyCategory (class/channel keys hold content)
       skip = [ "provides" "_" "includes" "excludes" "policies" "meta" ];
       classifyKey =
