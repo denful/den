@@ -18,7 +18,19 @@ let
   lower =
     lib: leaf: d:
     let
-      aspectsOf = if leaf == "default" then { default = d.value; } else d.value;
+      # A bare fn DEFINITION of an aspect (top-level or under provides/_) is class content, like an inline include fn.
+      # shortcut: only the fn result's `nixos` is kept, as for inline includes.
+      bare = f: { nixos = lib.setFunctionArgs (args: (f (builtins.intersectAttrs (lib.functionArgs f) args)).nixos or { }) (lib.functionArgs f); };
+      norm =
+        a:
+        if builtins.isFunction a then
+          bare a
+        else if builtins.isAttrs a then
+          a // lib.genAttrs (builtins.filter (k: builtins.isAttrs (a.${k} or null)) [ "provides" "_" ]) (k: builtins.mapAttrs (_: norm) a.${k})
+        else
+          a;
+      raw = if leaf == "default" then { default = d.value; } else d.value;
+      aspectsOf = if builtins.isAttrs raw then builtins.mapAttrs (_: norm) raw else raw;
       inl = a: lib.imap0 (i: e: { inherit i e; }) (if builtins.isAttrs a && builtins.isList (a.includes or null) then a.includes else [ ]);
       anon = n: i: "${n}/${toString i}";
       # Keys exist for every include slot (elements stay unforced: they may reference `den`, which would cycle).
