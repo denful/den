@@ -4,7 +4,7 @@
   outputs = inputs: let denGen = import ./default.nix { gen = import inputs.gen.outPath { }; }; in {
     lib = denGen;
     flakeModule = denGen.flakeModule;
-    flakeModules.default = denGen.flakeModule;   # flake-parts variant comes later
+    flakeModules.default = denGen.flakeModules.default;
     templates.minimal = { path = ./templates/minimal; description = "denGen minimal"; };
   };
 }
