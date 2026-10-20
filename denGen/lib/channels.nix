@@ -52,6 +52,8 @@ denGen: {
         collected =
           p: builtins.concatMap (n: if builtins.all (pr: call pr { host = allHosts.${n}.host; } == true) p.preds then emit p.key n else [ ]) order;
       in
-      map (p: { _module.args.${p.key} = collected p; }) pipes;
+      map (p: { _module.args.${p.key} = collected p; }) pipes
+      # docs quirks-and-pipes: a declared quirk is always bound, [] when nothing is emitted
+      ++ map (k: { _module.args.${k} = [ ]; }) (builtins.filter (k: !builtins.any (p: p.key == k) pipes) (builtins.attrNames (world.quirks or { })));
   };
 }
