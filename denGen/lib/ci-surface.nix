@@ -19,7 +19,7 @@ denGen: {
           lib = inputs.nixpkgs.lib;
           ev = lib.evalModules {
             specialArgs = { inherit lib inputs; };
-            modules = [ module testModule helpers denGen.flakeModule extra ];
+            modules = [ module testModule fixture helpers denGen.flakeModule extra ];
           };
           c = ev.config;
           hasExpected = !(c.expected ? undefined);
@@ -28,6 +28,12 @@ denGen: {
         { inherit expr; }
         // lib.optionalAttrs hasExpected { inherit (c) expected; }
         // lib.optionalAttrs (!(c.expectedError ? undefined)) { inherit (c) expectedError; };
+      # Den denTest.nix:108-110 pre-declares these for every eval.
+      fixture = { lib, ... }: {
+        den.schema.user.classes = lib.mkDefault [ "homeManager" ];
+        den.default.nixos.system.stateVersion = lib.mkDefault "25.11";
+        den.default.homeManager.home.stateVersion = lib.mkDefault "25.11";
+      };
       testModule = { lib, ... }: {
         options.expr = lib.mkOption { };
         options.expected = lib.mkOption { default.undefined = { }; };
