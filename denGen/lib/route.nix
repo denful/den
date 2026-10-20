@@ -85,9 +85,11 @@ denGen: {
       act = fix 1 m0;
       mF = memOf act;
       # one model per host tree: host scope + one scope per user
+      # policies of every aspect in scope s's previous-pass membership (policy-added ones included); synthetic names have none
+      memPols = m: s: builtins.concatMap (n: if aspects ? ${n} then builtins.concatMap (b: if b.name == n then b.policyIncs else [ ]) (cl aspects.${n}) else [ ]) (m s);
       scopesOf =
         m:
-        { ${host.name} = { cands = hostBase ++ tuCl ++ adds (hostArgs m) (schemaPols "host"); ex = hostEx m; }; }
+        { ${host.name} = { cands = hostBase ++ tuCl ++ adds (hostArgs m) (schemaPols "host" ++ memPols m host.name); ex = hostEx m; }; }
         // builtins.listToAttrs (map (u: { name = userScope u; value = userCands m u; }) allUsers);
       userEnt = m: u: host.users.${u} // { host = hostE m; hasAspect = hasFn (a: builtins.elem a.name (m (userScope u))); };
       argsOf' = m: u: { host = hostE m; user = userEnt m u; };
@@ -97,7 +99,7 @@ denGen: {
         m: u:
         let
           r = aspects."${u}@${host.name}" or aspects.${u} or null;
-          pols = builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user";
+          pols = schemaPols "user" ++ memPols m (userScope u);
         in
         {
           cands = (if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf' m u) pols;
