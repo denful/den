@@ -94,13 +94,27 @@ denGen: {
           config.aspects.default = config.default;
           # shortcut: raw, no semantics yet; later rungs type these.
           options.schema = lib.mkOption {
-            type = t.submodule {
-              freeformType = t.lazyAttrsOf t.raw;
-              options.host.imports = lib.mkOption { type = t.listOf t.raw; default = [ ]; };
-              options.user.imports = lib.mkOption { type = t.listOf t.raw; default = [ ]; };
-            };
+            type = t.lazyAttrsOf (
+              t.submodule {
+                freeformType = t.lazyAttrsOf t.raw;
+                options =
+                  let
+                    rawList = lib.mkOption { type = t.listOf t.raw; default = [ ]; };
+                  in
+                  {
+                    imports = rawList;
+                    includes = rawList;
+                    excludes = rawList;
+                    classes = lib.mkOption { type = t.listOf t.str; default = [ ]; };
+                    isEntity = lib.mkOption { type = t.bool; default = false; };
+                  };
+              }
+            );
             default = { };
           };
+          # consumers read schema.host/user unconditionally
+          config.schema.host = { };
+          config.schema.user = { };
           options.policies = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.systems = lib.mkOption { type = t.listOf t.str; default = [ ]; };

@@ -109,8 +109,14 @@ let
       aspects.igloo.nixos = { host, ... }: { environment.etc.a.text = host.addr; };
     }
   ) ];
+  s1 =
+    n:
+    builtins.length
+      (denGen.genLib.evalModules { modules = [ denGen.view.module { schema.host.includes = [ "a" ]; } { schema.host.includes = [ "b" ]; } ]; }).config.schema.host.includes == n;
 in
 {
+  S1 = s1 2;
+  S1neg = s1 1; # control: MUST be false
   H1 = hAddr "1.2.3.4";
   H1neg = hAddr "9.9.9.9"; # control: MUST be false
   G3a = g3 == "tux";
