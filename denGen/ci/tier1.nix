@@ -90,6 +90,7 @@ let
   g3 =
     (nixpkgsLib.evalModules {
       modules = [
+        { options.users.users = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf nixpkgsLib.types.anything; default = {}; }; }
         { options.environment.etc = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf (nixpkgsLib.types.submodule { options.text = nixpkgsLib.mkOption { type = nixpkgsLib.types.str; }; }); default = {}; }; }
       ] ++ (denGen.route d3.schema d3.aspects (d3.host "igloo") [ "tux" ]).modules;
     }).config.environment.etc.k.text;
@@ -170,8 +171,8 @@ in
   O2host = O2set.O2host;
   O2neg = O2set.O2neg;
 
-  D1 = builtins.length r2.modules == 4; # default nixos once + igloo nixos + 1 default user part per user
-  D1neg = builtins.length r2.modules == 5; # control: MUST be false (default nixos twice)
+  D1 = builtins.length r2.modules == 6; # default nixos once + igloo nixos + per user: users.users stub + 1 default user part
+  D1neg = builtins.length r2.modules == 7; # control: MUST be false (default nixos twice)
   D2 = map (u: builtins.length (r2.userModules u)) [ "tux" "pingu" ] == [ 1 1 ];
   # mkInstanceType: strict=false accepts unknown attr; strict=true rejects (negative)
   R1 = fhOk == "1";

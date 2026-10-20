@@ -91,9 +91,18 @@ denGen: {
           go = v: fnNeeds v || (builtins.isAttrs v && builtins.isList (v.imports or null) && builtins.any go v.imports);
         in
         a.content ? nixos && go a.content.nixos;
+      # provides.to-hosts of every aspect in a user's closure (incl. policy-added) runs once per user, landing in the host's nixos (where-config-lands.mdx)
+      toHosts =
+        u:
+        builtins.concatMap (
+          a: let p = (a.provides or { })."to-hosts" or null; in if builtins.isAttrs p then builtins.concatMap (nixosOf (argsOf u)) (cl p) else [ ]
+        ) (userClosure u);
+      # every host user gets users.users.<u> even with no user-class content
       forUser =
         u:
-        defaultUser u
+        [ { users.users.${u} = { }; } ]
+        ++ toHosts u
+        ++ defaultUser u
         ++ builtins.concatMap (nixosOf (argsOf u)) (builtins.filter needsUser defaultCl)
         ++ builtins.concatMap (
           a: (if hasUser u a then [ (userPart u a) ] else [ ]) ++ (if builtins.elem a.name (map (b: b.name) tuCl) then [ ] else nixosOf (argsOf u) a)
