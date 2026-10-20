@@ -3,8 +3,9 @@ denGen: {
   normalize =
     lib: leaf: cnf: raw:
     let
-      # fn aspects/includes are class content; shortcut: only the fn result's `nixos` is kept, lift other classes when a fleet needs it.
-      bare = f: { nixos = lib.setFunctionArgs (args: (f (builtins.intersectAttrs (lib.functionArgs f) args)).nixos or { }) (lib.functionArgs f); };
+      # fn aspects/includes are class content: each declared class key projects its own part of the fn result
+      classes = builtins.filter (k: denGen.gen.aspects.keyCategory cnf k == "class") (builtins.attrNames cnf.keySemantics);
+      bare = f: lib.genAttrs classes (cls: lib.setFunctionArgs (args: (f (builtins.intersectAttrs (lib.functionArgs f) args)).${cls} or { }) (lib.functionArgs f));
       # structural keys are never nested aspects; other keys go through Gen keyCategory (class/channel keys hold content)
       skip = [ "provides" "_" "includes" "excludes" "policies" "meta" ];
       classifyKey =

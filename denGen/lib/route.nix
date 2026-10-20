@@ -68,11 +68,15 @@ denGen: {
         in
         builtins.concatMap inc eff;
       routes = denGen.routes defaultCl hostBase;
-      userPart = u: a: { users.users.${u} = denGen.flatten (argsOf u) [ a.content.user ]; };
+      userVal = u: a: denGen.flatten (argsOf u) [ a.content.user ];
+      userPart = u: a: { users.users.${u} = userVal u a; };
+      # fn aspects project every class key; an empty projection must not declare users.users.<u>
+      isEmpty = v: if v._type or null == "merge" then builtins.all isEmpty v.contents else v == { };
+      hasUser = u: a: a.content ? user && !isEmpty (userVal u a);
       # den.default is walked in both scopes, first (docs silent on order); its nixos lands once, in the host list.
       defaultCl = cl aspects.default;
-      defaultUser = u: map (userPart u) (builtins.filter (a: a.content ? user) defaultCl);
-      userModules = u: defaultUser u ++ map (userPart u) (builtins.filter (a: a.content ? user) (userClosure u));
+      defaultUser = u: map (userPart u) (builtins.filter (hasUser u) defaultCl);
+      userModules = u: defaultUser u ++ map (userPart u) (builtins.filter (hasUser u) (userClosure u));
       # default parts whose fn needs `user` bind per user scope and are skipped at host scope
       needsUser =
         a:
@@ -86,7 +90,7 @@ denGen: {
         defaultUser u
         ++ builtins.concatMap (nixosOf (argsOf u)) (builtins.filter needsUser defaultCl)
         ++ builtins.concatMap (
-          a: (if a.content ? user then [ (userPart u a) ] else [ ]) ++ nixosOf (argsOf u) a
+          a: (if hasUser u a then [ (userPart u a) ] else [ ]) ++ nixosOf (argsOf u) a
         ) (userClosure u);
     in
     {
