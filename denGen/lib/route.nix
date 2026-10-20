@@ -59,24 +59,35 @@ denGen: {
           fire = p: let r = p.fn (builtins.intersectAttrs (denGen.genLib.functionArgs p.fn) args); in if builtins.isList r then r else [ r ];
         in
         map (e: e.value.name) (builtins.filter (e: (e.__effect or null) == "exclude" && e.value ? name) (builtins.concatMap fire (builtins.filter ready pols)));
-      dropEx = ex: builtins.filter (a: !builtins.elem a.name ex);
       # schema.<kind>.excludes aspect refs: authoritative over includes (reference/schema.mdx, policies.mdx:245)
       schemaEx = kind: map (b: b.name) (builtins.filter (b: builtins.isAttrs b && b ? name && !(b.__isPolicy or false) && !(b ? __builtin)) (sch.${kind}.excludes or [ ]));
       hostEx = schemaEx "host" ++ excludedAt hostArgs (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "host");
-      hostCl = dropEx hostEx (hostBase ++ tuCl ++ adds hostArgs (schemaPols "host"));
+      hostCl = act.members host.name;
+      userScope = u: "${u}@${host.name}";
+      # one model per host tree: host scope + one scope per user
+      act = denGen.mkActivation (
+        { ${host.name} = { cands = hostBase ++ tuCl ++ adds hostArgs (schemaPols "host"); ex = hostEx; }; }
+        // builtins.listToAttrs (map (u: { name = userScope u; value = userCands u; }) (users ++ builtins.attrNames host.users))
+      );
       # user hasAspect: policy-free closure of default+host+user (policy-added aspects excluded, else cycle)
       userStatic = u: defaultCl ++ hostBase ++ tuCl ++ provCl u ++ (let r = aspects."${u}@${host.name}" or aspects.${u} or null; in if r == null then [ ] else cl r);
       userEnt = u: host.users.${u} // { host = hostE; hasAspect = hasFn (a: builtins.elem a.name (map (b: b.name) (userStatic u))); };
       argsOf = u: { host = hostE; user = userEnt u; };
       nixosOf = args: a: if a.content ? nixos then [ (denGen.content.classModule args a.content.nixos) ] else [ ];
-      userClosure =
+      userCands =
         u:
         let
           r = aspects."${u}@${host.name}" or aspects.${u} or null;
-        in
-        let
           pols = builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user";
-          base = dropEx (hostEx ++ schemaEx "user" ++ excludedAt (argsOf u) pols) ((if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) pols);
+        in
+        {
+          cands = (if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) pols;
+          ex = hostEx ++ schemaEx "user" ++ excludedAt (argsOf u) pols;
+        };
+      userClosure =
+        u:
+        let
+          base = act.members (userScope u);
         in
         base ++ routes (argsOf u) (defaultCl ++ base);
       # Aspect policies of the host closure fire at user scope; include effects add aspects (inline class attrs -> synthetic "<policy>#<i>").
