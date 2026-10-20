@@ -12,15 +12,19 @@ denGen: {
         in
         if r == null then [ ] else cl r;
       userPart = u: a: { users.users.${u} = denGen.flatten { inherit host; user = u; } [ a.content.user ]; };
-      userModules = u: map (userPart u) (builtins.filter (a: a.content ? user) (userClosure u));
+      # den.default is walked in both scopes, first (docs silent on order); its nixos lands once, in the host list.
+      defaultCl = cl aspects.default;
+      defaultUser = u: map (userPart u) (builtins.filter (a: a.content ? user) defaultCl);
+      userModules = u: defaultUser u ++ map (userPart u) (builtins.filter (a: a.content ? user) (userClosure u));
       forUser =
         u:
-        builtins.concatMap (
+        defaultUser u
+        ++ builtins.concatMap (
           a: (if a.content ? user then [ (userPart u a) ] else [ ]) ++ nixosOf { inherit host; user = u; } a
         ) (userClosure u);
     in
     {
       inherit userModules;
-      modules = builtins.concatMap (nixosOf { inherit host; }) (cl aspects.${host}) ++ builtins.concatMap forUser users;
+      modules = builtins.concatMap (nixosOf { inherit host; }) (defaultCl ++ cl aspects.${host}) ++ builtins.concatMap forUser users;
     };
 }

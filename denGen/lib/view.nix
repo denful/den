@@ -45,7 +45,7 @@ denGen: {
     {
       inherit mkAspects;
       module =
-        { lib, ... }:
+        { lib, config, ... }:
         {
           options.hosts = lib.mkOption {
             type = t.lazyAttrsOf (
@@ -71,6 +71,17 @@ denGen: {
             type = gen.aspects.aspectsType cnf;
             default = { };
           };
+          # den.default is an aspect: same type as aspects.<n>, then walked as aspects.default.
+          options.default = lib.mkOption {
+            type = gen.aspects.aspectType cnf;
+            default = { };
+          };
+          config.aspects.default = config.default;
+          # shortcut: raw, no semantics yet; later rungs type these.
+          options.schema = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
+          options.policies = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
+          options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
+          options.systems = lib.mkOption { type = t.listOf t.str; default = [ ]; };
         };
     };
 }

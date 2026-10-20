@@ -12,6 +12,16 @@ let
       };
     }
   ) ];
+  den2 = denGen.evalDen [ (
+    { ... }:
+    {
+      hosts.x86_64-linux.igloo.users = { tux = { }; pingu = { }; };
+      aspects.igloo.nixos.environment.etc.y.text = "h";
+      default.nixos.environment.etc.x.text = "d";
+      default.user.extraGroups = [ "d" ];
+    }
+  ) ];
+  r2 = denGen.route den2.aspects "igloo" [ "tux" "pingu" ];
   names = map (a: a.name);
   cl = den.lib.closure den.aspects.tux;
   ms = den.lib.userModules "igloo" "tux";
@@ -78,4 +88,7 @@ in
   N5 = names (den.lib.closure den.aspects.primary-user) == [ "primary-user" ];
   O2home = O2set.O2home;
 
+  D1 = builtins.length r2.modules == 4; # default nixos once + igloo nixos + 1 default user part per user
+  D1neg = builtins.length r2.modules == 5; # control: MUST be false (default nixos twice)
+  D2 = map (u: builtins.length (r2.userModules u)) [ "tux" "pingu" ] == [ 1 1 ];
 }
