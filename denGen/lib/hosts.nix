@@ -19,8 +19,9 @@ denGen: {
               us = pol.usersOf h0;
               h = h0 // { users = us; };
               r = denGen.route world.aspects h (builtins.attrNames us);
-              # shortcut: empty user classes falls back to schema default; no per-user override of schema.
-              hmClasses = u: if us.${u}.classes != [ ] then us.${u}.classes else world.schema.user.classes or [ ];
+              # policy-resolved users carry the registry's default classes ["user"], not an explicit choice; only declared host.users override schema.
+              # shortcut: empty user classes falls back to schema default.
+              hmClasses = u: if h0.users ? ${u} && us.${u}.classes != [ ] then us.${u}.classes else world.schema.user.classes or [ ];
               allHosts = builtins.mapAttrs (n: e: { host = e; config = systems.${n}.config; }) flat;
             in
             r.modules
