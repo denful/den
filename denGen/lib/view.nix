@@ -5,16 +5,16 @@ denGen: {
       inherit (denGen) gen;
       t = denGen.genLib.types;
       cat = category: builtins.mapAttrs (_: _: { inherit category; });
-      cnf = {
-        keySemantics = cat "class" {
-          nixos = null;
-          user = null;
-          homeManager = null;
-        };
+      cnfOf = c: {
+        # quirk names are channel keys (quirks never depend on aspects: no cycle)
+        keySemantics =
+          cat "class" { nixos = null; user = null; homeManager = null; }
+          // cat "channel" c.quirks;
       };
       mkAspects =
         decl:
         let
+          cnf = cnfOf decl;
           isRef = b: (decl.aspects.${b.name}.key or null) == b.key;
           authored =
             name: e: k: _:
@@ -39,6 +39,7 @@ denGen: {
               ) e.includes;
               # forces key validation (N2)
               content = gen.prelude.filterAttrs (authored name e) e;
+              quirks = gen.prelude.filterAttrs (k: _: gen.aspects.keyCategory cnf k == "channel") e;
             };
         in
         builtins.mapAttrs norm decl.aspects;
@@ -83,12 +84,12 @@ denGen: {
             default = { };
           };
           options.aspects = lib.mkOption {
-            type = gen.aspects.aspectsType cnf;
+            type = gen.aspects.aspectsType (cnfOf config);
             default = { };
           };
           # den.default is an aspect: same type as aspects.<n>, then walked as aspects.default.
           options.default = lib.mkOption {
-            type = gen.aspects.aspectType cnf;
+            type = gen.aspects.aspectType (cnfOf config);
             default = { };
           };
           config.aspects.default = config.default;

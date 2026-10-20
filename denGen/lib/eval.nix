@@ -15,11 +15,12 @@ denGen: {
       hostNames = builtins.concatMap builtins.attrNames (builtins.attrValues cfg.hosts);
       world = {
         inherit aspects;
-        inherit (cfg) hosts;
+        inherit (cfg) hosts schema policies quirks;
         batteries.primary-user = aspects.primary-user;
         batteries.define-user = aspects.define-user;
         batteries.hostname = aspects.hostname;
         lib.nh.denPackages = denGen.nh hostNames;
+        lib.policy = denGen.channels.lib.policy;
         lib.closure = denGen.closure aspects;
         # host entity by name (system = its attr-path key)
         host = name: builtins.head (builtins.concatLists (builtins.attrValues (builtins.mapAttrs (system: hs: if hs ? ${name} then [ (hs.${name} // { inherit system; }) ] else [ ]) cfg.hosts)));

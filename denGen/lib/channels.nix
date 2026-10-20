@@ -1,0 +1,33 @@
+# Quirk channels: pipe policies mark consumer hosts; emissions are aspect quirk keys read per host (G1: lazy cross-config).
+denGen: {
+  channels = {
+    # policy value: pipe.from k [collect pred] -> { __pipe; key; preds }
+    lib.policy.pipe = {
+      from = key: steps: { __pipe = true; inherit key; preds = map (s: s.pred) steps; };
+      collect = pred: { inherit pred; };
+    };
+    # modules for host h; allHosts = name -> { host; config (lazy final nixos config) }
+    modules =
+      world: allHosts: h:
+      let
+        call = f: a: if builtins.isFunction f then f (builtins.intersectAttrs (builtins.functionArgs f) a) else f;
+        pipes = builtins.filter (p: builtins.isAttrs p && p ? __pipe) (
+          builtins.concatMap (p: let r = call p { host = h; }; in if builtins.isList r then r else [ r ]) world.schema.host.includes
+        );
+        names = builtins.attrNames allHosts;
+        # self first, then the rest in attrName order
+        order = [ h.name ] ++ builtins.filter (n: n != h.name) names;
+        cl = n: denGen.closure world.aspects world.aspects.default ++ denGen.closure world.aspects world.aspects.${n};
+        emit =
+          k: n:
+          let
+            e = allHosts.${n};
+            args = { inherit (e) host config; };
+          in
+          builtins.concatMap (a: if a.quirks ? ${k} then [ (call a.quirks.${k} args) ] else [ ]) (cl n);
+        collected =
+          p: builtins.concatMap (n: if builtins.all (pr: call pr { host = allHosts.${n}.host; } == true) p.preds then emit p.key n else [ ]) order;
+      in
+      map (p: { _module.args.${p.key} = collected p; }) pipes;
+  };
+}
