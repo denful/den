@@ -7,6 +7,21 @@ denGen: {
       to = kind: bindings: { __effect = "resolve"; inherit kind bindings; };
     };
     lib.policy.include = denGen.effects.include;
+    # when pred inner: guard over scope ctx only. hasAspect (closure membership) is NOT provided: reading it from a policy would cycle through the closure.
+    lib.policy.when =
+      pred: inner:
+      let
+        run = ctx: x:
+          if builtins.isList x then builtins.concatMap (run ctx) x
+          else if builtins.isAttrs x && x ? fn then run ctx x.fn
+          else if builtins.isFunction x then run ctx (x (builtins.intersectAttrs (builtins.functionArgs x) ctx))
+          else if builtins.isAttrs x && x ? __effect then [ x ]
+          else [ (denGen.effects.include x) ];
+      in
+      {
+        __functionArgs = builtins.functionArgs pred;
+        __functor = _: ctx: if pred (builtins.intersectAttrs (builtins.functionArgs pred) ctx) then run ctx inner else [ ];
+      };
     lib.policy.instantiate = x: { __effect = "instantiate"; value = x; };
     # policy value: pipe.from k [collect pred] -> { __pipe; key; preds }
     lib.policy.pipe = {
