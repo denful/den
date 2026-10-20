@@ -22,15 +22,23 @@ denGen: {
     let
       cl = denGen.closure aspects;
       # a host with no declared aspect contributes nothing (users are treated the same below)
-      # schema.host.includes aspect refs join the host closure (policy elements fire separately)
-      schemaRefs =
+      # schema.<kind>.includes elements join a closure: refs via their closure, inline attrs as anon aspects (policy elements fire separately).
+      # a named element missing from the registry is skipped (host: builtin atoms live there) unless `strict`.
+      # shortcut: inline attrs carry no includes of their own; elements do not enter activation membership (hasAspect).
+      schemaCl =
+        strict: kind:
         let
-          go = x:
-            if builtins.isList x then builtins.concatMap go x
-            else if builtins.isAttrs x && !(denGen.classifyInc x).policy && x ? name && aspects ? ${x.name} then cl aspects.${x.name}
+          flat = x: if builtins.isList x then builtins.concatMap flat x else [ x ];
+          one = i: x:
+            if !builtins.isAttrs x || denGen.isPol x then [ ]
+            else if x ? name then (if aspects ? ${x.name} then cl aspects.${x.name} else if strict then throw "den: schema.${kind}.includes: unknown aspect `${x.name}`" else [ ])
+            else if denGen.inlineAttrs x then [ { name = "schema.${kind}#${toString i}"; content = x; includes = [ ]; quirks = { }; policyIncs = [ ]; } ]
             else [ ];
         in
-        go (sch.host.includes or [ ]);
+        builtins.concatLists (denGen.genLib.imap0 one (flat (sch.${kind}.includes or [ ])));
+      schemaRefs = schemaCl false "host";
+      # schema.hm-host.includes (batteries.mdx): only on hosts with an HM user, applied in `hm`
+      hmHostCl = schemaCl true "hm-host";
       hostBase = schemaRefs ++ (if aspects ? ${host.name} then cl aspects.${host.name} else [ ]);
       # schema.<kind>.includes policies (possibly nested in `includes` lists); non-policy elements are skipped
       schemaPols =
@@ -178,7 +186,8 @@ denGen: {
           [ ]
         else
           [ inputs.home-manager.nixosModules.home-manager ]
-          ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ userClosure u ++ viaHost u ++ routes (argsOf u) (viaHost u)); }) hmUsers;
+          ++ builtins.concatMap (nixosOf { inherit host; }) hmHostCl
+          ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ hmHostCl ++ userClosure u ++ viaHost u ++ routes (argsOf u) (viaHost u)); }) hmUsers;
       modules = builtins.concatMap (nixosOf { inherit host; }) (builtins.filter (a: !needsUser a) defaultCl ++ hostCl) ++ builtins.concatMap forUser users;
     };
 }
