@@ -34,7 +34,7 @@ denGen: {
     modules =
       world: allHosts: h: sibs:
       let
-        call = f: a: if builtins.isFunction f then f (builtins.intersectAttrs (builtins.functionArgs f) a) else f;
+        call = f0: a: let f = if builtins.isAttrs f0 && (f0.__isPolicy or false) then f0.fn else f0; in if builtins.isFunction f then f (builtins.intersectAttrs (builtins.functionArgs f) a) else f;
         pipes = builtins.filter (p: builtins.isAttrs p && p ? __pipe) (
           builtins.concatMap (p: let r = call p { host = h; }; in if builtins.isList r then r else [ r ]) world.schema.host.includes
         );

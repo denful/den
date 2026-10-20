@@ -29,8 +29,7 @@ denGen: {
         let
           go = x:
             if builtins.isList x then builtins.concatMap go x
-            else if builtins.isFunction x || (builtins.isAttrs x && x ? __functor && x ? __functionArgs) then [ { name = "schema.${kind}"; fn = x; } ]
-            else if builtins.isAttrs x && (x.__isPolicy or false) then [ x ]
+            else if (denGen.classifyInc x).policy then [ (if x.__isPolicy or false then x else { name = "schema.${kind}"; fn = x; }) ]
             else if builtins.isAttrs x && builtins.isList (x.includes or null) then go x.includes
             else [ ];
         in

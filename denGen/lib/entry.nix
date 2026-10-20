@@ -9,7 +9,7 @@ let
       type = lib.mkOptionType {
         name = "denGenLeaf";
         emptyValue = { value = [ ]; };
-        merge = _loc: defs: map (d: if leaf == "aspects" || leaf == "default" then lower lib leaf d else { _file = d.file; ${leaf} = d.value; }) defs;
+        merge = _loc: defs: map (d: if leaf == "aspects" || leaf == "default" then lower lib leaf d else { _file = d.file; ${leaf} = if leaf == "policies" && builtins.isAttrs d.value then builtins.mapAttrs (name: v: if v.__isPolicy or false then v else { __isPolicy = true; inherit name; fn = v; }) d.value else d.value; }) defs;
       };
     };
   # Lowering lives in normalize.nix; this only shapes the Gen module (inline includes -> anon aspects, design-fleet G3 arm a).
@@ -28,7 +28,7 @@ let
         aspects = n.anons // lib.optionalAttrs (leaf == "aspects") fixed;
         default = lib.optionalAttrs (leaf == "default") fixed.default;
         policyRecs = lib.optionalAttrs (leaf == "aspects") n.recs;
-        policyIncRecs = lib.optionalAttrs (leaf == "aspects" || leaf == "default") n.polIncs;
+        aspectPolicies = lib.optionalAttrs (leaf == "aspects" || leaf == "default") n.polIncs;
       };
   # flake-parts already declares `flake`, so only the plain-evalModules host adds it.
   mk =

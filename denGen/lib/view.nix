@@ -39,7 +39,7 @@ denGen: {
             // builtins.listToAttrs (map (k: { name = k; value = norm "${name}/${k}" e.${k}; }) (kids e))
             // {
               inherit name;
-              policyIncs = decl.policyIncRecs.${name} or [ ];
+              policyIncs = builtins.filter (p: !builtins.any (x: builtins.isAttrs x && (x.__isPolicy or false) && x.name == p.name) (e.excludes or [ ])) (decl.aspectPolicies.${name} or [ ]);
               includes = gen.prelude.imap0 (
                 i: b:
                 if isRef b then
@@ -142,7 +142,7 @@ denGen: {
           options.policies = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           # builtins are named atoms so schema.<kind>.excludes can reference them (reference/policies.mdx:293-297)
           config.policies = lib.genAttrs [ "flake-to-systems" "system-to-os-outputs" "system-to-hm-outputs" "host-to-users" ] (n: { __builtin = n; });
-          options.policyIncRecs = lib.mkOption { type = t.lazyAttrsOf (t.listOf t.raw); default = { }; };
+          options.aspectPolicies = lib.mkOption { type = t.lazyAttrsOf (t.listOf t.raw); default = { }; };
           options.policyRecs = lib.mkOption { type = t.lazyAttrsOf (t.lazyAttrsOf t.raw); default = { }; };
           options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.classes = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };

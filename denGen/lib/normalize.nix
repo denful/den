@@ -1,5 +1,12 @@
 # One lowering pass: normAspect (value), classifyKey (aspect key), classifyInc (include element).
 denGen: {
+  # policy record or functor-with-args; den.policies values are records from capture (entry.nix), so refs compare by name
+  isPol = e: builtins.isAttrs e && ((e.__isPolicy or false) || (e ? __functor && e ? __functionArgs));
+  inlineAttrs = e: builtins.isAttrs e && !(e ? key) && !denGen.isPol e;
+  classifyInc = e: {
+    policy = denGen.isPol e;
+    slot = if denGen.isPol e then null else if builtins.isFunction e || denGen.inlineAttrs e then "anon" else "ref";
+  };
   normalize =
     lib: leaf: cnf: raw:
     let
@@ -34,14 +41,7 @@ denGen: {
           mapKids normAspect path a
         else
           a;
-      # policy record or functor-with-args; a plain fn in den.default.includes also counts (shortcut: elsewhere fns cannot be compared by `excludes`)
-      isPol = e: builtins.isAttrs e && ((e.__isPolicy or false) || (e ? __functor && e ? __functionArgs));
-      inlineAttrs = e: builtins.isAttrs e && !(e ? key) && !isPol e;
-      classifyInc = e: {
-        policy = isPol e || (leaf == "default" && builtins.isFunction e);
-        slot = if isPol e then null else if builtins.isFunction e || inlineAttrs e then "anon" else "ref";
-      };
-      inl = a: lib.imap0 (i: e: { inherit i e; inc = classifyInc e; }) (if builtins.isAttrs a && builtins.isList (a.includes or null) then a.includes else [ ]);
+      inl = a: lib.imap0 (i: e: { inherit i e; inc = denGen.classifyInc e; }) (if builtins.isAttrs a && builtins.isList (a.includes or null) then a.includes else [ ]);
       anon = n: i: "${n}/${toString i}";
       tree = if builtins.isAttrs raw then builtins.mapAttrs normAspect raw else raw;
       # Keys exist for every include slot (elements stay unforced: they may reference `den`, which would cycle).
@@ -50,14 +50,15 @@ denGen: {
         builtins.listToAttrs (
           map (x: {
             name = anon n x.i;
-            value = if builtins.isFunction x.e then bare x.e else if inlineAttrs x.e then x.e else { };
+            value = if builtins.isFunction x.e then bare x.e else if denGen.inlineAttrs x.e then x.e else { };
           }) (inl a)
         )
         // lib.foldl' (acc: k: acc // anonsAt k.p k.v) { } (if builtins.isAttrs a then kidList n a else [ ]);
       polsAt =
         n: a:
         {
-          ${n} = map (x: if x.e ? __isPolicy then x.e else { fn = x.e; name = "${n}.when${toString x.i}"; }) (builtins.filter (x: x.inc.policy) (inl a));
+          ${n} =
+            map (x: if x.e ? __isPolicy then x.e else { fn = x.e; name = "${n}.when${toString x.i}"; }) (builtins.filter (x: x.inc.policy) (inl a));
         }
         // lib.foldl' (acc: k: acc // polsAt k.p k.v) { } (kidList n a);
     in
@@ -65,7 +66,7 @@ denGen: {
       inherit tree;
       anons = lib.concatMapAttrs anonsAt tree;
       polIncs = lib.concatMapAttrs polsAt (lib.filterAttrs (_: builtins.isAttrs) tree);
-      # include slots become refs to the hoisted anons; `policies` is stripped (eval.nix overlays recs back)
+      # include slots become refs to the hoisted anons; `policies` is stripped (policy records live in the `policies` field)
       fixed =
         den:
         let

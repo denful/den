@@ -6,6 +6,7 @@ denGen: {
     world:
     let
       lst = x: if builtins.isList x then x else [ x ];
+      polFn = p: if builtins.isAttrs p && (p.__isPolicy or false) then p.fn else p;
       idOf = p: if builtins.isAttrs p && p ? __builtin then p.__builtin else null;
       # fires when every required arg is bound in the scope ctx (fleet.nix:19-21 resolveArgsSatisfied)
       ready = f: ctx: builtins.all (n: ctx ? ${n}) (builtins.attrNames (denGen.genLib.filterAttrs (_: opt: !opt) (denGen.genLib.functionArgs f)));
@@ -29,8 +30,8 @@ denGen: {
             ++ builtins.genList (i: { head = "p:${toString i}"; pos = [ ]; neg = let id = idOf (builtins.elemAt incs i); in if id != null && builtins.elem id excl then [ "x:${id}" ] else [ ]; relata = [ ]; }) (builtins.length incs)
             ++ map (n: { head = "b:${n}"; pos = [ ]; neg = if builtins.elem n excl then [ "x:${n}" ] else [ ]; relata = [ ]; }) builtinNames;
           m = model rules;
-          fired = builtins.filter (i: let p = builtins.elemAt incs i; in (builtins.isFunction p || (p ? __functor && p ? __functionArgs)) && (m.resolve "p:${toString i}").included && ready p ctx) (builtins.genList (i: i) (builtins.length incs));
-          effects = builtins.concatMap (i: let p = builtins.elemAt incs i; in map (e: if builtins.isAttrs e then e else { }) (lst (p (builtins.intersectAttrs (denGen.genLib.functionArgs p) ctx)))) fired;
+          fired = builtins.filter (i: let p = builtins.elemAt incs i; in (let f = polFn p; in builtins.isFunction f || (f ? __functor && f ? __functionArgs)) && (m.resolve "p:${toString i}").included && ready (polFn p) ctx) (builtins.genList (i: i) (builtins.length incs));
+          effects = builtins.concatMap (i: let p = builtins.elemAt incs i; in map (e: if builtins.isAttrs e then e else { }) (lst (polFn p (builtins.intersectAttrs (denGen.genLib.functionArgs (polFn p)) ctx)))) fired;
           eff = k: builtins.filter (e: (e.__effect or null) == k) effects;
           key = e: "${e.kind}=${e.bindings.${e.kind}.name or ""}";
         in
