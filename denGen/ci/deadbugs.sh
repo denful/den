@@ -2,7 +2,8 @@
 # usage: deadbugs.sh <den-path> <out.tsv> [suite...]  (run from the den checkout)
 # PASS iff rc==0 and "N/M successful" with M>0, N==M (0/0 is a false green).
 set -u
-den=$(realpath "$1"); out=$2; shift 2
+# a failed realpath left den empty and nix silently fell back to the locked den input
+den=$(realpath -e "${1#path:}") || { echo "bad den path: $1" >&2; exit 2; }; den="path:$den"; out=$2; shift 2
 if [ $# -gt 0 ]; then suites=("$@"); else
   mapfile -t suites < <(rg -oN --no-filename -r '$1' 'flake\.tests\.([A-Za-z0-9_-]+)' templates/ci/modules/deadbugs/*.nix | sort -u)
 fi
