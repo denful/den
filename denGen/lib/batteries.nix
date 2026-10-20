@@ -14,6 +14,13 @@ denGen: {
         home = "/home/${user.userName}";
         isNormalUser = true;
       };
+    aspects.define-user.homeManager =
+      { user, ... }:
+      let n = user.userName or user.name; in
+      {
+        home.username = n;
+        home.homeDirectory = "/home/${n}";
+      };
     aspects.hostname.nixos =
       { host, ... }:
       {

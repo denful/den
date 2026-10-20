@@ -69,7 +69,7 @@ let
         aspects = anons // lib.optionalAttrs (leaf == "aspects") fixed;
         default = lib.optionalAttrs (leaf == "default") fixed.default;
         policyRecs = lib.optionalAttrs (leaf == "aspects") recs;
-        policyIncRecs = lib.optionalAttrs (leaf == "aspects") (lib.mapAttrs (n: a: map (x: if x.e ? __isPolicy then x.e else { fn = x.e; name = "${n}.when${toString x.i}"; }) (builtins.filter (x: isPol x.e) (inl a))) (lib.filterAttrs (_: a: builtins.isAttrs a) aspectsOf));
+        policyIncRecs = lib.optionalAttrs (leaf == "aspects" || leaf == "default") (lib.mapAttrs (n: a: map (x: if x.e ? __isPolicy then x.e else { fn = x.e; name = "${n}.when${toString x.i}"; }) (builtins.filter (x: isPol x.e) (inl a))) (lib.filterAttrs (_: a: builtins.isAttrs a) aspectsOf));
       };
   # flake-parts already declares `flake`, so only the plain-evalModules host adds it.
   mk =
@@ -101,7 +101,7 @@ let
             inputs.home-manager.lib.homeManagerConfiguration {
               pkgs = inputs.nixpkgs.legacyPackages.${system};
               modules = lib.concatMap (
-                a: lib.optional (a.content ? homeManager) (denGen.content.classModule { home = h // { inherit name system; }; } a.content.homeManager)
+                a: lib.optional (a.content ? homeManager) (denGen.content.classModule { home = h // { inherit name system; }; user = h // { inherit name system; }; } a.content.homeManager)
               ) (cl den.aspects.default ++ cl (den.aspects.${name} or den.aspects.${lib.head (lib.splitString "@" name)}));
             }
           ) hs
