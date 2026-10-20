@@ -22,6 +22,7 @@ denGen: {
         __functionArgs = builtins.functionArgs pred;
         __functor = _: ctx: if pred (builtins.intersectAttrs (builtins.functionArgs pred) ctx) then run ctx inner else [ ];
       };
+    lib.policy.mkPolicy = name: fn: { __isPolicy = true; inherit name fn; };
     lib.policy.instantiate = x: { __effect = "instantiate"; value = x; };
     # policy value: pipe.from k [collect pred] -> { __pipe; key; preds }
     lib.policy.pipe = {

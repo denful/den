@@ -26,7 +26,7 @@ denGen: {
         lib.closure = denGen.closure aspects;
         # host entity by name (system = its attr-path key)
         host = name: builtins.head (builtins.concatLists (builtins.attrValues (builtins.mapAttrs (system: hs: if hs ? ${name} then [ (hs.${name} // { inherit system; }) ] else [ ]) cfg.hosts)));
-        lib.userModules = h: u: (denGen.route aspects (world.host h) [ ]).userModules u;
+        lib.userModules = h: u: (denGen.route cfg.schema aspects (world.host h) [ ]).userModules u;
       };
     in
     world;

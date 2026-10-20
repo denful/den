@@ -21,7 +21,7 @@ let
       default.user.extraGroups = [ "d" ];
     }
   ) ];
-  r2 = denGen.route den2.aspects (den2.host "igloo") [ "tux" "pingu" ];
+  r2 = denGen.route den2.schema den2.aspects (den2.host "igloo") [ "tux" "pingu" ];
   names = map (a: a.name);
   cl = den.lib.closure den.aspects.tux;
   ms = den.lib.userModules "igloo" "tux";
@@ -69,7 +69,7 @@ let
             );
           };
         }
-      ] ++ (denGen.route d2.aspects (d2.host host) [ "tux" ]).modules;
+      ] ++ (denGen.route d2.schema d2.aspects (d2.host host) [ "tux" ]).modules;
     }).config;
   O2set = {
     O2host = (stub "igloo").networking.hostName == "igloo";
@@ -91,7 +91,7 @@ let
     (nixpkgsLib.evalModules {
       modules = [
         { options.environment.etc = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf (nixpkgsLib.types.submodule { options.text = nixpkgsLib.mkOption { type = nixpkgsLib.types.str; }; }); default = {}; }; }
-      ] ++ (denGen.route d3.aspects (d3.host "igloo") [ "tux" ]).modules;
+      ] ++ (denGen.route d3.schema d3.aspects (d3.host "igloo") [ "tux" ]).modules;
     }).config.environment.etc.k.text;
   # H1: schema.host.imports adds option `addr`; nixos fn gets host entity
   hAddr =
@@ -99,7 +99,7 @@ let
     (nixpkgsLib.evalModules {
       modules = [
         { options.environment.etc = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf (nixpkgsLib.types.submodule { options.text = nixpkgsLib.mkOption { type = nixpkgsLib.types.str; }; }); default = {}; }; }
-      ] ++ (denGen.route d4.aspects (d4.host "igloo") [ ]).modules;
+      ] ++ (denGen.route d4.schema d4.aspects (d4.host "igloo") [ ]).modules;
     }).config.environment.etc.a.text == a;
   d4 = denGen.evalDen [ (
     { lib, ... }:

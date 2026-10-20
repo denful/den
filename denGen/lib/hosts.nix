@@ -18,7 +18,7 @@ denGen: {
             let
               us = pol.usersOf h0;
               h = h0 // { users = us; };
-              r = denGen.route world.aspects h (builtins.attrNames us);
+              r = denGen.route world.schema world.aspects h (builtins.attrNames us);
               # policy-resolved users carry the registry's default classes ["user"], not an explicit choice; only declared host.users override schema.
               # shortcut: empty user classes falls back to schema default.
               hmClasses = u: if h0.users ? ${u} && us.${u}.classes != [ ] then us.${u}.classes else world.schema.user.classes or [ ];
