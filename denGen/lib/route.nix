@@ -22,7 +22,16 @@ denGen: {
     let
       cl = denGen.closure aspects;
       # a host with no declared aspect contributes nothing (users are treated the same below)
-      hostBase = if aspects ? ${host.name} then cl aspects.${host.name} else [ ];
+      # schema.host.includes aspect refs join the host closure (policy elements fire separately)
+      schemaRefs =
+        let
+          go = x:
+            if builtins.isList x then builtins.concatMap go x
+            else if builtins.isAttrs x && !(denGen.classifyInc x).policy && x ? name && aspects ? ${x.name} then cl aspects.${x.name}
+            else [ ];
+        in
+        go (sch.host.includes or [ ]);
+      hostBase = schemaRefs ++ (if aspects ? ${host.name} then cl aspects.${host.name} else [ ]);
       # schema.<kind>.includes policies (possibly nested in `includes` lists); non-policy elements are skipped
       schemaPols =
         kind:
