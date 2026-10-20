@@ -12,7 +12,7 @@ denGen: {
       wrap = path: c: builtins.foldl' (v: i: { ${builtins.elemAt path (builtins.length path - 1 - i)} = v; }) c (builtins.genList (i: i) (builtins.length path));
       one = e: {
         name = "route#${e.fromClass}->${e.intoClass}";
-        content.${e.intoClass} = { imports = map (a: wrap e.path a.content.${e.fromClass}) (builtins.filter (a: a.content ? ${e.fromClass}) scope); };
+        content.${e.intoClass} = { imports = map (a: wrap (if e ? intoPath then (if builtins.isFunction e.intoPath then e.intoPath { } else e.intoPath) else e.path) a.content.${e.fromClass}) (builtins.filter (a: a.content ? ${e.fromClass}) scope); };
         includes = [ ]; quirks = { }; policyIncs = [ ];
       };
     in
@@ -36,10 +36,14 @@ denGen: {
         go (sch.${kind}.includes or [ ]);
       # hasAspect over the policy-free closure (policy-added aspects excluded, else it would cycle)
       hasIn = a: builtins.elem a.name (map (b: b.name) (defaultCl ++ hostBase));
-      hostArgs = { host = host // { hasAspect = { __functor = _: hasIn; forAnyClass = hasIn; }; }; };
+      hasFn = f: { __functor = _: f; forAnyClass = f; };
+      hostE = host // { hasAspect = hasFn hasIn; };
+      hostArgs = { host = hostE; };
       hostCl = hostBase ++ adds hostArgs (schemaPols "host");
-      userEnt = u: host.users.${u} // { inherit host; };
-      argsOf = u: { inherit host; user = userEnt u; };
+      # user hasAspect: policy-free closure of default+host+user (policy-added aspects excluded, else cycle)
+      userStatic = u: defaultCl ++ hostBase ++ (let r = aspects."${u}@${host.name}" or aspects.${u} or null; in if r == null then [ ] else cl r);
+      userEnt = u: host.users.${u} // { host = hostE; hasAspect = hasFn (a: builtins.elem a.name (map (b: b.name) (userStatic u))); };
+      argsOf = u: { host = hostE; user = userEnt u; };
       nixosOf = args: a: if a.content ? nixos then [ (denGen.content.classModule args a.content.nixos) ] else [ ];
       userClosure =
         u:
