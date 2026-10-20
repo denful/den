@@ -13,7 +13,22 @@ denGen: {
         let
           r = aspects."${u}@${host.name}" or aspects.${u} or null;
         in
-        if r == null then [ ] else cl r;
+        if r == null then [ ] else cl r ++ policyAdds u;
+      # Aspect policies of the host closure fire at user scope; include effects add aspects (inline class attrs -> synthetic "<policy>#<i>").
+      # shortcut: no gen.program stratification (R1), policies of policy-included aspects and per-scope dedup come later.
+      policyAdds =
+        u:
+        let
+          fire = p: let r = p.fn (builtins.intersectAttrs (builtins.functionArgs p.fn) (argsOf u)); in if builtins.isList r then r else [ r ];
+          ready = p: builtins.all (n: (argsOf u) ? ${n}) (builtins.attrNames (denGen.genLib.filterAttrs (_: opt: !opt) (builtins.functionArgs p.fn)));
+          eff = builtins.concatMap (p: builtins.genList (i: { inherit p i; e = builtins.elemAt (fire p) i; }) (builtins.length (fire p))) (builtins.filter ready (builtins.concatMap (a: a.policyIncs) (cl aspects.${host.name})));
+          inc = x:
+            if (x.e.__effect or null) != "include" then [ ]
+            else if x.e.value ? name then cl x.e.value
+            else if x.e.value ? includes then builtins.concatMap cl x.e.value.includes
+            else [ { name = "${x.p.name}#${toString x.i}"; content = x.e.value; includes = [ ]; quirks = { }; policyIncs = [ ]; } ];
+        in
+        builtins.concatMap inc eff;
       userPart = u: a: { users.users.${u} = denGen.flatten (argsOf u) [ a.content.user ]; };
       # den.default is walked in both scopes, first (docs silent on order); its nixos lands once, in the host list.
       defaultCl = cl aspects.default;

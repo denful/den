@@ -6,6 +6,7 @@ denGen: {
       __functor = _: bindings: { __effect = "resolve"; inherit bindings; };
       to = kind: bindings: { __effect = "resolve"; inherit kind bindings; };
     };
+    lib.policy.include = denGen.effects.include;
     lib.policy.instantiate = x: { __effect = "instantiate"; value = x; };
     # policy value: pipe.from k [collect pred] -> { __pipe; key; preds }
     lib.policy.pipe = {

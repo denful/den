@@ -11,7 +11,7 @@ denGen: {
         ] ++ denModules;
       };
       cfg = inner.config;
-      aspects = denGen.view.mkAspects cfg;
+      aspects = builtins.mapAttrs (n: a: if cfg.policyRecs ? ${n} then a // { policies = cfg.policyRecs.${n}; } else a) (denGen.view.mkAspects cfg);
       hostNames = builtins.concatMap builtins.attrNames (builtins.attrValues cfg.hosts);
       world = {
         inherit aspects;
@@ -19,6 +19,7 @@ denGen: {
         batteries.primary-user = aspects.primary-user;
         batteries.define-user = aspects.define-user;
         batteries.hostname = aspects.hostname;
+        provides = world.batteries;
         lib.nh.denPackages = denGen.nh hostNames;
         lib.policy = denGen.channels.lib.policy;
         lib.schema = denGen.schema.lib;

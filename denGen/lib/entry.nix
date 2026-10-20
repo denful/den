@@ -54,12 +54,16 @@ let
       { den, ... }:
       let
         fix = n: a: a // { includes = map (x: if builtins.isFunction x.e then den.aspects.${anon n x.i} else x.e) (inl a); };
-        fixed = builtins.mapAttrs (n: a: if builtins.isAttrs a && builtins.isList (a.includes or null) then fix n a else a) aspectsOf;
+        strip = a: if builtins.isAttrs a then removeAttrs a [ "policies" ] else a;
+        fixed = builtins.mapAttrs (n: a: strip (if builtins.isAttrs a && builtins.isList (a.includes or null) then fix n a else a)) aspectsOf;
+        # policy fns live outside the typed aspect (gen-aspects reads policies.* as a nested aspect path); eval.nix overlays them back.
+        recs = lib.concatMapAttrs (n: a: lib.optionalAttrs (builtins.isAttrs a && builtins.isAttrs (a.policies or null)) { ${n} = builtins.mapAttrs (p: fn: { __isPolicy = true; inherit fn; name = "${n}.${p}"; }) a.policies; }) aspectsOf;
       in
       {
         _file = d.file;
         aspects = anons // lib.optionalAttrs (leaf == "aspects") fixed;
         default = lib.optionalAttrs (leaf == "default") fixed.default;
+        policyRecs = lib.optionalAttrs (leaf == "aspects") recs;
       };
   # flake-parts already declares `flake`, so only the plain-evalModules host adds it.
   mk =
