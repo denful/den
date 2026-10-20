@@ -1,17 +1,17 @@
 # One lowering pass: normAspect (value), classifyKey (aspect key), classifyInc (include element).
 denGen: {
   normalize =
-    lib: leaf: raw:
+    lib: leaf: cnf: raw:
     let
       # fn aspects/includes are class content; shortcut: only the fn result's `nixos` is kept, lift other classes when a fleet needs it.
       bare = f: { nixos = lib.setFunctionArgs (args: (f (builtins.intersectAttrs (lib.functionArgs f) args)).nixos or { }) (lib.functionArgs f); };
-      # shortcut: class keys are a fixed list; custom classes holding an `includes` list would be mistaken for nested aspects (R2 uses keyCategory).
-      skip = [ "provides" "_" "includes" "excludes" "policies" "meta" "nixos" "darwin" "user" "homeManager" ];
+      # structural keys are never nested aspects; other keys go through Gen keyCategory (class/channel keys hold content)
+      skip = [ "provides" "_" "includes" "excludes" "policies" "meta" ];
       classifyKey =
         a: k:
         if builtins.elem k [ "provides" "_" ] then
           if builtins.isAttrs (a.${k} or null) then "provides" else null
-        else if !builtins.elem k skip && builtins.isAttrs a.${k} && !(a.${k} ? _type) then
+        else if !builtins.elem k skip && denGen.gen.aspects.keyCategory cnf k == null && builtins.isAttrs a.${k} && !(a.${k} ? _type) then
           "nested"
         else
           null;

@@ -15,14 +15,12 @@ let
   # Lowering lives in normalize.nix; this only shapes the Gen module (inline includes -> anon aspects, design-fleet G3 arm a).
   lower =
     lib: leaf: d:
-    let
-      n = denGen.normalize lib leaf (if leaf == "default" then { default = d.value; } else d.value);
-    in
-    if !builtins.isAttrs n.tree then
+    if leaf != "default" && !builtins.isAttrs d.value then
       { _file = d.file; ${leaf} = d.value; }
     else
       { den, ... }:
       let
+        n = denGen.normalize lib leaf (denGen.view.cnfOf den) (if leaf == "default" then { default = d.value; } else d.value);
         fixed = n.fixed den;
       in
       {

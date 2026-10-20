@@ -8,7 +8,7 @@ denGen: {
       cnfOf = c: {
         # quirk names are channel keys (quirks never depend on aspects: no cycle)
         keySemantics =
-          cat "class" { nixos = null; user = null; homeManager = null; }
+          cat "class" { nixos = null; darwin = null; user = null; homeManager = null; }
           // cat "class" c.classes
           // cat "channel" c.quirks;
       };
@@ -67,7 +67,7 @@ denGen: {
         normed;
     in
     {
-      inherit mkAspects;
+      inherit mkAspects cnfOf;
       module =
         { lib, config, ... }:
         {
