@@ -113,6 +113,7 @@ let
     n:
     builtins.length
       (denGen.genLib.evalModules { modules = [ denGen.view.module { schema.host.includes = [ "a" ]; } { schema.host.includes = [ "b" ]; } ]; }).config.schema.host.includes == n;
+  mkEval = strict: (denGen.genLib.evalModules { modules = [ { options.r = denGen.genLib.mkOption { type = denGen.genLib.types.attrsOf (denGen.schema.lib.mkInstanceType { inherit strict; } { }); default = { }; }; config.r.a.foo = 1; } ]; }).config.r.a;
 in
 {
   S1 = s1 2;
@@ -136,4 +137,7 @@ in
   D1 = builtins.length r2.modules == 4; # default nixos once + igloo nixos + 1 default user part per user
   D1neg = builtins.length r2.modules == 5; # control: MUST be false (default nixos twice)
   D2 = map (u: builtins.length (r2.userModules u)) [ "tux" "pingu" ] == [ 1 1 ];
+  # mkInstanceType: strict=false accepts unknown attr; strict=true rejects (negative)
+  M1 = (mkEval false).foo == 1;
+  M1neg = !(builtins.tryEval (builtins.deepSeq (mkEval true) true)).success; # strict MUST reject
 }

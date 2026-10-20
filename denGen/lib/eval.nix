@@ -21,6 +21,7 @@ denGen: {
         batteries.hostname = aspects.hostname;
         lib.nh.denPackages = denGen.nh hostNames;
         lib.policy = denGen.channels.lib.policy;
+        lib.schema = denGen.schema.lib;
         lib.closure = denGen.closure aspects;
         # host entity by name (system = its attr-path key)
         host = name: builtins.head (builtins.concatLists (builtins.attrValues (builtins.mapAttrs (system: hs: if hs ? ${name} then [ (hs.${name} // { inherit system; }) ] else [ ]) cfg.hosts)));

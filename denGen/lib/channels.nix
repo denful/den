@@ -1,6 +1,12 @@
 # Quirk channels: pipe policies mark consumer hosts; emissions are aspect quirk keys read per host (G1: lazy cross-config).
 denGen: {
   channels = {
+    # shortcut: inert effect descriptors (docs explanation/policies.mdx s resolve); no routing yet, upgrade when policies fire.
+    lib.policy.resolve = {
+      __functor = _: bindings: { __effect = "resolve"; inherit bindings; };
+      to = kind: bindings: { __effect = "resolve"; inherit kind bindings; };
+    };
+    lib.policy.instantiate = x: { __effect = "instantiate"; value = x; };
     # policy value: pipe.from k [collect pred] -> { __pipe; key; preds }
     lib.policy.pipe = {
       from = key: steps: { __pipe = true; inherit key; preds = map (s: s.pred) steps; };
