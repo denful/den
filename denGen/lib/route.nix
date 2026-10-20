@@ -42,7 +42,17 @@ denGen: {
       hasFn = f: { __functor = _: f; forAnyClass = f; };
       hostE = host // { hasAspect = hasFn hasIn; };
       hostArgs = { host = hostE; };
-      hostCl = hostBase ++ tuCl ++ adds hostArgs (schemaPols "host");
+      # policy.exclude of host-closure/schema policies drops those aspects from the scope subtree (names; shortcut: not the excluder's exclusive subtree).
+      excludedAt =
+        args: pols:
+        let
+          ready = p: builtins.all (n: args ? ${n}) (builtins.attrNames (denGen.genLib.filterAttrs (_: opt: !opt) (denGen.genLib.functionArgs p.fn)));
+          fire = p: let r = p.fn (builtins.intersectAttrs (denGen.genLib.functionArgs p.fn) args); in if builtins.isList r then r else [ r ];
+        in
+        map (e: e.value.name) (builtins.filter (e: (e.__effect or null) == "exclude" && e.value ? name) (builtins.concatMap fire (builtins.filter ready pols)));
+      dropEx = ex: builtins.filter (a: !builtins.elem a.name ex);
+      hostEx = excludedAt hostArgs (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "host");
+      hostCl = dropEx hostEx (hostBase ++ tuCl ++ adds hostArgs (schemaPols "host"));
       # user hasAspect: policy-free closure of default+host+user (policy-added aspects excluded, else cycle)
       userStatic = u: defaultCl ++ hostBase ++ tuCl ++ provCl u ++ (let r = aspects."${u}@${host.name}" or aspects.${u} or null; in if r == null then [ ] else cl r);
       userEnt = u: host.users.${u} // { host = hostE; hasAspect = hasFn (a: builtins.elem a.name (map (b: b.name) (userStatic u))); };
@@ -54,7 +64,8 @@ denGen: {
           r = aspects."${u}@${host.name}" or aspects.${u} or null;
         in
         let
-          base = (if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user");
+          pols = builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user";
+          base = dropEx (hostEx ++ excludedAt (argsOf u) pols) ((if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) pols);
         in
         base ++ routes (argsOf u) (defaultCl ++ base);
       # Aspect policies of the host closure fire at user scope; include effects add aspects (inline class attrs -> synthetic "<policy>#<i>").

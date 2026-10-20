@@ -80,7 +80,7 @@ denGen: {
                     # schema.host.imports (e.g. fleet addr/environment options) extend the entity.
                     # open by default (entities.mdx:183-192); schema.host.isStrict closes it
                     freeformType = if config.schema.host.isStrict then null else t.lazyAttrsOf t.raw;
-                    imports = config.schema.host.imports;
+                    imports = config.schema.host.imports ++ [ (denGen.schema.entity config.schema.host) ];
                     options.name = lib.mkOption { type = t.str; default = name; };
                     options.hostName = lib.mkOption { type = t.str; default = name; };
                     options.intoAttr = lib.mkOption { type = t.listOf t.str; default = [ "nixosConfigurations" name ]; };
@@ -91,7 +91,7 @@ denGen: {
                           { name, ... }:
                           {
                             freeformType = t.lazyAttrsOf t.raw;
-                            imports = config.schema.user.imports;
+                            imports = config.schema.user.imports ++ [ (denGen.schema.entity config.schema.user) ];
                             options.name = lib.mkOption { type = t.str; default = name; };
                             options.userName = lib.mkOption { type = t.str; default = name; };
                             options.classes = lib.mkOption {

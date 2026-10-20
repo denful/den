@@ -7,6 +7,7 @@ denGen: {
       to = kind: bindings: { __effect = "resolve"; inherit kind bindings; };
     };
     lib.policy.include = denGen.effects.include;
+    lib.policy.exclude = denGen.effects.exclude;
     lib.policy.route = denGen.effects.route;
     # when pred inner: guard over scope ctx only. hasAspect (closure membership) is NOT provided: reading it from a policy would cycle through the closure.
     lib.policy.when =
