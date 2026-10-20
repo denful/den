@@ -35,13 +35,16 @@ denGen: {
         in
         go (sch.${kind}.includes or [ ]);
       # hasAspect over the policy-free closure (policy-added aspects excluded, else it would cycle)
-      hasIn = a: builtins.elem a.name (map (b: b.name) (defaultCl ++ hostBase));
+      hostProv = (aspects.${host.name} or { }).provides or { };
+      provCl = k: if builtins.isAttrs (hostProv.${k} or null) then cl hostProv.${k} else [ ];
+      tuCl = provCl "to-users";
+      hasIn = a: builtins.elem a.name (map (b: b.name) (defaultCl ++ hostBase ++ tuCl));
       hasFn = f: { __functor = _: f; forAnyClass = f; };
       hostE = host // { hasAspect = hasFn hasIn; };
       hostArgs = { host = hostE; };
-      hostCl = hostBase ++ adds hostArgs (schemaPols "host");
+      hostCl = hostBase ++ tuCl ++ adds hostArgs (schemaPols "host");
       # user hasAspect: policy-free closure of default+host+user (policy-added aspects excluded, else cycle)
-      userStatic = u: defaultCl ++ hostBase ++ (let r = aspects."${u}@${host.name}" or aspects.${u} or null; in if r == null then [ ] else cl r);
+      userStatic = u: defaultCl ++ hostBase ++ tuCl ++ provCl u ++ (let r = aspects."${u}@${host.name}" or aspects.${u} or null; in if r == null then [ ] else cl r);
       userEnt = u: host.users.${u} // { host = hostE; hasAspect = hasFn (a: builtins.elem a.name (map (b: b.name) (userStatic u))); };
       argsOf = u: { host = hostE; user = userEnt u; };
       nixosOf = args: a: if a.content ? nixos then [ (denGen.content.classModule args a.content.nixos) ] else [ ];
@@ -51,7 +54,7 @@ denGen: {
           r = aspects."${u}@${host.name}" or aspects.${u} or null;
         in
         let
-          base = (if r == null then [ ] else cl r) ++ adds (argsOf u) (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user");
+          base = (if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user");
         in
         base ++ routes (argsOf u) (defaultCl ++ base);
       # Aspect policies of the host closure fire at user scope; include effects add aspects (inline class attrs -> synthetic "<policy>#<i>").
@@ -93,7 +96,7 @@ denGen: {
         defaultUser u
         ++ builtins.concatMap (nixosOf (argsOf u)) (builtins.filter needsUser defaultCl)
         ++ builtins.concatMap (
-          a: (if hasUser u a then [ (userPart u a) ] else [ ]) ++ nixosOf (argsOf u) a
+          a: (if hasUser u a then [ (userPart u a) ] else [ ]) ++ (if builtins.elem a.name (map (b: b.name) tuCl) then [ ] else nixosOf (argsOf u) a)
         ) (userClosure u);
     in
     {
