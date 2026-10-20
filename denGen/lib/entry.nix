@@ -76,6 +76,7 @@ let
 in
 {
   lowerDef = lower;
-  flakeModule = mk true;
+  # key: a test importing den.flakeModule again must dedupe, not redeclare `flake`
+  flakeModule = { key = "denGen:flakeModule"; imports = [ (mk true) ]; };
   flakeModules.default = mk false;
 }

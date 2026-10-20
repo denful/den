@@ -44,7 +44,7 @@ denGen: {
         options.expected = lib.mkOption { default.undefined = { }; };
         options.expectedError = lib.mkOption { default.undefined = { }; };
       };
-      helpers = { config, ... }: let igloo = config.flake.nixosConfigurations.igloo.config; in {
+      helpers = { lib, config, ... }: let igloo = config.flake.nixosConfigurations.igloo.config; in {
         _module.args = {
           inherit igloo;
           iceberg = config.flake.nixosConfigurations.iceberg.config;
@@ -53,7 +53,13 @@ denGen: {
           pinguHm = igloo.home-manager.users.pingu;
           trace = nope "trace";
           show = nope "show";
-          funnyNames = nope "funnyNames";
+          funnyNames = aspect:
+            let
+              den = config._module.args.den;
+              mods = lib.concatMap (a: lib.optional (a.content ? funny) (denGen.content.classModule { } a.content.funny)) (denGen.closure den.aspects aspect);
+              names = lib.evalModules { modules = mods ++ [ { options.names = lib.mkOption { type = lib.types.listOf lib.types.str; default = [ ]; }; } ]; };
+            in
+            lib.sort (a: b: a < b) names.config.names;
         };
       };
     in

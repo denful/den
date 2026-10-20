@@ -25,6 +25,7 @@ denGen: {
         provides = world.batteries;
         _ = world.provides;
         lib.parametric = denGen.parametric;
+        lib.__findFile = denGen.angle world;
         lib.nh.denPackages = denGen.nh hostNames;
         lib.policy = denGen.channels.lib.policy;
         lib.schema = denGen.schema.lib;
