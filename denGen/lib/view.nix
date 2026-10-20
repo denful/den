@@ -60,6 +60,7 @@ denGen: {
                     imports = config.schema.host.imports;
                     options.name = lib.mkOption { type = t.str; default = name; };
                     options.hostName = lib.mkOption { type = t.str; default = name; };
+                    options.intoAttr = lib.mkOption { type = t.listOf t.str; default = [ "nixosConfigurations" name ]; };
                     options.class = lib.mkOption { type = t.str; default = "nixos"; };
                     options.users = lib.mkOption {
                       type = t.lazyAttrsOf (
@@ -118,6 +119,8 @@ denGen: {
           config.schema.host = { };
           config.schema.user = { };
           options.policies = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
+          # builtins are named atoms so schema.<kind>.excludes can reference them (reference/policies.mdx:293-297)
+          config.policies = lib.genAttrs [ "flake-to-systems" "system-to-os-outputs" "system-to-hm-outputs" "host-to-users" ] (n: { __builtin = n; });
           options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.systems = lib.mkOption { type = t.listOf t.str; default = [ ]; };
         };

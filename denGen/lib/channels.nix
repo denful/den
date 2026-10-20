@@ -14,15 +14,14 @@ denGen: {
     };
     # modules for host h; allHosts = name -> { host; config (lazy final nixos config) }
     modules =
-      world: allHosts: h:
+      world: allHosts: h: sibs:
       let
         call = f: a: if builtins.isFunction f then f (builtins.intersectAttrs (builtins.functionArgs f) a) else f;
         pipes = builtins.filter (p: builtins.isAttrs p && p ? __pipe) (
           builtins.concatMap (p: let r = call p { host = h; }; in if builtins.isList r then r else [ r ]) world.schema.host.includes
         );
-        names = builtins.attrNames allHosts;
-        # self first, then the rest in attrName order
-        order = [ h.name ] ++ builtins.filter (n: n != h.name) names;
+        # self first, then sibling scopes (same parent) in attrName order (fleet.mdx:101-102)
+        order = [ h.name ] ++ builtins.filter (n: n != h.name && allHosts ? ${n}) sibs;
         cl = n: denGen.closure world.aspects world.aspects.default ++ denGen.closure world.aspects world.aspects.${n};
         emit =
           k: n:

@@ -19,9 +19,18 @@ denGen: {
       defaultCl = cl aspects.default;
       defaultUser = u: map (userPart u) (builtins.filter (a: a.content ? user) defaultCl);
       userModules = u: defaultUser u ++ map (userPart u) (builtins.filter (a: a.content ? user) (userClosure u));
+      # default parts whose fn needs `user` bind per user scope and are skipped at host scope
+      needsUser =
+        a:
+        let
+          fnNeeds = v: (builtins.isFunction v || (builtins.isAttrs v && v ? __functor)) && (denGen.genLib.functionArgs v) ? user;
+          go = v: fnNeeds v || (builtins.isAttrs v && builtins.isList (v.imports or null) && builtins.any go v.imports);
+        in
+        a.content ? nixos && go a.content.nixos;
       forUser =
         u:
         defaultUser u
+        ++ builtins.concatMap (nixosOf (argsOf u)) (builtins.filter needsUser defaultCl)
         ++ builtins.concatMap (
           a: (if a.content ? user then [ (userPart u a) ] else [ ]) ++ nixosOf (argsOf u) a
         ) (userClosure u);
@@ -39,6 +48,6 @@ denGen: {
         else
           [ inputs.home-manager.nixosModules.home-manager ]
           ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ userClosure u); }) hmUsers;
-      modules = builtins.concatMap (nixosOf { inherit host; }) (defaultCl ++ cl aspects.${host.name}) ++ builtins.concatMap forUser users;
+      modules = builtins.concatMap (nixosOf { inherit host; }) (builtins.filter (a: !needsUser a) defaultCl ++ cl aspects.${host.name}) ++ builtins.concatMap forUser users;
     };
 }
