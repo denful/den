@@ -15,7 +15,7 @@ denGen: {
       hostNames = builtins.concatMap builtins.attrNames (builtins.attrValues cfg.hosts);
       world = {
         inherit aspects;
-        inherit (cfg) hosts schema policies quirks;
+        inherit (cfg) hosts schema policies quirks classes homes;
         batteries.primary-user = aspects.primary-user;
         batteries.define-user = aspects.define-user;
         batteries.hostname = aspects.hostname;

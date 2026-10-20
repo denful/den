@@ -9,6 +9,7 @@ denGen: {
         # quirk names are channel keys (quirks never depend on aspects: no cycle)
         keySemantics =
           cat "class" { nixos = null; user = null; homeManager = null; }
+          // cat "class" c.classes
           // cat "channel" c.quirks;
       };
       mkAspects =
@@ -122,6 +123,8 @@ denGen: {
           # builtins are named atoms so schema.<kind>.excludes can reference them (reference/policies.mdx:293-297)
           config.policies = lib.genAttrs [ "flake-to-systems" "system-to-os-outputs" "system-to-hm-outputs" "host-to-users" ] (n: { __builtin = n; });
           options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
+          options.classes = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
+          options.homes = lib.mkOption { type = t.lazyAttrsOf (t.lazyAttrsOf t.raw); default = { }; };
           options.systems = lib.mkOption { type = t.listOf t.str; default = [ ]; };
         };
     };
