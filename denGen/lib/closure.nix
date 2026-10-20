@@ -17,7 +17,9 @@ denGen: {
       rules =
         [ { head = root.name; pos = [ ]; neg = [ ]; relata = [ ]; } ]
         ++ builtins.concatMap (
-          a: map (b: { head = b.name; pos = [ a.name ]; neg = [ ]; relata = [ ]; }) a.includes
+          a:
+          map (b: { head = b.name; pos = [ a.name ]; neg = [ "x:${b.name}" ]; relata = [ ]; }) a.includes
+          ++ map (b: { head = "x:${b.name}"; pos = [ a.name ]; neg = [ ]; relata = [ ]; }) (a.excludes or [ ])
         ) order;
       model = denGen.gen.program.model {
         program = denGen.gen.program.program [ ] rules;

@@ -26,7 +26,9 @@ denGen: {
             let
               c = gen.aspects.keyCategory cnf k;
             in
-            if c == null then
+            if k == "excludes" then
+              false
+            else if c == null then
               # nested aspect: own entry, its content lands only if included
               if builtins.isAttrs e.${k} then false else throw "den: aspect `${name}`: key `${k}` is not a declared class and not a nested aspect"
             else
@@ -45,6 +47,16 @@ denGen: {
                 else
                   throw "den: aspect `${name}`: includes[${toString i}] is not a ref to a declared aspect"
               ) e.includes;
+              # policy elements (attrs/functions without an aspect name) are not aspect refs: not closure-excluded here
+              excludes = builtins.filter (b: builtins.isAttrs b && b ? name && b ? key && isRef b) (
+                gen.prelude.imap0 (
+                  i: b:
+                  if builtins.isString b then
+                    throw "den: aspect `${name}`: excludes[${toString i}] is not of type aspect or function returning aspect (is not of type `aspect or function returning aspect')"
+                  else
+                    b
+                ) (e.excludes or [ ])
+              );
               # forces key validation (N2)
               content = gen.prelude.filterAttrs (authored name e) e;
               # unset channel keys surface as null; only authored emissions count
