@@ -16,19 +16,25 @@ denGen: {
         decl:
         let
           cnf = cnfOf decl;
-          isRef = b: (decl.aspects.${b.name}.key or null) == b.key;
+          # nested aspects (Den aspects.mdx:19; gen-aspects "A key with no entry is a nested aspect") are
+          # addressed by name `<parent>/<key>`; resolved by path so the world's key set never forces aspect bodies.
+          kids = e: builtins.filter (k: gen.aspects.keyCategory cnf k == null && builtins.isAttrs e.${k}) (builtins.attrNames e);
+          at = n: builtins.foldl' (e: s: e.${s} or { }) decl.aspects (if decl.aspects ? ${n} then [ n ] else builtins.filter builtins.isString (builtins.split "/" n));
+          isRef = b: (at b.name).key or null == b.key;
           authored =
             name: e: k: _:
             let
               c = gen.aspects.keyCategory cnf k;
             in
             if c == null then
-              throw "den: aspect `${name}`: key `${k}` is not a declared class"
+              # nested aspect: own entry, its content lands only if included
+              if builtins.isAttrs e.${k} then false else throw "den: aspect `${name}`: key `${k}` is not a declared class and not a nested aspect"
             else
               c == "class" && gen.aspects.hasClassContent e.${k};
           norm =
             name: e:
             e
+            // builtins.listToAttrs (map (k: { name = k; value = norm "${name}/${k}" e.${k}; }) (kids e))
             // {
               inherit name;
               policyIncs = decl.policyIncRecs.${name} or [ ];
@@ -44,8 +50,9 @@ denGen: {
               # unset channel keys surface as null; only authored emissions count
               quirks = gen.prelude.filterAttrs (k: v: v != null && gen.aspects.keyCategory cnf k == "channel") e;
             };
+          normed = builtins.mapAttrs norm decl.aspects;
         in
-        builtins.mapAttrs norm decl.aspects;
+        normed;
     in
     {
       inherit mkAspects;

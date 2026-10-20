@@ -116,8 +116,24 @@ let
   mkEval = strict: (denGen.genLib.evalModules { modules = [ { options.r = denGen.genLib.mkOption { type = denGen.genLib.types.attrsOf (denGen.schema.lib.mkInstanceType { inherit strict; } { }); default = { }; }; config.r.a.foo = 1; } ]; }).config.r.a;
   # Q1: aspect without a channel emission has no quirk entry (was null -> channel collect crashed)
   dq = denGen.evalDen [ ({ ... }: { quirks.host-addrs = { }; aspects.igloo.nixos = { }; }) ];
+  # nested aspects: a.b is its own aspect (recursive), content lands only when included
+  dn = denGen.evalDen [ (
+    { ... }:
+    {
+      hosts.x86_64-linux.igloo.users = { };
+      aspects.igloo.nixos.networking.hostName = "h";
+      aspects.igloo.includes = [ dn.aspects.a.b ];
+      aspects.a.nixos.x = 1;
+      aspects.a.b.nixos.y = 2;
+      aspects.a.b.c.nixos.z = 3;
+      aspects.a.b.c.includes = [ ];
+    }
+  ) ];
+  dnBad = denGen.evalDen [ ({ ... }: { aspects.a.b = 1; }) ];
 in
 {
+  Nok = (names (dn.lib.closure dn.aspects.igloo)) == [ "igloo" "a/b" ] && dn.aspects.a.b.c.name == "a/b/c" && dn.aspects.a.b.content ? nixos && !(dn.aspects.a.content ? b) && !(builtins.elem "a/b/c" (names (dn.lib.closure dn.aspects.igloo)));
+  Nneg = !(builtins.tryEval (builtins.deepSeq dnBad.aspects.a.content true)).success; # N-nested: non-attr leaf MUST throw
   Q1 = dq.aspects.igloo.quirks == { };
   S1 = s1 2;
   S1neg = s1 1; # control: MUST be false
