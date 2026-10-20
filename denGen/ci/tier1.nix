@@ -76,8 +76,27 @@ let
     O2home = (stub "igloo").users.users.tux.home == "/home/tux";
     O2neg = (stub "x").networking.hostName == "igloo"; # control: MUST be false
   };
+  # G3a: inline include fn lowered (as entry.nix capture does) to anonymous aspect `tux/0`, bound with user = "tux"
+  d3 = denGen.evalDen [
+    ({ ... }: { hosts.x86_64-linux.igloo.users.tux = { }; })
+    (denGen.lowerDef nixpkgsLib "aspects" {
+      file = "t";
+      value = {
+        igloo.nixos = { };
+        tux.includes = [ ({ host, user }: { nixos.environment.etc.k.text = user; }) ];
+      };
+    })
+  ];
+  g3 =
+    (nixpkgsLib.evalModules {
+      modules = [
+        { options.environment.etc = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf (nixpkgsLib.types.submodule { options.text = nixpkgsLib.mkOption { type = nixpkgsLib.types.str; }; }); default = {}; }; }
+      ] ++ (denGen.route d3.aspects "igloo" [ "tux" ]).modules;
+    }).config.environment.etc.k.text;
 in
 {
+  G3a = g3 == "tux";
+  G3aneg = g3 == "pingu"; # control: MUST be false
   T5 = names cl == [ "tux" "primary-user" ];
   T6 = map (m: (eval [ m ]).extraGroups) ms == [ [ "audio" ] [ "wheel" "networkmanager" ] ];
   T2 = (eval ms).extraGroups == [ "audio" "wheel" "networkmanager" ];

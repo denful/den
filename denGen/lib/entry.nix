@@ -9,9 +9,46 @@ let
       type = lib.mkOptionType {
         name = "denGenLeaf";
         emptyValue = { value = [ ]; };
-        merge = _loc: defs: map (d: { _file = d.file; ${leaf} = d.value; }) defs;
+        merge = _loc: defs: map (d: if leaf == "aspects" || leaf == "default" then lower lib leaf d else { _file = d.file; ${leaf} = d.value; }) defs;
       };
     };
+  # Inline `includes` fns become anonymous aspects `<parent>/<idx>` (nixos content = fn's nixos, bound later by content.nix)
+  # and the include becomes a ref to it, before gen-aspects typing sees a closure (design-fleet G3 arm a).
+  # shortcut: only the fn result's `nixos` is kept (user/other classes dropped); lift them when a fleet needs it.
+  lower =
+    lib: leaf: d:
+    let
+      aspectsOf = if leaf == "default" then { default = d.value; } else d.value;
+      inl = a: lib.imap0 (i: e: { inherit i e; }) (if builtins.isAttrs a && builtins.isList (a.includes or null) then a.includes else [ ]);
+      anon = n: i: "${n}/${toString i}";
+      # Keys exist for every include slot (elements stay unforced: they may reference `den`, which would cycle).
+      anons = lib.concatMapAttrs (
+        n: a:
+        builtins.listToAttrs (
+          map (x: {
+            name = anon n x.i;
+            value.nixos =
+              if builtins.isFunction x.e then
+                lib.setFunctionArgs (args: (x.e (builtins.intersectAttrs (lib.functionArgs x.e) args)).nixos or { }) (lib.functionArgs x.e)
+              else
+                { };
+          }) (inl a)
+        )
+      ) aspectsOf;
+    in
+    if !builtins.isAttrs aspectsOf then
+      { _file = d.file; ${leaf} = d.value; }
+    else
+      { den, ... }:
+      let
+        fix = n: a: a // { includes = map (x: if builtins.isFunction x.e then den.aspects.${anon n x.i} else x.e) (inl a); };
+        fixed = builtins.mapAttrs (n: a: if builtins.isAttrs a && builtins.isList (a.includes or null) then fix n a else a) aspectsOf;
+      in
+      {
+        _file = d.file;
+        aspects = anons // lib.optionalAttrs (leaf == "aspects") fixed;
+        default = lib.optionalAttrs (leaf == "default") fixed.default;
+      };
   # flake-parts already declares `flake`, so only the plain-evalModules host adds it.
   mk =
     declareFlake:
@@ -32,6 +69,7 @@ let
     };
 in
 {
+  lowerDef = lower;
   flakeModule = mk true;
   flakeModules.default = mk false;
 }
