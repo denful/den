@@ -23,6 +23,7 @@ denGen: {
         batteries.primary-user = aspects.primary-user;
         batteries.define-user = aspects.define-user;
         batteries.hostname = aspects.hostname;
+        batteries.host-aspects = aspects.host-aspects;
         batteries."inputs'" = aspects."inputs'";
         batteries."self'" = aspects."self'";
         provides = world.batteries;

@@ -169,12 +169,15 @@ denGen: {
         inputs: hmUsers:
         let
           hmOf = u: a: if a.content ? homeManager then [ (denGen.content.classModule (argsOf u) a.content.homeManager) ] else [ ];
+          # host-aspects opt-in: host closure parts not already in the user's closure
+          viaHost = u: let uc = userClosure u; seen = map (b: b.name) (defaultCl ++ uc); in
+            if builtins.elem "host-aspects" (map (b: b.name) uc) then builtins.filter (a: !(builtins.elem a.name seen)) hostBase else [ ];
         in
         if hmUsers == [ ] then
           [ ]
         else
           [ inputs.home-manager.nixosModules.home-manager ]
-          ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ userClosure u); }) hmUsers;
+          ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ userClosure u ++ viaHost u ++ routes (argsOf u) (viaHost u)); }) hmUsers;
       modules = builtins.concatMap (nixosOf { inherit host; }) (builtins.filter (a: !needsUser a) defaultCl ++ hostCl) ++ builtins.concatMap forUser users;
     };
 }

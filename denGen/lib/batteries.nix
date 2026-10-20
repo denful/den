@@ -21,6 +21,8 @@ denGen: {
         home.username = n;
         home.homeDirectory = "/home/${n}";
       };
+    # marker: route.hm gives users whose closure holds it the host closure's homeManager content
+    aspects.host-aspects.description = "Project the host aspect closure's homeManager content onto the including user";
     aspects.hostname.nixos =
       { host, ... }:
       {
