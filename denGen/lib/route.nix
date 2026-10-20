@@ -1,6 +1,22 @@
 # Per-host nixos module list: host closure first, then users, each aspect's user part before its nixos part (design-gen.md §3.8-9).
 # `host` is the host entity (view.nix); users' entities come from host.users.
 denGen: {
+  # policy.route: fromClass content of the scope closure re-delivered as intoClass content (reference/policies.mdx route).
+  # shortcut: only user/home scope fires routes; path != [] needs attrset (non-function) content.
+  routes =
+    defaultCl: hostBase: args: scope:
+    let
+      pols = builtins.attrValues (builtins.listToAttrs (map (p: { name = p.name; value = p; }) (builtins.concatMap (a: a.policyIncs) (defaultCl ++ hostBase ++ scope))));
+      ready = p: builtins.all (n: args ? ${n}) (builtins.attrNames (denGen.genLib.filterAttrs (_: opt: !opt) (denGen.genLib.functionArgs p.fn)));
+      effs = builtins.concatMap (p: let r = p.fn (builtins.intersectAttrs (denGen.genLib.functionArgs p.fn) args); in if builtins.isList r then r else [ r ]) (builtins.filter ready pols);
+      wrap = path: c: builtins.foldl' (v: i: { ${builtins.elemAt path (builtins.length path - 1 - i)} = v; }) c (builtins.genList (i: i) (builtins.length path));
+      one = e: {
+        name = "route#${e.fromClass}->${e.intoClass}";
+        content.${e.intoClass} = { imports = map (a: wrap e.path a.content.${e.fromClass}) (builtins.filter (a: a.content ? ${e.fromClass}) scope); };
+        includes = [ ]; quirks = { }; policyIncs = [ ];
+      };
+    in
+    map one (builtins.filter (e: (e.__effect or null) == "route") effs);
   route =
     sch: aspects: host: users:
     let
@@ -51,22 +67,7 @@ denGen: {
             else [ { name = "${x.p.name}#${toString x.i}"; content = x.e.value; includes = [ ]; quirks = { }; policyIncs = [ ]; } ];
         in
         builtins.concatMap inc eff;
-      # policy.route: fromClass content of the scope closure re-delivered as intoClass content (reference/policies.mdx route).
-      # shortcut: only user scope fires routes; path != [] needs attrset (non-function) content.
-      routes =
-        args: scope:
-        let
-          pols = builtins.attrValues (builtins.listToAttrs (map (p: { name = p.name; value = p; }) (builtins.concatMap (a: a.policyIncs) (defaultCl ++ hostBase ++ scope))));
-          ready = p: builtins.all (n: args ? ${n}) (builtins.attrNames (denGen.genLib.filterAttrs (_: opt: !opt) (denGen.genLib.functionArgs p.fn)));
-          effs = builtins.concatMap (p: let r = p.fn (builtins.intersectAttrs (denGen.genLib.functionArgs p.fn) args); in if builtins.isList r then r else [ r ]) (builtins.filter ready pols);
-          wrap = path: c: builtins.foldl' (v: i: { ${builtins.elemAt path (builtins.length path - 1 - i)} = v; }) c (builtins.genList (i: i) (builtins.length path));
-          one = e: {
-            name = "route#${e.fromClass}->${e.intoClass}";
-            content.${e.intoClass} = { imports = map (a: wrap e.path a.content.${e.fromClass}) (builtins.filter (a: a.content ? ${e.fromClass}) scope); };
-            includes = [ ]; quirks = { }; policyIncs = [ ];
-          };
-        in
-        map one (builtins.filter (e: (e.__effect or null) == "route") effs);
+      routes = denGen.routes defaultCl hostBase;
       userPart = u: a: { users.users.${u} = denGen.flatten (argsOf u) [ a.content.user ]; };
       # den.default is walked in both scopes, first (docs silent on order); its nixos lands once, in the host list.
       defaultCl = cl aspects.default;
