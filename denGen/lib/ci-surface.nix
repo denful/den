@@ -17,8 +17,13 @@ denGen: {
         inputs: extra: module:
         let
           lib = inputs.nixpkgs.lib;
+          # Den denTest.nix:37-46 fake-parts withSystem: only self and nixpkgs.
+          withSystem = system: let pkgs = inputs.nixpkgs.legacyPackages.${system}; in cb: cb {
+            inputs'.nixpkgs = { packages = pkgs; legacyPackages = pkgs; };
+            self' = { packages = pkgs; legacyPackages = pkgs; };
+          };
           ev = lib.evalModules {
-            specialArgs = { inherit lib inputs; };
+            specialArgs = { inherit lib inputs withSystem; };
             modules = [ module testModule fixture helpers denGen.flakeModule extra ];
           };
           c = ev.config;

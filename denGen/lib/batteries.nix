@@ -1,6 +1,6 @@
 # Inner module pre-declaring battery aspects (design-gen.md §4; content ASSUMED from Den docs).
 denGen: {
-  batteries.module = {
+  batteries.module = { config, ... }: let withSystem = config._module.args.withSystem; in {
     aspects.primary-user.user = {
       isNormalUser = true;
       extraGroups = [ "wheel" "networkmanager" ];
@@ -26,5 +26,10 @@ denGen: {
       {
         networking.hostName = host.hostName;
       };
+    # inputs'/self' via flake-parts withSystem; system from the bound host/user/home entity.
+    aspects."inputs'".homeManager = { user, ... }: { _module.args."inputs'" = withSystem (user.system or user.host.system) (ps: ps."inputs'"); };
+    aspects."inputs'".nixos = { host, ... }: { _module.args."inputs'" = withSystem host.system (ps: ps."inputs'"); };
+    aspects."self'".homeManager = { user, ... }: { _module.args."self'" = withSystem (user.system or user.host.system) (ps: ps."self'"); };
+    aspects."self'".nixos = { host, ... }: { _module.args."self'" = withSystem host.system (ps: ps."self'"); };
   };
 }

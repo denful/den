@@ -7,6 +7,7 @@ denGen: {
         modules = [
           denGen.view.module
           denGen.batteries.module
+          { _module.args.withSystem = denGen.genLib.mkDefault (_: throw "den: inputs'/self' need flake-parts withSystem"); }
           { _module.args.den = world; }
         ] ++ denModules;
       };
@@ -19,6 +20,8 @@ denGen: {
         batteries.primary-user = aspects.primary-user;
         batteries.define-user = aspects.define-user;
         batteries.hostname = aspects.hostname;
+        batteries."inputs'" = aspects."inputs'";
+        batteries."self'" = aspects."self'";
         provides = world.batteries;
         _ = world.provides;
         lib.parametric = denGen.parametric;

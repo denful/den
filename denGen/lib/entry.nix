@@ -33,7 +33,7 @@ let
   # flake-parts already declares `flake`, so only the plain-evalModules host adds it.
   mk =
     declareFlake:
-    { lib, config, inputs, ... }:
+    { lib, config, inputs, ... }@margs:
     {
       options =
         lib.optionalAttrs declareFlake {
@@ -45,7 +45,7 @@ let
         // {
           den = lib.genAttrs leaves (capture lib);
         };
-      config._module.args.den = denGen.evalDen (lib.concatMap (l: config.den.${l}) leaves);
+      config._module.args.den = denGen.evalDen (lib.concatMap (l: config.den.${l}) leaves ++ lib.optional (margs ? withSystem) { _module.args.withSystem = margs.withSystem; });
       config.flake.nixosConfigurations = denGen.hosts config._module.args.den inputs;
       # standalone homes: aspect named by the home (guides/standalone-home-manager.mdx), its homeManager parts
       config.flake.homeConfigurations =
@@ -61,9 +61,10 @@ let
               pkgs = inputs.nixpkgs.legacyPackages.${system};
               modules =
                 let
-                  args = { home = h // { inherit name system; }; user = h // { inherit name system; }; };
+                  base = lib.head (lib.splitString "@" name);
+                  args = { home = h // { inherit name system; }; user = h // { inherit system; name = base; userName = base; }; };
                   dcl = cl den.aspects.default;
-                  scope = cl (den.aspects.${name} or den.aspects.${lib.head (lib.splitString "@" name)});
+                  scope = lib.concatMap (n: lib.optionals (den.aspects ? ${n}) (cl den.aspects.${n})) (lib.unique [ name base ]);
                 in
                 lib.concatMap (a: lib.optional (a.content ? homeManager) (denGen.content.classModule args a.content.homeManager)) (
                   dcl ++ scope ++ denGen.routes dcl [ ] args (dcl ++ scope)
