@@ -13,7 +13,7 @@ denGen: {
         let
           r = aspects."${u}@${host.name}" or aspects.${u} or null;
         in
-        if r == null then [ ] else cl r ++ policyAdds u;
+        (if r == null then [ ] else cl r) ++ policyAdds u;
       # Aspect policies of the host closure fire at user scope; include effects add aspects (inline class attrs -> synthetic "<policy>#<i>").
       # shortcut: no gen.program stratification (R1), policies of policy-included aspects and per-scope dedup come later.
       policyAdds =
@@ -24,8 +24,8 @@ denGen: {
           eff = builtins.concatMap (p: builtins.genList (i: { inherit p i; e = builtins.elemAt (fire p) i; }) (builtins.length (fire p))) (builtins.filter ready (builtins.concatMap (a: a.policyIncs) (cl aspects.${host.name})));
           inc = x:
             if (x.e.__effect or null) != "include" then [ ]
-            else if x.e.value ? name then cl x.e.value
-            else if x.e.value ? includes then builtins.concatMap cl x.e.value.includes
+            else if x.e.value ? name then cl aspects.${x.e.value.name}
+            else if x.e.value ? includes then builtins.concatMap (b: cl aspects.${b.name}) x.e.value.includes
             else [ { name = "${x.p.name}#${toString x.i}"; content = x.e.value; includes = [ ]; quirks = { }; policyIncs = [ ]; } ];
         in
         builtins.concatMap inc eff;

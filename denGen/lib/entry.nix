@@ -32,6 +32,8 @@ let
       raw = if leaf == "default" then { default = d.value; } else d.value;
       aspectsOf = if builtins.isAttrs raw then builtins.mapAttrs (_: norm) raw else raw;
       inl = a: lib.imap0 (i: e: { inherit i e; }) (if builtins.isAttrs a && builtins.isList (a.includes or null) then a.includes else [ ]);
+      # inline class-content attrset include: not a ref (refs carry `key`) and not a policy record
+      inlineAttrs = e: builtins.isAttrs e && !(e ? key) && !(e.__isPolicy or false);
       anon = n: i: "${n}/${toString i}";
       # Keys exist for every include slot (elements stay unforced: they may reference `den`, which would cycle).
       anons = lib.concatMapAttrs (
@@ -39,9 +41,11 @@ let
         builtins.listToAttrs (
           map (x: {
             name = anon n x.i;
-            value.nixos =
+            value =
               if builtins.isFunction x.e then
-                lib.setFunctionArgs (args: (x.e (builtins.intersectAttrs (lib.functionArgs x.e) args)).nixos or { }) (lib.functionArgs x.e)
+                { nixos = lib.setFunctionArgs (args: (x.e (builtins.intersectAttrs (lib.functionArgs x.e) args)).nixos or { }) (lib.functionArgs x.e); }
+              else if inlineAttrs x.e then
+                x.e
               else
                 { };
           }) (inl a)
@@ -53,7 +57,7 @@ let
     else
       { den, ... }:
       let
-        fix = n: a: a // { includes = map (x: if builtins.isFunction x.e then den.aspects.${anon n x.i} else x.e) (inl a); };
+        fix = n: a: a // { includes = map (x: if builtins.isFunction x.e || inlineAttrs x.e then den.aspects.${anon n x.i} else x.e) (builtins.filter (x: !(x.e.__isPolicy or false)) (inl a)); };
         strip = a: if builtins.isAttrs a then removeAttrs a [ "policies" ] else a;
         fixed = builtins.mapAttrs (n: a: strip (if builtins.isAttrs a && builtins.isList (a.includes or null) then fix n a else a)) aspectsOf;
         # policy fns live outside the typed aspect (gen-aspects reads policies.* as a nested aspect path); eval.nix overlays them back.
@@ -64,6 +68,7 @@ let
         aspects = anons // lib.optionalAttrs (leaf == "aspects") fixed;
         default = lib.optionalAttrs (leaf == "default") fixed.default;
         policyRecs = lib.optionalAttrs (leaf == "aspects") recs;
+        policyIncRecs = lib.optionalAttrs (leaf == "aspects") (lib.mapAttrs (_: a: map (x: x.e) (builtins.filter (x: x.e.__isPolicy or false) (inl a))) (lib.filterAttrs (_: a: builtins.isAttrs a) aspectsOf));
       };
   # flake-parts already declares `flake`, so only the plain-evalModules host adds it.
   mk =

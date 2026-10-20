@@ -31,14 +31,14 @@ denGen: {
             e
             // {
               inherit name;
-              policyIncs = builtins.filter (b: b.__isPolicy or false) e.includes;
+              policyIncs = decl.policyIncRecs.${name} or [ ];
               includes = gen.prelude.imap0 (
                 i: b:
                 if isRef b then
                   b
                 else
                   throw "den: aspect `${name}`: includes[${toString i}] is not a ref to a declared aspect"
-              ) (builtins.filter (b: !(b.__isPolicy or false)) e.includes);
+              ) e.includes;
               # forces key validation (N2)
               content = gen.prelude.filterAttrs (authored name e) e;
               # unset channel keys surface as null; only authored emissions count
@@ -123,6 +123,7 @@ denGen: {
           options.policies = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           # builtins are named atoms so schema.<kind>.excludes can reference them (reference/policies.mdx:293-297)
           config.policies = lib.genAttrs [ "flake-to-systems" "system-to-os-outputs" "system-to-hm-outputs" "host-to-users" ] (n: { __builtin = n; });
+          options.policyIncRecs = lib.mkOption { type = t.lazyAttrsOf (t.listOf t.raw); default = { }; };
           options.policyRecs = lib.mkOption { type = t.lazyAttrsOf (t.lazyAttrsOf t.raw); default = { }; };
           options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.classes = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
