@@ -20,6 +20,7 @@ denGen: {
         batteries.define-user = aspects.define-user;
         batteries.hostname = aspects.hostname;
         provides = world.batteries;
+        lib.parametric = denGen.parametric;
         lib.nh.denPackages = denGen.nh hostNames;
         lib.policy = denGen.channels.lib.policy;
         lib.schema = denGen.schema.lib;

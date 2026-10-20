@@ -46,7 +46,6 @@ denGen: {
           apple = config.flake.darwinConfigurations.apple.config;
           tuxHm = igloo.home-manager.users.tux;
           pinguHm = igloo.home-manager.users.pingu;
-          ns = nope "ns";
           trace = nope "trace";
           show = nope "show";
           funnyNames = nope "funnyNames";
