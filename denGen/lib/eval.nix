@@ -17,6 +17,8 @@ denGen: {
         inherit aspects;
         inherit (cfg) hosts;
         batteries.primary-user = aspects.primary-user;
+        batteries.define-user = aspects.define-user;
+        batteries.hostname = aspects.hostname;
         lib.nh.denPackages = denGen.nh hostNames;
         lib.closure = denGen.closure aspects;
         lib.userModules = host: u: (denGen.route aspects host [ ]).userModules u;
