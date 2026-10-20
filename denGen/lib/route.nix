@@ -120,9 +120,10 @@ denGen: {
           fire = p: let r = p.fn (builtins.intersectAttrs (fnArgs p) args); in if builtins.isList r then r else [ r ];
           ready = p: builtins.all (n: args ? ${n}) (builtins.attrNames (denGen.genLib.filterAttrs (_: opt: !opt) (fnArgs p)));
           eff = builtins.concatMap (p: builtins.genList (i: { inherit p i; e = builtins.elemAt (fire p) i; }) (builtins.length (fire p))) (builtins.filter ready pols);
+          declared = n: let r = builtins.foldl' (e: s: if builtins.isAttrs e && e ? ${s} then e.${s} else null) aspects (if aspects ? ${n} then [ n ] else builtins.filter builtins.isString (builtins.split "/" n)); in if r == null then throw "den: aspect ${n} not declared" else r;
           inc = x:
             if (x.e.__effect or null) != "include" then [ ]
-            else if x.e.value ? name then cl aspects.${x.e.value.name}
+            else if x.e.value ? name then cl (declared x.e.value.name)
             else if x.e.value ? includes then builtins.concatMap (b: cl aspects.${b.name}) x.e.value.includes
             else [ { name = "${x.p.name}#${toString x.i}"; content = x.e.value; includes = [ ]; quirks = { }; policyIncs = [ ]; } ];
         in

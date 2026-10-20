@@ -54,18 +54,52 @@ denGen: {
           }) (inl a)
         )
         // lib.foldl' (acc: k: acc // anonsAt k.p k.v) { } (if builtins.isAttrs a then kidList n a else [ ]);
+      # Aspect policy delivering the `includes` a fn aspect/include returns (Den parity: fn results' includes are live).
+      # declared quirks are always bound ([] when nothing is emitted), so a fn include needing only them is ready at any scope
+      # shortcut: pipe-fed quirk values are not seen when deciding includes; upgrade when an include depends on a quirk value
+      chan = lib.genAttrs (builtins.filter (k: denGen.gen.aspects.keyCategory cnf k == "channel") (builtins.attrNames cnf.keySemantics)) (_: [ ]);
+      # Fn elements whose required args are not yet in scope fire later at the user scope (member policies fire per scope).
+      fnIncs =
+        n: f:
+        let
+          content = e: removeAttrs e [ "name" "includes" "excludes" "provides" "_" "policies" "meta" "description" ];
+          expand =
+            args: es:
+            lib.concatMap (
+              e:
+              let
+                c = denGen.classifyInc e;
+                inline = r: lib.optional (content r != { }) (denGen.effects.include (content r)) ++ expand args (r.includes or [ ]);
+              in
+              if c.policy then [ ]
+              else if c.slot == "ref" then [ (denGen.effects.include e) ]
+              else if builtins.isFunction e then
+                lib.optionals (builtins.all (k: args ? ${k}) (builtins.attrNames (lib.filterAttrs (_: opt: !opt) (lib.functionArgs e)))) (inline (e (builtins.intersectAttrs (lib.functionArgs e) args)))
+              else inline e
+            ) es;
+        in
+        {
+          name = "${n}.fnIncs";
+          fn = lib.setFunctionArgs (
+            scope:
+            let args = chan // scope; in expand args ((f (builtins.intersectAttrs (lib.functionArgs f) args)).includes or [ ])
+          # host/user are advertised optional so nested fn includes see them when the scope has them (content.nix denArgs)
+          ) ({ host = true; user = true; } // builtins.mapAttrs (k: opt: opt || chan ? ${k}) (lib.functionArgs f));
+        };
       polsAt =
         n: a:
+        if builtins.isFunction a then { ${n} = [ (fnIncs n a) ]; } else
         {
           ${n} =
             map (x: if x.e ? __isPolicy then x.e else { fn = x.e; name = "${n}.when${toString x.i}"; }) (builtins.filter (x: x.inc.policy) (inl a));
         }
+        // lib.foldl' (acc: x: acc // { ${anon n x.i} = [ (fnIncs (anon n x.i) x.e) ]; }) { } (builtins.filter (x: builtins.isFunction x.e) (inl a))
         // lib.foldl' (acc: k: acc // polsAt k.p k.v) { } (kidList n a);
     in
     {
       inherit tree;
       anons = lib.concatMapAttrs anonsAt tree;
-      polIncs = lib.concatMapAttrs polsAt (lib.filterAttrs (_: builtins.isAttrs) tree);
+      polIncs = lib.concatMapAttrs polsAt (lib.filterAttrs (_: v: builtins.isAttrs v || builtins.isFunction v) (if builtins.isAttrs raw then raw else { }));
       # include slots become refs to the hoisted anons; `policies` is stripped (policy records live in the `policies` field)
       fixed =
         den:
