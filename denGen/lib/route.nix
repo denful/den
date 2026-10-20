@@ -47,10 +47,11 @@ denGen: {
       hostProv = (aspects.${host.name} or { }).provides or { };
       provCl = k: if builtins.isAttrs (hostProv.${k} or null) then cl hostProv.${k} else [ ];
       tuCl = provCl "to-users";
-      hasIn = a: builtins.elem a.name (map (b: b.name) (defaultCl ++ hostBase ++ tuCl));
+      # hasAspect reads membership m (scope -> names) of the previous activation pass (design-activation.md R2, PM ruling Q3c)
       hasFn = f: { __functor = _: f; forAnyClass = f; };
-      hostE = host // { hasAspect = hasFn hasIn; };
-      hostArgs = { host = hostE; };
+      names = map (b: b.name);
+      hostE = m: host // { hasAspect = hasFn (a: builtins.elem a.name (m host.name)); };
+      hostArgs = m: { host = hostE m; };
       # policy.exclude of host-closure/schema policies drops those aspects from the scope subtree (names; shortcut: not the excluder's exclusive subtree).
       excludedAt =
         args: pols:
@@ -61,28 +62,46 @@ denGen: {
         map (e: e.value.name) (builtins.filter (e: (e.__effect or null) == "exclude" && e.value ? name) (builtins.concatMap fire (builtins.filter ready pols)));
       # schema.<kind>.excludes aspect refs: authoritative over includes (reference/schema.mdx, policies.mdx:245)
       schemaEx = kind: map (b: b.name) (builtins.filter (b: builtins.isAttrs b && b ? name && !(b.__isPolicy or false) && !(b ? __builtin)) (sch.${kind}.excludes or [ ]));
-      hostEx = schemaEx "host" ++ excludedAt hostArgs (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "host");
+      hostEx = m: schemaEx "host" ++ excludedAt (hostArgs m) (builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "host");
       hostCl = act.members host.name;
       userScope = u: "${u}@${host.name}";
-      # one model per host tree: host scope + one scope per user
-      act = denGen.mkActivation (
-        { ${host.name} = { cands = hostBase ++ tuCl ++ adds hostArgs (schemaPols "host"); ex = hostEx; }; }
-        // builtins.listToAttrs (map (u: { name = userScope u; value = userCands u; }) (users ++ builtins.attrNames host.users))
-      );
-      # user hasAspect: policy-free closure of default+host+user (policy-added aspects excluded, else cycle)
+      allUsers = users ++ builtins.attrNames host.users;
+      scopeNames = [ host.name ] ++ map userScope allUsers;
+      # hasAspect view of a scope: default + host members (+ the user scope's own); excluded aspects are absent
+      memOf = a: s: names defaultCl ++ names (a.members host.name) ++ (if s == host.name then [ ] else names (a.members s));
+      # pass -1: policy-free static closures
       userStatic = u: defaultCl ++ hostBase ++ tuCl ++ provCl u ++ (let r = aspects."${u}@${host.name}" or aspects.${u} or null; in if r == null then [ ] else cl r);
-      userEnt = u: host.users.${u} // { host = hostE; hasAspect = hasFn (a: builtins.elem a.name (map (b: b.name) (userStatic u))); };
-      argsOf = u: { host = hostE; user = userEnt u; };
+      m0 = s: (builtins.listToAttrs (map (u: { name = userScope u; value = names (userStatic u); }) allUsers) // { ${host.name} = names (defaultCl ++ hostBase ++ tuCl); }).${s};
+      # pass k fires policies with hasAspect reading pass k-1 membership, until membership is unchanged; oscillation throws
+      passBound = builtins.length (builtins.attrNames aspects) + 1;
+      fix =
+        k: m:
+        let
+          a = denGen.mkActivation (scopesOf m);
+          m' = memOf a;
+          same = builtins.all (s: builtins.sort builtins.lessThan (m s) == builtins.sort builtins.lessThan (m' s)) scopeNames;
+        in
+        if same then a else if k >= passBound then throw "den: policy activation did not converge" else fix (k + 1) m';
+      act = fix 1 m0;
+      mF = memOf act;
+      # one model per host tree: host scope + one scope per user
+      scopesOf =
+        m:
+        { ${host.name} = { cands = hostBase ++ tuCl ++ adds (hostArgs m) (schemaPols "host"); ex = hostEx m; }; }
+        // builtins.listToAttrs (map (u: { name = userScope u; value = userCands m u; }) allUsers);
+      userEnt = m: u: host.users.${u} // { host = hostE m; hasAspect = hasFn (a: builtins.elem a.name (m (userScope u))); };
+      argsOf' = m: u: { host = hostE m; user = userEnt m u; };
+      argsOf = argsOf' mF;
       nixosOf = args: a: if a.content ? nixos then [ (denGen.content.classModule args a.content.nixos) ] else [ ];
       userCands =
-        u:
+        m: u:
         let
           r = aspects."${u}@${host.name}" or aspects.${u} or null;
           pols = builtins.concatMap (a: a.policyIncs) hostBase ++ schemaPols "user";
         in
         {
-          cands = (if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf u) pols;
-          ex = hostEx ++ schemaEx "user" ++ excludedAt (argsOf u) pols;
+          cands = (if r == null then [ ] else cl r) ++ tuCl ++ provCl u ++ adds (argsOf' m u) pols;
+          ex = hostEx m ++ schemaEx "user" ++ excludedAt (argsOf' m u) pols;
         };
       userClosure =
         u:
