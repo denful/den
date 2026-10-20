@@ -70,7 +70,7 @@ denGen: {
       fixed =
         den:
         let
-          fix = n: a: a // { includes = map (x: if x.inc.slot == "anon" then den.aspects.${anon n x.i} else x.e) (builtins.filter (x: x.inc.slot != null) (inl a)); };
+          fix = n: a: a // { includes = map (x: if x.inc.slot == "anon" then (den.rawAspects or den.aspects).${anon n x.i} else if x.inc.slot == "ref" && builtins.isAttrs x.e then removeAttrs x.e [ "__functor" ] else x.e) (builtins.filter (x: x.inc.slot != null) (inl a)); };
           fixTree = n: a: if builtins.isAttrs a then mapKids fixTree n (if builtins.isList (a.includes or null) then fix n a else a) else a;
           strip = a: if builtins.isAttrs a then removeAttrs a [ "policies" ] else a;
         in

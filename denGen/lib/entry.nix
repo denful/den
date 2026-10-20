@@ -28,6 +28,7 @@ let
         aspects = n.anons // lib.optionalAttrs (leaf == "aspects") fixed;
         default = lib.optionalAttrs (leaf == "default") fixed.default;
         policyRecs = lib.optionalAttrs (leaf == "aspects") n.recs;
+        rawFns = lib.optionalAttrs (leaf == "aspects") (lib.filterAttrs (_: builtins.isFunction) d.value);
         aspectPolicies = lib.optionalAttrs (leaf == "aspects" || leaf == "default") n.polIncs;
       };
   # flake-parts already declares `flake`, so only the plain-evalModules host adds it.

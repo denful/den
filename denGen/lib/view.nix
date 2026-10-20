@@ -148,6 +148,7 @@ denGen: {
           config.policies = lib.genAttrs [ "flake-to-systems" "system-to-os-outputs" "system-to-hm-outputs" "host-to-users" ] (n: { __builtin = n; });
           options.aspectPolicies = lib.mkOption { type = t.lazyAttrsOf (t.listOf t.raw); default = { }; };
           options.policyRecs = lib.mkOption { type = t.lazyAttrsOf (t.lazyAttrsOf t.raw); default = { }; };
+          options.rawFns = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.classes = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.homes = lib.mkOption { type = t.lazyAttrsOf (t.lazyAttrsOf t.raw); default = { }; };

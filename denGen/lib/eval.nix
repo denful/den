@@ -13,9 +13,12 @@ denGen: {
       };
       cfg = inner.config;
       aspects = builtins.mapAttrs (n: a: if cfg.policyRecs ? ${n} then a // { policies = cfg.policyRecs.${n}; } else a) (denGen.view.mkAspects cfg);
+      # callable aspects: `den.aspects.f arg` = the raw fn applied, as an inline aspect (rawFns are the inner, unwrapped eval)
+      wrapped = builtins.mapAttrs (n: a: a // { __functor = _: arg: cfg.rawFns.${n} arg; }) aspects;
       hostNames = builtins.concatMap builtins.attrNames (builtins.attrValues cfg.hosts);
       world = {
-        inherit aspects;
+        aspects = wrapped;
+        rawAspects = aspects;
         inherit (cfg) hosts schema policies quirks classes homes;
         batteries.primary-user = aspects.primary-user;
         batteries.define-user = aspects.define-user;
