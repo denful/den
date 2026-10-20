@@ -1,0 +1,76 @@
+# Inner surface: hosts + aspects at ROOT. includes elems must be refs to declared aspects.
+denGen: {
+  view =
+    let
+      inherit (denGen) gen;
+      t = denGen.genLib.types;
+      cat = category: builtins.mapAttrs (_: _: { inherit category; });
+      cnf = {
+        keySemantics = cat "class" {
+          nixos = null;
+          user = null;
+        };
+      };
+      mkAspects =
+        decl:
+        let
+          isRef = b: (decl.aspects.${b.name}.key or null) == b.key;
+          authored =
+            name: e: k: _:
+            let
+              c = gen.aspects.keyCategory cnf k;
+            in
+            if c == null then
+              throw "den: aspect `${name}`: key `${k}` is not a declared class"
+            else
+              c == "class" && gen.aspects.hasClassContent e.${k};
+          norm =
+            name: e:
+            e
+            // {
+              inherit name;
+              includes = gen.prelude.imap0 (
+                i: b:
+                if isRef b then
+                  b
+                else
+                  throw "den: aspect `${name}`: includes[${toString i}] is not a ref to a declared aspect"
+              ) e.includes;
+              # forces key validation (N2)
+              content = gen.prelude.filterAttrs (authored name e) e;
+            };
+        in
+        builtins.mapAttrs norm decl.aspects;
+    in
+    {
+      inherit mkAspects;
+      module =
+        { lib, ... }:
+        {
+          options.hosts = lib.mkOption {
+            type = t.lazyAttrsOf (
+              t.lazyAttrsOf (
+                t.submodule {
+                  options.users = lib.mkOption {
+                    type = t.lazyAttrsOf (
+                      t.submodule {
+                        options.classes = lib.mkOption {
+                          type = t.listOf t.str;
+                          default = [ ];
+                        };
+                      }
+                    );
+                    default = { };
+                  };
+                }
+              )
+            );
+            default = { };
+          };
+          options.aspects = lib.mkOption {
+            type = gen.aspects.aspectsType cnf;
+            default = { };
+          };
+        };
+    };
+}

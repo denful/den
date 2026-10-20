@@ -1,11 +1,6 @@
 denGen: {
   flakeModule =
-    {
-      lib,
-      config,
-      inputs,
-      ...
-    }:
+    { lib, config, ... }:
     {
       options.flake = lib.mkOption {
         type = lib.types.lazyAttrsOf lib.types.raw;
@@ -15,9 +10,6 @@ denGen: {
         type = lib.types.deferredModule;
         default = { };
       };
-      config._module.args.den = {
-        batteries = { };
-        lib = { };
-      };
+      config._module.args.den = denGen.evalDen config.den;
     };
 }
