@@ -87,6 +87,8 @@ in
   T9 = builtins.sort builtins.lessThan (names cl) == [ "primary-user" "tux" ];
   N5 = names (den.lib.closure den.aspects.primary-user) == [ "primary-user" ];
   O2home = O2set.O2home;
+  O2host = O2set.O2host;
+  O2neg = O2set.O2neg;
 
   D1 = builtins.length r2.modules == 4; # default nixos once + igloo nixos + 1 default user part per user
   D1neg = builtins.length r2.modules == 5; # control: MUST be false (default nixos twice)
