@@ -129,6 +129,23 @@ let
       aspects.a.b.c.includes = [ ];
     }
   ) ];
+  # R1: freeform host data readable as host.<key>; strict host rejects unknown keys
+  fh =
+    strict:
+    denGen.evalDen [ (
+      { ... }:
+      {
+        schema.host.isStrict = strict;
+        hosts.x86_64-linux.igloo.foo.bar = 1;
+        aspects.igloo.nixos = { host, ... }: { environment.etc.a.text = toString host.foo.bar; };
+      }
+    ) ];
+  fhOk =
+    (nixpkgsLib.evalModules {
+      modules = [
+        { options.environment.etc = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf (nixpkgsLib.types.submodule { options.text = nixpkgsLib.mkOption { type = nixpkgsLib.types.str; }; }); default = {}; }; }
+      ] ++ (let w = fh false; in denGen.route w.schema w.aspects (w.host "igloo") [ ]).modules;
+    }).config.environment.etc.a.text;
   dnBad = denGen.evalDen [ ({ ... }: { aspects.a.b = 1; }) ];
 in
 {
@@ -157,6 +174,8 @@ in
   D1neg = builtins.length r2.modules == 5; # control: MUST be false (default nixos twice)
   D2 = map (u: builtins.length (r2.userModules u)) [ "tux" "pingu" ] == [ 1 1 ];
   # mkInstanceType: strict=false accepts unknown attr; strict=true rejects (negative)
+  R1 = fhOk == "1";
+  R1neg = !(builtins.tryEval (builtins.deepSeq (fh true).hosts true)).success; # strict MUST reject
   M1 = (mkEval false).foo == 1;
   M1neg = !(builtins.tryEval (builtins.deepSeq (mkEval true) true)).success; # strict MUST reject
 }

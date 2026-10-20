@@ -78,6 +78,8 @@ denGen: {
                   { name, ... }:
                   {
                     # schema.host.imports (e.g. fleet addr/environment options) extend the entity.
+                    # open by default (entities.mdx:183-192); schema.host.isStrict closes it
+                    freeformType = if config.schema.host.isStrict then null else t.lazyAttrsOf t.raw;
                     imports = config.schema.host.imports;
                     options.name = lib.mkOption { type = t.str; default = name; };
                     options.hostName = lib.mkOption { type = t.str; default = name; };
@@ -88,6 +90,7 @@ denGen: {
                         t.submodule (
                           { name, ... }:
                           {
+                            freeformType = t.lazyAttrsOf t.raw;
                             imports = config.schema.user.imports;
                             options.name = lib.mkOption { type = t.str; default = name; };
                             options.userName = lib.mkOption { type = t.str; default = name; };
@@ -130,6 +133,7 @@ denGen: {
                     includes = rawList;
                     excludes = rawList;
                     classes = lib.mkOption { type = t.listOf t.str; default = [ ]; };
+                    isStrict = lib.mkOption { type = t.bool; default = false; };
                     isEntity = lib.mkOption { type = t.bool; default = false; };
                   };
               }
