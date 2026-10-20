@@ -5,6 +5,7 @@
     lib = denGen;
     flakeModule = denGen.flakeModule;
     flakeModules.default = denGen.flakeModules.default;
+    namespace = denGen.namespace;
     flakeModules.denTest = denGen.ciSurface.denTestModule;
     flakeOutputs = denGen.ciSurface.flakeOutputs;
     templates.minimal = { path = ./templates/minimal; description = "denGen minimal"; };
