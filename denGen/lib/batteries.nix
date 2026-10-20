@@ -10,15 +10,14 @@ denGen: {
     aspects.define-user.user =
       { user, ... }:
       {
-        name = user;
-        home = "/home/${user}";
+        name = user.userName;
+        home = "/home/${user.userName}";
         isNormalUser = true;
       };
-    # shortcut: hosts option has no hostName, so the host name is used; add hostName option when a fleet overrides it.
     aspects.hostname.nixos =
       { host, ... }:
       {
-        networking.hostName = host;
+        networking.hostName = host.hostName;
       };
   };
 }

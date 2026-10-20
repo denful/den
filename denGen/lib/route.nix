@@ -1,17 +1,20 @@
 # Per-host nixos module list: host closure first, then users, each aspect's user part before its nixos part (design-gen.md §3.8-9).
+# `host` is the host entity (view.nix); users' entities come from host.users.
 denGen: {
   route =
     aspects: host: users:
     let
       cl = denGen.closure aspects;
+      userEnt = u: host.users.${u} // { inherit host; };
+      argsOf = u: { inherit host; user = userEnt u; };
       nixosOf = args: a: if a.content ? nixos then [ (denGen.content.classModule args a.content.nixos) ] else [ ];
       userClosure =
         u:
         let
-          r = aspects."${u}@${host}" or aspects.${u} or null;
+          r = aspects."${u}@${host.name}" or aspects.${u} or null;
         in
         if r == null then [ ] else cl r;
-      userPart = u: a: { users.users.${u} = denGen.flatten { inherit host; user = u; } [ a.content.user ]; };
+      userPart = u: a: { users.users.${u} = denGen.flatten (argsOf u) [ a.content.user ]; };
       # den.default is walked in both scopes, first (docs silent on order); its nixos lands once, in the host list.
       defaultCl = cl aspects.default;
       defaultUser = u: map (userPart u) (builtins.filter (a: a.content ? user) defaultCl);
@@ -20,7 +23,7 @@ denGen: {
         u:
         defaultUser u
         ++ builtins.concatMap (
-          a: (if a.content ? user then [ (userPart u a) ] else [ ]) ++ nixosOf { inherit host; user = u; } a
+          a: (if a.content ? user then [ (userPart u a) ] else [ ]) ++ nixosOf (argsOf u) a
         ) (userClosure u);
     in
     {
@@ -29,13 +32,13 @@ denGen: {
       hm =
         inputs: hmUsers:
         let
-          hmOf = u: a: if a.content ? homeManager then [ (denGen.content.classModule { inherit host; user = u; } a.content.homeManager) ] else [ ];
+          hmOf = u: a: if a.content ? homeManager then [ (denGen.content.classModule (argsOf u) a.content.homeManager) ] else [ ];
         in
         if hmUsers == [ ] then
           [ ]
         else
           [ inputs.home-manager.nixosModules.home-manager ]
           ++ map (u: { home-manager.users.${u}.imports = builtins.concatMap (hmOf u) (defaultCl ++ userClosure u); }) hmUsers;
-      modules = builtins.concatMap (nixosOf { inherit host; }) (defaultCl ++ cl aspects.${host}) ++ builtins.concatMap forUser users;
+      modules = builtins.concatMap (nixosOf { inherit host; }) (defaultCl ++ cl aspects.${host.name}) ++ builtins.concatMap forUser users;
     };
 }

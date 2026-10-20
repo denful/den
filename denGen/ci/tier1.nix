@@ -21,7 +21,7 @@ let
       default.user.extraGroups = [ "d" ];
     }
   ) ];
-  r2 = denGen.route den2.aspects "igloo" [ "tux" "pingu" ];
+  r2 = denGen.route den2.aspects (den2.host "igloo") [ "tux" "pingu" ];
   names = map (a: a.name);
   cl = den.lib.closure den.aspects.tux;
   ms = den.lib.userModules "igloo" "tux";
@@ -69,7 +69,7 @@ let
             );
           };
         }
-      ] ++ (denGen.route d2.aspects host [ "tux" ]).modules;
+      ] ++ (denGen.route d2.aspects (d2.host host) [ "tux" ]).modules;
     }).config;
   O2set = {
     O2host = (stub "igloo").networking.hostName == "igloo";
@@ -83,7 +83,7 @@ let
       file = "t";
       value = {
         igloo.nixos = { };
-        tux.includes = [ ({ host, user }: { nixos.environment.etc.k.text = user; }) ];
+        tux.includes = [ ({ host, user }: { nixos.environment.etc.k.text = user.name; }) ];
       };
     })
   ];
@@ -91,10 +91,28 @@ let
     (nixpkgsLib.evalModules {
       modules = [
         { options.environment.etc = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf (nixpkgsLib.types.submodule { options.text = nixpkgsLib.mkOption { type = nixpkgsLib.types.str; }; }); default = {}; }; }
-      ] ++ (denGen.route d3.aspects "igloo" [ "tux" ]).modules;
+      ] ++ (denGen.route d3.aspects (d3.host "igloo") [ "tux" ]).modules;
     }).config.environment.etc.k.text;
+  # H1: schema.host.imports adds option `addr`; nixos fn gets host entity
+  hAddr =
+    a:
+    (nixpkgsLib.evalModules {
+      modules = [
+        { options.environment.etc = nixpkgsLib.mkOption { type = nixpkgsLib.types.attrsOf (nixpkgsLib.types.submodule { options.text = nixpkgsLib.mkOption { type = nixpkgsLib.types.str; }; }); default = {}; }; }
+      ] ++ (denGen.route d4.aspects (d4.host "igloo") [ ]).modules;
+    }).config.environment.etc.a.text == a;
+  d4 = denGen.evalDen [ (
+    { lib, ... }:
+    {
+      schema.host.imports = [ { options.addr = lib.mkOption { type = lib.types.str; default = ""; }; } ];
+      hosts.x86_64-linux.igloo.addr = "1.2.3.4";
+      aspects.igloo.nixos = { host, ... }: { environment.etc.a.text = host.addr; };
+    }
+  ) ];
 in
 {
+  H1 = hAddr "1.2.3.4";
+  H1neg = hAddr "9.9.9.9"; # control: MUST be false
   G3a = g3 == "tux";
   G3aneg = g3 == "pingu"; # control: MUST be false
   T5 = names cl == [ "tux" "primary-user" ];

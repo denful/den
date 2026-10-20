@@ -51,19 +51,33 @@ denGen: {
           options.hosts = lib.mkOption {
             type = t.lazyAttrsOf (
               t.lazyAttrsOf (
-                t.submodule {
-                  options.users = lib.mkOption {
-                    type = t.lazyAttrsOf (
-                      t.submodule {
-                        options.classes = lib.mkOption {
-                          type = t.listOf t.str;
-                          default = [ ];
-                        };
-                      }
-                    );
-                    default = { };
-                  };
-                }
+                t.submodule (
+                  { name, ... }:
+                  {
+                    # schema.host.imports (e.g. fleet addr/environment options) extend the entity.
+                    imports = config.schema.host.imports;
+                    options.name = lib.mkOption { type = t.str; default = name; };
+                    options.hostName = lib.mkOption { type = t.str; default = name; };
+                    options.class = lib.mkOption { type = t.str; default = "nixos"; };
+                    options.users = lib.mkOption {
+                      type = t.lazyAttrsOf (
+                        t.submodule (
+                          { name, ... }:
+                          {
+                            imports = config.schema.user.imports;
+                            options.name = lib.mkOption { type = t.str; default = name; };
+                            options.userName = lib.mkOption { type = t.str; default = name; };
+                            options.classes = lib.mkOption {
+                              type = t.listOf t.str;
+                              default = [ ];
+                            };
+                          }
+                        )
+                      );
+                      default = { };
+                    };
+                  }
+                )
               )
             );
             default = { };
@@ -79,7 +93,14 @@ denGen: {
           };
           config.aspects.default = config.default;
           # shortcut: raw, no semantics yet; later rungs type these.
-          options.schema = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
+          options.schema = lib.mkOption {
+            type = t.submodule {
+              freeformType = t.lazyAttrsOf t.raw;
+              options.host.imports = lib.mkOption { type = t.listOf t.raw; default = [ ]; };
+              options.user.imports = lib.mkOption { type = t.listOf t.raw; default = [ ]; };
+            };
+            default = { };
+          };
           options.policies = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.quirks = lib.mkOption { type = t.lazyAttrsOf t.raw; default = { }; };
           options.systems = lib.mkOption { type = t.listOf t.str; default = [ ]; };
