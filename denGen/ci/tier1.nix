@@ -114,8 +114,11 @@ let
     builtins.length
       (denGen.genLib.evalModules { modules = [ denGen.view.module { schema.host.includes = [ "a" ]; } { schema.host.includes = [ "b" ]; } ]; }).config.schema.host.includes == n;
   mkEval = strict: (denGen.genLib.evalModules { modules = [ { options.r = denGen.genLib.mkOption { type = denGen.genLib.types.attrsOf (denGen.schema.lib.mkInstanceType { inherit strict; } { }); default = { }; }; config.r.a.foo = 1; } ]; }).config.r.a;
+  # Q1: aspect without a channel emission has no quirk entry (was null -> channel collect crashed)
+  dq = denGen.evalDen [ ({ ... }: { quirks.host-addrs = { }; aspects.igloo.nixos = { }; }) ];
 in
 {
+  Q1 = dq.aspects.igloo.quirks == { };
   S1 = s1 2;
   S1neg = s1 1; # control: MUST be false
   H1 = hAddr "1.2.3.4";

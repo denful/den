@@ -39,7 +39,8 @@ denGen: {
               ) e.includes;
               # forces key validation (N2)
               content = gen.prelude.filterAttrs (authored name e) e;
-              quirks = gen.prelude.filterAttrs (k: _: gen.aspects.keyCategory cnf k == "channel") e;
+              # unset channel keys surface as null; only authored emissions count
+              quirks = gen.prelude.filterAttrs (k: v: v != null && gen.aspects.keyCategory cnf k == "channel") e;
             };
         in
         builtins.mapAttrs norm decl.aspects;
