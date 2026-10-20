@@ -1,7 +1,7 @@
 # Tier-1 R2/R3 assertions (no nix-unit available): ci/run.sh prints the result attrset; every value must be true.
 { denGen, nixpkgsLib }:
 let
-  den = denGen.evalDen (
+  den = denGen.evalDen [ (
     { ... }:
     {
       hosts.x86_64-linux.igloo.users.tux.classes = [ "user" ];
@@ -11,7 +11,7 @@ let
         user.extraGroups = [ "audio" ];
       };
     }
-  );
+  ) ];
   names = map (a: a.name);
   cl = den.lib.closure den.aspects.tux;
   ms = den.lib.userModules "igloo" "tux";

@@ -1,15 +1,14 @@
-# evalDen: Gen-side eval of the captured `den` module -> world (design-gen.md §3 steps 2-4). No routing yet (R2+).
+# evalDen: Gen-side eval of the captured `den` leaf modules -> world (design-gen.md §3 steps 2-4). No routing yet (R2+).
 denGen: {
   evalDen =
-    denModule:
+    denModules:
     let
       inner = denGen.genLib.evalModules {
         modules = [
           denGen.view.module
           denGen.batteries.module
           { _module.args.den = world; }
-          denModule
-        ];
+        ] ++ denModules;
       };
       cfg = inner.config;
       aspects = denGen.view.mkAspects cfg;
