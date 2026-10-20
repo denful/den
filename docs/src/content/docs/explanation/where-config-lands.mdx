@@ -28,8 +28,11 @@ the scope that walks that aspect, and each scope only delivers some classes:
   bug ([#694](https://github.com/denful/den/issues/694)), see the caution
   below. It walks the user aspect (`den.aspects.tux`), everything it
   `includes`, and `den.schema.user.includes`.
-- `den.default` is walked in **both**. Its content still lands once, not once
-  per scope.
+- `den.default` is walked in **both**. Its owned (static) content still lands
+  once, not once per scope. A parametric function in `den.default.includes` is
+  called in every scope whose context has its arguments, so a `{ host }`
+  function lands once for the host plus once per user; see
+  [Global Defaults](/guides/configure-aspects/#global-defaults).
 
 A `homeManager` key the host scope walks is dropped, and den gives no warning.
 Host content reaches a user's home only through an explicit edge from host to
@@ -63,7 +66,7 @@ from a broken probe.
 | `den.aspects.apple` | `nixos` (on a darwin host) | **nowhere** |
 | `den.schema.user.includes` | `homeManager` | every user's home |
 | `den.default` | `homeManager` | every user's home, once each |
-| `den.default` | `nixos` | igloo's OS config, **once** (not once per scope) |
+| `den.default` | `nixos` | igloo's OS config, **once** (not once per scope); a `{ host }` function in `den.default.includes` lands once per scope (host + each user) |
 | `den.default` | `user` | `users.users.<name>` for every user, once each |
 | `igloo.provides.to-users` | `homeManager` | every user's home |
 | `igloo.provides.to-users` | `nixos` | igloo's OS config, once |
