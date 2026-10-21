@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-integration = {
+  flake.tests.c1.fx-integration = {
 
     # Real den aspect resolves through fx pipeline.
     test-real-aspect-through-fx = denTest (

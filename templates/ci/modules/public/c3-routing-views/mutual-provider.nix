@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.mutual-provider = {
+  flake.tests.c3.mutual-provider = {
 
     test-host-provide-user = denTest (
       {

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.tty-autologin = {
+  flake.tests.c2.tty-autologin = {
 
     test-service-defined = denTest (
       { den, config, ... }:

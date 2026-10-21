@@ -6,7 +6,7 @@
   ...
 }:
 {
-  flake.tests.fx-diag-capture = {
+  flake.tests.c5.fx-diag-capture = {
 
     test-capture-basic = denTest (
       { den, ... }:

@@ -81,7 +81,7 @@ let
     };
 in
 {
-  flake.tests.fx-spawn-edges = {
+  flake.tests.internal.fx-spawn-edges = {
 
     # The surfaced edge set carries the re-applied mergedSpawnRoutes route edge
     # (a homeManager→nixos simple route at the spawn root) — the edge the old

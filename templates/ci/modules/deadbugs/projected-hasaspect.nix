@@ -3,7 +3,7 @@
 # overloaded by provenance.
 { denTest, lib, ... }:
 {
-  flake.tests.projected-hasaspect = {
+  flake.tests.deadbugs.projected-hasaspect = {
     test-content-position = denTest (
       { den, igloo, ... }:
       {

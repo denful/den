@@ -3,7 +3,7 @@
 # indistinguishable, so an inline includes literal silently read as a root.
 { denTest, ... }:
 {
-  flake.tests.aspect-chain-absence = {
+  flake.tests.c5.aspect-chain-absence = {
 
     test-root-chain-is-empty-list = denTest (
       { den, ... }:

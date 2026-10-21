@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.hostname = {
+  flake.tests.c1.hostname = {
 
     test-sets-hostname = denTest (
       { den, igloo, ... }:

@@ -8,7 +8,7 @@
 # `just ci fx-instantiate-edges` runs this suite.
 { denTest, lib, ... }:
 {
-  flake.tests.fx-instantiate-edges = {
+  flake.tests.internal.fx-instantiate-edges = {
 
     # A host(scope "host=igloo") + user(scope "host=igloo/user=tux") topology.
     # The host carries a nixos bucket (perScope), and a user→host route nests the

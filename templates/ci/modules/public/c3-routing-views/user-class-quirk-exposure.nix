@@ -8,7 +8,7 @@
 # only host-scope emits (re-emitted host -> home), never the user's own.
 { denTest, lib, ... }:
 {
-  flake.tests.user-class-quirk-exposure = {
+  flake.tests.c3.user-class-quirk-exposure = {
 
     # Baseline: host aspect emits a quirk, host's nixos consumer reads it
     # locally — no pipe policy. host <-> nixos works.

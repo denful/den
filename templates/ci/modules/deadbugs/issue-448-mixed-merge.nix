@@ -6,7 +6,7 @@
 # (wrong context — host isn't in _module.args).
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-448 = {
+  flake.tests.deadbugs.issue-448 = {
 
     # Mixed function + attrset at same sub-aspect path.
     test-mixed-merge-fx = denTest (

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.home-extraction = {
+  flake.tests.c5.home-extraction = {
     # A pipeline-parametric pipe collected across a fleet must resolve to
     # concrete DATA at the consumer even when no host configs are available on
     # the collected path. Before the fix, the raw `{ host, ... }: ...` lambda

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.namespace-provider = {
+  flake.tests.c5.namespace-provider = {
 
     # Provider aspect is callable in the consumer
     # and produces the correct names — no doubling.

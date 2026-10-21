@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.fx-dispatch-policies = {
+  flake.tests.internal.fx-dispatch-policies = {
 
     # mkDispatchPoliciesHandler wraps mkDispatch, resumes its result, passes state through.
     test-dispatch-policies-resumes-result = denTest (

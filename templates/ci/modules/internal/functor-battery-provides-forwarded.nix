@@ -11,7 +11,7 @@
 # classified (and thus dispatched) at B only.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.functor-battery-provides-forwarded = {
+  flake.tests.internal.functor-battery-provides-forwarded = {
 
     # Three-way comparison, one provides-child name (`d9leak`), one per
     # construction site. B is the site under test; A and C are live

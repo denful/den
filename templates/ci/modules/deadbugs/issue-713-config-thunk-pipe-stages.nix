@@ -54,7 +54,7 @@ let
     };
 in
 {
-  flake.tests.issue-713-config-thunk-pipe-stages = {
+  flake.tests.deadbugs.issue-713-config-thunk-pipe-stages = {
 
     test-transform-applies-to-local-config-thunk = denTest (
       { den, igloo, ... }:

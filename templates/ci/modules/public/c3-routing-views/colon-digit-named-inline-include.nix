@@ -8,7 +8,7 @@
 # working the whole time.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.colon-digit-named-inline-include = {
+  flake.tests.c3.colon-digit-named-inline-include = {
 
     test-inline-includes-named-with-colon-digit-both-deliver = denTest (
       { den, igloo, ... }:

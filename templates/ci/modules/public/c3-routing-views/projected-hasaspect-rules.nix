@@ -21,7 +21,7 @@ let
   };
 in
 {
-  flake.tests.projected-hasaspect-rules = {
+  flake.tests.c3.projected-hasaspect-rules = {
 
     # R12 +: host sees an aspect it delivers DOWN to its users (provides.to-users),
     # checked from inside the delivered home.

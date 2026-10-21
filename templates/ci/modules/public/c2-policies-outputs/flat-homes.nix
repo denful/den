@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.flat-homes = {
+  flake.tests.c2.flat-homes = {
     test-flat-home-two-level-shape = denTest (
       { den, ... }:
       {

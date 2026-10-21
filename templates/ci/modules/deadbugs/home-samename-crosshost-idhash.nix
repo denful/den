@@ -8,7 +8,7 @@
 # fields like `description`.
 { denTest, ... }:
 {
-  flake.tests.home-samename-crosshost-idhash = {
+  flake.tests.deadbugs.home-samename-crosshost-idhash = {
 
     # Same username, different host binding: id_hash must differ.
     test-crosshost-distinct-id-hash = denTest (

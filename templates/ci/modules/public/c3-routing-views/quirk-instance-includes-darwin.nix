@@ -11,7 +11,7 @@
 # flat `den.hosts.<name>` spelling, neither of which the linux cells cover.
 { denTest, lib, ... }:
 {
-  flake.tests.deadbugs.quirk-instance-includes-darwin = {
+  flake.tests.c3.quirk-instance-includes-darwin = {
 
     # CONTROL: the aspect spelling from the second screenshot.
     test-darwin-aspect-includes = denTest (

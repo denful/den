@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.issue-540-conditional-first-include = {
+  flake.tests.deadbugs.issue-540-conditional-first-include = {
     # Guard on an aspect included by a later sibling. The conditional is walked
     # first, so the guard fails initially. Drain must wait until all siblings
     # are resolved before re-evaluating.

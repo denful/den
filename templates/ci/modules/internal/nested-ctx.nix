@@ -2,7 +2,7 @@
 # Nested-path into was removed with den.ctx — only flat policies remain.
 { denTest, lib, ... }:
 {
-  flake.tests.ctx-nested = {
+  flake.tests.internal.ctx-nested = {
 
     test-flat-still-works = denTest (
       { den, funnyNames, ... }:

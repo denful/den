@@ -8,7 +8,7 @@
 # like impermanence keep deduping) — exercised throughout the rest of the suite.
 { denTest, ... }:
 {
-  flake.tests.user-scoped-host-class-fanout = {
+  flake.tests.c1.user-scoped-host-class-fanout = {
 
     # Two users on one host. A static user-include sets per-user SYSTEM config
     # (environment.etc keyed by user.name). BOTH must materialize on the host.

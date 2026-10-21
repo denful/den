@@ -1,7 +1,7 @@
 { denTest, inputs, ... }:
 {
 
-  flake.tests.deadbugs-namespace-deep-aspect = {
+  flake.tests.deadbugs.namespace-deep-aspect = {
 
     test-tools-has-underscore = denTest (
       { den, provider, ... }:

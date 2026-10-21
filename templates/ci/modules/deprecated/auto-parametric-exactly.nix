@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.auto-parametric = {
+  flake.tests.deprecated.auto-parametric = {
 
     # Explicit parametric.exactly on a helper must NOT be overridden.
     test-explicit-exactly-not-overridden-by-default = denTest (

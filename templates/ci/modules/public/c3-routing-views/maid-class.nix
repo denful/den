@@ -22,7 +22,7 @@ let
     };
 in
 {
-  flake.tests.maid-class = {
+  flake.tests.c3.maid-class = {
 
     test-maid-forwards-to-users = denTest (
       { den, igloo, ... }:

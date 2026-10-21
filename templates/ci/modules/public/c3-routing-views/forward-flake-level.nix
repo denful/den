@@ -1,6 +1,6 @@
 { denTest, inputs, ... }:
 {
-  flake.tests.forward-flake-level = {
+  flake.tests.c3.forward-flake-level = {
 
     test-forward-flake-foo = denTest (
       {

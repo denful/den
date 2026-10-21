@@ -34,7 +34,7 @@ let
     ) n;
 in
 {
-  flake.tests.performance.ctx-chain = {
+  flake.tests.internal.performance.ctx-chain = {
 
     test-ctx-chain-5 = denTest (
       { den, funnyNames, ... }:

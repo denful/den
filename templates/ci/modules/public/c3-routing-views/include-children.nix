@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.include-children = {
+  flake.tests.c3.include-children = {
 
     # Basic: ._ includes all immediate child aspect keys
     test-include-children-basic = denTest (

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.empty-aspects = {
+  flake.tests.c1.empty-aspects = {
     test-no-aspects = denTest (
       { den, ... }:
       {

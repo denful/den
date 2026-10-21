@@ -1,7 +1,7 @@
 # Battery: host-aspects — projects host homeManager configs to opted-in users.
 { denTest, ... }:
 {
-  flake.tests.host-aspects = {
+  flake.tests.c3.host-aspects = {
 
     # Host aspect with homeManager key projects to user who includes den._.host-aspects.
     test-host-hm-projects-to-user = denTest (

@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.fx-compile-static = {
+  flake.tests.internal.fx-compile-static = {
 
     # Minimal static aspect (no class handler, no nested keys) →
     # gate passes, classify returns empty, resolve-children is called.

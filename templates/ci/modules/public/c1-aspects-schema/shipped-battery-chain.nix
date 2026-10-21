@@ -8,7 +8,7 @@
 # den configuration includes den.default, so every one was affected.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.shipped-battery-chain = {
+  flake.tests.c1.shipped-battery-chain = {
 
     test-insecure-and-unfree-batteries-keep-shipped-identities = denTest (
       { den, ... }:

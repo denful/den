@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.default-includes = {
+  flake.tests.c1.default-includes = {
 
     test-setting-host-service-package = denTest (
       {

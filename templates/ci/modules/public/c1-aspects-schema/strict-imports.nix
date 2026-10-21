@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.strict-imports = {
+  flake.tests.c1.strict-imports = {
     test-host = denTest (
       { den, ... }:
       {
@@ -71,7 +71,7 @@
     );
   };
 
-  flake.tests.mkInstanceType-kind-first = {
+  flake.tests.c1.mkInstanceType-kind-first = {
     test-kind-first = denTest (
       { den, ... }:
       let

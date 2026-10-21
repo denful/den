@@ -3,7 +3,7 @@
 # matching a receiver predicate, fleet-wide. Receivers read the pipe normally.
 { denTest, lib, ... }:
 {
-  flake.tests.pipe-broadcast = {
+  flake.tests.c5.pipe-broadcast = {
 
     # Basic all-to-all: each user broadcasts peer-dev to every user scope
     # fleet-wide. tux's home sees its own base (tux) + alice's broadcast.

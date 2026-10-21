@@ -43,7 +43,7 @@ let
   };
 in
 {
-  flake.tests.schema-included-parametric-exclude = {
+  flake.tests.deadbugs.schema-included-parametric-exclude = {
 
     test-host-aspect-excludes = denTest (
       {

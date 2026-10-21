@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.include-dedup = {
+  flake.tests.c5.include-dedup = {
 
     # === Fix 1: Parametric merge — coerce to includes instead of last-wins ===
 

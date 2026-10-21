@@ -12,7 +12,7 @@
 # dropped the other.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.issue-670-same-named-sub-aspects = {
+  flake.tests.c3.issue-670-same-named-sub-aspects = {
 
     test-same-named-sub-aspects = denTest (
       { den, tuxHm, ... }:

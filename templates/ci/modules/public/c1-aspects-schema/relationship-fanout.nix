@@ -8,7 +8,7 @@
 # entity args never reach `defer`.
 { denTest, lib, ... }:
 {
-  flake.tests.relationship-fanout = {
+  flake.tests.c1.relationship-fanout = {
 
     # 1. Per-user distinct content lands on the host once per user.
     test-per-user-distinct-lands-on-host = denTest (

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-261.parametric-aspect-from-remote-namespace = {
+  flake.tests.deadbugs.issue-261.parametric-aspect-from-remote-namespace = {
 
     test-explicitly-called = denTest (
       {

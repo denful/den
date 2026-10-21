@@ -1,7 +1,7 @@
 # Regression test for #575: dynamic home/host forwarding.
 { denTest, ... }:
 {
-  flake.tests.dynamic-forward = {
+  flake.tests.c5.dynamic-forward = {
 
     test-nixpkgs-overlay-forward = denTest (
       {

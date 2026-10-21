@@ -1,7 +1,7 @@
 { denTest, inputs, ... }:
 {
 
-  flake.tests.special-args-custom-instantiate = {
+  flake.tests.c3.special-args-custom-instantiate = {
 
     test-standalone-hm-os-config = denTest (
       { den, config, ... }:

@@ -11,7 +11,7 @@
 # child surfaced as `flake.packages.<system>`, fields and all).
 { denTest, inputs, ... }:
 {
-  flake.tests.deadbugs.issue-683-remerge-provides-forwarded = {
+  flake.tests.c4.issue-683-remerge-provides-forwarded = {
 
     # `src` is the live control: it is merged once and classifies correctly.
     # The two aliases are the same value merged a second time, at the two

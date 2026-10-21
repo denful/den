@@ -24,7 +24,7 @@ let
     }).state;
 in
 {
-  flake.tests.unmatched-policy-exclude = {
+  flake.tests.internal.unmatched-policy-exclude = {
 
     test-exclude-naming-unregistered-policy-warns = denTest (
       { den, ... }:

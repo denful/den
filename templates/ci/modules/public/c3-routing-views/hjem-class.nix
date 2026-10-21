@@ -18,7 +18,7 @@ let
     };
 in
 {
-  flake.tests.hjem-class = {
+  flake.tests.c3.hjem-class = {
 
     test-hjem-forwards-to-users = denTest (
       { den, igloo, ... }:

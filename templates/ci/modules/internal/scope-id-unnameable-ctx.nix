@@ -13,7 +13,7 @@
 # in different buckets and the collection came back empty.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.scope-id-unnameable-ctx = {
+  flake.tests.internal.scope-id-unnameable-ctx = {
 
     # An unnameable ctx value must not enter the scope identity.
     test-unnameable-ctx-excluded-from-scope-id = denTest (

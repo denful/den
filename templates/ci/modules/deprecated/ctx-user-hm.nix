@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.ctx-user-hm = {
+  flake.tests.deprecated.ctx-user-hm = {
     test-ctx-user-delivers-hm-stateversion = denTest (
       {
         den,

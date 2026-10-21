@@ -35,7 +35,7 @@ let
     };
 in
 {
-  flake.tests.custom-entity-kind = {
+  flake.tests.c3.custom-entity-kind = {
 
     test-registry-instance-inherits-conf = denTest (
       { config, ... }:

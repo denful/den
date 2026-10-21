@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.policy-type = {
+  flake.tests.c2.policy-type = {
 
     test-raw-fn-wrapping = denTest (
       { den, ... }:

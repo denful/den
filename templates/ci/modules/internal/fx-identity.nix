@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-identity = {
+  flake.tests.internal.fx-identity = {
 
     test-aspectPath-with-chain = denTest (
       { den, ... }:

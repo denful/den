@@ -22,7 +22,7 @@ let
   };
 in
 {
-  flake.tests.policy-exclude-reaches-includer-subtree = {
+  flake.tests.deadbugs.policy-exclude-reaches-includer-subtree = {
 
     test-direct-include = denTest (
       { den, igloo, ... }:

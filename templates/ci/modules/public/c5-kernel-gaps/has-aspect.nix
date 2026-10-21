@@ -11,7 +11,7 @@
 # `den.hosts.x86_64-linux.igloo.users.tux`.
 { denTest, lib, ... }:
 {
-  flake.tests.has-aspect = {
+  flake.tests.c5.has-aspect = {
 
     test-host-hasAspect-present-static = denTest (
       { den, ... }:

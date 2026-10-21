@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.user-host-mutual-config = {
+  flake.tests.c3.user-host-mutual-config = {
 
     test-host-owned-unidirectional = denTest (
       {

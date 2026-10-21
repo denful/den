@@ -6,7 +6,7 @@
 # `perUser-perHost.nix`; this asserts the shim produces the same result.)
 { denTest, ... }:
 {
-  flake.tests.perctx-shim = {
+  flake.tests.deprecated.perctx-shim = {
 
     test-perhost-binds-once-peruser-fans-out = denTest (
       {

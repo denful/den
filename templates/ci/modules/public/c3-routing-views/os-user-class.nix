@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.os-user = {
+  flake.tests.c3.os-user = {
 
     test-forwards-user-description = denTest (
       { den, igloo, ... }:

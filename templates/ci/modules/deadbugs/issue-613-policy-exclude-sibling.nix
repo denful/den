@@ -6,7 +6,7 @@
 # schema-tier (den.schema.KIND.excludes) excludes still broadcast.
 { denTest, ... }:
 {
-  flake.tests.issue-613-policy-exclude-sibling = {
+  flake.tests.deadbugs.issue-613-policy-exclude-sibling = {
 
     # iceberg excludes the policy, igloo includes it → igloo must still fire it.
     test-sibling-policy-exclude-does-not-suppress-includer = denTest (

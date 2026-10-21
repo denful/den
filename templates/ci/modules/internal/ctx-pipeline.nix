@@ -120,7 +120,7 @@ let
 
 in
 {
-  flake.tests.performance.ctx = {
+  flake.tests.internal.performance.ctx = {
 
     test-chain-30 = denTest (
       { den, funnyNames, ... }:

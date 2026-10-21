@@ -1,7 +1,7 @@
 # Copy this file to start new tests
 { denTest, ... }:
 {
-  flake.tests.schema-base-modules = {
+  flake.tests.c1.schema-base-modules = {
 
     # The shape the docs use — `lib` as a MODULE ARGUMENT, not from outer
     # scope. gen's module system ships no nixpkgs lib (it has its own types),

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.namespace-schemas = {
+  flake.tests.c3.namespace-schemas = {
 
     # A namespace has its own aspects that can be resolved.
     test-namespace-aspects-resolve = denTest (

@@ -11,7 +11,7 @@
 # host scope.
 { denTest, lib, ... }:
 {
-  flake.tests.host-aspects-chain-ctx = {
+  flake.tests.deadbugs.host-aspects-chain-ctx = {
 
     test-parametric-host-quirk-survives-home-projection = denTest (
       {

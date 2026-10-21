@@ -28,7 +28,7 @@ let
     );
 in
 {
-  flake.tests.late-registered-to-hosts = {
+  flake.tests.deadbugs.late-registered-to-hosts = {
     test-user-policy-include = t (den: {
       den.policies.p = { user, ... }: [ (den.lib.policy.include den.aspects.consumer) ];
       den.aspects.tux.includes = [ den.policies.p ];

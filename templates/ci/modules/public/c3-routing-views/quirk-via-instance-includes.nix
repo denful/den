@@ -12,7 +12,7 @@
 # divergence shows up as one arm going red rather than as both.
 { denTest, lib, ... }:
 {
-  flake.tests.deadbugs.quirk-via-instance-includes = {
+  flake.tests.c3.quirk-via-instance-includes = {
 
     # CONTROL: the aspect spelling — documented working path.
     test-via-aspect-includes = denTest (

@@ -2,7 +2,7 @@
 # A factory-function aspect called at include time, returning nixos config.
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-429 = {
+  flake.tests.deadbugs.issue-429 = {
 
     test-parametrized-aspect-call-at-include = denTest (
       { den, igloo, ... }:

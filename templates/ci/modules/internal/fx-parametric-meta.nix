@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-parametric-meta = {
+  flake.tests.internal.fx-parametric-meta = {
 
     # Parametric aspect resolves functor args through the pipeline.
     test-parametric-resolves-args = denTest (

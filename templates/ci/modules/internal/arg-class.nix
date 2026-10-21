@@ -16,7 +16,7 @@ let
   };
 in
 {
-  flake.tests.arg-class = {
+  flake.tests.internal.arg-class = {
 
     test-isDescendantOf-direct = denTest (
       { den, ... }:

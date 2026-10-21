@@ -4,7 +4,7 @@
   # This test uses the `funny.names` test option to
   # demostrate different places and context-aspects that
   # can contribute configurations to the host.
-  flake.tests.ctx-transformation.test-host = denTest (
+  flake.tests.internal.ctx-transformation.test-host = denTest (
     {
       den,
       lib,

@@ -18,7 +18,7 @@
 # file's own scope.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.underscore-provides-spelling-merge = {
+  flake.tests.c3.underscore-provides-spelling-merge = {
 
     test-o8-root-mixed-spellings-merge = denTest (
       { den, igloo, ... }:

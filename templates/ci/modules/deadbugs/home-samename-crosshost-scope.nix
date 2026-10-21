@@ -13,7 +13,7 @@
 # extra attribute rather than a merge conflict.
 { denTest, ... }:
 {
-  flake.tests.home-samename-crosshost-scope = {
+  flake.tests.deadbugs.home-samename-crosshost-scope = {
 
     # The core defect, with no provides involved: each home must resolve its own
     # host context, not the first-declared home's.

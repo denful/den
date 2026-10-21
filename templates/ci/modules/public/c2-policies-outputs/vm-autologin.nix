@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.vm-autologin = {
+  flake.tests.c2.vm-autologin = {
 
     test-service-defined = denTest (
       { den, config, ... }:

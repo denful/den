@@ -39,7 +39,7 @@ let
     go 0;
 in
 {
-  flake.tests.performance.depth = {
+  flake.tests.internal.performance.depth = {
 
     test-deep-10 = denTest (
       { den, funnyNames, ... }:

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.standalone-homes = {
+  flake.tests.c2.standalone-homes = {
 
     test-home-standalone-without-existing-host = denTest (
       {

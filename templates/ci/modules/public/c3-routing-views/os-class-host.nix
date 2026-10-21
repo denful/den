@@ -1,7 +1,7 @@
 # Test os-class forwarding from host aspects (not user aspects).
 { denTest, lib, ... }:
 {
-  flake.tests.os-class-host = {
+  flake.tests.c3.os-class-host = {
 
     # Host aspect sets os.networking.hostName — should forward to nixos.
     test-host-os-forwards-to-nixos = denTest (

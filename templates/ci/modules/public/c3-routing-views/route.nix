@@ -22,7 +22,7 @@ let
     };
 in
 {
-  flake.tests.route = {
+  flake.tests.c3.route = {
 
     # Class route with path = [] — top-level injection into target class.
     test-route-class-toplevel = denTest (

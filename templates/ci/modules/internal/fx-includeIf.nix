@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-includeIf = {
+  flake.tests.internal.fx-includeIf = {
 
     test-guard-passes-includes = denTest (
       { den, ... }:

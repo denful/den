@@ -84,7 +84,7 @@ let
   };
 in
 {
-  flake.tests.fx-effectful-resolve = {
+  flake.tests.internal.fx-effectful-resolve = {
 
     # Basic: parent with child, both resolved via fx.send "resolve".
     test-basic-aspectToEffect = denTest (

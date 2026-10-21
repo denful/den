@@ -2,7 +2,7 @@
 {
 
   # See den#201
-  flake.tests.deadbugs-issue-201 = {
+  flake.tests.deadbugs.issue-201 = {
 
     test-forward-two-users = denTest (
       {

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.issue-525-hasaspect-in-policy-when = {
+  flake.tests.deadbugs.issue-525-hasaspect-in-policy-when = {
     # policy.when with host.hasAspect — the original bug report.
     # Was infinite recursion because hasAspect read config.resolved.
     # Fix: policy.when emits conditional aspect; compile-conditional provides

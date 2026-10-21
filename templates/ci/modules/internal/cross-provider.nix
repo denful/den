@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.ctx-cross-provider = {
+  flake.tests.internal.ctx-cross-provider = {
 
     test-source-provides-target = denTest (
       {

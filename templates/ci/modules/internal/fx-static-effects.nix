@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.fx-static-effects = {
+  flake.tests.internal.fx-static-effects = {
 
     # classify: partitions aspect keys into class keys and nested keys.
     test-classify-class-key = denTest (

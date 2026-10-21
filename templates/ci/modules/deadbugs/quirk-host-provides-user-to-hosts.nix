@@ -3,7 +3,7 @@
 # scope's late dispatch ran; it must still fire.
 { denTest, ... }:
 {
-  flake.tests.quirk-host-provides-user-to-hosts =
+  flake.tests.deadbugs.quirk-host-provides-user-to-hosts =
     let
       common =
         { den, ... }:

@@ -9,7 +9,7 @@ let
   denModule = (import denPath).nixModule inputs;
 in
 {
-  flake.tests.den-as-lib = {
+  flake.tests.internal.den-as-lib = {
 
     test-expose-lib-functions =
       let

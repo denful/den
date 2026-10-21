@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.ctx-custom = {
+  flake.tests.internal.ctx-custom = {
 
     test-ctx-into = denTest (
       {

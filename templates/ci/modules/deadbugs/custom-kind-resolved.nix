@@ -34,7 +34,7 @@ let
     };
 in
 {
-  flake.tests.custom-kind-resolved = {
+  flake.tests.deadbugs.custom-kind-resolved = {
 
     test-instance-has-resolved = denTest (
       { config, ... }:

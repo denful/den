@@ -59,7 +59,7 @@ let
   n = 20;
 in
 {
-  flake.tests.performance.entity = {
+  flake.tests.c2.performance.entity = {
 
     test-entity-chain-host-user-home = denTest (
       {

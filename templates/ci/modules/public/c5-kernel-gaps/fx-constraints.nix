@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-constraints = {
+  flake.tests.c5.fx-constraints = {
 
     test-exclude-declaration = denTest (
       { den, ... }:

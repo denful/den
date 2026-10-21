@@ -27,7 +27,7 @@ let
     } comp;
 in
 {
-  flake.tests.fx-adapter-integration = {
+  flake.tests.internal.fx-adapter-integration = {
 
     # Default pipeline collects class modules from tree.
     test-default-pipeline-collects-modules = denTest (

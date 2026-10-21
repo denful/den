@@ -5,7 +5,7 @@
 # with @system so both are accessible.
 { denTest, ... }:
 {
-  flake.tests.home-intoattr-collision = {
+  flake.tests.deadbugs.home-intoattr-collision = {
 
     # Same user on two systems: should produce system-qualified names.
     test-multi-system-qualified = denTest (

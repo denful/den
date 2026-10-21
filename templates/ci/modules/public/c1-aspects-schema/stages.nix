@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.stages = {
+  flake.tests.c1.stages = {
 
     # Behavior set on den.default appears in the resolved NixOS config.
     test-stage-default-nixos = denTest (

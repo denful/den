@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.import-tree = {
+  flake.tests.c4.import-tree = {
 
     test-host-auto-import = denTest (
       { den, config, ... }:

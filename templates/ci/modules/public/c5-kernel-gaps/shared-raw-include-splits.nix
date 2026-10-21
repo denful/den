@@ -8,7 +8,7 @@
 # delivered content, not just a diagnostic identity string.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.shared-raw-include-splits = {
+  flake.tests.c5.shared-raw-include-splits = {
 
     # The defect: one node, one emission — `text` is the cell that fails on
     # delivered content rather than on a diagnostic string. A cell asserting

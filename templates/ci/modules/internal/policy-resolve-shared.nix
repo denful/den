@@ -1,7 +1,7 @@
 # Tests for policy.resolve.shared — shared (non-isolated) fan-out via effect.
 { denTest, ... }:
 {
-  flake.tests.policy-resolve-shared = {
+  flake.tests.internal.policy-resolve-shared = {
 
     # policy.resolve produces __shared = false by default.
     test-resolve-default-not-shared = denTest (

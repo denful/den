@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.pipes = {
+  flake.tests.c3.pipes = {
     test-pipe-declaration = denTest (
       { den, igloo, ... }:
       {

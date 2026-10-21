@@ -1,7 +1,7 @@
 { denTest, ... }:
 {
 
-  flake.tests.home-manager-managed-home = {
+  flake.tests.c1.home-manager-managed-home = {
 
     test-program-enabled = denTest (
       {

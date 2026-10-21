@@ -11,7 +11,7 @@
 # even when a sibling Y excludes it.
 { denTest, ... }:
 {
-  flake.tests.issue-613-exclude-sibling-isolation = {
+  flake.tests.deadbugs.issue-613-exclude-sibling-isolation = {
 
     # iceberg excludes, igloo includes → igloo (the includer) must get the aspect.
     # (the tschan `bogus` case — the sibling exclude must not leak into igloo.)

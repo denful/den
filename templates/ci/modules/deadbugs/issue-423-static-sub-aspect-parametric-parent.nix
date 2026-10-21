@@ -5,7 +5,7 @@
 # https://github.com/denful/den/pull/423
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-423 = {
+  flake.tests.deadbugs.issue-423 = {
     test-static-sub-aspect-from-parametric-parent = denTest (
       { den, igloo, ... }:
       {

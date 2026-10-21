@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.issue-687-schema-module-lib-arg = {
+  flake.tests.deadbugs.issue-687-schema-module-lib-arg = {
     # the reporter's shape: a schema module whose BODY is `lib.mkIf …`,
     # with `lib` taken as a module argument
     test-lib-arg-mkif-body = denTest (

@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.policy-excludes = {
+  flake.tests.c2.policy-excludes = {
 
     # A policy excluded via meta.excludes does not fire.
     test-excluded-policy-does-not-fire = denTest (

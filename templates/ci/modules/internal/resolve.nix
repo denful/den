@@ -53,7 +53,7 @@ let
   };
 in
 {
-  flake.tests.performance.resolve = {
+  flake.tests.internal.performance.resolve = {
 
     test-chain-100 = denTest (
       { den, funnyNames, ... }:

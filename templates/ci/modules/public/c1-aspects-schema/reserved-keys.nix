@@ -4,7 +4,7 @@
 # metadata and read them back exactly as declared.
 { denTest, ... }:
 {
-  flake.tests.reserved-keys = {
+  flake.tests.c1.reserved-keys = {
     # A reserved key carries metadata: the rest of the aspect resolves
     # normally, and the key's value passes through unwrapped. Without
     # reservation `settings` would be dispatched and its value content-wrapped.

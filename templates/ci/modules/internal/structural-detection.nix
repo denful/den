@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.structural-detection = {
+  flake.tests.internal.structural-detection = {
 
     # When schema registries are empty, all non-structural keys are classes (backward compat).
     test-empty-registry-all-classes = denTest (

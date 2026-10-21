@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.ctx-non-exact.test-apply-non-exact-less = denTest (
+  flake.tests.internal.ctx-non-exact.test-apply-non-exact-less = denTest (
     { den, funnyNames, ... }:
     {
       den.schema.foobar.includes = [
@@ -27,7 +27,7 @@
     }
   );
 
-  flake.tests.ctx-non-exact.test-apply-non-exact-more = denTest (
+  flake.tests.internal.ctx-non-exact.test-apply-non-exact-more = denTest (
     { den, funnyNames, ... }:
     {
       den.schema.foobar.includes = [

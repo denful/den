@@ -1,7 +1,7 @@
 { denTest, inputs, ... }:
 {
 
-  flake.tests.provides-parametric = {
+  flake.tests.c3.provides-parametric = {
 
     test-parametric-inside-provides = denTest (
       {
@@ -43,7 +43,7 @@
   };
 
   # Bare function sub-aspects receive parametric context from parent.
-  flake.tests.provides-parametric-bare-fn = {
+  flake.tests.c3.provides-parametric-bare-fn = {
 
     test-bare-fn-sub-aspect-receives-host = denTest (
       {

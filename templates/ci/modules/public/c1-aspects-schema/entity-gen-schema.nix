@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.entity-gen-schema = {
+  flake.tests.c1.entity-gen-schema = {
     # gen-schema id_hash available on hosts
     test-entity-host-id-hash = denTest (
       { den, ... }:

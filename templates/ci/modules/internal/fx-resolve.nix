@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-resolve = {
+  flake.tests.internal.fx-resolve = {
 
     # Static aspect resolves with identity envelope through the pipeline.
     test-static-resolves-with-envelope = denTest (

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.policy-for-include = {
+  flake.tests.c2.policy-for-include = {
     # policy.for wrapping policy.include should work (was: "attempt to call
     # something which is not a function but a set").
     test-for-include-fires = denTest (

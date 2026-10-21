@@ -7,7 +7,7 @@
 # fix this mirrors.
 { denTest, ... }:
 {
-  flake.tests.schema-tier-includes-string-form-rejected = {
+  flake.tests.c1.schema-tier-includes-string-form-rejected = {
 
     test-schema-includes-string-form-errors = denTest (
       { den, igloo, ... }:

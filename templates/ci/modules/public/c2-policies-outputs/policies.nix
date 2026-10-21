@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.policies = {
+  flake.tests.c2.policies = {
 
     test-policy-fires = denTest (
       { den, igloo, ... }:

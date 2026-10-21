@@ -1,7 +1,7 @@
 { denTest, ... }:
 {
 
-  flake.tests.user-shell.test-on-nixos-included-at-user = denTest (
+  flake.tests.c1.user-shell.test-on-nixos-included-at-user = denTest (
     {
       den,
       lib,

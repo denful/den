@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.scope-inheritance = {
+  flake.tests.internal.scope-inheritance = {
 
     # Single entity, no child scopes — scopeParent has only the root scope.
     test-no-child-scopes = denTest (

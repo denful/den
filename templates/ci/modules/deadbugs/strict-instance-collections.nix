@@ -72,7 +72,7 @@ let
     };
 in
 {
-  flake.tests.strict-instance-collections = {
+  flake.tests.deadbugs.strict-instance-collections = {
 
     test-strict-host-instance-includes = denTest (
       { den, igloo, ... }:

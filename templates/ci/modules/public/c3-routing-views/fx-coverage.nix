@@ -8,7 +8,7 @@
   ...
 }:
 {
-  flake.tests.fx-coverage = {
+  flake.tests.c3.fx-coverage = {
 
     # --- 1. Deferred include drain ---
 

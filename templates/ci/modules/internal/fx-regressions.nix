@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-regressions = {
+  flake.tests.internal.fx-regressions = {
 
     # #413/#423: Provider sub-aspect's includes contain parametric fns.
     # Old pipeline: context dropped during recursive descent.

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.dynamic-intopath = {
+  flake.tests.c5.dynamic-intopath = {
 
     test-dynamic-intoPath-host-scope = denTest (
       {

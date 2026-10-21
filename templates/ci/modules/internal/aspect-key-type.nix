@@ -53,7 +53,7 @@ let
   };
 in
 {
-  flake.tests.aspect-key-type = {
+  flake.tests.internal.aspect-key-type = {
 
     # Class key (nixos is registered in den.classes) → provenance-wrapped __contentValues.
     test-class-key-shape = denTest (

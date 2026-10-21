@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.schema-registry = {
+  flake.tests.c3.schema-registry = {
     test-class-declaration = denTest (
       { den, ... }:
       {

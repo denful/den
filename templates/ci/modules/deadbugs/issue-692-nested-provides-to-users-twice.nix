@@ -3,7 +3,7 @@
 # ("already declared").
 { denTest, ... }:
 {
-  flake.tests.issue-692-nested-provides-to-users-twice = {
+  flake.tests.deadbugs.issue-692-nested-provides-to-users-twice = {
 
     test-top-level-provides-to-users = denTest (
       { den, igloo, ... }:

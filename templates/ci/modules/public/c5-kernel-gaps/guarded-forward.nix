@@ -19,7 +19,7 @@ let
     };
 in
 {
-  flake.tests.guarded-forward = {
+  flake.tests.c5.guarded-forward = {
 
     test-guard-applies-when-target-exists = denTest (
       {

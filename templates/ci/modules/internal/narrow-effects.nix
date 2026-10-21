@@ -69,7 +69,7 @@ let
   };
 in
 {
-  flake.tests.narrow-effects = {
+  flake.tests.internal.narrow-effects = {
 
     # resolve-aspect: static aspect emits its class and resolves to itself.
     test-resolve-aspect-static = denTest (

@@ -5,7 +5,7 @@
 # this test reads [ "/opt/vic" ] for tux.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.parametric-provides-fan = {
+  flake.tests.c3.parametric-provides-fan = {
 
     test-parametric-provides-keeps-per-instance-binding = denTest (
       { den, tuxHm, ... }:

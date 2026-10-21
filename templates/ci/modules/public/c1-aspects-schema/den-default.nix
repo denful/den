@@ -1,7 +1,7 @@
 { denTest, ... }:
 {
 
-  flake.tests.den-default.test-includes-owned = denTest (
+  flake.tests.c1.den-default.test-includes-owned = denTest (
     {
       den,
       lib,
@@ -19,7 +19,7 @@
     }
   );
 
-  flake.tests.den-default.test-includes-host-function = denTest (
+  flake.tests.c1.den-default.test-includes-host-function = denTest (
     {
       den,
       lib,
@@ -41,7 +41,7 @@
     }
   );
 
-  flake.tests.den-default.test-includes-user-function = denTest (
+  flake.tests.c1.den-default.test-includes-user-function = denTest (
     {
       den,
       lib,

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.policy-context-enrichment = {
+  flake.tests.c2.policy-context-enrichment = {
 
     # Policy emits non-schema resolve bindings (isDarwin/isNixos).
     # A parametric wrapper aspect should defer until the bindings arrive,

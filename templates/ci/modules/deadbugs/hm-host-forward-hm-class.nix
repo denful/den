@@ -5,7 +5,7 @@
 # the userForward route carries it to home-manager.users.<name>.
 { denTest, ... }:
 {
-  flake.tests.hm-host-forward-hm-class = {
+  flake.tests.deadbugs.hm-host-forward-hm-class = {
 
     # homeManager key in hm-host schema should reach user's HM config
     test-hm-host-forwards-homemanager-class = denTest (
