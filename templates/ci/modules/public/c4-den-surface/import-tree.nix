@@ -7,7 +7,7 @@
       {
         den.hosts.x86_64-linux.rockhopper.users.tux = { };
         den.default.includes = [
-          (den.provides.import-tree.provides.host ../../non-dendritic/hosts)
+          (den.provides.import-tree.provides.host ../../../non-dendritic/hosts)
         ];
 
         expr = config.flake.nixosConfigurations.rockhopper.config.auto-imported;
@@ -20,7 +20,7 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.igloo.includes = [
-          (den.provides.import-tree ../../non-dendritic/no-such-dir)
+          (den.provides.import-tree ../../../non-dendritic/no-such-dir)
         ];
 
         expr = igloo ? auto-imported;
