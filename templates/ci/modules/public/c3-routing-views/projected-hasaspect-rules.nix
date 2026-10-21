@@ -2,7 +2,7 @@
 # axis — i.e. `host.hasAspect X` answering membership at the ACTIVE (consuming)
 # descendant scope. The consuming-entity axis (`user.hasAspect`) is covered by
 # deadbugs/projected-hasaspect.nix; the host-own-scope axis by
-# internal-api/hasaspect-ancestor-scope.nix. This suite pins the host-binding
+# public/c2-policies-outputs/hasaspect-ancestor-scope.nix. This suite pins the host-binding
 # axis with matched positives and negatives.
 #
 # Formal rule (specs/2026-06-09-projected-hasaspect-v1.md): every in-context

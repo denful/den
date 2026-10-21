@@ -14,87 +14,67 @@ The CI template is Den's comprehensive test suite. It tests every feature using 
 
 Every `.nix` file under `modules/` is auto-imported by [import-tree](https://github.com/denful/import-tree) — the flake just hands `./modules` to it. To add a test, drop a new file in; there is no central list to edit.
 
-## Structure
-
-Test files are grouped into four buckets by **what surface they exercise**:
-
-```
-flake.nix                  # evalModules + (import-tree ./modules)
-modules/
-  new-test.nix             # copy-me skeleton for a new test
-  test-support/
-    eval-den.nix           # wires denTest + the den fixture into the flake
-  public-api/              # tests using ONLY the documented public surface
-  internal-api/            # tests poking pipeline internals (not for users)
-  deprecated/              # tests pinning legacy/compat behavior
-  deadbugs/                # one regression test per fixed bug
-non-dendritic/             # plain files consumed by import-tree tests
-provider/                  # a separate flake exporting a namespace
-```
-
-When you want to learn the recommended way to do something, read `public-api/`. The other buckets exist to keep the suite honest: `internal-api/` and `deprecated/` are not patterns to copy.
-
 ## Test Categories
 
-The tables below point at representative files in `public-api/`. Each file declares one `flake.tests.<suite>` and holds several `test-*` cases.
+The tables below list representative suites. Each test file declares one `flake.tests.<suite>` and holds several `test-*` cases.
 
 ### Core Features
 
-| Test File | Suite | What It Tests |
-|-----------|-------|---------------|
-| [conditional-config.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/conditional-config.nix) | `conditional-config` | Conditional imports using host/user attributes |
-| [default-includes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/default-includes.nix) | `default-includes` | `den.default` applying to all hosts/users |
-| [host-options.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/host-options.nix) | `host-options` | Custom host attributes, hostName, aspect names |
-| [top-level-parametric.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/top-level-parametric.nix) | `top-level-parametric` | Context-aware top-level aspects |
-| [auto-parametric.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/auto-parametric.nix) | `auto-parametric` | Parametric aspects auto-dispatched by the pipeline |
+| Suite | What It Tests |
+|-------|---------------|
+| `conditional-config` | Conditional imports using host/user attributes |
+| `default-includes` | `den.default` applying to all hosts/users |
+| `host-options` | Custom host attributes, hostName, aspect names |
+| `top-level-parametric` | Context-aware top-level aspects |
+| `auto-parametric` | Parametric aspects auto-dispatched by the pipeline |
 
 ### Bidirectional & Providers
 
-| Test File | Suite | What It Tests |
-|-----------|-------|---------------|
-| [user-host-mutual-config.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/user-host-mutual-config.nix) | `user-host-mutual-config` | Host→user and user→host config flow |
-| [mutual-provider.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/mutual-provider.nix) | `mutual-provider` | Mutual provider mechanism |
-| [policy-provide.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policy-provide.nix) | `policy-provide` | Policy-driven `provide` effects |
+| Suite | What It Tests |
+|-------|---------------|
+| `user-host-mutual-config` | Host→user and user→host config flow |
+| `mutual-provider` | Mutual provider mechanism |
+| `policy-provide` | Policy-driven `provide` effects |
 
 ### Policies
 
-| Test File | Suite | What It Tests |
-|-----------|-------|---------------|
-| [policies.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policies.nix) | `policies` | Policy declaration and activation |
-| [policy-excludes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/policy-excludes.nix) | `policy-excludes` | Policies excluding includes |
-| [route.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/route.nix) | `route` | Route effects |
+| Suite | What It Tests |
+|-------|---------------|
+| `policies` | Policy declaration and activation |
+| `policy-excludes` | Policies excluding includes |
+| `route` | Route effects |
 
 ### Batteries
 
-| Test File | Suite | What It Tests |
-|-----------|-------|---------------|
-| [define-user.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/define-user.nix) | `define-user` | User definition across contexts |
-| [primary-user.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/primary-user.nix) | `primary-user` | Primary user groups |
-| [user-shell.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/user-shell.nix) | `user-shell` | Shell configuration |
-| [unfree.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/unfree.nix) | `unfree` | Unfree package predicates |
-| [tty-autologin.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/tty-autologin.nix) | `tty-autologin` | TTY autologin service |
-| [vm-autologin.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/vm-autologin.nix) | `vm-autologin` | VM autologin service |
-| [import-tree.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/import-tree.nix) | (import-tree) | Auto-importing class dirs |
-| [flake-parts.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/flake-parts.nix) | `flake-parts` | `inputs'` and `self'` providers |
+| Suite | What It Tests |
+|-------|---------------|
+| `define-user` | User definition across contexts |
+| `primary-user` | Primary user groups |
+| `user-shell` | Shell configuration |
+| `unfree` | Unfree package predicates |
+| `tty-autologin` | TTY autologin service |
+| `vm-autologin` | VM autologin service |
+| `import-tree` | Auto-importing class dirs |
+| `flake-parts` | `inputs'` and `self'` providers |
 
 ### Advanced
 
-| Test File | Suite | What It Tests |
-|-----------|-------|---------------|
-| [angle-brackets.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/angle-brackets.nix) | `angle-brackets` | All bracket resolution paths |
-| [namespaces.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/namespaces.nix) | `namespaces` | Local, remote, merged namespaces |
-| [forward-from-custom-class.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/forward-from-custom-class.nix) | `forward-custom-class` | Custom class forwarding |
-| [homes.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/homes.nix) | `standalone-homes` | Standalone Home-Manager configs |
-| [schema-base-modules.nix](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/schema-base-modules.nix) | `schema-base-modules` | `den.schema.{host,user,home,conf}` |
+| Suite | What It Tests |
+|-------|---------------|
+| `angle-brackets` | All bracket resolution paths |
+| `namespaces` | Local, remote, merged namespaces |
+| `forward-custom-class` | Custom class forwarding |
+| `standalone-homes` | Standalone Home-Manager configs |
+| `schema-base-modules` | `den.schema.{host,user,home,conf}` |
 
 ### Bug Regressions
 
-Every fixed bug gets a pinned regression test in `deadbugs/`, named after its issue. A couple of examples:
+Every fixed bug gets a pinned regression test, named after its issue. A couple of examples:
 
-| Test File | What It Tests |
-|-----------|---------------|
-| [deadbugs/static-include-dup-package.nix](https://github.com/denful/den/blob/main/templates/ci/modules/deadbugs/static-include-dup-package.nix) | Deduplication for packages/lists |
-| [deadbugs/external-namespace-deep-aspect.nix](https://github.com/denful/den/blob/main/templates/ci/modules/deadbugs/external-namespace-deep-aspect.nix) | Deep aspect access from external flakes |
+| Suite | What It Tests |
+|-------|---------------|
+| `deadbugs-static-include-dups` | Deduplication for packages/lists |
+| `deadbugs-namespace-deep-aspect` | Deep aspect access from external flakes |
 
 ## External Provider
 

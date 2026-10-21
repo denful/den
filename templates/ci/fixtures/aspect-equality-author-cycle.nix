@@ -31,8 +31,8 @@
 # nothing:
 #
 #   cp templates/ci/fixtures/aspect-equality-author-cycle.nix \
-#      templates/ci/modules/features/deadbugs/
-#   git add templates/ci/modules/features/deadbugs/aspect-equality-author-cycle.nix
+#      templates/ci/modules/internal/
+#   git add templates/ci/modules/internal/aspect-equality-author-cycle.nix
 #
 #   nix eval --override-input den . \
 #     './templates/ci#tests.deadbugs.aspect-equality-author-cycle.test-control-difference-before-cycle.expr'
@@ -42,8 +42,8 @@
 #     './templates/ci#tests.deadbugs.aspect-equality-author-cycle.test-cycle-before-difference.expr'
 #   => error: stack overflow; max-call-depth exceeded    EXIT=1
 #
-#   git rm --cached templates/ci/modules/features/deadbugs/aspect-equality-author-cycle.nix
-#   rm templates/ci/modules/features/deadbugs/aspect-equality-author-cycle.nix
+#   git rm --cached templates/ci/modules/internal/aspect-equality-author-cycle.nix
+#   rm templates/ci/modules/internal/aspect-equality-author-cycle.nix
 { denTest, ... }:
 {
   flake.tests.deadbugs.aspect-equality-author-cycle = {

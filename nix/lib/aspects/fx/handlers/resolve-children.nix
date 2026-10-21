@@ -50,7 +50,7 @@ in
       let
         aspect = param.aspect;
         isMeaningful = param.isMeaningful;
-        # Defaulted: internal-api tests exercise this handler directly without
+        # Defaulted: internal/ tests exercise this handler directly without
         # a segment list, and isMeaningful = false skips chainWrap's push
         # anyway.
         chainSegments = param.chainSegments or [ ];

@@ -24,8 +24,8 @@ modules/                   — NixOS-module-style option declarations and batter
   aspects/batteries/       — built-in batteries (define-user, home-manager, hostname, etc.)
   policies/                — core and flake-level policy declarations
 templates/                 — example flakes (one per directory) + the CI test suite
-  ci/modules/              — tests, bucketed: public-api/, internal-api/, features/,
-                             deadbugs/ (regressions), deprecated/
+  ci/modules/              — tests: public/c1-*..c5-* (by Gen coverage level), internal/,
+                             deadbugs/ (regressions), deprecated/; see its README.md
 ```
 
 ## Core concepts
@@ -85,7 +85,7 @@ just repl
 
 ## Testing
 
-Tests live in `templates/ci/modules/`, bucketed by what they pin: `public-api/`, `internal-api/`, `features/`, `deprecated/`, and `deadbugs/` for regressions.
+Tests live in `templates/ci/modules/`: `public/c1-*` to `public/c5-*` (public-surface tests by Gen coverage level, see `templates/ci/modules/README.md`), `internal/`, `deprecated/`, and `deadbugs/` for regressions.
 
 Test files export `flake.tests.<suite>.<test-name>` using the `denTest` helper. `<suite>` is the file's subject, never its directory — `flake.tests.projected-hasaspect`, not `flake.tests.deadbugs.projected-hasaspect`, because `just ci` splits its argument on the first dot and a nested suite makes a passing cell report `❌ … 😢 0/1`.
 

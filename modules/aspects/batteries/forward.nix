@@ -29,7 +29,7 @@ let
     Note: `den.batteries.forward` returns an aspect that needs to be included for
     the new class to exist.
 
-    See templates/ci/modules/public-api/guarded-forward.nix, templates/ci/modules/public-api/forward-from-custom-class.nix
+    See templates/ci/modules/public/c5-kernel-gaps/guarded-forward.nix, templates/ci/modules/public/c5-kernel-gaps/forward-from-custom-class.nix
     See also: https://github.com/denful/den/issues/160
   '';
 
