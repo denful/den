@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.hm-host-isolation = {
+  flake.tests.internal.hm-host-isolation = {
 
     test-hm-host-owned-config-not-applied-without-hm-users = denTest (
       { den, funnyNames, ... }:

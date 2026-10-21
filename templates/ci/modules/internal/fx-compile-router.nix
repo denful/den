@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-compile-router = {
+  flake.tests.internal.fx-compile-router = {
 
     # resolve sends compile, which routes static aspects to compile-static.
     test-resolve-routes-static = denTest (

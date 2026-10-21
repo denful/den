@@ -8,7 +8,7 @@
 # via late dispatch, firing in a context that lacks host.
 { denTest, ... }:
 {
-  flake.tests.policy-when-arg-safety = {
+  flake.tests.deadbugs.policy-when-arg-safety = {
 
     # policy.when with { host, ... } predicate must not crash when a
     # standalone home triggers cross-scope dispatch

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.top-level-parametric = {
+  flake.tests.c1.top-level-parametric = {
 
     test-user-aspect-with-context = denTest (
       { den, igloo, ... }:

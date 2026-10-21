@@ -5,7 +5,7 @@
 # `excludes-string-form-rejected.nix` for the aspect-tier counterpart.
 { denTest, ... }:
 {
-  flake.tests.schema-tier-excludes-string-form-rejected = {
+  flake.tests.c2.schema-tier-excludes-string-form-rejected = {
 
     test-schema-excludes-string-form-errors = denTest (
       { den, igloo, ... }:

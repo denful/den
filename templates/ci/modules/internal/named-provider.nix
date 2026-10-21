@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.ctx-named-provider = {
+  flake.tests.internal.ctx-named-provider = {
 
     test-self-named-provider = denTest (
       { den, funnyNames, ... }:

@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-scope-widen = {
+  flake.tests.internal.fx-scope-widen = {
 
     # scope-widened with no deferred items: drain returns [], resumes null.
     test-scope-widen-empty = denTest (

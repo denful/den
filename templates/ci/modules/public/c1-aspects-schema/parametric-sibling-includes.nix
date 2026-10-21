@@ -7,7 +7,7 @@
 # this; it was only found by survey.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.parametric-sibling-includes = {
+  flake.tests.c1.parametric-sibling-includes = {
 
     test-parametric-sibling-includes-survive-resolution = denTest (
       { den, igloo, ... }:

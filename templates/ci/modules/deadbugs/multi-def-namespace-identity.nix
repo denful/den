@@ -20,7 +20,7 @@
 # which is why 3-level aspects like apps.shell.foo dedup fine.
 { denTest, ... }:
 {
-  flake.tests.multi-def-namespace-identity = {
+  flake.tests.deadbugs.multi-def-namespace-identity = {
 
     # Aspect under a multi-def key, included via two roles → its homeManager
     # content must reach the user's HM config exactly once.

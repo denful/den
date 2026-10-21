@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.unfree = {
+  flake.tests.c1.unfree = {
 
     test-packages-set-on-nixos = denTest (
       { den, igloo, ... }:

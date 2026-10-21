@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-compile-forward = {
+  flake.tests.internal.fx-compile-forward = {
 
     # Tier 1: simple forward with source already collected → simple route.
     test-tier1-simple-route = denTest (

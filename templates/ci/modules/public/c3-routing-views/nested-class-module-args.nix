@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.nested-class-module-args = {
+  flake.tests.c3.nested-class-module-args = {
 
     # Guard: class module with { user } skipped when user not in context
     test-guard-skips-without-context = denTest (

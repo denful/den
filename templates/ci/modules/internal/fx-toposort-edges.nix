@@ -4,7 +4,7 @@
 # producer before the parent merge) and the loud cycle throw on a synthesize 2-cycle.
 { denTest, ... }:
 {
-  flake.tests.fx-toposort-edges = {
+  flake.tests.internal.fx-toposort-edges = {
 
     # A simple route writing (s,"nixos") must precede the final-extraction merge
     # edge whose collectedScopes=["s"] reads (s,"nixos").

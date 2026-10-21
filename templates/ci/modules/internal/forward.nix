@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.performance.forward = {
+  flake.tests.internal.performance.forward = {
 
     test-forward-into-funny = denTest (
       { den, funnyNames, ... }:

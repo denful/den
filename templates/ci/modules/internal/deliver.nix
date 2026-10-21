@@ -39,7 +39,7 @@ let
     (den.lib.aspects.resolveWithPaths cls (den.lib.resolveEntity "host" { inherit host; })).edgeTrace;
 in
 {
-  flake.tests.deliver = {
+  flake.tests.internal.deliver = {
 
     # ===== mode = merge (default), class source, at = [] ================
     # Equivalent to route { fromClass; intoClass; path = []; }.

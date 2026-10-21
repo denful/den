@@ -11,7 +11,7 @@
 # future drift back to exclusion is caught rather than silently reintroduced.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.underscore-shadow-key-included = {
+  flake.tests.c3.underscore-shadow-key-included = {
 
     # Site A: root aspect (mergeWithAspectMeta).
     test-shadow-key-included-via-underscore-root = denTest (

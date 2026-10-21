@@ -8,7 +8,7 @@
 {
   imports = [ inputs.den.flakeOutputs.packages ];
 
-  flake.tests.deadbugs-issue-674 = {
+  flake.tests.deadbugs.issue-674 = {
 
     # Two aspects producing the same derivation at the same key.
     test-identical-derivations-merge = denTest (

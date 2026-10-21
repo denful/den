@@ -2,7 +2,7 @@
 # four inclusion routes, and `<aspect>._` includes only depth-1 children.
 { denTest, lib, ... }:
 {
-  flake.tests.aspect-naming-inclusion = {
+  flake.tests.c3.aspect-naming-inclusion = {
 
     test-route-host-includes = denTest (
       { den, igloo, ... }:

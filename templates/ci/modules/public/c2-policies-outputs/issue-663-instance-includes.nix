@@ -15,7 +15,7 @@
 # declares `isEntity` gains it at once.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.issue-663-instance-includes = {
+  flake.tests.c2.issue-663-instance-includes = {
 
     test-host-instance-includes-honoured = denTest (
       { den, igloo, ... }:

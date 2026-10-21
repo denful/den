@@ -32,7 +32,7 @@
 # injection as the cause.
 { denTest, lib, ... }:
 {
-  flake.tests.bprime-basedrain-crosshost = {
+  flake.tests.deadbugs.bprime-basedrain-crosshost = {
 
     # Defect case: cross-host config-thunk reads a PIPE-derived config field.
     # Pre-fix this threw `feat missing`; after, it resolves to the peer's value.

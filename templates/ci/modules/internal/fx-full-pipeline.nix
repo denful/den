@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-full-pipeline = {
+  flake.tests.internal.fx-full-pipeline = {
 
     # Minimal: single aspect with nixos config, collects module.
     test-minimal-pipeline = denTest (

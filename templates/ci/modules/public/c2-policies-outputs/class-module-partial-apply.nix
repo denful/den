@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.class-module-partial-apply = {
+  flake.tests.c2.class-module-partial-apply = {
 
     # Flat form: a nixos class module that requests `host` (a den context arg)
     # alongside standard module-system args. wrapClassModule detects `host`

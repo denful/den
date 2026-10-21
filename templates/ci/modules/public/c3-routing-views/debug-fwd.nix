@@ -1,7 +1,7 @@
 # Forward custom class to leaf option using evalConfig.
 { denTest, ... }:
 {
-  flake.tests.fwd-leaf-option = {
+  flake.tests.c3.fwd-leaf-option = {
 
     # Forward a custom "variables" class to environment.sessionVariables.
     test-fwd-variables-static = denTest (

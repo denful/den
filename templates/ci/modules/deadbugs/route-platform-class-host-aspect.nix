@@ -15,7 +15,7 @@
 # moved into homeLinux and vanished from every generation.
 { denTest, ... }:
 {
-  flake.tests.route-platform-class-host-aspect = {
+  flake.tests.deadbugs.route-platform-class-host-aspect = {
 
     # Control: the same route delivers user-attached homeLinux content.
     test-user-attached-homelinux-routes = denTest (

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.route-ensure-entry-function = {
+  flake.tests.deadbugs.route-ensure-entry-function = {
     # When a route with adaptArgs and path has no source modules, the
     # ensureEntry placeholder must produce an attrset — not a function.
     # Bug: ensureEntry used (_: { imports = []; }) which is a function value.

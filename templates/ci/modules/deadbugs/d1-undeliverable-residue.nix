@@ -129,7 +129,7 @@ let
   };
 in
 {
-  flake.tests.d1residue = {
+  flake.tests.deadbugs.d1residue = {
     # Pins the fix: the policy half no longer vanishes silently. It throws,
     # naming the undeliverable kind, instead of dropping it with no trace.
     test-policy-borne-residue-throws-loud = denTest (

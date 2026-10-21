@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.home-flat-form = {
+  flake.tests.c2.home-flat-form = {
     test-host-context-in-standalone-home = denTest (
       { den, config, ... }:
       {

@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.aspect-path = {
+  flake.tests.c5.aspect-path = {
 
     test-aspectPath-named = denTest (
       { den, ... }:

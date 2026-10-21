@@ -6,7 +6,7 @@
 # statics path could resolve them with {class, aspect-chain}.
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-460 = {
+  flake.tests.deadbugs.issue-460 = {
 
     # Baseline: static includes work (never broken).
     test-unfree-static-includes = denTest (

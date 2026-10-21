@@ -17,7 +17,7 @@ let
     };
 in
 {
-  flake.tests.performance.pure = {
+  flake.tests.internal.performance.pure = {
 
     test-pure-aspects-50 =
       let

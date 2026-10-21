@@ -9,7 +9,7 @@
 # aspect over host.users; class-module args never reach that fan-out.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.issue-629-class-module-user-arg = {
+  flake.tests.c1.issue-629-class-module-user-arg = {
 
     # FAILING: class module names `user`, aspect included at host scope.
     # Host has one user; the module should fan per-user like the aspect form.

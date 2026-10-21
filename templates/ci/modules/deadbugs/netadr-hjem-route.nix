@@ -6,7 +6,7 @@
 # losing it.  Models netadr's hjemLinux -> hjem policy (homeManager == hjem).
 { denTest, ... }:
 {
-  flake.tests.netadr-hjem-route = {
+  flake.tests.deadbugs.netadr-hjem-route = {
 
     # User-scope source, policy fires at user scope (host+user signature).
     test-route-user-scope-usersig = denTest (

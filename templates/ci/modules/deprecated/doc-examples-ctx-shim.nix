@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.doc-examples = {
+  flake.tests.deprecated.doc-examples = {
 
     # migrate-ctx.mdx: compat shim forwards den.ctx class keys to den.stages.
     test-doc-ctx-class-shim = denTest (

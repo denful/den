@@ -15,7 +15,7 @@
 # aspect and a host-specific one both apply. See nix/lib/entities/_types.nix.
 { denTest, ... }:
 {
-  flake.tests.aspect-host-qualified-lookup = {
+  flake.tests.c2.aspect-host-qualified-lookup = {
 
     # --- host users -------------------------------------------------------
 

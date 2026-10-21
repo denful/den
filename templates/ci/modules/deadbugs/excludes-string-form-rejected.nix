@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.excludes-string-form-rejected = {
+  flake.tests.deadbugs.excludes-string-form-rejected = {
 
     # D2: `excludes` used to accept a bare string with `lib.types.unspecified`
     # and silently exclude nothing (`identity.key` on a string yields

@@ -1,7 +1,7 @@
 # templates/ci/modules/public/c1-aspects-schema/path-set-by-scope.nix
 { denTest, ... }:
 {
-  flake.tests.path-set-by-scope = {
+  flake.tests.c1.path-set-by-scope = {
     test-bucket-by-scope = denTest (
       { den, ... }:
       let

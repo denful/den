@@ -21,7 +21,7 @@
 # `config.flake` is the in-harness analogue of `self.outputs`.
 { denTest, ... }:
 {
-  flake.tests.issue-580-self-output-classification-recursion = {
+  flake.tests.deadbugs.issue-580-self-output-classification-recursion = {
 
     # The bug: unregistered `nixpkgs` key whose value reads a flake
     # self-output.  Classification forces the value → self-fixpoint cycle.

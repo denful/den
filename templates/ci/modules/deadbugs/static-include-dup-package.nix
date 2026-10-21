@@ -1,7 +1,7 @@
 { denTest, ... }:
 {
 
-  flake.tests.deadbugs-static-include-dups = {
+  flake.tests.deadbugs.static-include-dups = {
 
     test-static-include = denTest (
       {

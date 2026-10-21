@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.fx-compile-parametric = {
+  flake.tests.internal.fx-compile-parametric = {
 
     # Parametric resolves: aspect with __args, scope handlers available →
     # gate passes, bind resolves, re-enters via resolve effect.

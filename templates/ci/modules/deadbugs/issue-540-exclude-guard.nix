@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.issue-540-exclude-guard = {
+  flake.tests.deadbugs.issue-540-exclude-guard = {
     # Guard respects per-scope excludes: starship is excluded for tux
     # via policy.exclude, so user.hasAspect starship returns false in
     # tux's scope. Guards always defer and evaluate at drain time with

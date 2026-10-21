@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-compile-conditional = {
+  flake.tests.internal.fx-compile-conditional = {
 
     # Guard passes: emitIncludes dispatches children.
     test-guard-passes-emits-includes = denTest (

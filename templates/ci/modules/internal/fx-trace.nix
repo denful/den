@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-trace = {
+  flake.tests.internal.fx-trace = {
 
     test-structured-trace-fields = denTest (
       { den, ... }:

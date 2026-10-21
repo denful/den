@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.flake-scope-pipeline-args = {
+  flake.tests.c4.flake-scope-pipeline-args = {
 
     # pipelineOnly on attrset preserves all attributes and adds collisionPolicy.
     test-pipeline-only-preserves-attrs = denTest (

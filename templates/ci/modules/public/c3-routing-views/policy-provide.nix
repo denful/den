@@ -21,7 +21,7 @@ let
     };
 in
 {
-  flake.tests.provide = {
+  flake.tests.c3.provide = {
 
     # Direct provide — inject a module into the host's NixOS class.
     test-provide-direct = denTest (

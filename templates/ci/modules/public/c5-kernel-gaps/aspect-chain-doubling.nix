@@ -4,7 +4,7 @@
 # its own prefix, corrupting the whole subtree's identities.
 { denTest, ... }:
 {
-  flake.tests.aspect-chain-doubling = {
+  flake.tests.c5.aspect-chain-doubling = {
 
     test-agreeing-definitions-collapse = denTest (
       { den, ... }:

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.user-classes = {
+  flake.tests.c1.user-classes = {
 
     test-default-classes = denTest (
       { den, ... }:

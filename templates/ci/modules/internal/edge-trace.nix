@@ -171,7 +171,7 @@ let
     ];
 in
 {
-  flake.tests.delivery-edges = {
+  flake.tests.internal.delivery-edges = {
 
     # ===== (1) host + single user =====================================
     # Full edge list. Default folds (host homeManager/nixos, host+user os→nixos),

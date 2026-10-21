@@ -4,7 +4,7 @@
 # matched, so the guarded user half was silently dropped.
 { denTest, ... }:
 {
-  flake.tests.nested-ref-guard-hasaspect =
+  flake.tests.deadbugs.nested-ref-guard-hasaspect =
     let
       subs = {
         host-part.nixos =

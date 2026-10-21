@@ -10,7 +10,7 @@
 # users only via a to-users policy, never a bare host-scope include.
 { denTest, ... }:
 {
-  flake.tests.issue-609 = {
+  flake.tests.deadbugs.issue-609 = {
 
     # (a) { user, … } at host scope: user is a descendant of host → fan out.
     # The nixos content lands per-user, merged on the host, once per user.

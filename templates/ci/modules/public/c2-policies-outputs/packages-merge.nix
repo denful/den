@@ -4,7 +4,7 @@
 {
   imports = [ inputs.den.flakeOutputs.packages ];
 
-  flake.tests.packages-merge = {
+  flake.tests.c2.packages-merge = {
 
     # Two aspects each defining a different package should both appear.
     test-multi-aspect-packages = denTest (

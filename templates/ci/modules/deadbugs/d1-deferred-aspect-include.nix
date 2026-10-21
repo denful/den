@@ -95,7 +95,7 @@ let
     );
 in
 {
-  flake.tests.d1probe = {
+  flake.tests.deadbugs.d1probe = {
     test-arm1-control-plain-nested = arm 10010;
     test-arm2-deferred-nested-includes = arm 10020;
     test-arm3-deferred-direct-class = arm 10030;

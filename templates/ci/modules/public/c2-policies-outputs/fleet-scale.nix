@@ -23,7 +23,7 @@ let
   excludedHost = builtins.head fleetNames;
 in
 {
-  flake.tests.performance.fleet = {
+  flake.tests.c2.performance.fleet = {
 
     test-fleet-scale = denTest (
       {

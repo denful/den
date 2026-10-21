@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.ctx.test-apply = denTest (
+  flake.tests.internal.ctx.test-apply = denTest (
     { den, funnyNames, ... }:
     {
       den.schema.foobar.includes = [

@@ -60,7 +60,7 @@ let
   };
 in
 {
-  flake.tests.fx-ctx-apply = {
+  flake.tests.internal.fx-ctx-apply = {
 
     # emitAspectPolicies: produces include from aspect.provides.${name} (self-provide).
     test-self-provide = denTest (

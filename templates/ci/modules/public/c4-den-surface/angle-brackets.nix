@@ -1,7 +1,7 @@
 { denTest, inputs, ... }:
 {
 
-  flake.tests.angle-brackets = {
+  flake.tests.c4.angle-brackets = {
 
     test-den-dot-access = denTest (
       { den, __findFile, ... }:

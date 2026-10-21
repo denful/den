@@ -1,7 +1,7 @@
 { denTest, inputs, ... }:
 {
 
-  flake.tests.flake-parts.inputs' = denTest (
+  flake.tests.c4.flake-parts.inputs' = denTest (
     {
       den,
       lib,
@@ -24,7 +24,7 @@
     }
   );
 
-  flake.tests.flake-parts.self' = denTest (
+  flake.tests.c4.flake-parts.self' = denTest (
     {
       den,
       lib,

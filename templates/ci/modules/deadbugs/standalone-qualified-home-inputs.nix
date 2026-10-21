@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.standalone-qualified-home-inputs = {
+  flake.tests.deadbugs.standalone-qualified-home-inputs = {
 
     # FAILS: `user@host` standalone home, host not declared.
     test-qualified-home-inputs = denTest (

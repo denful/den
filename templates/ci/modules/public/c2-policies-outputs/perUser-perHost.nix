@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.perUser-perHost = {
+  flake.tests.c2.perUser-perHost = {
 
     test-included-in-default-pipeline = denTest (
       {

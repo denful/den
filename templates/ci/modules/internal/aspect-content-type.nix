@@ -49,7 +49,7 @@ let
     };
 in
 {
-  flake.tests.aspect-content-type = {
+  flake.tests.internal.aspect-content-type = {
 
     # Class keys still work through the pipeline — emitClasses unwraps
     # __contentValues and passes the module value to wrapClassModule.

@@ -1,7 +1,7 @@
 # Forward custom class to leaf option using evalConfig (parametric children variant).
 { denTest, ... }:
 {
-  flake.tests.fwd-leaf-option = {
+  flake.tests.deprecated.fwd-leaf-option = {
 
     # parametric children with evalConfig.
     test-fwd-perHost-variables = denTest (

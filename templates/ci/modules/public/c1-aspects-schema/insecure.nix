@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.insecure = {
+  flake.tests.c1.insecure = {
     test-insecure-package-set-on-nixos = denTest (
       {
         den,

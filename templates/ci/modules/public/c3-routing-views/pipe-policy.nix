@@ -1,7 +1,7 @@
 # Tests for pipe policy effects: pipe.from with transform stages.
 { denTest, lib, ... }:
 {
-  flake.tests.pipe-policy = {
+  flake.tests.c3.pipe-policy = {
 
     # pipe.filter removes entries that don't match the predicate.
     test-pipe-filter = denTest (

@@ -23,7 +23,7 @@ let
     }";
 in
 {
-  flake.tests.pipe-projection = {
+  flake.tests.c5.pipe-projection = {
 
     # 1. A user-scope collectAll of the projected quirk sees it EXACTLY ONCE —
     # the spawn root is absent from the pre-drain scope universe, so there is no

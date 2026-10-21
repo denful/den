@@ -8,7 +8,7 @@
 # could not (flake is not bound in its own ctx).
 { denTest, ... }:
 {
-  flake.tests.self-guard = {
+  flake.tests.c2.self-guard = {
     # A self-guarded policy is dispatchable and fires at its registration scope.
     test-self-fires-at-registration-scope = denTest (
       {

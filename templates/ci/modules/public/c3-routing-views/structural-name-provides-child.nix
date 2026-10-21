@@ -25,7 +25,7 @@
 # a string. `mkUnderscore.forwardable` is what the raw sites fold.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.structural-name-provides-child = {
+  flake.tests.c3.structural-name-provides-child = {
 
     # A structural-named child now delivers, at all three construction sites.
     test-structural-name-survives-at-all-sites = denTest (

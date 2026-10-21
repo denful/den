@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.forward-to = {
+  flake.tests.c5.forward-to = {
 
     test-forwardTo-default-routing = denTest (
       { den, igloo, ... }:

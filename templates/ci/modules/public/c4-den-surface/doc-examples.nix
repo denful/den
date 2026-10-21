@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.doc-examples = {
+  flake.tests.c4.doc-examples = {
 
     # entities.mdx: den.schema.conf shared options apply to host config.
     test-doc-schema-conf-option = denTest (

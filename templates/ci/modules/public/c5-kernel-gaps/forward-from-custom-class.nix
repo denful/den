@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.forward-custom-class = {
+  flake.tests.c5.forward-custom-class = {
 
     test-forward-custom-class-to-nixos = denTest (
       {

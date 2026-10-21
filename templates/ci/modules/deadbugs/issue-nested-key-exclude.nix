@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.issue-nested-key-exclude = {
+  flake.tests.deadbugs.issue-nested-key-exclude = {
     # Excluding a nested key (sub-aspect defined without _ prefix) should
     # work the same as excluding a provides sub-aspect.
     test-nested-key-exclude = denTest (

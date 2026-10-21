@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.auto-parametric = {
+  flake.tests.c3.auto-parametric = {
 
     # Helper aspect NOT linked to any host but included transitively.
     # Without auto-parametric, its __functor.__functionArgs = { aspect = false }

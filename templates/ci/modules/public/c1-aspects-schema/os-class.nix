@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.os-class = {
+  flake.tests.c1.os-class = {
 
     test-forwards-to-nixos-and-darwin = denTest (
       {

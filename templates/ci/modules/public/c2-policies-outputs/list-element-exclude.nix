@@ -13,7 +13,7 @@
 # never existed.
 { denTest, ... }:
 {
-  flake.tests.list-element-exclude = {
+  flake.tests.c2.list-element-exclude = {
     # The fixed direction: a list-wrapped policy reference must exclude.
     test-list-element-exclude = denTest (
       { den, igloo, ... }:

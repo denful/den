@@ -9,7 +9,7 @@
   ...
 }:
 {
-  flake.tests.fx-diag-context = {
+  flake.tests.c5.fx-diag-context = {
 
     test-capture-in-context = denTest (
       { den, ... }:

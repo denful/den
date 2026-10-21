@@ -42,7 +42,7 @@ let
     }).config;
 in
 {
-  flake.tests.collision-validator-freeform-class = {
+  flake.tests.deadbugs.collision-validator-freeform-class = {
 
     test-freeform-target-without-warnings = denTest (
       { config, ... }:

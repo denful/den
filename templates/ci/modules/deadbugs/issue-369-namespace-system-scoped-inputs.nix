@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-369 = {
+  flake.tests.deadbugs.issue-369 = {
 
     test-self-arg-includes = denTest (
       {

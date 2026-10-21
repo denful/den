@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.fx-bind-subsystem = {
+  flake.tests.internal.fx-bind-subsystem = {
 
     # bind: all required args have scope handlers → calls compileFn, returns { value }.
     test-bind-all-available = denTest (

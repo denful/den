@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.fx-ctx-parametric = {
+  flake.tests.internal.fx-ctx-parametric = {
 
     # Bare lambda include with context arg — pipeline provides host via ctx.
     test-bare-lambda-host = denTest (

@@ -7,7 +7,7 @@
 # https://github.com/denful/den/issues/442
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-442 = {
+  flake.tests.deadbugs.issue-442 = {
 
     # Exact reproducer from the issue: parametric dev includes parametric git.
     test-parametric-aspect-included-by-parametric-aspect = denTest (

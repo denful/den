@@ -2,7 +2,7 @@
 # https://github.com/denful/den/pull/413
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-413 = {
+  flake.tests.deadbugs.issue-413 = {
 
     # Parametric parent unconditionally includes parametric sub
     test-parametric-parent-parametric-sub = denTest (

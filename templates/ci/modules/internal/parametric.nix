@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.performance.parametric = {
+  flake.tests.internal.performance.parametric = {
 
     test-fixedTo-deep-chain = denTest (
       { den, funnyNames, ... }:

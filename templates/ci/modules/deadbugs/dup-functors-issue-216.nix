@@ -50,7 +50,7 @@ let
 
 in
 {
-  flake.tests.deadbugs-216-no-dup-functors = {
+  flake.tests.deadbugs.issue-216-no-dup-functors = {
     test-no-merging-for-functors = testBogus (
       { den, ... }:
       let

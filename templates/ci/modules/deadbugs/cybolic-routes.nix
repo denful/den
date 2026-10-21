@@ -2,7 +2,7 @@
 {
 
   # See den#165, https://github.com/Cybolic/nix-den-bug-double-import-routes/tree/3cccc7c
-  flake.tests.deadbugs-cybolic-routes = {
+  flake.tests.deadbugs.cybolic-routes = {
 
     test-has-no-dups = denTest (
       {

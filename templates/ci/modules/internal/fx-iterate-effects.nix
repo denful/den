@@ -4,7 +4,7 @@
   ...
 }:
 {
-  flake.tests.fx-iterate-effects = {
+  flake.tests.internal.fx-iterate-effects = {
 
     # record-fired updates firedPolicyNames with dispatch key.
     test-record-fired-updates-state = denTest (

@@ -1,7 +1,7 @@
 # Entity-isolation marker + isolation-aware extraction (spec 2026-06-11).
 { denTest, ... }:
 {
-  flake.tests.entity-isolation = {
+  flake.tests.c3.entity-isolation = {
 
     # Kind-level marker: declared via gen-schema collection, default false.
     test-isolated-marker = denTest (

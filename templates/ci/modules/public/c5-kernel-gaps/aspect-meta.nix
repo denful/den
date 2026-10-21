@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.aspect-meta = {
+  flake.tests.c5.aspect-meta = {
 
     test-meta-can-be-referenced = denTest (
       { den, funnyNames, ... }:

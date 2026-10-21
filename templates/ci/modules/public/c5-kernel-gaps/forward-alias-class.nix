@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.forward-alias-class = {
+  flake.tests.c5.forward-alias-class = {
 
     test-home-alias-forwards-into-home-manager-root = denTest (
       {

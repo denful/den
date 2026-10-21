@@ -2,7 +2,7 @@
 # imported from mutual provider aspect.
 { denTest, ... }:
 {
-  flake.tests.forward-each-mutual = {
+  flake.tests.c5.forward-each-mutual = {
 
     test-forward-each-from-provide = denTest (
       {

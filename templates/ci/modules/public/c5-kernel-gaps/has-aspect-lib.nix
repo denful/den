@@ -3,7 +3,7 @@
 # entity wiring — see has-aspect.nix for the entity-method tests.
 { denTest, lib, ... }:
 {
-  flake.tests.has-aspect-lib = {
+  flake.tests.c5.has-aspect-lib = {
 
     test-hasAspectIn-positive = denTest (
       { den, ... }:

@@ -10,7 +10,7 @@
 # inert at a funnyNames root.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.functor-root-structural-siblings = {
+  flake.tests.internal.functor-root-structural-siblings = {
 
     test-functor-root-excludes-survive-normalize = denTest (
       { den, funnyNames, ... }:

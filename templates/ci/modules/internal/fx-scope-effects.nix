@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-scope-effects = {
+  flake.tests.internal.fx-scope-effects = {
 
     # push-scope: sets currentScope, registers scopeContexts, scope-local policies (no inheritance).
     test-push-scope-basic = denTest (

@@ -5,7 +5,7 @@
 # across sibling hosts in an eval-order-dependent way.
 { denTest, ... }:
 {
-  flake.tests.hasaspect-guard-cross-host = {
+  flake.tests.c2.hasaspect-guard-cross-host = {
 
     # The reported case: iceberg includes `test`; igloo does NOT, but guards on
     # `host.hasAspect test`. igloo's guard must be FALSE (→ hostName stays the

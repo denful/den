@@ -8,7 +8,7 @@
 # name. Live on the stock igloo/tux fixture with no user aspects at all.
 { denTest, lib, ... }:
 {
-  flake.tests.deadbugs.walkstamp-parametric-roundtrip = {
+  flake.tests.c1.walkstamp-parametric-roundtrip = {
 
     test-walk-stamped-parametric-child-identity-does-not-double = denTest (
       { den, ... }:

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-292 = {
+  flake.tests.deadbugs.issue-292 = {
 
     test-should-not-read-from-host-without-mutuality = denTest (
       {

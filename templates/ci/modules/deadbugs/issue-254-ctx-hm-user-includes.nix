@@ -1,7 +1,7 @@
 # See https://github.com/denful/den/issues/254
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-254.hm-user-includes = {
+  flake.tests.deadbugs.issue-254.hm-user-includes = {
 
     test-hm-user = denTest (
       {

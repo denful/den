@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-handlers = {
+  flake.tests.c5.fx-handlers = {
 
     # constantHandler resumes with ctx value for known arg.
     test-parametric-handler-provides-value = denTest (

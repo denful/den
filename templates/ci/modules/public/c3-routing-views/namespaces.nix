@@ -1,7 +1,7 @@
 { denTest, inputs, ... }:
 {
 
-  flake.tests.namespaces = {
+  flake.tests.c3.namespaces = {
 
     test-local-definition = denTest (
       { den, ns, ... }:

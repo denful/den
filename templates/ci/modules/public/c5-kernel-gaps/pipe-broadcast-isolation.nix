@@ -2,7 +2,7 @@
 # NOT leak across pipe names, entity kinds, predicate misses, or into collect.
 { denTest, lib, ... }:
 {
-  flake.tests.pipe-broadcast-isolation = {
+  flake.tests.c5.pipe-broadcast-isolation = {
 
     # Pipe-name isolation: a broadcast on `alpha` must not bleed into `beta`.
     # alice consumes BOTH pipes; only alpha carries tux's broadcast.

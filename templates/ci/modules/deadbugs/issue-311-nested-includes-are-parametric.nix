@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-311 = {
+  flake.tests.deadbugs.issue-311 = {
 
     test-nested-includes-are-parametric = denTest (
       {

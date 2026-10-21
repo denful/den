@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-e2e = {
+  flake.tests.internal.fx-e2e = {
 
     # Basic pipeline: host with includes produces correct module count.
     test-host-with-includes = denTest (

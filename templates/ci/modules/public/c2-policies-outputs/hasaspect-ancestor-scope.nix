@@ -15,7 +15,7 @@
 # because `system` is a plain string, not an entity kind.
 { denTest, lib, ... }:
 {
-  flake.tests.hasaspect-ancestor-scope = {
+  flake.tests.c2.hasaspect-ancestor-scope = {
 
     test-projected-hasaspect-under-ancestor-tier = denTest (
       { den, igloo, ... }:

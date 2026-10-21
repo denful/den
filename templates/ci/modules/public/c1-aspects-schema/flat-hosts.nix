@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.flat-hosts = {
+  flake.tests.c1.flat-hosts = {
     test-flat-host-two-level-shape = denTest (
       { den, ... }:
       {

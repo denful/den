@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.parametric = {
+  flake.tests.c1.parametric = {
 
     test-parametric-forwards-context = denTest (
       { den, igloo, ... }:

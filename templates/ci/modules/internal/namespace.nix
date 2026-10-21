@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.performance.namespace = {
+  flake.tests.internal.performance.namespace = {
 
     test-namespace-many-aspects = denTest (
       {

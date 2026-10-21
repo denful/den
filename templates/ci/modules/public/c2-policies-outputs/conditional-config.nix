@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.conditional-config = {
+  flake.tests.c2.conditional-config = {
 
     test-conditional-nixos-import = denTest (
       {

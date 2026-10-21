@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.strict-mode = {
+  flake.tests.c4.strict-mode = {
     test-relaxed-mode = denTest (
       { den, ... }:
       {

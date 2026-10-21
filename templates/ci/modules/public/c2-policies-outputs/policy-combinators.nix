@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.policy-combinators = {
+  flake.tests.c2.policy-combinators = {
 
     # policy.when with true predicate — fn fires, returns effects
     test-when-true-fires = denTest (

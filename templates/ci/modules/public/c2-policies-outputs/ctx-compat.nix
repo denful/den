@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.ctx-compat = {
+  flake.tests.c2.ctx-compat = {
 
     test-ctx-shim-forwards-to-stages = denTest (
       { den, igloo, ... }:

@@ -2,7 +2,7 @@
 # https://github.com/denful/den/pull/413
 { denTest, lib, ... }:
 {
-  flake.tests.deadbugs-issue-413 = {
+  flake.tests.deadbugs.issue-413 = {
     test-provider-sub-aspect-bare-function = denTest (
       { den, igloo, ... }:
       {

@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.cross-context-forward = {
+  flake.tests.c3.cross-context-forward = {
 
     test-resolve-other-host-context = denTest (
       { den, ... }:

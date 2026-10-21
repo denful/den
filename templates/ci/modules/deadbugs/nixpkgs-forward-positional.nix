@@ -3,7 +3,7 @@
 # Reproduction from https://github.com/musjj/nixpkgs-forward-bug
 { denTest, ... }:
 {
-  flake.tests.nixpkgs-forward-positional = {
+  flake.tests.deadbugs.nixpkgs-forward-positional = {
 
     test-overlay-forward = denTest (
       {

@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.policy-include-routing = {
+  flake.tests.c2.policy-include-routing = {
 
     # A policy value in includes registers and fires at entity boundary.
     test-policy-in-includes-fires = denTest (

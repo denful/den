@@ -9,7 +9,7 @@
 # syntheticProvides) and nested keys match that shape deliberately.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.multidef-provides-internals = {
+  flake.tests.c3.multidef-provides-internals = {
 
     test-multidef-underscore-hides-wrapper-internals = denTest (
       { den, ... }:

@@ -75,7 +75,7 @@ let
     };
 in
 {
-  flake.tests.d1cycle = {
+  flake.tests.deadbugs.d1cycle = {
     # RED on stock: [ "iceberg-plain" "igloo" ] — the control fires, the
     # deferred include delivers nothing.
     # GREEN with the drain walk: [ "iceberg-plain-deferred" "igloo" ].

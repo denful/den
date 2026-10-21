@@ -10,7 +10,7 @@
 # Reported via github.com/tschan/den-hasaspect-bug.
 { denTest, ... }:
 {
-  flake.tests.hasaspect-host-provides-to-users = {
+  flake.tests.deadbugs.hasaspect-host-provides-to-users = {
 
     test-host-sees-aspect-it-provides-to-users = denTest (
       {

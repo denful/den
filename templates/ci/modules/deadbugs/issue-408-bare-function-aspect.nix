@@ -2,7 +2,7 @@
 # https://github.com/denful/den/pull/408
 { denTest, lib, ... }:
 {
-  flake.tests.deadbugs-issue-408 = {
+  flake.tests.deadbugs.issue-408 = {
     test-function-aspect-with-static-merge = denTest (
       { den, igloo, ... }:
       {

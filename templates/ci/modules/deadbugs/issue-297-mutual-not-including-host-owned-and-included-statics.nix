@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.deadbugs-issue-297 = {
+  flake.tests.deadbugs.issue-297 = {
 
     test-mutual-host-owned = denTest (
       {

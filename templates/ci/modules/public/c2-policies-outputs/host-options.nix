@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.host-options = {
+  flake.tests.c2.host-options = {
 
     test-custom-hostname-attr = denTest (
       { den, ... }:

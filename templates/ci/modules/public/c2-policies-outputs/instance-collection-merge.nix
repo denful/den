@@ -12,7 +12,7 @@
 # survived.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.instance-collection-merge = {
+  flake.tests.c2.instance-collection-merge = {
 
     test-includes-merge-across-definitions = denTest (
       { den, igloo, ... }:

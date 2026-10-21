@@ -4,7 +4,7 @@
 # the policy to fire in contexts without host.
 { denTest, ... }:
 {
-  flake.tests.hm-host-standalone-crash = {
+  flake.tests.deadbugs.hm-host-standalone-crash = {
 
     # Core bug: standalone home + hm-host schema → crash
     test-hm-host-with-standalone-home = denTest (

@@ -1,6 +1,6 @@
 { denTest, lib, ... }:
 {
-  flake.tests.parametric-fixedTo =
+  flake.tests.c1.parametric-fixedTo =
     let
       test-option = {
         nixos.options.test = lib.mkOption { type = lib.types.listOf lib.types.str; };

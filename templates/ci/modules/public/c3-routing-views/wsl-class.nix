@@ -8,7 +8,7 @@ let
     };
 in
 {
-  flake.tests.wsl-class = {
+  flake.tests.c3.wsl-class = {
 
     test-wsl-forwards = denTest (
       { den, igloo, ... }:

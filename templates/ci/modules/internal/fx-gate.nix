@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.fx-gate = {
+  flake.tests.internal.fx-gate = {
 
     # Aspect with no constraints and no prior dedup passes cleanly.
     test-gate-pass-through = denTest (

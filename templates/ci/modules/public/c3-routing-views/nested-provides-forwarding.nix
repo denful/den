@@ -3,7 +3,7 @@
   ...
 }:
 {
-  flake.tests.nested-provides-forwarding = {
+  flake.tests.c3.nested-provides-forwarding = {
 
     # Provides children are forwarded onto nested aspects
     test-nested-provides-access = denTest (

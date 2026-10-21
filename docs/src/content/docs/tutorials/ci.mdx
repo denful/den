@@ -109,10 +109,10 @@ You can run a single suite (or a sub-path below `flake.tests`) by passing its na
 
 ```console
 # Any attr-path below flake.tests works, e.g. a whole suite:
-just ci wsl-class
+just ci c3.wsl-class
 
 # …or a single case within it:
-just ci wsl-class.test-wsl-forwards
+just ci c3.wsl-class.test-wsl-forwards
 ```
 
 The default `just ci` is fast but cannot show error diffs and skips tests that assert via nix-unit `expectedError`. Use `just ci-deep` for full nix-unit output with diffs:

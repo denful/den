@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.policy-inspect = {
+  flake.tests.c4.policy-inspect = {
 
     # inspect returns core policies matching the kind.
     test-inspect-core-policies = denTest (

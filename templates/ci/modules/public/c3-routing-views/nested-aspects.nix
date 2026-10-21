@@ -5,7 +5,7 @@
   ...
 }:
 {
-  flake.tests.nested-aspects = {
+  flake.tests.c3.nested-aspects = {
 
     # Direct nesting: igloo.tux = { homeManager... } — activated by policy
     # because tux is a declared user of igloo, not by auto-walk

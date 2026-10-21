@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.host-aspects-sibling-leak = {
+  flake.tests.deadbugs.host-aspects-sibling-leak = {
     # Host with two users; only `tux` opts into host-aspects. `pingu` must NOT
     # receive the host's homeManager projection.
     test-sibling-no-leak = denTest (

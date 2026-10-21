@@ -80,7 +80,7 @@ let
     );
 in
 {
-  flake.tests.d1matrix = {
+  flake.tests.deadbugs.d1matrix = {
     test-named-enrich-direct = arm 10110;
     test-named-pipe-direct = arm 10120;
     test-inline-enrich-direct = arm 10130;

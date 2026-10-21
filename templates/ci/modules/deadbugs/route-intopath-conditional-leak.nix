@@ -35,7 +35,7 @@ let
     };
 in
 {
-  flake.tests.route-intopath-conditional-leak = {
+  flake.tests.deadbugs.route-intopath-conditional-leak = {
 
     # Bug 1: guard false (nixos has no `foo` option) → route contributes
     # nothing, cleanly, instead of crashing.

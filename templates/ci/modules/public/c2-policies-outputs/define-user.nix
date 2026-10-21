@@ -1,7 +1,7 @@
 { denTest, ... }:
 {
 
-  flake.tests.define-user.test-on-nixos-included-at-user = denTest (
+  flake.tests.c2.define-user.test-on-nixos-included-at-user = denTest (
     {
       den,
       lib,
@@ -16,7 +16,7 @@
     }
   );
 
-  flake.tests.define-user.test-on-nixos-included-at-host = denTest (
+  flake.tests.c2.define-user.test-on-nixos-included-at-host = denTest (
     {
       den,
       lib,
@@ -41,7 +41,7 @@
     }
   );
 
-  flake.tests.define-user.test-on-nixos-included-at-default = denTest (
+  flake.tests.c2.define-user.test-on-nixos-included-at-default = denTest (
     {
       den,
       lib,

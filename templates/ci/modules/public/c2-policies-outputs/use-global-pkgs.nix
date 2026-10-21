@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.home-manager-use-global-pkgs = {
+  flake.tests.c2.home-manager-use-global-pkgs = {
 
     test-enabled = denTest (
       { den, igloo, ... }:

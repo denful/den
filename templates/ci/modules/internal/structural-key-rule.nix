@@ -5,7 +5,7 @@
 # rule now; this pins it against a marker name that is deliberately NOT listed.
 { denTest, ... }:
 {
-  flake.tests.structural-key-rule = {
+  flake.tests.internal.structural-key-rule = {
 
     test-unlisted-double-underscore-key-is-not-dispatched = denTest (
       { den, ... }:

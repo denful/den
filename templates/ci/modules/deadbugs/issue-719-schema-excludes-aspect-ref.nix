@@ -2,7 +2,7 @@
 # and a bracket reference to a nested aspect recursed through den.aspects.
 { denTest, ... }:
 {
-  flake.tests.issue-719-schema-excludes-aspect-ref = {
+  flake.tests.deadbugs.issue-719-schema-excludes-aspect-ref = {
 
     test-schema-excludes-aspect-ref = denTest (
       { den, igloo, ... }:

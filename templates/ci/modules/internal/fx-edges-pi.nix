@@ -1,6 +1,6 @@
 { denTest, ... }:
 {
-  flake.tests.fx-edges-pi = {
+  flake.tests.internal.fx-edges-pi = {
 
     # aware/dedup defaults: dedupMode defaults, allScopeIds is OMITTED (so the
     # materializer's derive-from-perScope default applies — the per-host site).

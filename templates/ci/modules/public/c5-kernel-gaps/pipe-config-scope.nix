@@ -3,7 +3,7 @@
 # consuming one. Same-host; the cross-host eager path is covered by pipe-broadcast.
 { denTest, lib, ... }:
 {
-  flake.tests.pipe-config-scope = {
+  flake.tests.c5.pipe-config-scope = {
 
     # Host-PRODUCED config-thunk (reads a nixos field) CONSUMED in a home (a
     # different class). Must resolve against the host's nixos config (producing

@@ -10,7 +10,7 @@
 # two, and must still fire once (O5).
 { denTest, ... }:
 {
-  flake.tests.deadbugs.policy-record-provenance = {
+  flake.tests.c3.policy-record-provenance = {
 
     # O4: two inline mkPolicy records sharing the bare name "tools", each
     # owned by a different aspect, must both deliver. Today only one

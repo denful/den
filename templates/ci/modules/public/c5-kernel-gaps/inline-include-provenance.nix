@@ -8,7 +8,7 @@
 # applies this rule; it just does not apply it to named values.
 { denTest, ... }:
 {
-  flake.tests.deadbugs.inline-include-provenance = {
+  flake.tests.c5.inline-include-provenance = {
 
     test-inline-includes-from-different-owners-both-deliver = denTest (
       { den, igloo, ... }:

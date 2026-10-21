@@ -1,7 +1,7 @@
 # Tests for pipe.expose — upward scope flow from child to parent.
 { denTest, lib, ... }:
 {
-  flake.tests.pipe-scope = {
+  flake.tests.c5.pipe-scope = {
 
     # User pipe data exposed to host scope via pipe.expose.
     test-pipe-expose-basic = denTest (

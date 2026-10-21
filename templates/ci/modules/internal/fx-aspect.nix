@@ -68,7 +68,7 @@ let
   };
 in
 {
-  flake.tests.fx-aspect = {
+  flake.tests.internal.fx-aspect = {
 
     # Static aspect: emits emit-class for each class key.
     test-aspectToEffect-static = denTest (
