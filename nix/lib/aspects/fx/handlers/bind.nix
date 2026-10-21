@@ -214,7 +214,7 @@ in
             # double-cover avoidance, where the descendant does receive it.
             #
             # Adding an fx.send is not a local change: every hand-composed
-            # handler set under templates/ci/modules/internal-api/ has to list
+            # handler set under templates/ci/modules/internal/ has to list
             # a handler for it. One of the twelve bare compositions there
             # installs recordInertHandler; the other eleven are green only
             # because they do not reach this branch, and nothing structurally

@@ -34,7 +34,7 @@ Write a minimal test that reproduces the bug **before** attempting any fix. This
 
 ### Test location and structure
 
-Bug regression tests go in `templates/ci/modules/deadbugs/`, named `issue-NNN-short-description.nix` when there's a GitHub issue, `descriptive-name.nix` otherwise. (The other buckets — `public-api/`, `internal-api/`, `features/`, `deprecated/` — hold tests for behaviour that is not a regression.)
+Bug regression tests go in `templates/ci/modules/deadbugs/`, named `issue-NNN-short-description.nix` when there's a GitHub issue, `descriptive-name.nix` otherwise. (The other directories — `public/`, `internal/`, `deprecated/` — hold tests for behaviour that is not a regression.)
 
 The suite name is the **top-level** key under `flake.tests`, and it is the file's own subject, not its directory: `flake.tests.projected-hasaspect`, never `flake.tests.deadbugs.projected-hasaspect`. This matters beyond style — `just ci` splits its argument on the first dot, so a suite nested under `deadbugs.` makes `deadbugs` the suite and the rest a test-name filter that matches nothing, and a passing test reports as `❌ … 😢 0/1`.
 

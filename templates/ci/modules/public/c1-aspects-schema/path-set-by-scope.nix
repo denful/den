@@ -1,4 +1,4 @@
-# templates/ci/modules/internal-api/path-set-by-scope.nix
+# templates/ci/modules/public/c1-aspects-schema/path-set-by-scope.nix
 { denTest, ... }:
 {
   flake.tests.path-set-by-scope = {

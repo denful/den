@@ -30,7 +30,7 @@
                   # `userName`, because this cell is about a nested include
                   # resolving `{ home, ... }` at all — not about what `name`
                   # holds. The registry-key semantics of `home.name` are
-                  # pinned directly in public-api/flat-homes.nix.
+                  # pinned directly in public/c2-policies-outputs/flat-homes.nix.
                   homeManager.home.keyboard.variant = home.userName;
                 }
               )

@@ -10,8 +10,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 [`modules/policies/flake-parts.nix`](https://github.com/denful/den/blob/main/modules/policies/flake-parts.nix) --
 [`modules/outputs.nix`](https://github.com/denful/den/blob/main/modules/outputs.nix) --
 [`nix/flakeOutputs.nix`](https://github.com/denful/den/blob/main/nix/flakeOutputs.nix) --
-[`forward-flake-level.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/internal-api/forward-flake-level.nix) --
-[`packages-merge.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/packages-merge.nix)
+[`forward-flake-level.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public/c3-routing-views/forward-flake-level.nix) --
+[`packages-merge.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public/c2-policies-outputs/packages-merge.nix)
 </Aside>
 
 Hosts and homes turn into `nixosConfigurations`, `darwinConfigurations` and
@@ -260,7 +260,7 @@ attribute has to merge, keep the per-host key at the first level
 - **As a module**, it shapes the `flake` option den declares when flake-parts
   is absent. It's where you set a type for your own attributes, or turn on
   strict mode (`den.schema.flake = den.lib.strict;` rejects undeclared
-  attributes, see [`strict.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public-api/strict.nix)).
+  attributes, see [`strict.nix`](https://github.com/denful/den/blob/main/templates/ci/modules/public/c4-den-surface/strict.nix)).
   With flake-parts, flake-parts owns the `flake` option instead.
 
 ## With flake-parts
