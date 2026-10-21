@@ -279,12 +279,28 @@ input's NixOS module, home-manager `extraSpecialArgs`), see
 [Flake inputs and specialArgs](/explanation/class-modules/#flake-inputs-and-specialargs).
 
 <Aside type="caution">
-Owned configs from `den.default` are deduplicated across pipeline stages.
-Parametric functions in `den.default.includes` are evaluated at every context
-stage. The pipeline handles dispatch automatically based on function argument
-shape: a function taking `{ host }` only runs in host contexts, `{ host, user }`
-only in user contexts. Write your includes as bare functions — no extra wrapper
-is needed. (`den.lib.take.exactly` is deprecated.)
+Owned configs from `den.default` are deduplicated across pipeline stages, so
+they land once. Parametric functions in `den.default.includes` are not: every
+context stage whose context has the function's arguments calls it, and each
+call is a separate instance. Dispatch goes by argument shape, and a context
+matches when it has *at least* those arguments:
+
+- `{ host }` runs in the host context **and** in every user context on that
+  host, because a user context also carries `host`;
+- `{ host, user }` runs only in user contexts.
+
+A user context's `nixos`/`darwin`/`os` content also reaches its host
+([#694](https://github.com/denful/den/issues/694)). So a `{ host }` function in
+`den.default.includes` that sets host options lands once for the host plus once
+per user, and an option that must be defined once (`boot.kernelPackages`, for
+example) fails with "is defined multiple times". To deliver host content once:
+
+- put host-only parametric aspects in `den.schema.host.includes`, or
+- keep the aspect static and take `host` in the class module:
+  `nixos = { host, ... }: { … };`.
+
+Write your includes as bare functions — no extra wrapper is needed.
+(`den.lib.take.exactly` is deprecated.)
 </Aside>
 
 ## Aspect Meta-Data
