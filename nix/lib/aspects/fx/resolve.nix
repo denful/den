@@ -1149,15 +1149,31 @@ let
       # policy.spawn requests (host-aspects) materialize here too, or a static
       # resolve silently drops every projection (#742). A directly resolved
       # entity root is never pushed as a scope, so its kind comes from the root.
+      # A root whose context carries its schema parent's record (a user resolved
+      # with its host) also gets that parent as a scope, keyed as a full resolve
+      # keys it, so a spawn the root requests has a parent aspect to project.
+      rootScopeId = result.state.rootScopeId;
+      rootKind = self.__entityKind or null;
+      parentKind = if rootKind == null then null else den.schema.${rootKind}.parent or null;
+      parentRecord = if parentKind == null then null else ctx.${parentKind} or null;
+      rootParentId = den.lib.aspects.fx.pipeline.mkScopeId { ${parentKind} = parentRecord; };
+      seedParent = parentRecord != null && !(scopeParent ? ${rootScopeId});
       inherit
         (materializeSpawns {
           allHomeNodes = (result.state.scopedSpawns or (_: { })) null;
+          scopeContexts =
+            scopeContexts
+            // lib.optionalAttrs seedParent {
+              ${rootParentId} = {
+                ${parentKind} = parentRecord;
+              };
+            };
+          scopeParent = scopeParent // lib.optionalAttrs seedParent { ${rootScopeId} = rootParentId; };
           scopeEntityKind =
-            lib.optionalAttrs (self ? __entityKind) { ${result.state.rootScopeId} = self.__entityKind; }
+            lib.optionalAttrs (rootKind != null) { ${rootScopeId} = rootKind; }
+            // lib.optionalAttrs seedParent { ${rootParentId} = parentKind; }
             // scopeEntityKind;
           inherit
-            scopeContexts
-            scopeParent
             scopedClassImportsRaw
             spawnNode
             ;
