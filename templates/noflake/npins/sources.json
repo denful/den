@@ -42,14 +42,15 @@
     "nix-maid": {
       "type": "Git",
       "repository": {
-        "type": "GitHub",
+        "type": "Forgejo",
+        "server": "https://codeberg.org",
         "owner": "viperml",
         "repo": "nix-maid"
       },
       "branch": "master",
       "submodules": false,
       "revision": "303e67a8c67d1ba1416abd8842d206a57b46f832",
-      "url": "https://github.com/viperml/nix-maid/archive/303e67a8c67d1ba1416abd8842d206a57b46f832.tar.gz",
+      "url": "https://codeberg.org/viperml/nix-maid/archive/303e67a8c67d1ba1416abd8842d206a57b46f832.tar.gz",
       "hash": "sha256-nvybtwQnyGeUbAq/iOMnt0rOGrp8nkyjnZTW9XIsrfI="
     },
     "nixpkgs": {

@@ -82,6 +82,8 @@ jobs:
       - uses: cachix/install-nix-action@v31
       - uses: DeterminateSystems/magic-nix-cache-action@v13
       - uses: actions/checkout@v6
+      # nix-shell takes its bash from <nixpkgs>; without it macOS falls back to bash 3.2, which nixpkgs refuses
+      - run: echo "NIX_PATH=nixpkgs=$(jq -r .nodes.nixpkgs.locked.url templates/ci/flake.lock)" >> "$GITHUB_ENV"
       - run: nix-shell --run 'just ci-deep'
   flake-check:
     needs: [non-draft, allow-ci]
