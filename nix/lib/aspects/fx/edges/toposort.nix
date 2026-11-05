@@ -134,12 +134,17 @@ let
           acc // { ${t.class} = lib.unique ((acc.${t.class} or [ ]) ++ [ t.root ]); }
       ) { } idxs;
 
-      # Dependency indices of edge i: every writer of any cell i reads, minus self.
+      # Dependency indices of edge i: every writer of any cell i reads, plus any
+      # index the caller pinned via `__afterEdges` (a read the cell model cannot
+      # see from the record alone), minus self.
       depsOf =
         i:
         let
-          cells = readCellsOf writeClassScopes (edgeAt i);
-          writerIdxs = lib.unique (builtins.concatLists (map (c: writers.${c} or [ ]) cells));
+          e = edgeAt i;
+          cells = readCellsOf writeClassScopes e;
+          writerIdxs = lib.unique (
+            builtins.concatLists (map (c: writers.${c} or [ ]) cells) ++ (e.__afterEdges or [ ])
+          );
         in
         builtins.filter (j: j != i) writerIdxs;
 

@@ -37,6 +37,16 @@ let
   providesMod = import ./provides.nix { inherit lib den; };
   inherit (import ./materialize.nix { inherit lib den; }) assembleSubtree;
   inherit (import ./toposort.nix { inherit lib; }) topoSortEdges;
+  inherit (import ../scope-walk.nix { inherit lib; }) subtreeScopes;
+
+  appendAt =
+    perScope: sid: cls: mods:
+    perScope
+    // {
+      ${sid} = (perScope.${sid} or { }) // {
+        ${cls} = (perScope.${sid}.${cls} or [ ]) ++ mods;
+      };
+    };
 
   inherit (routeEdgesMod)
     applyComplexRouteEdge
@@ -159,7 +169,41 @@ let
       # returns reordered edge RECORDS, so we tag each edge with its source pair
       # index (inert — the cell model reads target/source/mode/annotations only) and
       # index the pairs back out after the sort.
-      taggedEdges = lib.imap0 (i: p: p.edge // { __pairIdx = i; }) pairs;
+      #
+      # A collectSubtree simple route also reads what complex forwards append to
+      # its subtree (see the fold below), a read the trace edge cannot show, so
+      # it is pinned after those forwards by pair index.
+      readsForwards = r: !(r.__complexForward or false) && (r.collectSubtree or false);
+      forwardIdxs = builtins.filter (i: (builtins.elemAt pairs i).spec.__complexForward or false) (
+        lib.range 0 (builtins.length pairs - 1)
+      );
+      forwardDepsOf =
+        r:
+        let
+          sids = subtreeScopes {
+            inherit scopeParent;
+            isolated = scopeIsolated;
+            root = r.sourceScopeId;
+            allScopeIds = lib.unique (map (i: (builtins.elemAt pairs i).spec.sourceScopeId) forwardIdxs);
+          };
+        in
+        builtins.filter (
+          i:
+          let
+            f = (builtins.elemAt pairs i).spec;
+          in
+          f.intoClass == r.fromClass && builtins.elem f.sourceScopeId sids
+        ) forwardIdxs;
+      taggedEdges = lib.imap0 (
+        i: p:
+        p.edge
+        // {
+          __pairIdx = i;
+        }
+        // lib.optionalAttrs (p.kind == "route" && readsForwards p.spec) {
+          __afterEdges = forwardDepsOf p.spec;
+        }
+      ) pairs;
       sortedTagged = topoSortEdges taggedEdges;
       orderedPairs = map (e: builtins.elemAt pairs e.__pairIdx) sortedTagged;
 
@@ -168,6 +212,8 @@ let
       # perScope (seed.perScope), NOT the evolving acc — matching applyRoutes,
       # whose route fold's `wrappedPerScope` is captured ONCE at fold start. Complex
       # forwards read the EVOLVING acc (getCollectedSource reads acc.perScope).
+      # A collectSubtree route additionally sees what complex forwards appended
+      # (`forwarded`): a delivered guest must carry its home-manager users (#742).
       wrappedPerScope = seed.perScope;
 
       # A class alias is a simple route that only re-labels a class within its own
@@ -192,43 +238,70 @@ let
       aliasedPerScope = builtins.foldl' (
         perScope: r:
         let
-          sid = r.sourceScopeId;
-          aliased = wrappedPerScope.${sid}.${r.fromClass} or [ ];
+          aliased = wrappedPerScope.${r.sourceScopeId}.${r.fromClass} or [ ];
         in
-        if aliased == [ ] then
-          perScope
-        else
-          perScope
-          // {
-            ${sid} = (perScope.${sid} or { }) // {
-              ${r.intoClass} = (perScope.${sid}.${r.intoClass} or [ ]) ++ aliased;
-            };
-          }
+        if aliased == [ ] then perScope else appendAt perScope r.sourceScopeId r.intoClass aliased
       ) wrappedPerScope (builtins.filter isClassAlias orderedRoutes);
 
-      acc = builtins.foldl' (
-        prev: pair:
-        if pair.kind == "provide" then
-          applyOneProvide ctx prev pair.spec
-        else if pair.spec.__complexForward or false then
-          applyComplexRouteEdge prev {
-            route = pair.spec;
-            inherit
-              rootScopeId
-              scopeContexts
-              scopeParent
-              scopeEntityKind
-              spawnNode
-              buildForwardAspect
-              ;
+      withForwarded =
+        forwarded:
+        builtins.foldl' (
+          perScope: sid:
+          builtins.foldl' (ps: cls: appendAt ps sid cls forwarded.${sid}.${cls}) perScope (
+            builtins.attrNames forwarded.${sid}
+          )
+        ) aliasedPerScope (builtins.attrNames forwarded);
+
+      folded =
+        builtins.foldl'
+          (
+            prev: pair:
+            if pair.kind == "provide" then
+              prev // { acc = applyOneProvide ctx prev.acc pair.spec; }
+            else if pair.spec.__complexForward or false then
+              let
+                inherit (pair.spec) sourceScopeId intoClass;
+                next = applyComplexRouteEdge prev.acc {
+                  route = pair.spec;
+                  inherit
+                    rootScopeId
+                    scopeContexts
+                    scopeParent
+                    scopeEntityKind
+                    spawnNode
+                    buildForwardAspect
+                    ;
+                };
+                before = prev.acc.perScope.${sourceScopeId}.${intoClass} or [ ];
+                # applyComplexRouteEdge only appends, so its output is the new suffix.
+                added = lib.drop (builtins.length before) next.perScope.${sourceScopeId}.${intoClass};
+              in
+              {
+                acc = next;
+                forwarded = appendAt prev.forwarded sourceScopeId intoClass added;
+              }
+            else
+              prev
+              // {
+                acc = applySimpleRouteEdge prev.acc {
+                  route = pair.spec;
+                  wrappedPerScope =
+                    if isClassAlias pair.spec then
+                      wrappedPerScope
+                    else if readsForwards pair.spec then
+                      withForwarded prev.forwarded
+                    else
+                      aliasedPerScope;
+                  inherit scopeParent scopeIsolated;
+                };
+              }
+          )
+          {
+            acc = seed;
+            forwarded = { };
           }
-        else
-          applySimpleRouteEdge prev {
-            route = pair.spec;
-            wrappedPerScope = if isClassAlias pair.spec then wrappedPerScope else aliasedPerScope;
-            inherit scopeParent scopeIsolated;
-          }
-      ) seed orderedPairs;
+          orderedPairs;
+      inherit (folded) acc;
 
       # The folded edge records, in fold (post-toposort) order — the exact trace
       # edges the dispatch above consumed. Captured for the literal-object trace.
