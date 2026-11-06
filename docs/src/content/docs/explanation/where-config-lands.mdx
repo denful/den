@@ -222,7 +222,9 @@ Today `den.aspects.tux.nixos` (and `darwin`, `os`) reaches every host tux
 lives on without any opt-in. That breaks isolation between users and hosts:
 one user's aspect changes a shared host for everyone. It is tracked as a bug
 in [#694](https://github.com/denful/den/issues/694); the planned fix makes it
-opt-in through a `user-aspects` battery, mirroring `host-aspects`. Don't rely
+opt-in through the
+[`user-aspects`](/reference/batteries/#denbatteriesuser-aspects) battery,
+mirroring `host-aspects`. Don't rely
 on the untargeted form. Use the `user` class or `provides.<host>` /
 `provides.to-hosts` above.
 </Aside>

@@ -14,9 +14,9 @@ configurations to a User.
 <Aside title="No battery required" type="tip">
 Cross-entity routing is built into the pipeline — you do **not** need to enable
 any battery. The `provides` keys below are translated into cross-entity policy
-effects automatically. (`den.batteries.mutual-provider` still exists as an inert
-compatibility shim so older configs that include it keep evaluating, but it
-produces no effects.)
+effects automatically. The user-to-host half runs through
+[`den.batteries.mutual-provider`](/reference/batteries/#denbatteriesmutual-provider),
+which every host includes by default.
 </Aside>
 
 

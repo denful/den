@@ -341,7 +341,13 @@ let
               inherit (pair) spec;
               target = targetOf spec;
             in
-            if pair.kind == "provide" then
+            # TODO(#694): a battery delivery the old subtree merge still
+            # carries; delivering it as well would double unkeyed modules. Its
+            # receiver is still resolved, so a delivery that cannot land fails
+            # now. The flip removes the marker.
+            if spec.__deliverAfterFlip or false then
+              builtins.seq target prev
+            else if pair.kind == "provide" then
               recordDelivery prev (applyOneProvide targetOf ctx prev.acc spec) target spec.class
             else if spec.__complexForward or false then
               recordDelivery prev (applyComplexRouteEdge prev.acc {

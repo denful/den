@@ -5,7 +5,7 @@
 # take.exactly uses optional-arg detection to gate on context level.
 # take.atLeast and take.upTo are identity (the pipeline's deferral
 # provides atLeast semantics naturally).
-{ lib, ... }:
+{ lib, den-lib, ... }:
 let
   take.unused = _unused: used: used;
 
@@ -27,7 +27,12 @@ let
             # the function's declared args.
             # Filter out `class` — it's an internal routing key added by push-scope,
             # not a user-facing context arg that should affect exact matching.
-            scopeKeys = builtins.filter (k: k != "class") (resolvedArgs.__scopeKeys or [ ]);
+            # So are the acceptance keys a host publishes (#694). Any battery
+            # that publishes a ctx key must be added here; the gap closes when
+            # take.exactly is removed.
+            scopeKeys = builtins.filter (k: k != "class" && !(den-lib.acceptance.isAcceptanceKey k)) (
+              resolvedArgs.__scopeKeys or [ ]
+            );
             cleanArgs = builtins.removeAttrs resolvedArgs [ "__scopeKeys" ];
             # Check 1: all required keys must be resolved
             hasMissing = builtins.any (k: !(cleanArgs ? ${k})) requiredKeys;
