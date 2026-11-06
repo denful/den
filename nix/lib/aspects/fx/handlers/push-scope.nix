@@ -22,6 +22,23 @@ let
         entityKind = param.entityKind or null;
         newScopeId = mkScopeId scopedCtx;
         isSameScope = newScopeId == parentScope;
+        # A push that lands on its parent's id adds no node: a routing kind's
+        # push (`flake-system`, the microvm template's `microvm-host`) is context
+        # belonging to its nearest entity ancestor, and a push of a record the
+        # parent already binds (a `den.default` policy re-resolving `{ host }`
+        # below where it first fired) re-enters that node. Neither overwrites
+        # the scope's kind, entity link or isolation mark. An entity push of a
+        # new record that adds no nameable key would have to share its parent's
+        # node, so it is refused.
+        isEntityKind = entityKind != null && (den.schema.${entityKind}.isEntity or false);
+        pushedHash = if entityKind == null then null else (scopedCtx.${entityKind} or { }).id_hash or null;
+        parentCtx = (state.scopeContexts null).${parentScope} or { };
+        isReentry = pushedHash != null && (parentCtx.${entityKind} or { }).id_hash or null == pushedHash;
+        checkedScopeId =
+          if isSameScope && isEntityKind && !isReentry then
+            throw "den: entity kind '${entityKind}' was resolved at scope '${parentScope}' with no binding that names it, so it has no scope of its own. Bind its record under `${entityKind}` in the resolve (e.g. `resolve.to \"${entityKind}\" { ${entityKind} = <record>; }`)."
+          else
+            newScopeId;
         scopeHandlers = constantHandler (
           scopedCtx // lib.optionalAttrs (entityClass != null) { class = entityClass; }
         );
@@ -47,7 +64,7 @@ let
         entityIdHash = if entityRecord == null then null else entityRecord.id_hash or null;
         updatedScopeByEntity =
           prevScopeByEntity
-          // lib.optionalAttrs (entityIdHash != null) {
+          // lib.optionalAttrs (entityIdHash != null && !isSameScope) {
             "${parentScope}\n${entityIdHash}" = newScopeId;
           };
         updatedParent = prevParent // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
@@ -57,20 +74,22 @@ let
         updatedEntityClass =
           prevEntityClass // lib.optionalAttrs (entityClass != null) { ${newScopeId} = entityClass; };
         updatedEntityKind =
-          prevEntityKind // lib.optionalAttrs (entityKind != null) { ${newScopeId} = entityKind; };
+          prevEntityKind
+          // lib.optionalAttrs (entityKind != null && !isSameScope) { ${newScopeId} = entityKind; };
         updatedSourcePolicy =
           prevSourcePolicy
           // lib.optionalAttrs (sourcePolicyName != null) { ${newScopeId} = sourcePolicyName; };
         isolatedKind = entityKind != null && (den.schema.${entityKind}.isolated or false);
-        updatedIsolated = prevIsolated // lib.optionalAttrs isolatedKind { ${newScopeId} = true; };
+        updatedIsolated =
+          prevIsolated // lib.optionalAttrs (isolatedKind && !isSameScope) { ${newScopeId} = true; };
       in
       {
         resume = {
           inherit scopeHandlers;
-          scopeId = newScopeId;
+          scopeId = checkedScopeId;
         };
         state = state // {
-          currentScope = newScopeId;
+          currentScope = checkedScopeId;
           inLateDispatch = false;
           inLateDispatchStack = (state.inLateDispatchStack or [ ]) ++ [ (state.inLateDispatch or false) ];
           scopeContexts = _: updatedContexts;

@@ -109,6 +109,7 @@ let
     synthesize = { inherit forwardId fromClass intoClass; };
   };
   rootT = root: class: { inherit root class; };
+  sortEdgeList = lib.sort (a: b: builtins.toJSON a < builtins.toJSON b);
   outT = output: { inherit output; };
   edge =
     {
@@ -134,15 +135,28 @@ let
   # darwin). The production edge object (Task 18.2) CAPTURES the edges its fold
   # dispatched (kept routes only), so the legacy oracle's dedup-suppressed twin is
   # NOT present here — production never dispatches it.
+  # #694: the user's channels name the host as receiver, so they land at the
+  # host's root; the user-scope arm of the home-manager host-module import is
+  # a provide from the user scope to the host.
   userForwardTail =
     {
       user,
       os,
+      host,
     }:
     [
       (edge {
+        source = collected "user:${user}" os;
+        target = rootT "host:${host}" os;
+        mode = "merge";
+        annotations = {
+          mergeHalf = "default-fold";
+          providesPolicyName = "hm-user-detect";
+        };
+      })
+      (edge {
         source = synthesize "homeManager/${os}/home-manager/users/${user}" "homeManager" os;
-        target = rootT "user:${user}" os;
+        target = rootT "host:${host}" os;
         path = [
           "home-manager"
           "users"
@@ -151,12 +165,13 @@ let
         mode = "nest";
         annotations = {
           complexForward = true;
+          receiver = true;
           sourceVia = "unresolved";
         };
       })
       (edge {
         source = collected "user:${user}" "user";
-        target = rootT "user:${user}" os;
+        target = rootT "host:${host}" os;
         path = [
           "users"
           "users"
@@ -166,6 +181,7 @@ let
         annotations = {
           adaptArgs = true;
           ensureTargetPath = true;
+          receiver = true;
         };
       })
     ];
@@ -183,45 +199,49 @@ in
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.igloo.nixos.networking.hostName = "igloo";
 
-        expr = hostTrace den "nixos" den.hosts.x86_64-linux.igloo;
-        expected = [
-          (edge {
-            source = collected "host:igloo" "homeManager";
-            target = rootT "host:igloo" "homeManager";
-            mode = "merge";
-            annotations = {
-              collectedScopes = [
-                "host:igloo"
-                "user:tux"
-              ];
-            };
-          })
-          (edge {
-            source = collected "host:igloo" "nixos";
-            target = rootT "host:igloo" "nixos";
-            mode = "merge";
-            annotations = {
-              collectedScopes = [
-                "host:igloo"
-                "user:tux"
-              ];
-            };
-          })
-          (edge {
-            source = collected "host:igloo" "os";
-            target = rootT "host:igloo" "nixos";
-            mode = "merge";
-          })
-          (edge {
-            source = collected "user:tux" "os";
-            target = rootT "user:tux" "nixos";
-            mode = "merge";
-          })
-        ]
-        ++ userForwardTail {
-          user = "tux";
-          os = "nixos";
-        };
+        # Compared as sets: the moved channels change the trace sort order.
+        expr = sortEdgeList (hostTrace den "nixos" den.hosts.x86_64-linux.igloo);
+        expected = sortEdgeList (
+          [
+            (edge {
+              source = collected "host:igloo" "homeManager";
+              target = rootT "host:igloo" "homeManager";
+              mode = "merge";
+              annotations = {
+                collectedScopes = [
+                  "host:igloo"
+                  "user:tux"
+                ];
+              };
+            })
+            (edge {
+              source = collected "host:igloo" "nixos";
+              target = rootT "host:igloo" "nixos";
+              mode = "merge";
+              annotations = {
+                collectedScopes = [
+                  "host:igloo"
+                  "user:tux"
+                ];
+              };
+            })
+            (edge {
+              source = collected "host:igloo" "os";
+              target = rootT "host:igloo" "nixos";
+              mode = "merge";
+            })
+            (edge {
+              source = collected "user:tux" "os";
+              target = rootT "user:tux" "nixos";
+              mode = "merge";
+            })
+          ]
+          ++ userForwardTail {
+            user = "tux";
+            os = "nixos";
+            host = "igloo";
+          }
+        );
       }
     );
 
@@ -533,31 +553,34 @@ in
         den.aspects.tux.includes = [ den.batteries.host-aspects ];
 
         expr = {
-          # The HM-into-user forward (the extraction edge), targeting the user
-          # root. Production (Task 18.2) captures the kept route only — the legacy
-          # oracle's dedup-suppressed twin is absent.
+          # The HM forward, naming the host as receiver (#694). Two copies: the
+          # host's own fold and the host-aspects spawn's surfaced fold, which
+          # re-applies it. The production trace concatenates both without dedup
+          # (as test-topology-fleet-environment notes for the os route).
           synth = synthEdges;
           # Stable total edge count for this topology.
           count = builtins.length trace;
         };
         expected = {
-          synth = [
-            (edge {
-              source = synthesize "homeManager/nixos/home-manager/users/tux" "homeManager" "nixos";
-              target = rootT "user:tux" "nixos";
-              path = [
-                "home-manager"
-                "users"
-                "tux"
-              ];
-              mode = "nest";
-              annotations = {
-                complexForward = true;
-                sourceVia = "unresolved";
-              };
-            })
-          ];
-          count = 6;
+          synth = lib.replicate 2 (edge {
+            source = synthesize "homeManager/nixos/home-manager/users/tux" "homeManager" "nixos";
+            target = rootT "host:igloo" "nixos";
+            path = [
+              "home-manager"
+              "users"
+              "tux"
+            ];
+            mode = "nest";
+            annotations = {
+              complexForward = true;
+              receiver = true;
+              sourceVia = "unresolved";
+            };
+          });
+          # host folds (2) + host os route + user os route + the tail (3, from
+          # userForwardTail) + the spawn's copies (forward, user route, os
+          # route) + the spawn's user-scope folds (2).
+          count = 12;
         };
       }
     );
@@ -680,56 +703,60 @@ in
         };
         den.aspects.apple.nixos.networking.hostName = "apple";
 
-        expr = hostTrace den "nixos" den.hosts.aarch64-darwin.apple;
-        expected = [
-          (edge {
-            source = collected "host:apple" "darwin";
-            target = rootT "host:apple" "darwin";
-            mode = "merge";
-            annotations = {
-              collectedScopes = [
-                "host:apple"
-                "user:tux"
-              ];
-            };
-          })
-          (edge {
-            source = collected "host:apple" "os";
-            target = rootT "host:apple" "darwin";
-            mode = "merge";
-          })
-          (edge {
-            source = collected "host:apple" "homeManager";
-            target = rootT "host:apple" "homeManager";
-            mode = "merge";
-            annotations = {
-              collectedScopes = [
-                "host:apple"
-                "user:tux"
-              ];
-            };
-          })
-          (edge {
-            source = collected "host:apple" "nixos";
-            target = rootT "host:apple" "nixos";
-            mode = "merge";
-            annotations = {
-              collectedScopes = [
-                "host:apple"
-                "user:tux"
-              ];
-            };
-          })
-          (edge {
-            source = collected "user:tux" "os";
-            target = rootT "user:tux" "darwin";
-            mode = "merge";
-          })
-        ]
-        ++ userForwardTail {
-          user = "tux";
-          os = "darwin";
-        };
+        # Compared as sets: the moved channels change the trace sort order.
+        expr = sortEdgeList (hostTrace den "nixos" den.hosts.aarch64-darwin.apple);
+        expected = sortEdgeList (
+          [
+            (edge {
+              source = collected "host:apple" "darwin";
+              target = rootT "host:apple" "darwin";
+              mode = "merge";
+              annotations = {
+                collectedScopes = [
+                  "host:apple"
+                  "user:tux"
+                ];
+              };
+            })
+            (edge {
+              source = collected "host:apple" "os";
+              target = rootT "host:apple" "darwin";
+              mode = "merge";
+            })
+            (edge {
+              source = collected "host:apple" "homeManager";
+              target = rootT "host:apple" "homeManager";
+              mode = "merge";
+              annotations = {
+                collectedScopes = [
+                  "host:apple"
+                  "user:tux"
+                ];
+              };
+            })
+            (edge {
+              source = collected "host:apple" "nixos";
+              target = rootT "host:apple" "nixos";
+              mode = "merge";
+              annotations = {
+                collectedScopes = [
+                  "host:apple"
+                  "user:tux"
+                ];
+              };
+            })
+            (edge {
+              source = collected "user:tux" "os";
+              target = rootT "user:tux" "darwin";
+              mode = "merge";
+            })
+          ]
+          ++ userForwardTail {
+            user = "tux";
+            os = "darwin";
+            host = "apple";
+          }
+        );
       }
     );
 

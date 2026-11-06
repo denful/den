@@ -13,7 +13,15 @@ let
     extractTopLevelEdges
     sortEdges
     ;
-  inherit (import ./scope-walk.nix { inherit lib; }) subtreeScopes dedupByKey;
+  inherit (import ./scope-walk.nix { inherit lib; }) subtreeScopes dedupByKey ownEntityMap;
+
+  # The resolved root's own entity: the record its kind names in the ctx.
+  rootIdHashOf =
+    self: ctx:
+    let
+      kind = self.__entityKind or null;
+    in
+    if kind == null then null else (ctx.${kind} or { }).id_hash or null;
   inherit (import ./edges/pi.nix { inherit lib; }) mkStaticPi;
   inherit (import ./edges/instantiate-edges.nix { inherit lib den; }) mkInstantiateEdges;
   inherit (import ./edges/edge.nix { inherit lib; }) scopeName edgeSortKey;
@@ -318,15 +326,19 @@ let
       scopeEntityClass ? (_: { }),
       scopeEntityKind ? { },
       scopeIsolated ? { },
+      ownEntityOf,
       spawnNodeFn,
       ctx,
     }:
     spec:
     let
-      # perHostProjection takes only the projection inputs; scopeEntityKind is a
-      # mkInstantiateArgs-LOCAL concern (Π naming for materializeUnified), so it is
-      # stripped from the bundle passed through.
-      projBundle = builtins.removeAttrs argBundle [ "scopeEntityKind" ];
+      # perHostProjection takes only the projection inputs; scopeEntityKind and
+      # ownEntityOf are mkInstantiateArgs-LOCAL concerns (the Π materializeUnified
+      # reads), so they are stripped from the bundle passed through.
+      projBundle = builtins.removeAttrs argBundle [
+        "scopeEntityKind"
+        "ownEntityOf"
+      ];
       proj = perHostProjection projBundle spec;
       preWalkedModules =
         if proj != null then
@@ -354,7 +366,7 @@ let
                 isolationMode = "aware";
               })
               // {
-                inherit scopeEntityKind;
+                inherit scopeEntityKind ownEntityOf;
               };
             materialized = materializeUnified {
               inherit pi ctx;
@@ -412,6 +424,7 @@ let
       scopeEntityClass ? (_: { }),
       scopeEntityKind ? { },
       scopeIsolated ? { },
+      ownEntityOf,
       spawnNodeFn,
       ctx,
     }:
@@ -428,6 +441,7 @@ let
           scopeEntityClass
           scopeEntityKind
           scopeIsolated
+          ownEntityOf
           spawnNodeFn
           ctx
           ;
@@ -482,6 +496,11 @@ let
       # it directly (no name-infix reconstruction); both instantiate call sites
       # (phase4 + the B′ hostConfigs build) use the link.
       scopeByEntity = (result.state.scopeByEntity or (_: { })) null;
+      ownEntityOf = ownEntityMap {
+        inherit scopeByEntity;
+        rootScopeId = result.state.rootScopeId;
+        rootIdHash = rootIdHashOf self ctx;
+      };
 
       # Scan raw pipe values for config-dependent thunks. If none exist, hostConfigs
       # stays null and assemblePipes skips cross-host instantiation entirely.
@@ -568,7 +587,7 @@ let
                 scopeByEntity
                 ;
               scopeEntityClass = result.state.scopeEntityClass or (_: { });
-              inherit scopeIsolated scopeEntityKind;
+              inherit scopeIsolated scopeEntityKind ownEntityOf;
               spawnNodeFn = spawnNode;
               inherit ctx;
             };
@@ -578,7 +597,11 @@ let
       # Assemble pipe data into scope contexts before wrapping.
       # Local config thunks are marked for deferred resolution inside evalModules.
       # Cross-host config thunks (from pipe.collect) are resolved using hostConfigs.
-      scopeEntityKind = (result.state.scopeEntityKind or (_: { })) null;
+      # A directly resolved entity root is never pushed as a scope, so its kind
+      # comes from the root (as the static resolve seeds it).
+      scopeEntityKind =
+        lib.optionalAttrs (self ? __entityKind) { ${result.state.rootScopeId} = self.__entityKind; }
+        // (result.state.scopeEntityKind or (_: { })) null;
       scopeEntityClassMap = (result.state.scopeEntityClass or (_: { })) null;
       tempAugmentedNoCfg = assemblePipes {
         inherit scopeContexts scopeEntityKind;
@@ -657,6 +680,7 @@ let
           scopeIsolated
           ctx
           scopeEntityKind
+          ownEntityOf
           ;
         scopedClassImports = scopedClassImportsRaw;
         scopedPipeEffects = result.state.scopedPipeEffects null;
@@ -908,7 +932,7 @@ let
           isolationMode = "aware";
         })
         // {
-          inherit scopeEntityKind;
+          inherit scopeEntityKind ownEntityOf;
         };
       materialized =
         materializeUnified
@@ -935,7 +959,7 @@ let
       phase4 = applyInstantiates {
         scopedInstantiates = result.state.scopedInstantiates null;
         scopeEntityClass = result.state.scopeEntityClass or (_: { });
-        inherit scopeIsolated scopeEntityKind;
+        inherit scopeIsolated scopeEntityKind ownEntityOf;
         inherit
           augmentedScopeContexts
           scopedProvides
@@ -1001,7 +1025,7 @@ let
                 isolationMode = "aware";
               })
               // {
-                inherit scopeEntityKind;
+                inherit scopeEntityKind ownEntityOf;
               };
             materialized =
               materializeUnified
@@ -1145,6 +1169,11 @@ let
       scopeParent = result.state.scopeParent null;
       scopeIsolated = (result.state.scopeIsolated or (_: { })) null;
       scopeEntityKind = (result.state.scopeEntityKind or (_: { })) null;
+      ownEntityOf = ownEntityMap {
+        scopeByEntity = (result.state.scopeByEntity or (_: { })) null;
+        rootScopeId = result.state.rootScopeId;
+        rootIdHash = rootIdHashOf self ctx;
+      };
 
       # policy.spawn requests (host-aspects) materialize here too, or a static
       # resolve silently drops every projection (#742). A directly resolved
@@ -1201,7 +1230,7 @@ let
           scopeIsolated
           ctx
           ;
-        inherit scopeEntityKind;
+        inherit scopeEntityKind ownEntityOf;
         scopedClassImports = scopedClassImportsRaw;
         scopedPipeEffects = result.state.scopedPipeEffects null;
         scopedRoutes = result.state.scopedRoutes null;
@@ -1232,7 +1261,7 @@ let
           isolationMode = "aware";
         })
         // {
-          scopeEntityKind = (result.state.scopeEntityKind or (_: { })) null;
+          inherit scopeEntityKind ownEntityOf;
         };
       materialized = materializeUnified {
         inherit pi ctx spawnNode;

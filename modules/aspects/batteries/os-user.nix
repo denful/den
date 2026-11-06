@@ -41,11 +41,17 @@ in
   den.default.includes = [ den.policies.user-to-host ];
 
   den.policies.user-to-host =
-    { user, host, ... }:
+    {
+      user,
+      host,
+      home ? null,
+      ...
+    }:
     # Same gate as os-to-host: a standalone home binds a user and a synthetic
     # host identity, neither of which has an OS to route into. `host ? class`
     # keeps this inert there and reading `host.class` safe.
-    lib.optional (host ? class) (
+    # A standalone home binds a host that is not its ancestor: no receiver.
+    lib.optional (host ? class && home == null) (
       den.lib.policy.route {
         fromClass = "user";
         intoClass = host.class;
@@ -55,6 +61,7 @@ in
           user.userName
         ];
         adaptArgs = args: args // { osConfig = args.config; };
+        receiver = host;
       }
     );
 }

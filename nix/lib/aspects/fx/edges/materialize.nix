@@ -258,6 +258,7 @@ rec {
       ctx,
       augmented,
       scopeEntityKind,
+      ownEntityOf,
       mergedClassImports,
       mergedScopeParent,
       mergedScopeIsolated,
@@ -289,7 +290,7 @@ rec {
           inherit allScopeIds;
         })
         // {
-          inherit scopeEntityKind;
+          inherit scopeEntityKind ownEntityOf;
         };
       # materializeUnified is reached via the lazy `den` namespace (NOT a direct
       # import) — materialize-unified.nix imports THIS file for assembleSubtree, so
