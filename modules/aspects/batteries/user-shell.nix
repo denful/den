@@ -1,4 +1,4 @@
-{ ... }:
+{ den, lib, ... }:
 let
 
   description = ''
@@ -12,22 +12,49 @@ let
       ];
   '';
 
-  userShell = shell: user: {
-    nixos =
-      { pkgs, ... }:
-      {
-        programs.${shell}.enable = true;
-        users.users.${user.userName}.shell = pkgs.${shell};
-      };
+  # Delivered to the host from each user scope, wherever the battery is
+  # included (a host-side include fans out to the users).
+  hostShell =
+    shell:
+    {
+      host,
+      user,
+      home ? null,
+      ...
+    }:
+    # A standalone home binds a host that is not its ancestor: no receiver.
+    # Only an OS host has these settings, as on main.
+    lib.optional
+      (
+        host ? class
+        && home == null
+        && builtins.elem host.class [
+          "nixos"
+          "darwin"
+        ]
+      )
+      (
+        den.lib.policy.provide {
+          class = host.class;
+          module =
+            { pkgs, ... }:
+            {
+              programs.${shell}.enable = true;
+              users.users.${user.userName}.shell = pkgs.${shell};
+            }
+            // lib.optionalAttrs (host.class == "darwin") { environment.shells = [ pkgs.${shell} ]; };
+          receiver = host;
+        }
+      );
 
-    darwin =
-      { pkgs, ... }:
+  userShell = shell: {
+    includes = [
       {
-        programs.${shell}.enable = true;
-        users.users.${user.userName}.shell = pkgs.${shell};
-        environment.shells = [ pkgs.${shell} ];
-      };
-
+        __isPolicy = true;
+        name = "user-shell-host/${shell}";
+        fn = hostShell shell;
+      }
+    ];
     homeManager = {
       programs.${shell}.enable = true;
     };
@@ -39,8 +66,14 @@ in
     inherit description;
 
     includes = [
-      ({ host, user }: { name = "user-shell/${user.userName}@${host.name}"; } // userShell shell user)
-      ({ home }: { name = "user-shell/${home.name}"; } // userShell shell home)
+      ({ host, user }: { name = "user-shell/${user.userName}@${host.name}"; } // userShell shell)
+      (
+        { home }:
+        {
+          name = "user-shell/${home.name}";
+          homeManager.programs.${shell}.enable = true;
+        }
+      )
     ];
   };
 }

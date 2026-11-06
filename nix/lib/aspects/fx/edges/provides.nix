@@ -32,13 +32,24 @@ let
 
   # Dedup provides by composite key (policyName/class/path). Null-keyed specs
   # (no __providePolicyName) are always kept. First-occurrence wins.
-  dedupProvides = dedupByKey (
-    s:
-    let
-      pn = s.__providePolicyName or null;
-    in
-    if pn != null then "${pn}/${s.class}/${lib.concatStringsSep "/" (s.path or [ ])}" else null
-  );
+  # A provide naming a `receiver` also keys on its source entity: one battery
+  # policy firing at every user scope delivers each user's settings separately.
+  # `entityOf` maps a source scope to its nearest own entity's id_hash.
+  dedupProvides =
+    entityOf:
+    dedupByKey (
+      s:
+      let
+        pn = s.__providePolicyName or null;
+        base = "${pn}/${s.class}/${lib.concatStringsSep "/" (s.path or [ ])}";
+      in
+      if pn == null then
+        null
+      else if (s.receiver or null) != null then
+        "${base}@${entityOf s.sourceScopeId}"
+      else
+        base
+    );
 
   # ===== materialization (ported from resolve.nix:applyProvides) ==========
   # Apply the deduped provides specs onto an accumulator { classImports; perScope; }.
@@ -55,11 +66,11 @@ let
   # order by materializeUnified's ordered-dispatch fold (edges/materialize-
   # unified.nix), which folds provides and routes together.
   applyOneProvide =
-    ctx: prev: spec:
+    targetOf: ctx: prev: spec:
     let
       targetClass = spec.class;
       path = spec.path or [ ];
-      sid = spec.sourceScopeId;
+      sid = targetOf spec;
       # Nest-at-P construction (P=[] degenerates to a plain merge contribution).
       rawModule = if path == [ ] then spec.module else lib.setAttrByPath path spec.module;
       wrapped = den.lib.aspects.fx.aspect.wrapClassModule {
@@ -97,10 +108,15 @@ let
   #   name  — sid → stable scope name (edge.nix scopeName).
   #   scopedProvides — sid → [ provide specs ].
   providesEdges =
-    { name, scopedProvides }:
+    {
+      name,
+      scopedProvides,
+      entityOf ? sid: sid,
+      targetOf ? spec: spec.sourceScopeId,
+    }:
     let
       allProvides = builtins.concatLists (lib.attrValues scopedProvides);
-      dedupedProvides = dedupProvides allProvides;
+      dedupedProvides = dedupProvides entityOf allProvides;
     in
     map (
       spec:
@@ -110,7 +126,7 @@ let
       in
       mkEdge {
         source = collected (name sid) spec.class;
-        target = rootTarget (name sid) spec.class;
+        target = rootTarget (name (targetOf spec)) spec.class;
         inherit path;
         mode = if path == [ ] then "merge" else "nest";
         annotations = {
