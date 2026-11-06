@@ -135,5 +135,47 @@
         expected = [ "feat-mod" ];
       }
     );
+
+    # A repeat under a provide is not walked again: an unkeyed pipe value its
+    # aspect emits counts once, in either order.
+    test-provided-and-direct-pipe-once = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.quirks.probe-pipe.description = "";
+        den.aspects.producer.probe-pipe = "p";
+        den.aspects.tux.includes = [ den.aspects.producer ];
+        den.aspects.tux.provides.to-hosts = {
+          includes = [ den.aspects.producer ];
+          nixos =
+            { probe-pipe, ... }:
+            {
+              environment.etc.pipe-count.text = toString (builtins.length probe-pipe);
+            };
+        };
+        expr = igloo.environment.etc.pipe-count.text;
+        expected = "1";
+      }
+    );
+
+    test-direct-after-provided-pipe-once = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.quirks.probe-pipe.description = "";
+        den.aspects.producer.probe-pipe = "p";
+        den.aspects.tux.provides.to-hosts = {
+          includes = [ den.aspects.producer ];
+          nixos =
+            { probe-pipe, ... }:
+            {
+              environment.etc.pipe-count.text = toString (builtins.length probe-pipe);
+            };
+        };
+        den.aspects.tux.includes = [ den.aspects.producer ];
+        expr = igloo.environment.etc.pipe-count.text;
+        expected = "1";
+      }
+    );
   };
 }
