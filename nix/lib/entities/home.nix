@@ -138,6 +138,9 @@ let
             ];
             config._module.args.host = hostCtx;
             config._module.args.user = userCtx;
+            # Declared once, on `den.schema.home` (modules/options.nix); a second
+            # declaration stating `description` is refused, as in nixpkgs.
+            config.system = lib.mkOptionDefault system;
             options = {
 
               userName = strOpt "user account name" userName;
@@ -154,7 +157,6 @@ let
                 default = hostCtx;
                 defaultText = lib.literalExpression "host";
               };
-              system = strOpt "platform system" system;
               class = strOpt "home management nix class" "homeManager";
               aspect = lib.mkOption {
                 description = "Aspect that configures this home.";
