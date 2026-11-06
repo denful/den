@@ -114,8 +114,13 @@ jobs:
           }
           EOF
           git add templates/noflake/modules/ci-runtime.nix
+      # install-nix-action enables flakes; turn them off so builtins.fetchTree is absent, as for a no-flake user.
       - run: (cd templates/noflake && nix-build ./default.nix -A flake.nixosConfigurations.igloo.config.system.build.toplevel)
+        env:
+          NIX_CONFIG: experimental-features = nix-command
       - run: (cd templates/noflake && nix-shell ./default.nix -A den.sh --run 'igloo build --offline')
+        env:
+          NIX_CONFIG: experimental-features = nix-command
   template:
     needs: [non-draft, allow-ci]
     if: ${{needs.non-draft.outputs.nix-changed == 'true'}}
