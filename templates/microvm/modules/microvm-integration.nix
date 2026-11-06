@@ -94,6 +94,7 @@ in
 
       sharedNixStore = lib.optional host.microvm.sharedNixStore (provide {
         class = host.class;
+        receiver = host;
         path = [
           "microvm"
           "vms"
@@ -121,6 +122,7 @@ in
       # evaluates them within the submodule context.
       osProvide = provide {
         class = host.class;
+        receiver = host;
         path = [
           "microvm"
           "vms"
@@ -133,6 +135,7 @@ in
       # Deliver VM's microvm class modules to server at microvm.vms.<name>
       microvmProvide = provide {
         class = host.class;
+        receiver = host;
         path = [
           "microvm"
           "vms"

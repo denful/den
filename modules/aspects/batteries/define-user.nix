@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ den, lib, ... }:
 let
   description = ''
     Defines a user at OS and Home levels.
@@ -22,19 +22,54 @@ let
     host: user:
     if lib.hasSuffix "darwin" host.system then "/Users/${user.userName}" else "/home/${user.userName}";
 
+  # Delivered to the host from each user scope, wherever the battery is
+  # included (a host-side include fans out to the users).
+  account =
+    {
+      host,
+      user,
+      home ? null,
+      ...
+    }:
+    # A standalone home binds a host that is not its ancestor: no receiver.
+    # Only an OS host has these settings, as on main.
+    lib.optional
+      (
+        host ? class
+        && home == null
+        && builtins.elem host.class [
+          "nixos"
+          "darwin"
+        ]
+      )
+      (
+        den.lib.policy.provide {
+          class = host.class;
+          path = [
+            "users"
+            "users"
+            user.userName
+          ];
+          module = {
+            name = user.userName;
+            home = homeDir host user;
+          }
+          // lib.optionalAttrs (host.class == "nixos") { isNormalUser = true; };
+          receiver = host;
+        }
+      );
+
   userContext =
     { host, user }:
     {
       name = "define-user/${user.userName}@${host.name}";
-      nixos.users.users.${user.userName} = {
-        name = user.userName;
-        home = homeDir host user;
-        isNormalUser = true;
-      };
-      darwin.users.users.${user.userName} = {
-        name = user.userName;
-        home = homeDir host user;
-      };
+      includes = [
+        {
+          __isPolicy = true;
+          name = "define-user-account";
+          fn = account;
+        }
+      ];
       homeManager = {
         home.username = user.userName;
         home.homeDirectory = homeDir host user;

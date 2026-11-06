@@ -36,6 +36,18 @@
     in
     builtins.filter isIn allScopeIds;
 
+  # sid → id_hash of the scope's own entity: the record push-scope linked in
+  # scopeByEntity (keyed "${parent}\n${id_hash}"), plus the resolved root's own
+  # record. Scopes with no own entity are absent.
+  ownEntityMap =
+    {
+      scopeByEntity,
+      rootScopeId,
+      rootIdHash,
+    }:
+    lib.mapAttrs' (k: sid: lib.nameValuePair sid (lib.last (lib.splitString "\n" k))) scopeByEntity
+    // lib.optionalAttrs (rootIdHash != null) { ${rootScopeId} = rootIdHash; };
+
   # First-occurrence-wins dedup of `list` by the key `getKey` extracts from each
   # element. Elements whose key is null are always kept (never deduped).
   dedupByKey =

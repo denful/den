@@ -9,7 +9,7 @@
 { lib, den }:
 let
   inherit (import ./assemble-pipes.nix { inherit lib den; }) assemblePipes;
-  inherit (import ./scope-walk.nix { inherit lib; }) subtreeScopes;
+  inherit (import ./scope-walk.nix { inherit lib; }) subtreeScopes ownEntityMap;
   inherit (import ./handlers/route.nix { inherit lib; }) routeKey;
   inherit (import ./edges/materialize.nix { inherit lib den; }) assembleSpawnSubtree;
   pipeNamesSet = lib.genAttrs (builtins.attrNames (den.quirks or { })) (_: true);
@@ -266,6 +266,15 @@ in
         wrapPerScope
         ;
       ctx = parentState.ctx;
+      ownEntityOf =
+        parentState.ownEntityOf
+        // ownEntityMap {
+          scopeByEntity = (result.state.scopeByEntity or (_: { })) null;
+          rootScopeId = spawnRoot;
+          rootIdHash = lib.findFirst (h: h != null) null (
+            map (v: v.id_hash or null) (lib.attrValues bindings)
+          );
+        };
       inherit augmented;
       inherit mergedClassImports;
       # Merged parent + spawned entity kinds — the surfaced edges' scopeName map.
