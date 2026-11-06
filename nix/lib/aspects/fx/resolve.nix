@@ -552,7 +552,7 @@ let
         rootScopeId = result.state.rootScopeId;
         rootIdHash = rootIdHashOf self ctx;
       };
-      provenanceLocs = (result.state.scopedProvenanceLocs or (_: { })) null;
+      provenanceLocs = (import ./handlers/provenance.nix { inherit lib; }).locsOf result.state;
 
       # Scan raw pipe values for config-dependent thunks. If none exist, hostConfigs
       # stays null and assemblePipes skips cross-host instantiation entirely.
@@ -1258,7 +1258,7 @@ let
         rootScopeId = result.state.rootScopeId;
         rootIdHash = rootIdHashOf self ctx;
       };
-      provenanceLocs = (result.state.scopedProvenanceLocs or (_: { })) null;
+      provenanceLocs = (import ./handlers/provenance.nix { inherit lib; }).locsOf result.state;
 
       # policy.spawn requests (host-aspects) materialize here too, or a static
       # resolve silently drops every projection (#742). A directly resolved
