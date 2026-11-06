@@ -166,5 +166,53 @@ in
         };
       }
     );
+
+    # The issue's own repro: the user is the resolve root, with its host in
+    # context, so the spawn has no parent scope unless the static resolve seeds it.
+    test-static-resolve-of-root-user-projects-host-aspects = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      let
+        imports = den.lib.aspects.resolveImports "probe-cls" (
+          den.lib.resolveEntity "user" {
+            host = config.den.hosts.x86_64-linux.igloo;
+            user = config.den.hosts.x86_64-linux.igloo.users.tux;
+          }
+        );
+        evaluated = lib.evalModules {
+          modules = imports.imports ++ [
+            { config._module.freeformType = lib.types.lazyAttrsOf lib.types.anything; }
+          ];
+        };
+      in
+      {
+        den.classes.probe-cls.description = "user class read by a static resolve";
+        den.hosts.x86_64-linux.igloo.users.tux.classes = [ "probe-cls" ];
+        den.aspects.tux.includes = [ den.batteries.host-aspects ];
+        den.aspects.tux.probe-cls.own = "tux";
+        # Only the host-aspects projection binds `user` while walking igloo's tree.
+        den.aspects.igloo.includes = [
+          (
+            { user, ... }:
+            {
+              probe-cls.projected = user.name;
+            }
+          )
+        ];
+
+        expr = {
+          own = evaluated.config.own or "<missing>";
+          projected = evaluated.config.projected or "<missing>";
+        };
+        expected = {
+          own = "tux";
+          projected = "tux";
+        };
+      }
+    );
   };
 }
