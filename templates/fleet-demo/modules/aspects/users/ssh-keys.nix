@@ -15,7 +15,7 @@
         { host, user }:
         {
           name = "ssh-keys/${user.userName}@${host.name}";
-          nixos.users.users.${user.userName}.openssh.authorizedKeys.keys = user.ssh-keys;
+          user.openssh.authorizedKeys.keys = user.ssh-keys;
         }
       )
     ];

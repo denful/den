@@ -92,6 +92,9 @@
         inherit (den.lib.policy) include;
       in
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # what this cell exercises.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.aspects.second-with-owned = {
@@ -137,6 +140,9 @@
         inherit (den.lib.policy) include;
       in
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # what this cell exercises.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.aspects.second.provides.with-owned = {

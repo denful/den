@@ -99,13 +99,22 @@ let
           receiver = host;
         };
 
-      # Host-scope arm: the host's own content.
-      classIncludes = [
-        (den.lib.policy.include hostModule)
-      ]
-      ++ lib.optional (den.aspects ? os-user-class-fwd) (
-        den.lib.policy.include den.aspects.os-user-class-fwd
-      );
+      # Host-scope arm: the host's own content. The module import is a provide
+      # at the host scope: an include of `hostModule` here is shared with the
+      # user-scope arm's include, so it lands nothing at the host, and
+      # excluding the user arm would leave the host without the module (#694).
+      # The key deduplicates it against the user arm's delivery.
+      classIncludes =
+        host:
+        [
+          (den.lib.policy.provide {
+            class = host.class;
+            module = hostModuleKeyed host;
+          })
+        ]
+        ++ lib.optional (den.aspects ? os-user-class-fwd) (
+          den.lib.policy.include den.aspects.os-user-class-fwd
+        );
 
       # User-scope arm: the same content, delivered to the host. The key
       # deduplicates it against the host-scope arm.
@@ -139,6 +148,9 @@ let
             && builtins.elem host.class supportedOses
             && lib.elem className user.classes
             && home == null
+            # An accepted user's bucket reaches the host whole, the include's
+            # copy with it.
+            && !(den.lib.acceptance.accepts userCtx host user)
           )
           (
             den.lib.policy.provide {
@@ -147,9 +159,31 @@ let
                 _:
                 den.lib.aspects.resolve host.class (den.lib.acceptance.atCtx userCtx den.aspects.os-user-class-fwd);
               receiver = host;
-              __deliverAfterFlip = true;
             }
           );
+
+      # The env's schema includes apply to the host (included at the host scope
+      # below) and to its users (for their user-env classes). At the user scope
+      # their host-class content would stay in the user, so it is stripped
+      # there; the host copy carries it (#694).
+      stripHostClass =
+        host: inc:
+        let
+          drop = [
+            host.class
+            "os"
+          ];
+          stripAttrs =
+            a:
+            builtins.removeAttrs a drop
+            // lib.optionalAttrs (a ? includes) { includes = map (stripHostClass host) a.includes; };
+        in
+        if builtins.isAttrs inc && !(inc ? __functor) then
+          stripAttrs inc
+        else if lib.isFunction inc then
+          lib.setFunctionArgs (args: stripHostClass host (inc args)) (lib.functionArgs inc)
+        else
+          inc;
 
       policyFn =
         { host, ... }:
@@ -165,12 +199,22 @@ let
             pairs = mkIntoClassUsers className { inherit host; };
             resolves = map (
               pair:
-              den.lib.policy.resolve.withIncludes ([ userForward ] ++ schemaIncludes) {
+              den.lib.policy.resolve.withIncludes ([ userForward ] ++ map (stripHostClass host) schemaIncludes) {
                 user = pair.user;
               }
             ) pairs;
           in
-          resolves ++ classIncludes ++ map (inc: den.lib.policy.include inc) schemaIncludes;
+          resolves ++ classIncludes host;
+
+      # The env's schema includes at the host scope, as their own policy:
+      # includes a policy returns beside its resolves are handed to the
+      # resolved users too, which would put the host-class content back in
+      # the users (#694).
+      hostSchemaFn =
+        { host, ... }:
+        lib.optionals (mkDetectHost { inherit className supportedOses optionPath; } { inherit host; }) (
+          map (inc: den.lib.policy.include inc) schemaIncludes
+        );
 
       # Complements the host-scope battery which only sees users
       # declared on host.users, not registry or policy-resolved users.
@@ -203,6 +247,11 @@ let
             __isPolicy = true;
             name = "host-to-${ctxName}-users";
             fn = policyFn;
+          }
+          {
+            __isPolicy = true;
+            name = "host-to-${ctxName}-schema-includes";
+            fn = hostSchemaFn;
           }
         ];
       };

@@ -126,7 +126,11 @@
             (include den.aspects.user-check)
           ];
 
-        den.schema.host.includes = [ den.policies.mixed ];
+        den.schema.host.includes = [
+          # #694: these hosts accept their users' host-class output (setup).
+          den.batteries.user-aspects
+          den.policies.mixed
+        ];
 
         den.aspects.user-check = {
           nixos =
@@ -195,6 +199,9 @@
     test-enrichment-fan-out = denTest (
       { den, igloo, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # setup for this cell, not its subject.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users = {
           alice = { };
           bob = { };

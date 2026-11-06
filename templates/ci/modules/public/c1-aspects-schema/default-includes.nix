@@ -74,6 +74,31 @@
         ];
 
         expr = igloo.users.users.tux.description;
+        # #694: a user's host-class content stays in the user; the loss check
+        # names what no delivery carries.
+        expectedError = {
+          type = "ThrownError";
+          msg = "no longer receives host-class content";
+        };
+      }
+    );
+
+    test-dynamic-class-in-user-host-context-with-user-aspects = denTest (
+      { den, igloo, ... }:
+      {
+        # The host accepts its users' host-class output.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.default.includes = [
+          (
+            { user, host, ... }:
+            {
+              ${host.class}.users.users.${user.userName}.description = "${user.userName} on ${host.name}";
+            }
+          )
+        ];
+
+        expr = igloo.users.users.tux.description;
         expected = "tux on igloo";
       }
     );

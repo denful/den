@@ -103,7 +103,11 @@
             })
           ];
 
-        den.schema.host.includes = [ den.policies.host-to-test-multi-args ];
+        den.schema.host.includes = [
+          # #694: these hosts accept their users' host-class output (setup).
+          den.batteries.user-aspects
+          den.policies.host-to-test-multi-args
+        ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";
@@ -316,7 +320,11 @@
             ))
           ];
 
-        den.schema.host.includes = [ den.policies.host-to-test-cross-param ];
+        den.schema.host.includes = [
+          # #694: these hosts accept their users' host-class output (setup).
+          den.batteries.user-aspects
+          den.policies.host-to-test-cross-param
+        ];
 
         expr = igloo.users.users.tux.description;
         expected = "igloo/tux";

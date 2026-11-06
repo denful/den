@@ -1,7 +1,18 @@
 # Effect handler: emit-class
 # Collects class modules into scope-partitioned buckets with dedup.
-{ den, ... }:
+{ lib, den, ... }:
 let
+  # The chain-push identity of a cross-provider include's wrapper starts with
+  # this marker (aspect/provide.nix); everything emitted under it records the
+  # provider so the delivery can select exactly its modules.
+  provenanceMarker = "den-provides-to-host=";
+  provenanceOf =
+    chain:
+    let
+      hits = builtins.filter (lib.hasInfix provenanceMarker) chain;
+    in
+    if hits == [ ] then null else lib.last (lib.splitString provenanceMarker (builtins.head hits));
+
   classCollectorHandler = {
     "emit-class" =
       { param, state }:
@@ -49,6 +60,18 @@ let
                   ${loc} = true;
                 };
               };
+              provenance = provenanceOf (((state.scopedIncludesChain or (_: { })) null).${scope} or [ ]);
+              allProvenance = (state.scopedProvenanceLocs or (_: { })) null;
+              updatedProvenance =
+                if provenance == null then
+                  allProvenance
+                else
+                  allProvenance
+                  // {
+                    ${scope} = (allProvenance.${scope} or { }) // {
+                      ${provenance} = ((allProvenance.${scope} or { }).${provenance} or [ ]) ++ [ loc ];
+                    };
+                  };
               # These two maps are threaded as `_: value` closures so the effect loop's state
               # deepSeq cannot reach the module bodies inside them (den's lazy-state discipline).
               # The shield is total, so each emit-class layered a fresh lazy `prev // { ... }`;
@@ -64,6 +87,7 @@ let
             // {
               scopedClassImports = builtins.seq (forceHead updatedImports) (_: updatedImports);
               scopedEmittedLocs = builtins.seq (forceHead updatedEmittedLocs) (_: updatedEmittedLocs);
+              scopedProvenanceLocs = builtins.seq (forceHead updatedProvenance) (_: updatedProvenance);
             };
       };
   };

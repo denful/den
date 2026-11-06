@@ -14,21 +14,39 @@ let
   inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
 
   # The user → host half of a cross-entity provide, delivered by the
-  # mutual-provider battery: the provided aspect's host-class output, resolved
-  # at the user's ctx, crosses to the host when that host accepts it (its key
-  # is in ctx; the key carries the host's id_hash, so a guest nested under an
-  # accepting host does not inherit the acceptance). Its other classes stay
-  # local through the include.
+  # mutual-provider battery. The provided aspect is included at the user scope
+  # inside a wrapper named after its provider (handlers/class-collector.nix
+  # records what is emitted under it), and a route moves exactly that content,
+  # folded in the user's own bucket, to the host. It is not resolved again, so
+  # pipe values and the user's context bind as for any user content.
+  provenanceMarker = "den-provides-to-host=";
+  providedInclude =
+    token: result:
+    policy.include {
+      name = "${provenanceMarker}${token}";
+      includes = [ result ];
+    };
   hostDelivery =
-    ctx: host: user: result:
+    token: ctx: host: user:
+    let
+      # A user the host already accepts through user-aspects delivers its whole
+      # host-class bucket, this include's copy with it; delivering the provided
+      # aspect as well would land it twice.
+      viaUserAspects = den.lib.acceptance.accepts ctx host user;
+    in
     lib.optional
-      (host ? class && (ctx.home or null) == null && ctx ? ${den.lib.acceptance.mutualProviderKey host})
       (
-        policy.provide {
-          class = host.class;
-          module = _: den.lib.aspects.resolve host.class (den.lib.acceptance.atCtx ctx result);
+        host ? class
+        && (ctx.home or null) == null
+        && ctx ? ${den.lib.acceptance.mutualProviderKey host}
+        && !viaUserAspects
+      )
+      (
+        policy.route {
+          fromClass = host.class;
+          intoClass = host.class;
           receiver = host;
-          __deliverAfterFlip = true;
+          __fromProvenance = token;
         }
       );
 
@@ -36,6 +54,8 @@ let
     nodeIdentity: provides: key:
     let
       value = provides.${key};
+      # Unique per registration: the registry key (handlers/policy.nix).
+      token = "${nodeIdentity}/${key}";
       policyFn =
         if key == "to-users" then
           (
@@ -51,7 +71,7 @@ let
             let
               result = applyProvide value { inherit host user; };
             in
-            [ (policy.include result) ] ++ hostDelivery ctx host user result
+            [ (providedInclude token result) ] ++ hostDelivery token ctx host user
           )
         else
           (
@@ -75,7 +95,8 @@ let
               toHost = host != null && user != null && host.name == key;
             in
             lib.optionals (atDeliverableScope && matches) (
-              [ (policy.include result) ] ++ lib.optionals toHost (hostDelivery ctx host user result)
+              [ (if toHost then providedInclude token result else policy.include result) ]
+              ++ lib.optionals toHost (hostDelivery token ctx host user)
             )
           );
     in
