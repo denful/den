@@ -91,7 +91,8 @@ The `user` class ([`os-user.nix`](https://github.com/denful/den/blob/main/module
 forwards OS-level user settings to NixOS/nix-Darwin lightweight user-environment.
 
 ```nix
-# Instead of:
+# Instead of (a user's `nixos` stays in the user unless the host accepts it
+# through user-aspects, #694):
 den.aspects.alice.nixos = { pkgs, ... }: {
   users.users.alice = {
     packages = [ pkgs.hello ];

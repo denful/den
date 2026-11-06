@@ -24,6 +24,9 @@
 
       den.aspects.igloo.funny.names = [ "host-owned" ];
       den.aspects.igloo.includes = [
+        # #694: a flat resolve of the host reads its users' `funny` only where
+        # the host accepts them.
+        den.batteries.user-aspects
         den.aspects.igloo.policies.to-users
         (take.exactly (
           { host }:

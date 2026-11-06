@@ -367,8 +367,8 @@ in
             hosts via `fleet.user-access.by-host`, allowing per-host overrides on top
             of environment-level grants.
 
-            The `ssh-keys` aspect fires in every user scope and sets
-            `users.users.''${user.userName}.openssh.authorizedKeys.keys` from
+            The `ssh-keys` aspect fires in every user scope and sets the user
+            account's `openssh.authorizedKeys.keys` (the `user` class) from
             `user.ssh-keys`. Because user scopes only exist on hosts where access
             was granted, keys are provisioned exactly where they should be — nowhere
             else.

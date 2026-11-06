@@ -318,18 +318,49 @@ let
     in
     lib.concatMap (sid: wrappedPerScope.${sid}.${fromClass} or [ ]) scopes;
 
+  # A flake route aggregates outputs over the whole tree and puts nothing into
+  # an entity's class content, so it honours only the kind-level isolation
+  # marks. A collectSubtree route stops at every entity below its source.
+  # A route that names a provenance (mutual-provider) takes only the modules
+  # emitted under that cross-provider include at its source scope
+  # (handlers/class-collector.nix records them). Recorded but unmatched
+  # content fails by name rather than dropping silently.
+  byProvenance =
+    provenanceLocs: route: mods:
+    let
+      token = route.__fromProvenance;
+      locs = (provenanceLocs.${route.sourceScopeId} or { }).${token} or [ ];
+      norm = l: den.lib.aspects.fx.identity.stripCtxSuffix (toString l);
+      wanted = lib.genAttrs (map norm locs) (_: true);
+      idOf = m: norm (m.key or m._file or m.__loc or "");
+      picked = builtins.filter (m: wanted ? ${idOf m}) mods;
+      classLocs = builtins.filter (lib.hasPrefix "${route.fromClass}@") locs;
+    in
+    if classLocs != [ ] && picked == [ ] then
+      throw "den: the host-class content of `${token}` could not be found at scope '${route.sourceScopeId}' to deliver it to the host (#694)"
+    else
+      picked;
+
   sourceModulesOf =
     {
       route,
       wrappedPerScope,
       scopeParent,
       scopeIsolated,
+      entityBoundary ? scopeIsolated,
+      provenanceLocs ? { },
     }:
     let
       isFlakeRoute = route.intoClass == "flake";
     in
-    if isFlakeRoute || (route.collectSubtree or false) then
+    if (route.__fromProvenance or null) != null then
+      byProvenance provenanceLocs route (
+        (wrappedPerScope.${route.sourceScopeId} or { }).${route.fromClass} or [ ]
+      )
+    else if isFlakeRoute then
       collectFromSubtree wrappedPerScope scopeParent scopeIsolated route.sourceScopeId route.fromClass
+    else if route.collectSubtree or false then
+      collectFromSubtree wrappedPerScope scopeParent entityBoundary route.sourceScopeId route.fromClass
     else if wrappedPerScope ? ${route.sourceScopeId} then
       wrappedPerScope.${route.sourceScopeId}.${route.fromClass} or [ ]
     else
@@ -721,6 +752,8 @@ let
       wrappedPerScope,
       scopeParent,
       scopeIsolated,
+      entityBoundary ? scopeIsolated,
+      provenanceLocs ? { },
       targetOf,
     }:
     let
@@ -731,6 +764,8 @@ let
           wrappedPerScope
           scopeParent
           scopeIsolated
+          entityBoundary
+          provenanceLocs
           ;
       };
       adapterMod = route.adapterModule or null;
@@ -843,6 +878,9 @@ in
             // lib.optionalAttrs ((spec.instantiate or null) != null) { instantiate = true; }
             // lib.optionalAttrs appendToParent { appendToParent = true; }
             // lib.optionalAttrs ((spec.receiver or null) != null) { receiver = true; }
+            // lib.optionalAttrs ((spec.__fromProvenance or null) != null) {
+              fromProvenance = spec.__fromProvenance;
+            }
             // lib.optionalAttrs (
               # §B cell 5: ensureEntry placeholder (empty target path materialized).
               # Content-blind approx (also requires empty module set) — converges

@@ -121,7 +121,7 @@ The user aspect:
 
   # User TODO: REMOVE THIS — placeholder boot/filesystem so the
   # example host evaluates. Replace with your real hardware config.
-  den.aspects.tux.nixos = {
+  den.aspects.igloo.nixos = {
     boot.loader.grub.enable = false;
     fileSystems."/".device = "/dev/fake";
     fileSystems."/".fsType = "auto";
@@ -133,7 +133,7 @@ The user aspect:
 place for `stateVersion` and other global settings. `den.schema.user.classes`
 sets the default output class for users (here, `homeManager`), so every user
 gets a Home-Manager environment without declaring it per-user. The
-`den.aspects.tux.nixos` block is a placeholder so the example evaluates into a
+`den.aspects.igloo.nixos` block is a placeholder so the example evaluates into a
 buildable system; delete it once you add real hardware configuration.
 
 ### vm.nix — Test in a VM

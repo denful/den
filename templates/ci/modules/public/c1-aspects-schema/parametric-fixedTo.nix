@@ -100,7 +100,7 @@
           ];
         in
         denTest (
-          { igloo, ... }:
+          { den, igloo, ... }:
           {
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
@@ -155,12 +155,14 @@
           ];
         in
         denTest (
-          { igloo, ... }:
+          { den, igloo, ... }:
           {
             den.hosts.x86_64-linux.igloo.users.tux = { };
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
             den.schema.host.includes = [
+              # #694: these hosts accept their users' host-class output (setup).
+              den.batteries.user-aspects
               test-option
             ];
 
@@ -276,6 +278,8 @@
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
             den.schema.host.includes = [
+              # #694: these hosts accept their users' host-class output (setup).
+              den.batteries.user-aspects
               test-option
             ];
 
@@ -403,6 +407,8 @@
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
             den.schema.host.includes = [
+              # #694: these hosts accept their users' host-class output (setup).
+              den.batteries.user-aspects
               test-option
             ];
 
@@ -520,6 +526,8 @@
             den.hosts.x86_64-linux.igloo.users.gnu = { };
 
             den.schema.host.includes = [
+              # #694: these hosts accept their users' host-class output (setup).
+              den.batteries.user-aspects
               test-option
             ];
 

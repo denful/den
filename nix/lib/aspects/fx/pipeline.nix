@@ -203,6 +203,8 @@ let
     scopedPipeEffects = _: { };
     scopedSpawns = _: { };
     scopedEmittedLocs = _: { };
+    # scope → cross-provider → [ emitted loc ] (handlers/class-collector.nix).
+    scopedProvenanceLocs = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
     includeSeen = _: { };

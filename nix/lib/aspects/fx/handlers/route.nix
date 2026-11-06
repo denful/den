@@ -11,7 +11,9 @@ let
     fallbackScope: r:
     "${r.fromClass or "?"}>${r.intoClass or "?"}@${r.sourceScopeId or fallbackScope}/${
       lib.concatStringsSep "/" (r.path or [ ])
-    }";
+    }"
+    # mutual-provider registers one route per provider at a scope (#694).
+    + lib.optionalString ((r.__fromProvenance or null) != null) "#${r.__fromProvenance}";
 
   registerRouteHandler = {
     "register-route" =

@@ -13,6 +13,12 @@ let
     map (e: e.annotations.providesPolicyName) (
       builtins.filter (e: (e.annotations or { }) ? providesPolicyName) result.edgeTrace
     );
+  # mutual-provider's host delivery is a route reading what the provider emitted.
+  provenanceRoutes =
+    result:
+    map (e: e.annotations.fromProvenance) (
+      builtins.filter (e: (e.annotations or { }) ? fromProvenance) result.edgeTrace
+    );
   keysWith =
     prefix: ctx:
     builtins.filter (k: builtins.substring 0 (builtins.stringLength prefix) k == prefix) (
@@ -165,6 +171,8 @@ in
       { den, funnyNames, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
+        # The host-rooted flat resolve reads tux's `funny` through user-aspects.
+        den.aspects.igloo.includes = [ den.batteries.user-aspects ];
         den.aspects.tux.includes = [
           (den.lib.take.exactly (
             { host, user }:
@@ -215,8 +223,8 @@ in
         };
         den.aspects.tux.provides.to-hosts.nixos.environment.etc.probe.text = "from-tux";
         expr = {
-          host = hasToHosts (providers config.den.hosts.x86_64-linux.igloo.__resolveResult);
-          home = hasToHosts (providers config.den.homes.x86_64-linux."tux@igloo".__resolveResult);
+          host = hasToHosts (provenanceRoutes config.den.hosts.x86_64-linux.igloo.__resolveResult);
+          home = hasToHosts (provenanceRoutes config.den.homes.x86_64-linux."tux@igloo".__resolveResult);
         };
         expected = {
           host = true;

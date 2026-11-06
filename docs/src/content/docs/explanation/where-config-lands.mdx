@@ -13,6 +13,8 @@ The most common den question is some version of:
 That is by design. This page gives the rule, a table of what lands where, and
 the mechanism to use for each thing people are usually trying to do.
 
+For how content moves from a user or guest to its host, see [Crossing Scopes](/explanation/crossing-scopes/).
+
 ## The rule
 
 Every entity resolves in its own **scope**: one per host, one per user on
@@ -23,11 +25,12 @@ the scope that walks that aspect, and each scope only delivers some classes:
   config. It walks the host aspect (`den.aspects.igloo`), everything it
   `includes`, and `den.schema.host.includes`.
 - **User scope** delivers `homeManager` into that user's home and `user` into
-  that user's own account on the host (`users.users.<name>`). Today it also
-  delivers `nixos`, `darwin` and `os` into the host; that is a known isolation
-  bug ([#694](https://github.com/denful/den/issues/694)), see the caution
-  below. It walks the user aspect (`den.aspects.tux`), everything it
-  `includes`, and `den.schema.user.includes`.
+  that user's own account on the host (`users.users.<name>`). Its `nixos`,
+  `darwin` and `os` stay in the user unless the host accepts the user through
+  [`user-aspects`](/reference/batteries/#denbatteriesuser-aspects)
+  ([#694](https://github.com/denful/den/issues/694)), see the caution below.
+  It walks the user aspect (`den.aspects.tux`), everything it `includes`, and
+  `den.schema.user.includes`.
 - `den.default` is walked in **both**. Its owned (static) content still lands
   once, not once per scope. A parametric function in `den.default.includes` is
   called in every scope whose context has its arguments, so a `{ host }`
@@ -218,15 +221,13 @@ For anything else on the host, name the host explicitly. For one host, use
 `den.aspects.tux.provides.to-hosts = { host, ... }: { … }`.
 
 <Aside type="caution" title="Untargeted nixos/os on a user aspect (#694)">
-Today `den.aspects.tux.nixos` (and `darwin`, `os`) reaches every host tux
-lives on without any opt-in. That breaks isolation between users and hosts:
-one user's aspect changes a shared host for everyone. It is tracked as a bug
-in [#694](https://github.com/denful/den/issues/694); the planned fix makes it
-opt-in through the
+`den.aspects.tux.nixos` (and `darwin`, `os`) does not reach tux's hosts on its
+own: one user's aspect must not change a shared host for everyone. When a host
+is built, den fails with [the loss error](/explanation/crossing-scopes/#the-loss-error)
+listing such content. Use the `user` class or `provides.<host>` /
+`provides.to-hosts` above, or let the host accept its users' content with the
 [`user-aspects`](/reference/batteries/#denbatteriesuser-aspects) battery,
-mirroring `host-aspects`. Don't rely
-on the untargeted form. Use the `user` class or `provides.<host>` /
-`provides.to-hosts` above.
+the counterpart of `host-aspects`.
 </Aside>
 
 ## Why

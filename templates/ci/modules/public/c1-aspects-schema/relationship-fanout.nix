@@ -324,7 +324,11 @@
         # host scope `user` is a descendant → it would fan out, but
         # sharedWithDescendant detects the shared user-include root and makes it
         # INERT here → no double-cover. Each contribution lands EXACTLY once.
-        den.schema.host.includes = [ den.aspects.shared ];
+        den.schema.host.includes = [
+          # #694: these hosts accept their users' host-class output (setup).
+          den.batteries.user-aspects
+          den.aspects.shared
+        ];
         den.schema.user.includes = [ den.aspects.shared ];
 
         expr = lib.sort lib.lessThan igloo.funny;

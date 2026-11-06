@@ -6,6 +6,22 @@ let
   mutualProviderRoot = "den-mutual-provider/";
   userAspectsRoot = "den-user-aspects/";
   userAspectsPrefix = host: "${userAspectsRoot}${host.id_hash}/";
+
+  # The users a host accepts, from every user-aspects key it published; null
+  # means all of them.
+  acceptedUsers =
+    ctx: host:
+    let
+      lists = map (k: ctx.${k}.users) (
+        builtins.filter (lib.hasPrefix (userAspectsPrefix host)) (builtins.attrNames ctx)
+      );
+    in
+    if lists == [ ] then
+      [ ]
+    else if builtins.any (l: l == null) lists then
+      null
+    else
+      lib.unique (builtins.concatLists lists);
 in
 {
   # An aspect resolved at a scope's full context (as the scope itself resolves
@@ -30,19 +46,14 @@ in
   userAspectsKey =
     host: users: "${userAspectsPrefix host}${builtins.hashString "sha256" (builtins.toJSON users)}";
 
-  # The users a host accepts, from every user-aspects key it published; null
-  # means all of them.
-  acceptedUsers =
-    ctx: host:
+  inherit acceptedUsers;
+
+  # Whether the host accepts this user through user-aspects. A user scope's
+  # stored context carries its host's keys, so `ctx` may be either.
+  accepts =
+    ctx: host: user:
     let
-      lists = map (k: ctx.${k}.users) (
-        builtins.filter (lib.hasPrefix (userAspectsPrefix host)) (builtins.attrNames ctx)
-      );
+      accepted = acceptedUsers ctx host;
     in
-    if lists == [ ] then
-      [ ]
-    else if builtins.any (l: l == null) lists then
-      null
-    else
-      lib.unique (builtins.concatLists lists);
+    host ? id_hash && (accepted == null || builtins.elem (user.name or null) accepted);
 }
