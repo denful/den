@@ -59,7 +59,11 @@ in
       ...
     }:
     lib.optionals (host.class == "nixos" && (host.wsl or { }).enable or false) [
-      (den.lib.policy.resolve.to "wsl-host" { inherit host; })
+      # A binding of its own gives this scope an id distinct from the host's
+      (den.lib.policy.resolve.to "wsl-host" {
+        inherit host;
+        wsl-host.name = host.name;
+      })
       (den.lib.policy.include wsl-host-aspect)
     ];
 
