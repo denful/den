@@ -122,6 +122,35 @@ let
           den.lib.policy.include den.aspects.os-user-class-fwd
         );
 
+      # The hook's host-class output, resolved at the user's ctx, crosses to the
+      # host; its other classes stay local through the include above. Its own
+      # schema policy: provides dedup by policy name, class and path, so sharing
+      # userDetectFn with the host-module provide would drop one of them.
+      hookDeliveryFn =
+        {
+          host,
+          user,
+          home ? null,
+          ...
+        }@userCtx:
+        lib.optional
+          (
+            den.aspects ? os-user-class-fwd
+            && builtins.elem host.class supportedOses
+            && lib.elem className user.classes
+            && home == null
+          )
+          (
+            den.lib.policy.provide {
+              class = host.class;
+              module =
+                _:
+                den.lib.aspects.resolve host.class (den.lib.acceptance.atCtx userCtx den.aspects.os-user-class-fwd);
+              receiver = host;
+              __deliverAfterFlip = true;
+            }
+          );
+
       policyFn =
         { host, ... }:
         let
@@ -163,7 +192,7 @@ let
               inherit host user;
             }))
           ]
-          ++ userClassDeliveries { inherit host; }
+          ++ userClassDeliveries { inherit host user; }
         );
     in
     {
@@ -186,6 +215,11 @@ let
             __isPolicy = true;
             name = "${ctxName}-user-detect";
             fn = userDetectFn;
+          }
+          {
+            __isPolicy = true;
+            name = "${ctxName}-os-user-class-fwd-host";
+            fn = hookDeliveryFn;
           }
         ];
       };
