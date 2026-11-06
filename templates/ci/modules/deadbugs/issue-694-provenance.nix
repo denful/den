@@ -109,5 +109,31 @@
         expected = 1;
       }
     );
+
+    # Provided and also included directly by the user, in either order: the
+    # provide's edge still crosses, and the unkeyed content lands once.
+    test-provided-and-direct = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.feat.nixos.boot.kernelModules = [ "feat-mod" ];
+        den.aspects.tux.includes = [ den.aspects.feat ];
+        den.aspects.tux.provides.to-hosts.includes = [ den.aspects.feat ];
+        expr = builtins.filter (m: m == "feat-mod") igloo.boot.kernelModules;
+        expected = [ "feat-mod" ];
+      }
+    );
+
+    test-direct-after-provided = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.feat.nixos.boot.kernelModules = [ "feat-mod" ];
+        den.aspects.tux.provides.to-hosts.includes = [ den.aspects.feat ];
+        den.aspects.tux.includes = [ den.aspects.feat ];
+        expr = builtins.filter (m: m == "feat-mod") igloo.boot.kernelModules;
+        expected = [ "feat-mod" ];
+      }
+    );
   };
 }

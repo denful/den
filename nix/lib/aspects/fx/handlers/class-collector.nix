@@ -40,12 +40,33 @@ let
         emittedLocs = (state.scopedEmittedLocs or (_: { })) null;
         scopeLocs = emittedLocs.${scope} or { };
         alreadyEmitted = scopeLocs ? ${loc};
+        provenance = provenanceOf (((state.scopedIncludesChain or (_: { })) null).${scope} or [ ]);
+        allProvenance = (state.scopedProvenanceLocs or (_: { })) null;
+        # Recorded on a skipped emission too: content provided and also reached
+        # another way still crosses, since the other path does not revoke the
+        # provide's edge.
+        updatedProvenance =
+          if provenance == null then
+            allProvenance
+          else
+            allProvenance
+            // {
+              ${scope} = (allProvenance.${scope} or { }) // {
+                ${provenance} = ((allProvenance.${scope} or { }).${provenance} or [ ]) ++ [ loc ];
+              };
+            };
       in
       {
         resume = null;
         state =
           if alreadyEmitted then
-            state
+            if provenance == null then
+              state
+            else
+              state
+              // {
+                scopedProvenanceLocs = builtins.seq (builtins.attrNames updatedProvenance) (_: updatedProvenance);
+              }
           else
             let
               allImports = state.scopedClassImports null;
@@ -60,18 +81,6 @@ let
                   ${loc} = true;
                 };
               };
-              provenance = provenanceOf (((state.scopedIncludesChain or (_: { })) null).${scope} or [ ]);
-              allProvenance = (state.scopedProvenanceLocs or (_: { })) null;
-              updatedProvenance =
-                if provenance == null then
-                  allProvenance
-                else
-                  allProvenance
-                  // {
-                    ${scope} = (allProvenance.${scope} or { }) // {
-                      ${provenance} = ((allProvenance.${scope} or { }).${provenance} or [ ]) ++ [ loc ];
-                    };
-                  };
               # These two maps are threaded as `_: value` closures so the effect loop's state
               # deepSeq cannot reach the module bodies inside them (den's lazy-state discipline).
               # The shield is total, so each emit-class layered a fresh lazy `prev // { ... }`;
