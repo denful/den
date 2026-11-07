@@ -40,27 +40,27 @@ let
     else
       parent == ancestor || isAncestorOf scopeParent ancestor parent;
 
-  # TODO(#694): remove with the loss check, 30 days after the release that
-  # bounds the merge. Fails a host whose nested entities hold host-class
-  # content that no delivery carries to it any more.
+  # The user-host-content migration (#694), until den.lib.migrations
+  # removalDate. While the transition defaults are on, a host warns once,
+  # listing the host-class content that reaches it only through them: what its
+  # nested entities' aspects write, which the end state leaves with them. Past
+  # the acknowledgement, or with the defaults off, that content is inert by
+  # design and nothing is reported.
   checkLost =
-    hostName: lost: modules:
-    if lost == [ ] then
+    hostName: class: lost: modules:
+    if lost == [ ] || !den.lib.migrations.transitionActive then
       modules
     else
-      throw (
-        "den: host '${hostName}' no longer receives host-class content from the entities nested in it (#694). Nesting no longer merges an entity's content into its host:\n"
+      lib.warn (
+        "den: ${hostName} receives ${class} content only through den's transition default, which ends ${den.lib.migrations.removalDate}:\n"
         + lib.concatMapStringsSep "\n" (
           e:
-          "  - from '${e.entity}' (scope ${e.scope}): ${
-              if e.aspect == null then "unidentified content" else e.aspect
-            }"
-          +
-            lib.optionalString (e.aspect != null && lib.hasPrefix "<policy:" e.aspect)
-              " (this policy `include`s host-class content at the user's scope; to deliver it to the host, emit `provide { receiver = host; ... }` instead. Or use `provides.to-hosts`, which mutual-provider delivers, or include `den.batteries.user-aspects` on the host)"
+          "  - from ${e.entity} (${
+              if e.aspect == null then "unidentified content, scope ${e.scope}" else e.aspect
+            })"
         ) lost
-        + "\nFixes, in order: include `den.batteries.user-aspects` on the host (optionally `{ users = [ ... ]; }`); keep `den.batteries.mutual-provider` for content from `provides.to-hosts` / `provides.<host>`; move account settings to the `user` class; deliver host-wide settings with `provide { receiver = host; }` or put them on the host's own aspect. See https://github.com/denful/den/issues/694."
-      );
+        + "\nIf the host should have it, include the aspect on the host or add the battery explicitly (`den.batteries.user-aspects`, or `den.batteries.mutual-provider` for `provides.to-hosts`); if it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694."
+      ) modules;
 
   # Phase 1: Wrap collected class imports per-scope.
   # Deduplicates modules with identical keys across scopes: when a shared
@@ -423,7 +423,7 @@ let
               if proj.unbounded then
                 materialized.${hostClass} or [ ]
               else
-                checkLost (spec.name or hostScopeId) (materialized.__lostAt hostClass) (
+                checkLost (spec.name or hostScopeId) hostClass (materialized.__lostAt hostClass) (
                   materialized.${hostClass} or [ ]
                 );
           in
@@ -1202,7 +1202,7 @@ let
       rootIsHost = (self.__entityKind or null) == "host" && class == (ctx.host.class or null);
       flatImports =
         if rootIsHost then
-          checkLost (ctx.host.name or result.state.rootScopeId) (materialized.__lostAt class) (
+          checkLost (ctx.host.name or result.state.rootScopeId) class (materialized.__lostAt class) (
             phase4.${class} or [ ]
           )
         else

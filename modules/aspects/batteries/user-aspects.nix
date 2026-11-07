@@ -34,9 +34,26 @@ let
     includes = [ (acceptFor users) ];
   };
 
+  # The transition default, on every host until den.lib.migrations
+  # removalDate: its own policy and key, so an explicit include is told apart
+  # from it.
+  defaultForm = {
+    __isPolicy = true;
+    name = "user-aspects-default";
+    fn =
+      { host, ... }@ctx:
+      lib.optional (!(ctx ? user) && host ? id_hash) (
+        den.lib.policy.resolve { ${acceptance.userAspectsDefaultKey host} = true; }
+      );
+  };
 in
 {
   den.batteries.user-aspects = battery null // {
     __functor = _: { users }: battery users;
+    # Excluding the battery excludes its transition default too. Temporary:
+    # PR 4's origin-matched excludes cover this generally.
+    __defaultForm = defaultForm;
   };
+
+  den.schema.host.includes = lib.optional den.lib.migrations.transitionActive defaultForm;
 }

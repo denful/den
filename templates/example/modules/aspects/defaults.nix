@@ -14,6 +14,10 @@
     homeManager.home.stateVersion = "25.05";
   };
 
+  # Hosts receive what their users provide them (`provides.to-hosts`, see
+  # alice.nix).
+  den.schema.host.includes = [ den.batteries.mutual-provider ];
+
   # These are functions that produce configs
   den.default.includes = [
     # Automatically set hostname

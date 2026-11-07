@@ -148,6 +148,19 @@ let
       entityBoundary =
         scopeIsolated
         // lib.mapAttrs (_: _: true) (lib.filterAttrs (sid: _: !(acceptedUserScope sid)) ownEntityOf);
+      # The boundary with the transition defaults off: only an explicit
+      # user-aspects acceptance lifts a user (#694 migration).
+      explicitBoundary =
+        scopeIsolated
+        // lib.mapAttrs (_: _: true) (
+          lib.filterAttrs (
+            sid: _:
+            let
+              ctx = scopeContexts.${sid} or { };
+            in
+            !(acceptedUserScope sid && den.lib.acceptance.acceptsExplicitly ctx ctx.host ctx.user)
+          ) ownEntityOf
+        );
       rootCtx = scopeContexts.${rootScopeId} or { };
       outerEntities = lib.listToAttrs (
         map (r: lib.nameValuePair r.id_hash true) (
@@ -427,10 +440,13 @@ let
           orderedPairs;
       inherit (folded) acc;
 
-      # TODO(#694): the loss check, removed 30 days after the release that
-      # bounds the merge. For class `cls`: content in a nested entity's bucket
-      # that no delivery carries to the root. Each entry is
-      # { scope; entity; aspect; }.
+      # The user-host-content migration (#694), removed on
+      # den.lib.migrations.removalDate. For class `cls`: content in a nested
+      # entity's bucket that would not reach the root with the transition
+      # defaults off. Read from this fold's state: the explicit-only boundary,
+      # the routes the end state delivers (stood-down ones included, ones only
+      # a default makes excluded), and the root's buckets inside that boundary.
+      # Each entry is { scope; entity; aspect; }.
       lostAt =
         cls:
         let
@@ -440,19 +456,30 @@ let
             root = rootScopeId;
             allScopeIds = builtins.attrNames acc.perScope;
           };
-          boundedSet = lib.genAttrs (subtreeScopes {
+          boundedScopes = subtreeScopes {
             inherit scopeParent;
-            isolated = entityBoundary;
+            isolated = explicitBoundary;
             root = rootScopeId;
             allScopeIds = builtins.attrNames acc.perScope;
-          }) (_: true);
+          };
+          boundedSet = lib.genAttrs boundedScopes (_: true);
           nested = builtins.filter (sid: !(boundedSet ? ${sid})) isolatedOnly;
           # A scope whose `cls` bucket a receiver route moves on whole is read.
           # A provenance route (mutual-provider) reads only the locations
           # emitted under its provider.
-          receiverRoutes = builtins.filter (
-            p: p.kind == "route" && (p.spec.receiver or null) != null && p.spec.fromClass == cls
-          ) orderedPairs;
+          receiverRoutes =
+            builtins.filter (
+              p:
+              p.kind == "route"
+              && (p.spec.receiver or null) != null
+              && p.spec.fromClass == cls
+              && !(p.spec.__transitionDefault or false)
+            ) orderedPairs
+            ++ map (spec: { inherit spec; }) (
+              builtins.filter (spec: spec.fromClass == cls && !(spec.__transitionDefault or false)) (
+                (pi.provenanceLocs or { }).__standDown or [ ]
+              )
+            );
           readScopes = lib.genAttrs (map (p: p.spec.sourceScopeId) (
             builtins.filter (p: (p.spec.__fromProvenance or null) == null) receiverRoutes
           )) (_: true);
@@ -483,7 +510,7 @@ let
               noClass = lib.removePrefix "${cls}@" raw;
             in
             if raw == "" then null else dropKindRoot (den.lib.aspects.fx.identity.stripCtxSuffix noClass);
-          rootMods = bounded.${cls} or [ ];
+          rootMods = lib.concatMap (sid: acc.perScope.${sid}.${cls} or [ ]) boundedScopes;
           # A module's keys, its own and those of the attrset modules it
           # imports: an anonymous wrapper around a keyed module (the
           # home-manager host-module import) is the keyed module.
@@ -524,26 +551,55 @@ let
                   go (seen // { ${s} = true; }) (scopeParent.${s} or null);
             in
             go { };
+          # What reaches the root now through a transition default: a scope
+          # the default lifts (inside the effective boundary, outside the
+          # explicit one), and the locations a route only a default makes
+          # delivers.
+          effectiveSet = lib.genAttrs (subtreeScopes {
+            inherit scopeParent;
+            isolated = entityBoundary;
+            root = rootScopeId;
+            allScopeIds = builtins.attrNames acc.perScope;
+          }) (_: true);
+          defaultRoutes = builtins.filter (
+            p:
+            p.kind == "route"
+            && (p.spec.receiver or null) != null
+            && p.spec.fromClass == cls
+            && (p.spec.__transitionDefault or false)
+            && (p.spec.__fromProvenance or null) != null
+          ) orderedPairs;
+          defaultDelivered = lib.concatMap (
+            p:
+            map (l: {
+              scope = p.spec.sourceScopeId;
+              entity = (entityOf p.spec.sourceScopeId).name or p.spec.sourceScopeId;
+              aspect = identityOf { key = l; };
+            }) (((pi.provenanceLocs or { }).${p.spec.sourceScopeId} or { }).${p.spec.__fromProvenance} or [ ])
+          ) defaultRoutes;
         in
-        lib.concatMap (
-          sid:
-          map
-            (m: {
-              scope = sid;
-              entity = (entityOf sid).name or sid;
-              aspect = identityOf m;
-            })
-            (
-              builtins.filter (
-                m:
-                !(reachesRoot m)
-                && !(
-                  provenanceRead
-                  ? "${sid}\n${den.lib.aspects.fx.identity.stripCtxSuffix (toString (m.key or m._file or ""))}"
-                )
-              ) (acc.perScope.${sid}.${cls} or [ ])
-            )
-        ) (builtins.filter (sid: !(readScopes ? ${sid}) && !(ownedBelow sid)) nested);
+        lib.concatMap
+          (
+            sid:
+            map
+              (m: {
+                scope = sid;
+                entity = (entityOf sid).name or sid;
+                aspect = identityOf m;
+              })
+              (
+                builtins.filter (
+                  m:
+                  !(reachesRoot m)
+                  && !(
+                    provenanceRead
+                    ? "${sid}\n${den.lib.aspects.fx.identity.stripCtxSuffix (toString (m.key or m._file or ""))}"
+                  )
+                ) (acc.perScope.${sid}.${cls} or [ ])
+              )
+          )
+          (builtins.filter (sid: effectiveSet ? ${sid} && !(readScopes ? ${sid}) && !(ownedBelow sid)) nested)
+        ++ defaultDelivered;
       # The root's class content: its own bounded subtree after delivery. An
       # "aware" walk takes the entity boundary; a "blind" one (spawn extraction)
       # is unchanged.
@@ -562,18 +618,21 @@ let
       acceptedUsers = lib.genAttrs (map (sid: ownEntityOf.${sid}) (
         builtins.filter acceptedUserScope (builtins.attrNames ownEntityOf)
       )) (_: true);
-      droppedLocs = lib.genAttrs (lib.concatMap (
-        byToken:
-        lib.concatLists (
-          lib.mapAttrsToList (
-            token: locs:
-            lib.optionals (
-              lib.hasPrefix sharedFanOutPrefix token
-              && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
-            ) locs
-          ) byToken
-        )
-      ) (builtins.attrValues (pi.provenanceLocs or { }))) (_: true);
+      droppedLocs =
+        lib.genAttrs
+          (lib.concatMap (
+            byToken:
+            lib.concatLists (
+              lib.mapAttrsToList (
+                token: locs:
+                lib.optionals (
+                  lib.hasPrefix sharedFanOutPrefix token
+                  && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
+                ) locs
+              ) byToken
+            )
+          ) (builtins.attrValues (builtins.removeAttrs (pi.provenanceLocs or { }) [ "__standDown" ])))
+          (_: true);
       bounded =
         if droppedLocs == { } then
           assembled

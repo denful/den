@@ -33,7 +33,13 @@ in
         builtins.any (id: lib.hasSuffix "@${id}" loc || builtins.elem id chain) ids;
       extra = scope: ids: builtins.attrNames (lib.filterAttrs (underAny ids) (chains.${scope} or { }));
     in
-    lib.recursiveUpdate direct (
+    {
+      # Routes stood down because a transition default carries their content.
+      __standDown = builtins.concatLists (
+        builtins.attrValues ((state.scopedStandDowns or (_: { })) null)
+      );
+    }
+    // lib.recursiveUpdate direct (
       lib.mapAttrs (
         scope: byToken:
         lib.mapAttrs (token: ids: ((direct.${scope} or { }).${token} or [ ]) ++ extra scope ids) byToken

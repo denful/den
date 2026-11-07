@@ -292,14 +292,28 @@ let
       # initial dispatch and policy/schema.nix's late-sibling re-dispatch)
       # can resolve it later, once dispatch has run past this aspect's own
       # includes and the registry actually holds the claim.
-      excludeList = map (
+      policyExclude = ref: {
+        type = "exclude";
+        scope = "subtree";
+        identity = excludeIdentity ref;
+        rawRef = ref;
+      };
+      excludeList = lib.concatMap (
         ref:
-        {
-          type = "exclude";
-          scope = "subtree";
-          identity = excludeIdentity ref;
-        }
-        // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+        [
+          (
+            {
+              type = "exclude";
+              scope = "subtree";
+              identity = excludeIdentity ref;
+            }
+            // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+          )
+        ]
+        # A battery's transition default is excluded with it (#694, until
+        # den.lib.migrations.removalDate). Temporary: PR 4's origin-matched
+        # excludes cover this generally.
+        ++ lib.optional (builtins.isAttrs ref && ref ? __defaultForm) (policyExclude ref.__defaultForm)
       ) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";

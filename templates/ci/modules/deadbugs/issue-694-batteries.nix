@@ -62,12 +62,26 @@ in
     );
 
     # Default-included: the host publishes its acceptance key.
+    # By default only the default form's key (until the migration's removal
+    # date); an explicit include publishes the battery's own.
     test-mutual-provider-key-published = denTest (
       { config, den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
-        expected = [ (den.lib.acceptance.mutualProviderKey config.den.hosts.x86_64-linux.igloo) ];
+        expected = [ (den.lib.acceptance.mutualProviderDefaultKey config.den.hosts.x86_64-linux.igloo) ];
+      }
+    );
+    test-mutual-provider-explicit-key-published = denTest (
+      { config, den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        expr = builtins.sort builtins.lessThan (keysWith "den-mutual-provider/" (hostCtx config "igloo"));
+        expected = builtins.sort builtins.lessThan [
+          (den.lib.acceptance.mutualProviderKey config.den.hosts.x86_64-linux.igloo)
+          (den.lib.acceptance.mutualProviderDefaultKey config.den.hosts.x86_64-linux.igloo)
+        ];
       }
     );
 

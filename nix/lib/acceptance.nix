@@ -6,6 +6,9 @@ let
   mutualProviderRoot = "den-mutual-provider/";
   userAspectsRoot = "den-user-aspects/";
   userAspectsPrefix = host: "${userAspectsRoot}${host.id_hash}/";
+  # Published by user-aspects' transition default only: outside the explicit
+  # prefix, so it never reads as an explicit acceptance.
+  userAspectsDefaultKey = host: "${userAspectsRoot}default/${host.id_hash}";
 
   # The users a host accepts, from every user-aspects key it published; null
   # means all of them.
@@ -22,6 +25,12 @@ let
       null
     else
       lib.unique (builtins.concatLists lists);
+  acceptsExplicitly =
+    ctx: host: user:
+    let
+      accepted = acceptedUsers ctx host;
+    in
+    host ? id_hash && (accepted == null || builtins.elem (user.name or null) accepted);
 in
 {
   # An aspect resolved at a scope's full context (as the scope itself resolves
@@ -40,6 +49,9 @@ in
   isAcceptanceKey = k: lib.hasPrefix mutualProviderRoot k || lib.hasPrefix userAspectsRoot k;
 
   mutualProviderKey = host: "${mutualProviderRoot}${host.id_hash}";
+  # Published by mutual-provider's transition default only (until
+  # den.lib.migrations.removalDate).
+  mutualProviderDefaultKey = host: "${mutualProviderRoot}default/${host.id_hash}";
 
   # One key per distinct argument set, so two identical includes write the same
   # key (enrichment is merged shallowly, last write wins).
@@ -50,10 +62,11 @@ in
 
   # Whether the host accepts this user through user-aspects. A user scope's
   # stored context carries its host's keys, so `ctx` may be either.
+  # Through user-aspects, explicitly or through its transition default (until
+  # den.lib.migrations.removalDate).
   accepts =
     ctx: host: user:
-    let
-      accepted = acceptedUsers ctx host;
-    in
-    host ? id_hash && (accepted == null || builtins.elem (user.name or null) accepted);
+    host ? id_hash && (ctx ? ${userAspectsDefaultKey host} || acceptsExplicitly ctx host user);
+
+  inherit userAspectsDefaultKey acceptsExplicitly;
 }

@@ -101,13 +101,18 @@ let
           };
         };
       hasIncludes = builtins.any isInclude effects;
-      accepted = firing != null && den.lib.acceptance.accepts ctx target firing;
+      accepted = firing != null && den.lib.acceptance.acceptsExplicitly ctx target firing;
+      # Accepted only through user-aspects' transition default: the bucket
+      # reaches the target whole, so the route stands down, recorded for the
+      # migration warning (#694).
+      acceptedByDefault = !accepted && firing != null && den.lib.acceptance.accepts ctx target firing;
       delivery = lib.optional (hasIncludes && target != null && !atTarget && !accepted) (
         den.lib.policy.route {
           fromClass = target.class;
           intoClass = target.class;
           receiver = target;
           __fromProvenance = token;
+          __standDown = acceptedByDefault;
         }
       );
     in
