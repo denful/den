@@ -51,12 +51,22 @@ let
     else
       "ne";
 
+  # Pipeline products (`hasAspect`, `__`-prefixed internals such as
+  # `__resolveResult`) are not identity, and forcing them would resolve the
+  # entity again; names are compared first, so most mismatches stop there.
+  identityAttrs =
+    r:
+    builtins.removeAttrs r (
+      [ "hasAspect" ] ++ builtins.filter (lib.hasPrefix "__") (builtins.attrNames r)
+    );
   sameByValue =
     kind: a: b:
     let
-      d = valueDiff (builtins.removeAttrs a [ "hasAspect" ]) (builtins.removeAttrs b [ "hasAspect" ]);
+      d = valueDiff (identityAttrs a) (identityAttrs b);
     in
-    if d == "fn" then
+    if (a.name or null) != (b.name or null) then
+      false
+    else if d == "fn" then
       throw "den: two `${kind}` records named ${a.name or "<unnamed>"} differ only in function values, so den cannot tell whether they are one entity; give them an id_hash"
     else
       d == "eq";
