@@ -115,7 +115,7 @@ let
                 prev = (st.installDispatched or (_: { })) null;
                 ran = lib.filterAttrs (_: p: resolveArgsSatisfied (p.fn or p) resolveCtx) aspectPolicies;
               in
-              _: prev // { ${scope} = (prev.${scope} or { }) // lib.mapAttrs (_: _: true) ran; };
+              _: prev // { ${dispatchKey} = (prev.${dispatchKey} or { }) // lib.mapAttrs (_: _: true) ran; };
           }
         )) (_: iterate aspectPolicies entityKind currentCtx 0 { } emptyAcc { } resolveCtx)
     );

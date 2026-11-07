@@ -99,6 +99,34 @@ let
   etcNames =
     lib: prefix: cfg:
     builtins.filter (lib.hasPrefix prefix) (builtins.attrNames cfg.environment.etc);
+
+  # A policy carried to tux by a late include (registered at tux after its own
+  # dispatch, so only the fresh-registration re-pass runs it), igloo with two
+  # users. Reads the variable it sets in tux's home-manager.
+  lateCarriedCell =
+    var: mkPol:
+    denTest (
+      { den, config, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
+        den.hosts.x86_64-linux.igloo.users.pingu.classes = [ "homeManager" ];
+        den.aspects.tux.homeManager.home.stateVersion = "25.11";
+        den.aspects.pingu.homeManager.home.stateVersion = "25.11";
+        den.policies.carrier =
+          { host, user, ... }:
+          lib.optional (user.name == "tux") (
+            den.lib.policy.include {
+              name = "carried";
+              includes = [ (den.lib.policy.mkPolicy "carried-${var}" (mkPol den)) ];
+            }
+          );
+        den.schema.host.includes = [ den.policies.carrier ];
+        expr =
+          config.flake.nixosConfigurations.igloo.config.home-manager.users.tux.home.sessionVariables.${var}
+            or "<missing>";
+        expected = "x";
+      }
+    );
 in
 {
   flake.tests.deadbugs.late-dispatch-any-depth = {
@@ -306,6 +334,23 @@ in
         expr = igloo.environment.etc ? late-provided;
         expected = true;
       }
+    );
+
+    # A policy registered at tux by a late include fires there, though no
+    # ancestor registers it: whether an ancestor could have dispatched it is
+    # only asked of ancestors at or below the farthest one registering it.
+    test-late-carried-no-arg-policy-fires = lateCarriedCell "LATENOARG" (
+      den: _: [ (den.lib.policy.include { homeManager.home.sessionVariables.LATENOARG = "x"; }) ]
+    );
+
+    test-late-carried-system-policy-fires = lateCarriedCell "LATESYS" (
+      den:
+      { system, ... }:
+      [
+        (den.lib.policy.include {
+          homeManager.home.sessionVariables.LATESYS = if system == "x86_64-linux" then "x" else system;
+        })
+      ]
     );
   };
 }

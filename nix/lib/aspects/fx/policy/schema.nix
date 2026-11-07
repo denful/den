@@ -241,7 +241,7 @@ let
         # values. Names alone are not enough where a scope rebinds one (a guest
         # binds `host` to itself).
         sameInstanceAbove =
-          policy:
+          name: policy:
           builtins.any (
             a:
             let
@@ -251,11 +251,22 @@ let
             resolveArgsSatisfied (policy.fn or policy) actx
             && names == boundOf sib.scopedCtx policy
             && builtins.all (k: sameBinding actx.${k} sib.scopedCtx.${k}) names
-          ) ancestorScopes;
+          ) (registeredFrom name);
+        # Only an ancestor at or below the farthest one that registers the
+        # policy could have run it: one registered at the sibling after its own
+        # dispatch (a late include) is new everywhere above.
+        registeredFrom =
+          name:
+          let
+            regIdx = builtins.filter (
+              i: (scopedAspectPolicies.${builtins.elemAt ancestorScopes i} or { }) ? ${name}
+            ) (lib.range 0 (builtins.length ancestorScopes - 1));
+          in
+          if regIdx == [ ] then [ ] else lib.take (lib.last regIdx + 1) ancestorScopes;
         # The sibling's own dispatch already ran these, whatever they returned.
-        ranAtSib = ((state.installDispatched or (_: { })) null).${sib.scopeId} or { };
+        ranAtSib = ((state.installDispatched or (_: { })) null).${dispatchKey} or { };
         filteredPolicies = lib.filterAttrs (
-          name: policy: !excluded name && !(ranAtSib ? ${name}) && !(sameInstanceAbove policy)
+          name: policy: !excluded name && !(ranAtSib ? ${name}) && !(sameInstanceAbove name policy)
         ) latePolicies;
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
@@ -444,7 +455,14 @@ let
                 }
               ) schemaEffects;
             in
-            fx.bind (lateDispatchPass siblingMetas) (_: fx.pure allResults)
+            # The pass sets inLateDispatch for the policies it emits; reset it
+            # after, so a later batch at this scope level gets its own pass.
+            fx.bind (lateDispatchPass siblingMetas) (
+              _:
+              fx.bind (fx.effects.state.modify (
+                st: st // { inLateDispatch = preState.inLateDispatch or false; }
+              )) (_: fx.pure allResults)
+            )
           )
       );
 in
