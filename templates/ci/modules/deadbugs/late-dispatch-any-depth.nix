@@ -293,5 +293,19 @@ in
         expected = [ ];
       }
     );
+
+    # A lone child's late pass keeps the fresh-registration re-pass: a
+    # `to-hosts` reached through `<host>.provides.<user>` registers at the user
+    # after the late include, and still lands.
+    test-lone-child-late-include-provides-lands = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.feat.provides.to-hosts.nixos.environment.etc.late-provided.text = "x";
+        den.aspects.igloo.provides.tux.includes = [ den.aspects.feat ];
+        expr = igloo.environment.etc ? late-provided;
+        expected = true;
+      }
+    );
   };
 }
