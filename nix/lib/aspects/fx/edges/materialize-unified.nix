@@ -569,7 +569,26 @@ let
             && (p.spec.__transitionDefault or false)
             && (p.spec.__fromProvenance or null) != null
           ) orderedPairs;
-          # Content the root also has without the default is not listed.
+          # A provide stood down under a transition default (the
+          # os-user-class-fwd hook) is the end state's delivery of its aspect
+          # at its source scope.
+          standDownAspects = lib.genAttrs (map (spec: "${spec.sourceScopeId}\n${spec.__standDownAspect}") (
+            builtins.filter (spec: spec.class == cls && spec ? __standDownAspect) (
+              (pi.provenanceLocs or { }).__standDownProvides or [ ]
+            )
+          )) (_: true);
+          # Content the root has before any delivery (its own scopes' buckets,
+          # inside the explicit boundary) is on the host without the default, so
+          # it is not listed.
+          seedIds = lib.genAttrs (builtins.filter (i: i != null) (
+            map identityOf (lib.concatMap (sid: seed.perScope.${sid}.${cls} or [ ]) boundedScopes)
+          )) (_: true);
+          onRootUndelivered =
+            m:
+            let
+              id = identityOf m;
+            in
+            id != null && seedIds ? ${id};
           defaultDelivered = lib.concatMap (
             p:
             map
@@ -579,7 +598,7 @@ let
                 aspect = identityOf { key = l; };
               })
               (
-                builtins.filter (l: !(reachesRoot { key = l; })) (
+                builtins.filter (l: !(onRootUndelivered { key = l; })) (
                   ((pi.provenanceLocs or { }).${p.spec.sourceScopeId} or { }).${p.spec.__fromProvenance} or [ ]
                 )
               )
@@ -598,6 +617,7 @@ let
                 builtins.filter (
                   m:
                   !(reachesRoot m)
+                  && !(standDownAspects ? "${sid}\n${toString (identityOf m)}")
                   && !(
                     provenanceRead
                     ? "${sid}\n${den.lib.aspects.fx.identity.stripCtxSuffix (toString (m.key or m._file or ""))}"
@@ -621,25 +641,32 @@ let
       };
       # A shared source fanned out at a host for a user the host accepts: the
       # lifted merge already carries that user's own copy, so this one goes
-      # (#694 §11a R6). Users are matched by id_hash (D5).
-      acceptedUsers = lib.genAttrs (map (sid: ownEntityOf.${sid}) (
-        builtins.filter acceptedUserScope (builtins.attrNames ownEntityOf)
-      )) (_: true);
-      droppedLocs =
-        lib.genAttrs
-          (lib.concatMap (
-            byToken:
-            lib.concatLists (
-              lib.mapAttrsToList (
-                token: locs:
-                lib.optionals (
-                  lib.hasPrefix sharedFanOutPrefix token
-                  && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
-                ) locs
-              ) byToken
-            )
-          ) (builtins.attrValues (builtins.removeAttrs (pi.provenanceLocs or { }) [ "__standDown" ])))
-          (_: true);
+      # (#694 §11a R6). Users are matched by host and user id_hash (D5).
+      acceptedUsers = lib.genAttrs (map (
+        sid: "${(scopeContexts.${sid} or { }).host.id_hash or ""}>${ownEntityOf.${sid}}"
+      ) (builtins.filter acceptedUserScope (builtins.attrNames ownEntityOf))) (_: true);
+      droppedLocs = lib.genAttrs (lib.concatMap
+        (
+          byToken:
+          lib.concatLists (
+            lib.mapAttrsToList (
+              token: locs:
+              lib.optionals (
+                lib.hasPrefix sharedFanOutPrefix token
+                && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
+              ) locs
+            ) byToken
+          )
+        )
+        (
+          builtins.attrValues (
+            builtins.removeAttrs (pi.provenanceLocs or { }) [
+              "__standDown"
+              "__standDownProvides"
+            ]
+          )
+        )
+      ) (_: true);
       bounded =
         if droppedLocs == { } then
           assembled

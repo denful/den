@@ -87,6 +87,7 @@ in
       { config, den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.schema.host.excludes = [ den.batteries.mutual-provider ];
         expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
         expected = [ ];
@@ -117,6 +118,7 @@ in
       { config, den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
         expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
         expected = [ ];

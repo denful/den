@@ -44,5 +44,8 @@ in
     __functor = self: _: self;
   };
 
-  den.schema.host.includes = lib.optional den.lib.migrations.transitionActive defaultForm;
+  # On every entity kind, so a nested kind with its own class (a guest that is
+  # its own host) gets it too; it acts only where `host` is bound and `user`
+  # is not.
+  den.default.includes = lib.optional den.lib.migrations.transitionActive defaultForm;
 }

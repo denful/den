@@ -38,6 +38,9 @@ in
       __standDown = builtins.concatLists (
         builtins.attrValues ((state.scopedStandDowns or (_: { })) null)
       );
+      __standDownProvides = builtins.concatLists (
+        builtins.attrValues ((state.scopedStandDownProvides or (_: { })) null)
+      );
     }
     // lib.recursiveUpdate direct (
       lib.mapAttrs (

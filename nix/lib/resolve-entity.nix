@@ -59,6 +59,28 @@ let
           };
         };
       scopeHandlers = constantHandler augmentedCtx;
+      # #694's transition defaults reach host, user and home through
+      # den.default; any other kind whose entity carries a class (a guest that
+      # is its own host) gets them here, so nothing changes for it either
+      # until den.lib.migrations.removalDate.
+      transitionDefaults =
+        lib.optionals
+          (
+            den.lib.migrations.transitionActive
+            && !(builtins.elem name [
+              "host"
+              "user"
+              "home"
+            ])
+            && builtins.isAttrs entity
+            && entity ? class
+          )
+          (
+            map (b: b.__defaultForm) [
+              den.batteries.user-aspects
+              den.batteries.mutual-provider
+            ]
+          );
       selfProvide =
         if name == "default" && den ? default then
           [ den.default ]
@@ -84,7 +106,7 @@ let
         aspect-chain = [ ];
       };
       excludes = schemaExcludes ++ instanceCollection "excludes";
-      includes = selfProvide ++ schemaIncludes ++ instanceCollection "includes";
+      includes = selfProvide ++ schemaIncludes ++ transitionDefaults ++ instanceCollection "includes";
       __entityKind = name;
       __scopeHandlers = scopeHandlers;
     };

@@ -307,7 +307,8 @@ An excluded host no longer receives `to-hosts` content.
 
 Lets a host accept everything its users produce for it, as before #694. Until
 2027-01-01 it is on by default, as one of the [transition
-defaults](#the-transition-defaults); include it explicitly to keep it: their
+defaults](#the-transition-defaults); include it explicitly to keep it. It
+carries their
 own `nixos`, `darwin` and `os`, what they include, custom classes they route or
 forward into the host's class, what their policies provide in their own scope,
 and a host-rooted `den.lib.aspects.resolve`. It is opt-in and declared on the
@@ -347,7 +348,8 @@ host-class content for when it is placed on a host, and a home part for when it
 is placed on a user.
 
 To give configs time to move, until 2027-01-01 den keeps two transition
-defaults on every host: `den.batteries.user-aspects` and
+defaults on every host (and on any nested kind with its own class, such as a
+guest): `den.batteries.user-aspects` and
 `den.batteries.mutual-provider`, each through a default form of its own. With
 them a config behaves as before #694. A host warns once, listing the
 host-class content that reaches it only through a default:
@@ -356,10 +358,13 @@ host-class content that reaches it only through a default:
 den: igloo receives nixos content only through den's transition default, which ends 2027-01-01:
   - from tux (steam)
   - from tux (tux/to-hosts)
-If the host should have it, include the aspect on the host or add the battery explicitly (`den.batteries.user-aspects`, or `den.batteries.mutual-provider` for `provides.to-hosts`); if it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694.
+If the host should have it, include the aspect on the host or add the battery explicitly: `den.schema.host.includes = [ den.batteries.user-aspects ];` for a user's own content, `den.schema.host.includes = [ den.batteries.mutual-provider ];` for `provides.to-hosts`. If it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694.
 ```
 
-Each entry names the user and the aspect that wrote the content. Content a
+Each entry names the nested entity (usually a user) and the aspect that wrote
+the content. The warning covers the host's class only: content in another
+class, such as a custom class a host route collects, changes without an entry
+when the defaults go. Content a
 host also receives another way, such as a `{ host, ... }` function in
 `den.default` that runs at the host scope too, is not listed. Neither is the
 content of a nested entity with its own class, such as a guest that is its own
@@ -408,7 +413,7 @@ den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
 ```
 
 `policy.include` adds the aspect to the scope the policy fires in, which is
-tux's. Its `nixos` stays with tux.  Write it as a provide instead, which
+tux's. Its `nixos` stays with tux. Write it as a provide instead, which
 `mutual-provider` delivers when the host includes it:
 
 ```nix

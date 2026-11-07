@@ -2,13 +2,11 @@
 # suite runs with them off (test-support/end-state.nix); these cells turn them
 # back on, as every config outside the suite has them.
 #
-# By default user-aspects and mutual-provider are on every host, so nothing
-# changes from before #694, and a host warns once for the host-class content
-# that reaches it only through them. The warning is `lib.warn`, which a cell
-# cannot read: each cell that should warn uses its own user name, and the
-# run's output carries exactly one `den: igloo receives nixos content only
-# through den's transition default` naming `warn-<case>` per such cell, and
-# none naming `quiet-<case>`.
+# By default user-aspects and mutual-provider are on every entity kind, so
+# nothing changes from before #694, and a host warns once for the host-class
+# content that reaches it only through them. The warning is `lib.warn`, which a
+# cell cannot read, so checkLost also hands the list it warns with to the
+# host's `_module.args.denTransitionDefaultLost`; `warned` reads it.
 { denTest, lib, ... }:
 let
   transition = {
@@ -31,10 +29,18 @@ let
     map (e: e.aspect) (
       config.flake.nixosConfigurations.igloo._module.args.denTransitionDefaultLost or [ ]
     );
+  hostCtx =
+    config: name:
+    config.den.hosts.x86_64-linux.${name}.__resolveResult.scopeContexts."host=${name}" or { };
+  keysWith =
+    prefix: ctx:
+    builtins.filter (k: builtins.substring 0 (builtins.stringLength prefix) k == prefix) (
+      builtins.attrNames ctx
+    );
   # One cell per #694 form: by default it still reaches the host, and the
   # warning lists it.
   formCell =
-    form: expectedAspect:
+    extra: form: expectedAspect:
     denTest (
       {
         den,
@@ -43,7 +49,10 @@ let
         ...
       }:
       {
-        imports = [ transition ];
+        imports = [
+          transition
+          extra
+        ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feat.nixos.environment.etc.probe.text = "x";
         den.policies.tux-to-hosts =
@@ -59,14 +68,17 @@ let
         };
       }
     );
+  form = formCell { };
 in
 {
   flake.tests.deadbugs.issue-694-migration = {
 
-    # The #694 table, each form listed by the warning.
-    test-form-own-nixos-warned = formCell (_: { nixos.environment.etc.probe.text = "x"; }) "tux";
-    test-form-include-warned = formCell (den: { includes = [ den.aspects.feat ]; }) "feat";
-    test-form-function-warned = formCell (_: {
+    # The issue's table, each form listed by the warning, and two more forms
+    # that also reach the host only through a default: a user policy's bare
+    # include, and `provides.to-hosts`.
+    test-form-own-nixos-warned = form (_: { nixos.environment.etc.probe.text = "x"; }) "tux";
+    test-form-include-warned = form (den: { includes = [ den.aspects.feat ]; }) "feat";
+    test-form-function-warned = form (_: {
       includes = [
         (
           { user, ... }:
@@ -76,11 +88,22 @@ in
         )
       ];
     }) "tux/<anon>:0";
-    test-form-policy-warned = formCell (den: {
+    test-form-function-module-warned = form (_: {
+      nixos =
+        { pkgs, ... }:
+        {
+          environment.etc.probe.text = "x";
+        };
+    }) "tux";
+    test-form-os-warned = form (_: { os.environment.etc.probe.text = "x"; }) "os@tux";
+    test-form-homemanager-classes-warned = formCell {
+      den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
+      den.default.homeManager.home.stateVersion = "25.11";
+    } (_: { nixos.environment.etc.probe.text = "x"; }) "tux";
+    test-form-policy-warned = form (den: {
       includes = [ den.policies.tux-to-hosts ];
     }) "<policy:tux-to-hosts>[1]";
-    test-form-os-warned = formCell (_: { os.environment.etc.probe.text = "x"; }) "os@tux";
-    test-form-to-hosts-warned = formCell (_: {
+    test-form-to-hosts-warned = form (_: {
       provides.to-hosts.nixos.environment.etc.probe.text = "x";
     }) "tux/to-hosts";
 
@@ -106,37 +129,47 @@ in
       }
     );
 
-    # By default a user's own nixos still reaches the host, with a warning
-    # (warn-default), as does what it provides to its hosts.
+    # By default a user's own nixos still reaches the host, as does what it
+    # provides to its hosts; the warning lists both.
     test-default-changes-nothing = denTest (
-      { den, igloo, ... }:
+      {
+        den,
+        igloo,
+        config,
+        ...
+      }:
       {
         imports = [ transition ];
-        den.hosts.x86_64-linux.igloo.users.warn-default = { };
-        den.aspects.warn-default = {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux = {
           nixos.environment.etc.own.text = "user";
           provides.to-hosts.nixos.environment.etc.provided.text = "user";
         };
         expr = {
           own = igloo.environment.etc.own.text or "<missing>";
           provided = igloo.environment.etc.provided.text or "<missing>";
+          warned = warned config;
         };
         expected = {
           own = "user";
           provided = "user";
+          warned = [
+            "tux"
+            "tux/to-hosts"
+          ];
         };
       }
     );
 
     # The acknowledgement turns both defaults off: neither the user's own
-    # nixos nor what it provides reaches the host (quiet-ack).
+    # nixos nor what it provides reaches the host.
     test-acknowledgement-turns-both-off = denTest (
       { den, igloo, ... }:
       {
         imports = [ transition ];
         den.migrations.user-host-content.acknowledged = true;
-        den.hosts.x86_64-linux.igloo.users.quiet-ack = { };
-        den.aspects.quiet-ack = {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux = {
           nixos.environment.etc.own.text = "user";
           provides.to-hosts.nixos.environment.etc.provided.text = "user";
         };
@@ -151,57 +184,115 @@ in
       }
     );
 
-    # Explicit batteries: the content arrives through them, so no warning
-    # (quiet-explicit). Both host policies fire for each battery (default and
-    # explicit are two policies), but each delivery is one, so content lands
-    # once.
+    # Explicit batteries: the content arrives through them, so no warning.
+    # Both host policies fire for each battery (default and explicit are two
+    # policies, one publishing each acceptance key), but each delivery is one,
+    # so the content lands once.
     test-explicit-include-no-warning = denTest (
-      { den, igloo, ... }:
+      {
+        den,
+        igloo,
+        config,
+        ...
+      }:
       {
         imports = [ transition ];
         den.schema.host.includes = [
           den.batteries.user-aspects
           den.batteries.mutual-provider
         ];
-        den.hosts.x86_64-linux.igloo.users.quiet-explicit = { };
-        den.aspects.quiet-explicit = {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux = {
           nixos.boot.kernelModules = [ "own" ];
           provides.to-hosts.nixos.boot.kernelModules = [ "provided" ];
         };
-        expr = builtins.filter (m: m == "own" || m == "provided") igloo.boot.kernelModules;
-        expected = [
-          "own"
-          "provided"
-        ];
+        expr = {
+          modules = builtins.filter (m: m == "own" || m == "provided") igloo.boot.kernelModules;
+          warned = warned config;
+        };
+        expected = {
+          modules = [
+            "own"
+            "provided"
+          ];
+          warned = [ ];
+        };
       }
     );
 
-    # Excluding a battery stops its default: with user-aspects excluded the
-    # user's own nixos stays with it, while mutual-provider's default still
-    # delivers what it provides, with a warning for that (warn-excluded).
-    test-excluding-a-battery-stops-its-default = denTest (
-      { den, igloo, ... }:
+    # Excluding user-aspects stops its default: the user's own nixos stays
+    # with it, while mutual-provider's default still delivers what it
+    # provides, which the warning lists.
+    test-excluding-user-aspects-stops-its-default = denTest (
+      {
+        den,
+        igloo,
+        config,
+        ...
+      }:
       {
         imports = [ transition ];
         den.schema.host.excludes = [ den.batteries.user-aspects ];
-        den.hosts.x86_64-linux.igloo.users.warn-excluded = { };
-        den.aspects.warn-excluded = {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux = {
           nixos.environment.etc.own.text = "user";
           provides.to-hosts.nixos.environment.etc.provided.text = "user";
         };
         expr = {
           own = igloo.environment.etc ? own;
           provided = igloo.environment.etc.provided.text or "<missing>";
+          warned = warned config;
         };
         expected = {
           own = false;
           provided = "user";
+          warned = [ "tux/to-hosts" ];
+        };
+      }
+    );
+
+    # Excluding mutual-provider stops its default: no acceptance key, and what
+    # a user provides doesn't reach the host through it.
+    test-excluding-mutual-provider-stops-its-default = denTest (
+      { den, config, ... }:
+      {
+        imports = [ transition ];
+        den.schema.host.excludes = [ den.batteries.mutual-provider ];
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
+        expected = [ ];
+      }
+    );
+
+    # Content mutual-provider's default delivers that the host also has
+    # without it is not listed.
+    test-default-delivery-already-on-host-not-listed = denTest (
+      {
+        den,
+        igloo,
+        config,
+        ...
+      }:
+      {
+        imports = [ transition ];
+        den.schema.host.excludes = [ den.batteries.user-aspects ];
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.feat.nixos.environment.etc.feat.text = "x";
+        den.aspects.igloo.includes = [ den.aspects.feat ];
+        den.aspects.tux.provides.to-hosts.includes = [ den.aspects.feat ];
+        expr = {
+          feat = igloo.environment.etc ? feat;
+          warned = warned config;
+        };
+        expected = {
+          feat = true;
+          warned = [ ];
         };
       }
     );
 
     # The steam-shaped dual aspect placed on a user: by default unchanged
-    # (the host part reaches the host) with a warning (warn-steam).
+    # (the host part reaches the host), with a warning.
     test-dual-aspect-by-default = denTest (
       {
         den,
@@ -212,23 +303,25 @@ in
       {
         imports = [
           transition
-          (homeUser "warn-steam")
+          (homeUser "tux")
         ];
         den.aspects.steam = steam;
-        den.aspects.warn-steam.includes = [ den.aspects.steam ];
+        den.aspects.tux.includes = [ den.aspects.steam ];
         expr = {
           host = igloo.environment.etc.steam-host.text or "<missing>";
-          home = (hmOf config "warn-steam").home.sessionVariables.STEAM or "<missing>";
+          home = (hmOf config "tux").home.sessionVariables.STEAM or "<missing>";
+          warned = warned config;
         };
         expected = {
           host = "host";
           home = "user";
+          warned = [ "steam" ];
         };
       }
     );
 
     # The same, acknowledged: the host part stays with the user, the home
-    # part applies (quiet-steam).
+    # part applies.
     test-dual-aspect-acknowledged = denTest (
       {
         den,
@@ -239,14 +332,14 @@ in
       {
         imports = [
           transition
-          (homeUser "quiet-steam")
+          (homeUser "tux")
         ];
         den.migrations.user-host-content.acknowledged = true;
         den.aspects.steam = steam;
-        den.aspects.quiet-steam.includes = [ den.aspects.steam ];
+        den.aspects.tux.includes = [ den.aspects.steam ];
         expr = {
           host = igloo.environment.etc ? steam-host;
-          home = (hmOf config "quiet-steam").home.sessionVariables.STEAM or "<missing>";
+          home = (hmOf config "tux").home.sessionVariables.STEAM or "<missing>";
         };
         expected = {
           host = false;
@@ -255,18 +348,102 @@ in
       }
     );
 
-    # Host-placed: no warning (quiet-host).
+    # Host-placed: no warning.
     test-host-placed-no-warning = denTest (
-      { den, igloo, ... }:
+      {
+        den,
+        igloo,
+        config,
+        ...
+      }:
       {
         imports = [
           transition
-          (homeUser "quiet-host")
+          (homeUser "tux")
         ];
         den.aspects.steam = steam;
         den.aspects.igloo.includes = [ den.aspects.steam ];
-        expr = igloo.environment.etc.steam-host.text;
-        expected = "host";
+        expr = {
+          host = igloo.environment.etc.steam-host.text;
+          warned = warned config;
+        };
+        expected = {
+          host = "host";
+          warned = [ ];
+        };
+      }
+    );
+
+    # A home-manager user's os-user-class-fwd hook content, accepted only by
+    # default, reaches the host through the user's bucket; its own delivery
+    # stands down, and is the end state's, so the warning doesn't list it.
+    test-os-user-class-fwd-hook-not-listed = denTest (
+      {
+        den,
+        igloo,
+        config,
+        ...
+      }:
+      {
+        imports = [
+          transition
+          (homeUser "tux")
+        ];
+        den.aspects.os-user-class-fwd.nixos.environment.etc.hook.text = "hook";
+        expr = {
+          hook = igloo.environment.etc.hook.text or "<missing>";
+          warned = builtins.elem "os-user-class-fwd" (warned config);
+        };
+        expected = {
+          hook = "hook";
+          warned = false;
+        };
+      }
+    );
+
+    # A nested kind with its own class that doesn't copy the host's includes
+    # (a guest that is its own host) still gets the transition default: its
+    # scope publishes user-aspects' default acceptance for itself.
+    test-guest-kind-gets-the-default = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      let
+        guest = config.den.hosts.x86_64-linux.cuda // {
+          intoAttr = [ ];
+        };
+        st = (den.lib.aspects.resolveWithState "nixos" (den.lib.resolveEntity "flake" { })).state;
+        ctxs = (st.scopeContexts or (_: { })) null;
+        guestScope = lib.findFirst (
+          sid: lib.hasInfix "guest-kind=cuda" sid && !(lib.hasInfix "user=" sid)
+        ) null (builtins.attrNames ctxs);
+      in
+      {
+        imports = [ transition ];
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.cuda = {
+          intoAttr = [ ];
+          users.pingu = { };
+        };
+        den.schema.guest-kind = {
+          isEntity = true;
+          parent = "host";
+          includes = [ den.policies.host-to-users ];
+        };
+        den.policies.to-guest =
+          { host, ... }:
+          lib.optionals (host.name == "igloo") [
+            (den.lib.policy.resolve.to "guest-kind" {
+              guest-kind = guest;
+              host = guest;
+            })
+          ];
+        den.schema.host.includes = [ den.policies.to-guest ];
+        expr = (ctxs.${guestScope} or { }) ? ${den.lib.acceptance.userAspectsDefaultKey guest};
+        expected = true;
       }
     );
   };

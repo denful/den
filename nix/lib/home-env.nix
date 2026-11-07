@@ -150,7 +150,7 @@ let
             && home == null
             # An accepted user's bucket reaches the host whole, the include's
             # copy with it.
-            && !(den.lib.acceptance.accepts userCtx host user)
+            && !(den.lib.acceptance.acceptsExplicitly userCtx host user)
           )
           (
             den.lib.policy.provide {
@@ -159,6 +159,11 @@ let
                 _:
                 den.lib.aspects.resolve host.class (den.lib.acceptance.atCtx userCtx den.aspects.os-user-class-fwd);
               receiver = host;
+              # Accepted only through user-aspects' transition default: the
+              # bucket carries it, so this stands down, recorded for the
+              # migration warning (#694).
+              __standDown = den.lib.acceptance.accepts userCtx host user;
+              __standDownAspect = "os-user-class-fwd";
             }
           );
 

@@ -313,7 +313,9 @@ let
         # A battery's transition default is excluded with it (#694, until
         # den.lib.migrations.removalDate). Temporary: PR 4's origin-matched
         # excludes cover this generally.
-        ++ lib.optional (builtins.isAttrs ref && ref ? __defaultForm) (policyExclude ref.__defaultForm)
+        ++ lib.optional (builtins.isAttrs ref && ref ? __defaultForm) (
+          policyExclude ref.__defaultForm // { defaultFormOf = true; }
+        )
       ) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";

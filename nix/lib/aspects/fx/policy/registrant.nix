@@ -38,9 +38,9 @@ let
     state: scope:
     let
       chain = ((state.scopedIncludesChain or (_: { })) null).${scope} or [ ];
-      # A registrant token starts with an entity key (`<kind>:<id_hash or
-      # name>/…`); a mutual-provider token names an aspect instead, so it
-      # matches no registrant on the path.
+      # A registrant token starts with an entity key (its id_hash, or
+      # `<kind>:<name>` without one) and `/`; a mutual-provider token names an
+      # aspect instead, so it matches no registrant on the path.
       tokens = map (h: lib.last (lib.splitString marker h)) (builtins.filter (lib.hasInfix marker) chain);
       parents = (state.scopeParent or (_: { })) null;
       # The registrants on the path, nearest first.

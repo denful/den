@@ -182,8 +182,14 @@
         den.policies.wrap = { host, user, ... }: [ (den.lib.policy.include den.aspects.feature) ];
         den.aspects.igloo.includes = [ den.policies.wrap ];
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
-        expr = igloo.environment.etc.provided.text or "<missing>";
-        expected = "<missing>";
+        expr = {
+          own = igloo.environment.etc.own.text or "<missing>";
+          provided = igloo.environment.etc.provided.text or "<missing>";
+        };
+        expected = {
+          own = "own";
+          provided = "<missing>";
+        };
       }
     );
 
