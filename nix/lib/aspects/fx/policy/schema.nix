@@ -16,6 +16,7 @@
   mkSupplementalResolution,
 }:
 let
+  inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
@@ -216,7 +217,24 @@ let
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
         # Applied once, outside the lambda — see isPolicyExcluded's currying note.
         excluded = isPolicyExcluded state sib.scopeId constraintRegistry;
-        filteredPolicies = lib.filterAttrs (name: _: !excluded name) latePolicies;
+        # A policy an ancestor scope could already dispatch with the same bound
+        # arguments fired there (late firings are not recorded in the fired
+        # set), so it does not fire again here: offering a grandparent's
+        # registry must not re-fire its `{ system }` policies at every user.
+        scopeCtxs = (state.scopeContexts or (_: { })) null;
+        boundOf =
+          ctx: policy:
+          builtins.filter (k: ctx ? ${k}) (builtins.attrNames (lib.functionArgs (policy.fn or policy)));
+        sameInstanceAbove =
+          policy:
+          builtins.any (
+            a:
+            resolveArgsSatisfied (policy.fn or policy) (scopeCtxs.${a} or { })
+            && boundOf (scopeCtxs.${a} or { }) policy == boundOf sib.scopedCtx policy
+          ) ancestorScopes;
+        filteredPolicies = lib.filterAttrs (
+          name: policy: !excluded name && !(sameInstanceAbove policy)
+        ) latePolicies;
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };
