@@ -57,9 +57,9 @@ let
   };
 
   # envTopology plus a guest of igloo: cuda (a host-like entity, parent kind
-  # host, with two users) binds `host` to itself. Not isolated, so on main's
-  # semantics the guest's subtree merges into igloo and its users' content
-  # is readable in igloo's config.
+  # host, with two users) binds `host` to itself. The guest is a bounded entity
+  # (#694): its subtree's content stays at its own scopes, never in igloo's
+  # config, so the cells read it there (guestValues).
   guestTopology =
     {
       den,
@@ -84,6 +84,9 @@ let
       den.schema.guest-kind = {
         isEntity = true;
         parent = "host";
+        # The walks are bounded either way (#694); `isolated` tells the loss
+        # check this guest never merged into igloo on main, either.
+        isolated = true;
         includes = [ den.policies.host-to-users ];
       };
       den.policies.to-guest =
@@ -96,6 +99,35 @@ let
         ];
       den.schema.host.includes = [ den.policies.to-guest ];
     };
+  # Values `f` reads from the attrset modules collected for `class` at the
+  # guest's tree scopes (guest-kind under an environment), from the pipeline
+  # state, before any host instantiates them.
+  guestValues =
+    lib: den: class: f:
+    let
+      st = (den.lib.aspects.resolveWithState class (den.lib.resolveEntity "flake" { })).state;
+      imports = (st.scopedClassImports or (_: { })) null;
+      scopes = builtins.filter (sid: lib.hasInfix "guest-kind=" sid && lib.hasInfix "environment=" sid) (
+        builtins.attrNames imports
+      );
+    in
+    lib.unique (
+      lib.concatMap (
+        sid:
+        lib.concatMap (e: lib.optionals (builtins.isAttrs e.module) (f e.module)) (
+          imports.${sid}.${class} or [ ]
+        )
+      ) scopes
+    );
+  # igloo's config with the guest's etc entries beside it: the view the cells
+  # assert on, wherever the content now lands.
+  withGuest = lib: den: config: {
+    environment.etc =
+      config.flake.nixosConfigurations.igloo.config.environment.etc
+      // lib.genAttrs (guestValues lib den "nixos" (m: builtins.attrNames (m.environment.etc or { }))) (
+        _: { }
+      );
+  };
   etcNames =
     lib: prefix: cfg:
     builtins.filter (lib.hasPrefix prefix) (builtins.attrNames cfg.environment.etc);
@@ -211,8 +243,9 @@ let
       den.schema.guest-kind = {
         isEntity = true;
         parent = "host";
-        # Not isolated: on main's semantics the guest's subtree merges into
-        # igloo, so its users' content is readable in igloo's config.
+        # The walks are bounded either way (#694); `isolated` tells the loss
+        # check this guest never merged into igloo on main, either.
+        isolated = true;
         includes = [ den.policies.host-to-users ];
       };
       den.policies.to-guest =
@@ -326,10 +359,11 @@ let
             }
           )
         );
-        expr =
-          config.flake.nixosConfigurations.igloo.config.home-manager.users.gentoo.home.sessionVariables.PROJ
-            or "<missing>";
-        expected = "cuda";
+        # gentoo is the guest's user: its home lives at the guest's scope.
+        expr = guestValues lib den "homeManager" (
+          m: lib.optional (m ? home.sessionVariables.PROJ) m.home.sessionVariables.PROJ
+        );
+        expected = [ "cuda" ];
       }
     );
   rebindCell = withIdHash: devFirst: rebindCellWith { inherit withIdHash devFirst; };
@@ -359,7 +393,7 @@ let
               ;
           })
         ];
-        expr = envEtc lib config.flake.nixosConfigurations.igloo.config;
+        expr = envEtc lib (withGuest lib den config);
         expected = [
           # The guest binds dev: dev's rule fires for its users, prod's does not.
           "dp-dev-cuda-gentoo"
@@ -481,7 +515,7 @@ in
         # registers it.
         den.schema.host.includes = [ den.policies.igloo-pol ];
         den.schema.environment.includes = [ den.policies.env-to-hosts ];
-        expr = etcNames lib "ig-" config.flake.nixosConfigurations.igloo.config;
+        expr = etcNames lib "ig-" (withGuest lib den config);
         expected = [ "ig-igloo-tux" ];
       }
     );
@@ -511,7 +545,7 @@ in
           den.policies.env-to-hosts
           den.policies.env-guest
         ];
-        expr = etcNames lib "ev-" config.flake.nixosConfigurations.igloo.config;
+        expr = etcNames lib "ev-" (withGuest lib den config);
         expected = [ "ev-cuda" ];
       }
     );
@@ -760,7 +794,7 @@ in
             })
           ]
         );
-        expr = envEtc lib config.flake.nixosConfigurations.igloo.config;
+        expr = envEtc lib (withGuest lib den config);
         expectedError = {
           type = "ThrownError";
           msg = "only one carries an id_hash";
@@ -815,7 +849,7 @@ in
             })
           ]
         );
-        expr = envEtc lib config.flake.nixosConfigurations.igloo.config;
+        expr = envEtc lib (withGuest lib den config);
         expectedError = {
           type = "ThrownError";
           msg = "differ only in function values";
@@ -864,7 +898,15 @@ in
             })
           ]
         );
-        expr = builtins.filter (lib.hasPrefix "dev-") config.flake.nixosConfigurations.igloo.config.nix.settings.allowed-users;
+        expr = lib.sort lib.lessThan (
+          builtins.filter (lib.hasPrefix "dev-") (
+            config.flake.nixosConfigurations.igloo.config.nix.settings.allowed-users
+            # The guest is never instantiated, so its forward into nixos is
+            # not applied; the content is read where it lands, in the nix
+            # class at the guest's users.
+            ++ guestValues lib den "nix" (m: m.settings.allowed-users or [ ])
+          )
+        );
         expected = [
           "dev-gentoo"
           "dev-pingu"
