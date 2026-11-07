@@ -34,29 +34,104 @@ let
   # Two scopes bind a value the same way: entities by identity, others by value.
   sameBinding = a: b: if builtins.isAttrs a && builtins.isAttrs b then sameEntity a b else a == b;
 
+  # The fired set grouped by scope, once per pass, so a sibling's offered
+  # scopes are looked up rather than every fired key scanned per sibling.
+  firedByScope =
+    firedPerScope:
+    let
+      entries = lib.concatMap (
+        key:
+        let
+          parts = lib.splitString "@" key;
+        in
+        lib.optional (builtins.length parts > 1) {
+          at = lib.concatStringsSep "@" (builtins.tail parts);
+          fired = firedPerScope.${key};
+        }
+      ) (builtins.attrNames firedPerScope);
+    in
+    builtins.mapAttrs (_: es: builtins.foldl' (acc: e: acc // e.fired) { } es) (
+      builtins.groupBy (e: e.at) entries
+    );
+
   # Policies that already fired in one of `offered` (under any entity kind).
   firedInScopes =
-    firedPerScope: offered:
-    let
-      offeredSet = lib.genAttrs offered (_: true);
-    in
-    builtins.foldl' (
-      acc: key:
+    byScope: offered: builtins.foldl' (acc: s: acc // (byScope.${s} or { })) { } offered;
+
+  describeRecord =
+    r: "${r.name or "<unnamed>"}${lib.optionalString (r ? id_hash) " (id_hash ${r.id_hash})"}";
+
+  # A binding is matched to an entity scope by id_hash, or by value when
+  # neither record has one. Either way a match that cannot be decided is an
+  # error: a quiet mismatch would silently fire none of the entity's rules.
+  mixedIdHash =
+    kind: a: b:
+    throw "den: two `${kind}` records, ${describeRecord a} and ${describeRecord b}, are compared but only one carries an id_hash, so den cannot tell whether they are one entity; give both an id_hash, or neither";
+
+  # "eq", "ne", or "fn" when the values differ only in function-valued
+  # attributes, which Nix compares unequal unless they are the same value.
+  valueDiff =
+    a: b:
+    if a == b then
+      "eq"
+    else if builtins.isFunction a && builtins.isFunction b then
+      "fn"
+    else if builtins.isAttrs a && builtins.isAttrs b then
       let
-        parts = lib.splitString "@" key;
-        at = lib.concatStringsSep "@" (builtins.tail parts);
+        names = builtins.attrNames a;
+        isLeaf = n: !(builtins.isAttrs a.${n}) && !(builtins.isFunction a.${n});
       in
-      if builtins.length parts > 1 && offeredSet ? ${at} then
-        acc // (firedPerScope.${key} or { })
+      if names != builtins.attrNames b then
+        "ne"
+      else if builtins.any (n: isLeaf n && a.${n} != b.${n}) names then
+        "ne"
       else
-        acc
-    ) { } (builtins.attrNames firedPerScope);
+        let
+          diffs = map (n: valueDiff a.${n} b.${n}) (builtins.filter (n: !isLeaf n) names);
+        in
+        if builtins.elem "ne" diffs then
+          "ne"
+        else if builtins.elem "fn" diffs then
+          "fn"
+        else
+          "eq"
+    else
+      "ne";
+
+  sameByValue =
+    kind: a: b:
+    let
+      d = valueDiff (builtins.removeAttrs a [ "hasAspect" ]) (builtins.removeAttrs b [ "hasAspect" ]);
+    in
+    if d == "fn" then
+      throw "den: two `${kind}` records named ${a.name or "<unnamed>"} differ only in function values, so den cannot tell whether they are one entity; give them an id_hash"
+    else
+      d == "eq";
+
+  # Pending re-pass entries for `kind`, bucketed by id_hash ("" for records
+  # without one): the entries waiting on `record`'s entity.
+  pendingFor =
+    kind: byKind: record:
+    let
+      noId = byKind."" or { };
+      withId = builtins.filter (b: b != "" && byKind.${b} != { }) (builtins.attrNames byKind);
+    in
+    if record ? id_hash then
+      if noId != { } then
+        mixedIdHash kind record (builtins.head (builtins.attrValues noId)).record
+      else
+        builtins.attrValues (byKind.${record.id_hash} or { })
+    else if withId != [ ] then
+      mixedIdHash kind record (builtins.head (builtins.attrValues byKind.${builtins.head withId})).record
+    else
+      builtins.filter (p: sameByValue kind p.record record) (builtins.attrValues noId);
 
   # A sibling's binding whose entity has not resolved yet is offered once that
   # entity resolves: a re-pass of the sibling with the entity's registry, so
-  # the order in which entities resolve does not decide which rules fire. Each
-  # (sibling, kind) re-passes at most once; the cap guards a runaway.
-  maxBoundRepasses = 1024;
+  # the order in which entities resolve does not decide which rules fire. An
+  # entry is consumed when it re-passes and the done set refuses a second
+  # (sibling, kind) re-pass, so re-passes are bounded by the entries late
+  # passes add: one per sibling and kind its tree does not bind.
   repassBound =
     targetKind: scopedCtx: entityScope:
     fx.bind fx.effects.state.get (
@@ -64,47 +139,65 @@ let
       let
         here = state.currentScope;
         record = scopedCtx.${targetKind} or null;
+        pendingAll = (state.boundRepassPending or (_: { })) null;
+        byKind = pendingAll.${targetKind} or { };
         done = state.boundRepassDone or { };
         key = p: "${p.sib.scopeId}|${p.kind}";
-        pending = builtins.filter (
-          p: p.kind == targetKind && record != null && !(done ? ${key p}) && sameEntity p.record record
-        ) ((state.boundRepassPending or (_: [ ])) null);
-        count = (state.boundRepassCount or 0) + builtins.length pending;
+        pending =
+          if byKind == { } || !(builtins.isAttrs record) then
+            [ ]
+          else
+            builtins.filter (p: !(done ? ${key p})) (pendingFor targetKind byKind record);
+        consumed = builtins.groupBy (p: p.record.id_hash or "") pending;
       in
       if pending == [ ] then
         fx.pure null
-      else if count > maxBoundRepasses then
-        throw "den: more than ${toString maxBoundRepasses} late re-passes for bindings resolved after their binders; is entity resolution cycling?"
       else
         fx.bind
           (fx.effects.state.modify (
             st:
             st
             // {
-              boundRepassCount = count;
               boundRepassDone = (st.boundRepassDone or { }) // lib.genAttrs (map key pending) (_: true);
+              boundRepassPending =
+                _:
+                pendingAll
+                // {
+                  ${targetKind} =
+                    byKind
+                    // builtins.mapAttrs (
+                      bucket: ps: builtins.removeAttrs (byKind.${bucket} or { }) (map (p: p.sib.scopeId) ps)
+                    ) consumed;
+                };
             }
           ))
           (
             _:
-            builtins.foldl' (
-              acc: p:
-              fx.bind acc (
-                _:
-                fx.bind fx.effects.state.get (
-                  st:
-                  let
-                    firedPerScope = (st.firedPolicyNames or (_: { })) null;
-                    policies = (st.scopedAspectPolicies or (_: { })) null;
-                  in
-                  fx.bind
-                    (emitLateForSibling p.parentScope [ entityScope ] (firedInScopes firedPerScope [
-                      entityScope
-                    ]) policies firedPerScope { } p.sib)
-                    (_: fx.effects.state.modify (st': st' // { currentScope = here; }))
+            fx.bind fx.effects.state.get (
+              st:
+              let
+                firedPerScope = (st.firedPolicyNames or (_: { })) null;
+                firedHere = firedInScopes (firedByScope firedPerScope) [ entityScope ];
+              in
+              builtins.foldl' (
+                acc: p:
+                fx.bind acc (
+                  _:
+                  fx.bind fx.effects.state.get (
+                    st':
+                    let
+                      policies = (st'.scopedAspectPolicies or (_: { })) null;
+                      # What the sibling's first pass offered, and its own
+                      # registry: those already had their chance to fire.
+                      seen = p.seen // lib.mapAttrs (_: _: true) (policies.${p.sib.scopeId} or { });
+                    in
+                    fx.bind
+                      (emitLateForSibling p.parentScope [ entityScope ] firedHere policies firedPerScope seen p.sib)
+                      (_: fx.effects.state.modify (st'': st'' // { currentScope = here; }))
+                  )
                 )
-              )
-            ) (fx.pure null) pending
+              ) (fx.pure null) pending
+            )
           )
     );
 
@@ -444,7 +537,6 @@ let
                   [ s ] ++ go (seen // { ${s} = true; }) (scopeParents.${s} or null);
             in
             go { } parentScope;
-          ancestorSet = lib.genAttrs ancestorScopes (_: true);
           # A tree ancestor whose own entity the sibling binds to a different
           # entity is not offered: a guest binds `host` to itself, so its host's
           # policies stay with the host, as guests are their own hosts.
@@ -460,66 +552,66 @@ let
               in
               own == null || !(sib.scopedCtx ? ${kind}) || sameEntity sib.scopedCtx.${kind} own
             ) ancestorScopes;
-          # Plus the scope of every entity the sibling binds: a policy applies
-          # where the scope's binding for its registrant's kind is that
-          # registrant, which for an ordinary host is the tree.
-          ownOf =
-            sid:
+          boundIndex = (state.boundEntityIndex or (_: { })) null;
+          # The scopes of the entity a sibling binds for `kind`, by id_hash, or
+          # by value among the kind's records without one.
+          boundScopesFor =
+            kind: record:
             let
-              kind = scopeKinds.${sid} or null;
+              ix = boundIndex.${kind} or { };
+              noId = ix."" or { };
+              withId = builtins.filter (b: b != "") (builtins.attrNames ix);
+              recordAt = sid: (scopeCtxsL.${sid} or { }).${kind};
             in
-            if kind == null then
-              null
+            if record ? id_hash then
+              if noId != { } then
+                mixedIdHash kind record (recordAt (builtins.head (builtins.attrNames noId)))
+              else
+                builtins.attrNames (ix.${record.id_hash} or { })
+            else if withId != [ ] then
+              mixedIdHash kind record (recordAt (builtins.head (builtins.attrNames ix.${builtins.head withId})))
             else
-              {
-                inherit kind;
-                record = (scopeCtxsL.${sid} or { }).${kind} or null;
-              };
-          entityScopes = builtins.filter (sid: (ownOf sid).record or null != null) (
-            builtins.attrNames scopeKinds
-          );
+              builtins.filter (sid: sameByValue kind record (recordAt sid)) (builtins.attrNames noId);
+          # Plus the scope of every entity the sibling binds outside its tree:
+          # a policy applies where the scope's binding for its registrant's
+          # kind is that registrant, which for an ordinary host is the tree.
+          # Only kinds no kept ancestor supplies are searched: id_hash is
+          # parent-blind, so tux@iceberg must not find tux@igloo's scope.
           offerFor =
             sib:
             let
               kept = keptAncestorsFor sib;
               keptSet = lib.genAttrs kept (_: true);
-              bound = builtins.filter (
-                sid:
-                let
-                  own = ownOf sid;
-                in
-                sid != sib.scopeId
-                && !(keptSet ? ${sid})
-                && builtins.isAttrs (sib.scopedCtx.${own.kind} or null)
-                && sameEntity sib.scopedCtx.${own.kind} own.record
-              ) entityScopes;
+              treeKinds = lib.genAttrs (builtins.filter (k: k != null) (map (a: scopeKinds.${a} or null) kept)) (
+                _: true
+              );
+              boundKinds = builtins.filter (
+                k:
+                k != sib.targetKind
+                && !(treeKinds ? ${k})
+                && schemaEntityKindsSet ? ${k}
+                && builtins.isAttrs sib.scopedCtx.${k}
+              ) (builtins.attrNames sib.scopedCtx);
+              lookups = map (k: {
+                kind = k;
+                scopes = builtins.filter (s: s != sib.scopeId && !(keptSet ? ${s})) (
+                  boundScopesFor k sib.scopedCtx.${k}
+                );
+              }) boundKinds;
+              offered = kept ++ lib.concatMap (l: l.scopes) lookups;
             in
-            kept ++ bound;
-          # Bindings whose entity has not resolved yet: offered once it does
-          # (repassBound).
-          unresolvedBindings =
-            sib:
-            builtins.filter (
-              k:
-              k != sib.targetKind
-              && builtins.isAttrs (sib.scopedCtx.${k} or null)
-              && !(builtins.any (
-                sid: (ownOf sid).kind == k && sameEntity sib.scopedCtx.${k} (ownOf sid).record
-              ) entityScopes)
-            ) den.lib.schemaUtil.schemaEntityKinds;
-          # Policies that already fired at the parent or above (under any entity
-          # kind) do not fire again below.
-          parentFiredPolicies = builtins.foldl' (
-            acc: key:
-            let
-              parts = lib.splitString "@" key;
-              at = lib.concatStringsSep "@" (builtins.tail parts);
-            in
-            if builtins.length parts > 1 && ancestorSet ? ${at} then
-              acc // (firedPerScope.${key} or { })
-            else
-              acc
-          ) { } (builtins.attrNames firedPerScope);
+            {
+              inherit sib offered;
+              # Bindings whose entity has not resolved yet: offered once it
+              # does (repassBound).
+              unresolved = map (l: l.kind) (builtins.filter (l: l.scopes == [ ]) lookups);
+              # The names this pass offers; a re-pass does not offer them again.
+              seen = builtins.foldl' (
+                acc: s: acc // lib.mapAttrs (_: _: true) (scopedAspectPolicies.${s} or { })
+              ) { } offered;
+            };
+          offers = map offerFor siblingMetas;
+          firedBy = firedByScope firedPerScope;
         in
         fx.bind
           (fx.effects.state.modify (
@@ -527,37 +619,54 @@ let
             st
             // {
               # Behind a thunk: the trampoline deepSeqs state each step, and
-              # these hold whole entity records.
+              # these hold whole entity records. Keyed by kind, id_hash and
+              # sibling, so a repeated batch does not add a sibling twice.
               boundRepassPending =
                 let
-                  prev = (st.boundRepassPending or (_: [ ])) null;
+                  prev = (st.boundRepassPending or (_: { })) null;
                   added = lib.concatMap (
-                    sib:
+                    o:
                     map (k: {
                       kind = k;
-                      record = sib.scopedCtx.${k};
-                      inherit parentScope sib;
-                    }) (unresolvedBindings sib)
-                  ) siblingMetas;
+                      record = o.sib.scopedCtx.${k};
+                      inherit parentScope;
+                      inherit (o) sib seen;
+                    }) o.unresolved
+                  ) offers;
+                  insert =
+                    acc: e:
+                    let
+                      bucket = e.record.id_hash or "";
+                      byKind = acc.${e.kind} or { };
+                      entries = byKind.${bucket} or { };
+                    in
+                    if entries ? ${e.sib.scopeId} then
+                      acc
+                    else
+                      acc
+                      // {
+                        ${e.kind} = byKind // {
+                          ${bucket} = entries // {
+                            ${e.sib.scopeId} = e;
+                          };
+                        };
+                      };
                 in
-                _: prev ++ added;
+                _: builtins.foldl' insert prev added;
             }
           ))
           (
             _:
             builtins.foldl' (
-              acc: sib:
+              acc: o:
               fx.bind acc (
                 _:
-                let
-                  offered = offerFor sib;
-                in
-                emitLateForSibling parentScope offered (firedInScopes firedPerScope offered) scopedAspectPolicies
+                emitLateForSibling parentScope o.offered (firedInScopes firedBy o.offered) scopedAspectPolicies
                   firedPerScope
                   { }
-                  sib
+                  o.sib
               )
-            ) (fx.pure null) siblingMetas
+            ) (fx.pure null) offers
           )
       )
     );

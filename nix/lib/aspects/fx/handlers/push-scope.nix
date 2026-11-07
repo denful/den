@@ -50,6 +50,26 @@ let
           // lib.optionalAttrs (entityIdHash != null) {
             "${parentScope}\n${entityIdHash}" = newScopeId;
           };
+        # Entity scopes by kind and id_hash (records without one by kind
+        # alone), so late dispatch finds the scope of an entity a sibling binds
+        # outside its tree without scanning every scope.
+        prevBoundIndex = (state.boundEntityIndex or (_: { })) null;
+        updatedBoundIndex =
+          if !(builtins.isAttrs entityRecord) then
+            prevBoundIndex
+          else
+            let
+              ix = prevBoundIndex.${entityKind} or { };
+              bucket = if entityIdHash != null then entityIdHash else "";
+            in
+            prevBoundIndex
+            // {
+              ${entityKind} = ix // {
+                ${bucket} = (ix.${bucket} or { }) // {
+                  ${newScopeId} = true;
+                };
+              };
+            };
         updatedParent = prevParent // lib.optionalAttrs (!isSameScope) { ${newScopeId} = parentScope; };
         updatedPolicies = prevPolicies // {
           ${newScopeId} = prevPolicies.${newScopeId} or { };
@@ -81,6 +101,7 @@ let
           scopeSourcePolicy = _: updatedSourcePolicy;
           scopeIsolated = _: updatedIsolated;
           scopeByEntity = _: updatedScopeByEntity;
+          boundEntityIndex = _: updatedBoundIndex;
         };
       };
   };

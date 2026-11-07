@@ -231,6 +231,57 @@ let
   # dev's rule opts the guest's user gentoo into host-aspects; the projection
   # carries cuda's homeManager content to gentoo. With dev declared after
   # prod, the rule only runs in the re-pass.
+  # A policy registered at the guest (a tree ancestor of its users) and at dev
+  # (their bound environment) fires once per user in either order. Provides
+  # are not deduplicated, so the list counts firings.
+  bothRegisteredCell =
+    devFirst:
+    denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      {
+        imports = [
+          (rebindFixture {
+            inherit
+              den
+              lib
+              config
+              devFirst
+              ;
+            withIdHash = true;
+          })
+        ];
+        den.policies.both-pol =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              module.boot.kernelModules = [ "both-${user.name}" ];
+            })
+          ];
+        den.aspects.cuda.includes = [ den.policies.both-pol ];
+        den.aspects.dev-env.includes = [ den.policies.both-pol ];
+        # Every provide the pipeline registered, read before any downstream
+        # dedup: one per firing.
+        expr =
+          let
+            st = (den.lib.aspects.resolveWithState "nixos" (den.lib.resolveEntity "flake" { })).state;
+          in
+          lib.sort lib.lessThan (
+            lib.concatMap (p: p.module.boot.kernelModules or [ ]) (
+              lib.concatLists (builtins.attrValues ((st.scopedProvides or (_: { })) null))
+            )
+          );
+        expected = [
+          "both-gentoo"
+          "both-pingu"
+        ];
+      }
+    );
   projectionCell =
     devFirst:
     denTest (
@@ -551,8 +602,196 @@ in
     # A spawn reached through re-passed content runs in the re-pass: dev's
     # rule includes a complex forward (a spawned sub-pipeline) at the guest's
     # users, and dev resolves after the guest. Its forwarded content lands.
+    test-both-registered-fires-once-bound-first = bothRegisteredCell true;
+    test-both-registered-fires-once-bound-later = bothRegisteredCell false;
     test-projection-from-bound-rule = projectionCell true;
     test-projection-from-repassed-rule = projectionCell false;
+
+    # id_hash is parent-blind: tux@igloo and tux@iceberg share one. A policy
+    # registered at tux@iceberg (through iceberg's provides, resolved first)
+    # stays there; the
+    # bound search skips the kinds a scope's tree already binds.
+    test-same-named-users-keep-their-own-rules = denTest (
+      { den, config, ... }:
+      let
+        etc =
+          h:
+          builtins.filter (lib.hasPrefix "pa-") (
+            builtins.attrNames config.flake.nixosConfigurations.${h}.config.environment.etc
+          );
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.tux = { };
+        den.policies.pa =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include {
+              name = "pa-${host.name}-${user.name}";
+              nixos.environment.etc."pa-${host.name}-${user.name}".text = "x";
+            })
+          ];
+        den.aspects.iceberg.provides.tux.includes = [ den.policies.pa ];
+        expr = {
+          igloo = etc "igloo";
+          iceberg = etc "iceberg";
+        };
+        expected = {
+          igloo = [ ];
+          iceberg = [ "pa-iceberg-tux" ];
+        };
+      }
+    );
+
+    # One host resolved under two environments has two scopes with one
+    # id_hash. A policy registered only at igloo@dev stays out of
+    # igloo@prod's users: their tree already binds `host`.
+    test-host-in-two-environments-keeps-scope-rules = denTest (
+      { den, igloo, ... }:
+      {
+        den.schema.environment.isEntity = true;
+        den.schema.host.parent = "environment";
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.to-env = _: [
+          # dev first, so igloo@dev exists when igloo@prod's users pass.
+          (den.lib.policy.resolve.to "environment" { environment.name = "dev"; })
+          (den.lib.policy.resolve.to "environment" { environment.name = "prod"; })
+        ];
+        den.policies.env-to-hosts =
+          { environment, ... }:
+          [ (den.lib.policy.resolve.to "host" { host = den.hosts.x86_64-linux.igloo; }) ]
+          ++ lib.optional (environment.name == "prod") (
+            den.lib.policy.instantiate den.hosts.x86_64-linux.igloo
+          );
+        den.schema.flake.includes = [ den.policies.to-env ];
+        den.schema.environment.includes = [ den.policies.env-to-hosts ];
+        den.schema.flake-system.excludes = [
+          den.policies.system-to-os-outputs
+          den.policies.system-to-hm-outputs
+        ];
+        den.policies.pa =
+          {
+            environment,
+            host,
+            user,
+            ...
+          }:
+          [
+            (den.lib.policy.include {
+              name = "pa-${environment.name}-${user.name}";
+              nixos.environment.etc."pa-${environment.name}-${host.name}-${user.name}".text = "x";
+            })
+          ];
+        den.policies.dev-registers =
+          { environment, host, ... }:
+          lib.optional (environment.name == "dev") (
+            den.lib.policy.include {
+              name = "dev-registers";
+              includes = [ den.policies.pa ];
+            }
+          );
+        den.schema.host.includes = [ den.policies.dev-registers ];
+        expr = builtins.filter (lib.hasPrefix "pa-prod-") (builtins.attrNames igloo.environment.etc);
+        expected = [ ];
+      }
+    );
+
+    # A binding compared with a record of the same kind where only one side
+    # has an id_hash cannot be decided, so it is an error, not no rules.
+    test-binding-mixed-id-hash-is-an-error = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      {
+        imports = [
+          (rebindFixture {
+            inherit den lib config;
+            withIdHash = true;
+            devFirst = true;
+          })
+        ];
+        den.policies.to-guest = lib.mkForce (
+          { host, ... }:
+          lib.optionals (host.name == "igloo") [
+            (den.lib.policy.resolve.to "guest-kind" {
+              guest-kind = config.den.hosts.x86_64-linux.cuda // {
+                intoAttr = [ ];
+              };
+              host = config.den.hosts.x86_64-linux.cuda // {
+                intoAttr = [ ];
+              };
+              environment = {
+                name = "dev";
+                aspect = den.aspects.dev-env;
+              };
+            })
+          ]
+        );
+        expr = envEtc lib config.flake.nixosConfigurations.igloo.config;
+        expectedError = {
+          type = "ThrownError";
+          msg = "only one carries an id_hash";
+        };
+      }
+    );
+
+    # Records without id_hash that differ only in function values (rebuilt
+    # with fresh lambdas) cannot be compared, so that is an error too.
+    test-binding-differing-only-in-functions-is-an-error = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      let
+        devWith = f: {
+          name = "dev";
+          aspect = den.aspects.dev-env;
+          inherit f;
+        };
+      in
+      {
+        imports = [
+          (rebindFixture {
+            inherit den lib config;
+            withIdHash = false;
+            devFirst = true;
+          })
+        ];
+        den.policies.to-env = lib.mkForce (_: [
+          (den.lib.policy.resolve.to "environment" { environment = devWith (_: "dev"); })
+          (den.lib.policy.resolve.to "environment" {
+            environment = {
+              name = "prod";
+              aspect = den.aspects.prod-env;
+            };
+          })
+        ]);
+        den.policies.to-guest = lib.mkForce (
+          { host, ... }:
+          lib.optionals (host.name == "igloo") [
+            (den.lib.policy.resolve.to "guest-kind" {
+              guest-kind = config.den.hosts.x86_64-linux.cuda // {
+                intoAttr = [ ];
+              };
+              host = config.den.hosts.x86_64-linux.cuda // {
+                intoAttr = [ ];
+              };
+              environment = devWith (_: "dev");
+            })
+          ]
+        );
+        expr = envEtc lib config.flake.nixosConfigurations.igloo.config;
+        expectedError = {
+          type = "ThrownError";
+          msg = "differ only in function values";
+        };
+      }
+    );
 
     test-repassed-content-spawns = denTest (
       {
