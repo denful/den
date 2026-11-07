@@ -285,7 +285,7 @@ let
       # walked (compile-static sequences registerConstraints ahead of
       # resolve-children's emitIncludes), so the claim registry a raw-value
       # lookup would need is measurably still empty here — traced empirically,
-      # `state.policyClaimsByName."name:<bucket>"` reads `[ ]` at this exact
+      # `state.policyClaimsByName."name:<bucket>"` reads `{ }` at this exact
       # point even though the excluded record's own self-equality already
       # compares true (`ref == ref`). rawRef carries the record itself so
       # constraint.nix's isPolicyExcluded (shared by dispatch-policies.nix's

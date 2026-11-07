@@ -7,22 +7,41 @@ let
   inherit (den.lib.aspects.fx.identity) aspectPath pathKey ownChain;
   inherit (den.lib.aspects) isMeaningfulName;
 
-  # Append trace entries, keeping `entryKindByPath` (an entry's path or name →
-  # its entityKind, first entry wins) in step, so deriveEntityKind looks an
-  # ancestor up instead of scanning every entry for each chain element: the
-  # scan was quadratic in the number of traced nodes.
+  # Append trace entries, indexing each kinded entry's path or name → its
+  # entityKind, so deriveEntityKind looks an ancestor up instead of scanning
+  # every entry per chain element (quadratic in traced nodes). The index is a
+  # list of chunks, newest first, two chunks of equal size merging into one:
+  # an append copies O(log n) amortised, where one growing attrset copied
+  # all of it each time.
   appendEntries =
     state: newEntries:
     let
       kinded = builtins.filter (e: e.entityKind != null) newEntries;
+      merge =
+        chunks: c:
+        if chunks != [ ] && (builtins.head chunks).size == c.size then
+          # The existing chunk is older; older entries win, as findFirst did.
+          merge (builtins.tail chunks) {
+            size = c.size * 2;
+            set = c.set // (builtins.head chunks).set;
+          }
+        else
+          [ c ] ++ chunks;
     in
     state
     // {
       entries = (state.entries or [ ]) ++ newEntries;
-      entryKindByPath =
-        builtins.listToAttrs (map (e: lib.nameValuePair (e.path or e.name) e.entityKind) kinded)
-        // (state.entryKindByPath or { });
+    }
+    // lib.optionalAttrs (kinded != [ ]) {
+      entryKindChunks = merge (state.entryKindChunks or [ ]) {
+        size = 1;
+        set = builtins.listToAttrs (map (e: lib.nameValuePair (e.path or e.name) e.entityKind) kinded);
+      };
     };
+
+  # The oldest indexed entry for `id` (chunks are newest first).
+  entryKindOf =
+    chunks: id: builtins.foldl' (acc: c: if c.set ? ${id} then c.set.${id} else acc) null chunks;
 
   # Derive the entity kind for the current node by walking the includes
   # chain upward to find the nearest ancestor with a non-null entityKind.
@@ -31,14 +50,14 @@ let
     let
       chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
       kindMap = state.entityKindMap or { };
-      entryKinds = state.entryKindByPath or { };
+      entryKindChunks = state.entryKindChunks or [ ];
       ancestorKinds = lib.filter (s: s != null) (
         map (
           id:
           # Check the kindMap first (populated by resolve-children before
           # children fire), then fall back to the trace entries for cross-entity
           # lookups.
-          if kindMap ? ${id} then kindMap.${id} else entryKinds.${id} or null
+          if kindMap ? ${id} then kindMap.${id} else entryKindOf entryKindChunks id
         ) (lib.reverseList chain)
       );
     in
@@ -106,7 +125,9 @@ let
       in
       {
         resume = param;
-        state = appendEntries state [ entry ];
+        state = state // {
+          entries = (state.entries or [ ]) ++ [ entry ];
+        };
       };
   };
 
