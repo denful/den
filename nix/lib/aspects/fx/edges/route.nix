@@ -25,6 +25,7 @@
 # (now a general edge toposort with loud cycle throw).
 { lib, den }:
 let
+  inherit (import ../policy/entity-identity.nix { inherit lib; }) sameEntity;
   inherit (import ./edge.nix { inherit lib; })
     mkEdge
     collected
@@ -385,21 +386,33 @@ let
       scopeParent,
       ownEntityOf,
       outerEntities ? { },
+      # sid → { kind; record; } of each scope's own entity, for a receiver
+      # without an id_hash, matched by value (#694 §11a R1).
+      ownRecordOf ? (_: null),
     }:
     spec:
     let
       sid = spec.sourceScopeId;
       receiver = spec.receiver or null;
       receiverHash = receiver.id_hash or null;
+      isReceiver =
+        s:
+        if receiverHash != null then
+          (ownEntityOf.${s} or null) == receiverHash
+        else
+          let
+            own = ownRecordOf s;
+          in
+          own != null && sameEntity own.kind own.record receiver;
       walk =
         s:
-        if (ownEntityOf.${s} or null) == receiverHash then
+        if isReceiver s then
           s
         else
           let
             p = scopeParent.${s} or null;
           in
-          if (p == null || p == s) && outerEntities ? ${receiverHash} then
+          if (p == null || p == s) && receiverHash != null && outerEntities ? ${receiverHash} then
             null
           else if p == null || p == s then
             throw "den: delivery receiver '${receiver.name or "<unnamed>"}' is not an entity on the chain of scope '${sid}' — `receiver` must name the source entity or one of its ancestors"
@@ -407,8 +420,8 @@ let
             walk p;
     in
     if receiver != null then
-      if receiverHash == null then
-        throw "den: delivery receiver at scope '${sid}' is not an entity record (no id_hash)"
+      if !(builtins.isAttrs receiver) then
+        throw "den: delivery receiver at scope '${sid}' is not an entity record"
       else
         walk sid
     else if spec.appendToParent or false then

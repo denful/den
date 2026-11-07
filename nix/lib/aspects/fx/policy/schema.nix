@@ -22,17 +22,16 @@ let
     isPolicyExcluded
     ;
 
-  # Identity by id_hash when both records carry one, else by value, minus the
-  # per-scope `hasAspect` decomposeSchemaEffect adds.
-  sameEntity =
-    a: b:
-    if a ? id_hash && b ? id_hash then
-      a.id_hash == b.id_hash
-    else
-      builtins.removeAttrs a [ "hasAspect" ] == builtins.removeAttrs b [ "hasAspect" ];
+  inherit (import ./entity-identity.nix { inherit lib; })
+    mixedIdHash
+    sameByValue
+    sameEntity
+    ;
 
   # Two scopes bind a value the same way: entities by identity, others by value.
-  sameBinding = a: b: if builtins.isAttrs a && builtins.isAttrs b then sameEntity a b else a == b;
+  sameBinding =
+    kind: a: b:
+    if builtins.isAttrs a && builtins.isAttrs b then sameEntity kind a b else a == b;
 
   # Two registry entries are one policy when they hold the same record (its
   # `fn` slot, children.nix registerPolicy); two records sharing a name are
@@ -77,63 +76,6 @@ let
   # Policies that already fired in one of `offered` (under any entity kind).
   firedInScopes =
     byScope: offered: builtins.foldl' (acc: s: acc // (byScope.${s} or { })) { } offered;
-
-  describeRecord =
-    r: "${r.name or "<unnamed>"}${lib.optionalString (r ? id_hash) " (id_hash ${r.id_hash})"}";
-
-  # A binding is matched to an entity scope by id_hash, or by value when
-  # neither record has one. A record with an id_hash and one without are
-  # different entities, unless they share a name: then den cannot tell, and a
-  # quiet mismatch would silently fire none of the entity's rules.
-  mixedIdHash =
-    kind: a: others:
-    let
-      clash = lib.findFirst (b: (b.name or null) != null && b.name == (a.name or null)) null others;
-    in
-    if clash == null then
-      [ ]
-    else
-      throw "den: two `${kind}` records, ${describeRecord a} and ${describeRecord clash}, share a name but only one carries an id_hash, so den cannot tell whether they are one entity; give both an id_hash, or neither";
-
-  # "eq", "ne", or "fn" when the values differ only in function-valued
-  # attributes, which Nix compares unequal unless they are the same value.
-  valueDiff =
-    a: b:
-    if a == b then
-      "eq"
-    else if builtins.isFunction a && builtins.isFunction b then
-      "fn"
-    else if builtins.isAttrs a && builtins.isAttrs b then
-      let
-        names = builtins.attrNames a;
-        isLeaf = n: !(builtins.isAttrs a.${n}) && !(builtins.isFunction a.${n});
-      in
-      if names != builtins.attrNames b then
-        "ne"
-      else if builtins.any (n: isLeaf n && a.${n} != b.${n}) names then
-        "ne"
-      else
-        let
-          diffs = map (n: valueDiff a.${n} b.${n}) (builtins.filter (n: !isLeaf n) names);
-        in
-        if builtins.elem "ne" diffs then
-          "ne"
-        else if builtins.elem "fn" diffs then
-          "fn"
-        else
-          "eq"
-    else
-      "ne";
-
-  sameByValue =
-    kind: a: b:
-    let
-      d = valueDiff (builtins.removeAttrs a [ "hasAspect" ]) (builtins.removeAttrs b [ "hasAspect" ]);
-    in
-    if d == "fn" then
-      throw "den: two `${kind}` records named ${a.name or "<unnamed>"} differ only in function values, so den cannot tell whether they are one entity; give them an id_hash"
-    else
-      d == "eq";
 
   # Pending re-pass entries for `kind`, bucketed by id_hash ("" for records
   # without one): the entries waiting on `record`'s entity.
@@ -449,7 +391,7 @@ let
             in
             resolveArgsSatisfied (policy.fn or policy) actx
             && names == boundOf sib.scopedCtx policy
-            && builtins.all (k: sameBinding actx.${k} sib.scopedCtx.${k}) names
+            && builtins.all (k: sameBinding k actx.${k} sib.scopedCtx.${k}) names
           ) (registeredFrom name);
         # Only an ancestor at or below the farthest one that registers the
         # policy could have run it: one registered at the sibling after its own
@@ -643,7 +585,7 @@ let
                 kind = scopeKinds.${a} or null;
                 own = if kind == null then null else (scopeCtxsL.${a} or { }).${kind} or null;
               in
-              own == null || !(sib.scopedCtx ? ${kind}) || sameEntity sib.scopedCtx.${kind} own
+              own == null || !(sib.scopedCtx ? ${kind}) || sameEntity kind sib.scopedCtx.${kind} own
             ) ancestorScopes;
           boundIndex = (state.boundEntityIndex or (_: { })) null;
           # The scopes of the entity a sibling binds for `kind`, by id_hash, or
