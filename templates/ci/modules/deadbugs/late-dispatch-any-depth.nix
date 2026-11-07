@@ -127,6 +127,138 @@ let
         expected = "x";
       }
     );
+  # Environments prod and dev; igloo in prod; igloo's guest cuda (two users,
+  # so the guest fans out) rebinds `environment` to dev. Each environment
+  # registers its own policy through its aspect.
+  rebindFixture =
+    {
+      den,
+      lib,
+      config,
+      withIdHash,
+      devFirst,
+    }:
+    let
+      env =
+        name:
+        {
+          inherit name;
+          aspect = den.aspects."${name}-env";
+        }
+        // lib.optionalAttrs withIdHash { id_hash = "environment:${name}"; };
+      prod = env "prod";
+      dev = env "dev";
+      guest = config.den.hosts.x86_64-linux.cuda // {
+        intoAttr = [ ];
+      };
+      envPolicy =
+        prefix:
+        {
+          environment,
+          host,
+          user,
+          ...
+        }:
+        [
+          (den.lib.policy.include {
+            # Named per user: anonymous content from sibling scopes shares one
+            # identity and merges once into the host.
+            name = "${prefix}-${user.name}";
+            nixos.environment.etc."${prefix}-${environment.name}-${host.name}-${user.name}".text = "x";
+          })
+        ];
+    in
+    {
+      den.schema.environment.isEntity = true;
+      den.schema.host.parent = "environment";
+      den.hosts.x86_64-linux.igloo.users.tux = { };
+      den.hosts.x86_64-linux.cuda = {
+        intoAttr = [ ];
+        users = {
+          pingu = { };
+          gentoo = { };
+        };
+      };
+      den.policies.to-env = _: [
+        (den.lib.policy.resolve.to "environment" {
+          environment = if devFirst then dev else prod;
+        })
+        (den.lib.policy.resolve.to "environment" {
+          environment = if devFirst then prod else dev;
+        })
+      ];
+      den.policies.env-to-hosts =
+        { environment, ... }:
+        lib.optionals (environment.name == "prod") [
+          (den.lib.policy.resolve.to "host" { host = den.hosts.x86_64-linux.igloo; })
+          (den.lib.policy.instantiate den.hosts.x86_64-linux.igloo)
+        ];
+      den.schema.flake.includes = [ den.policies.to-env ];
+      den.schema.flake-system.excludes = [
+        den.policies.system-to-os-outputs
+        den.policies.system-to-hm-outputs
+      ];
+      den.schema.environment.includes = [ den.policies.env-to-hosts ];
+      den.schema.guest-kind = {
+        isEntity = true;
+        parent = "host";
+        # Not isolated: on main's semantics the guest's subtree merges into
+        # igloo, so its users' content is readable in igloo's config.
+        includes = [ den.policies.host-to-users ];
+      };
+      den.policies.to-guest =
+        { host, ... }:
+        lib.optionals (host.name == "igloo") [
+          (den.lib.policy.resolve.to "guest-kind" {
+            guest-kind = guest;
+            host = guest;
+            environment = dev;
+          })
+        ];
+      den.schema.host.includes = [ den.policies.to-guest ];
+      den.policies.prod-pol = envPolicy "pp";
+      den.policies.dev-pol = envPolicy "dp";
+      den.aspects.prod-env.includes = [ den.policies.prod-pol ];
+
+      den.aspects.dev-env.includes = [ den.policies.dev-pol ];
+    };
+  # The env-policy entries in igloo's config.
+  envEtc =
+    lib: cfg:
+    builtins.filter (n: lib.hasPrefix "pp-" n || lib.hasPrefix "dp-" n) (
+      builtins.attrNames cfg.environment.etc
+    );
+  rebindCell =
+    withIdHash: devFirst:
+    denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      {
+        imports = [
+          (rebindFixture {
+            inherit
+              den
+              lib
+              config
+              withIdHash
+              devFirst
+              ;
+          })
+        ];
+        expr = envEtc lib config.flake.nixosConfigurations.igloo.config;
+        expected = [
+          # The guest binds dev: dev's rule fires for its users, prod's does not.
+          "dp-dev-cuda-gentoo"
+          "dp-dev-cuda-pingu"
+          # An ordinary host: prod's rule, as before.
+          "pp-prod-igloo-tux"
+        ];
+      }
+    );
 in
 {
   flake.tests.deadbugs.late-dispatch-any-depth = {
@@ -357,6 +489,70 @@ in
         den.aspects.igloo.provides.tux.includes = [ den.aspects.feat ];
         expr = igloo.environment.etc ? late-provided;
         expected = true;
+      }
+    );
+
+    # A policy applies where the scope's binding for its registrant's kind is
+    # that registrant: a guest rebinding `environment` gets dev's rules, not
+    # the tree environment's. Records matched by id_hash.
+    test-guest-rebinding-environment-by-id-hash = rebindCell true true;
+
+    # The same with ad-hoc records that carry no id_hash: matched by value.
+    test-guest-rebinding-environment-by-value = rebindCell false true;
+
+    # The bound environment resolves after the guest's subtree: the guest's
+    # users are re-passed once dev resolves, so the order does not decide.
+    test-guest-rebinding-environment-resolved-later = rebindCell true false;
+
+    # A spawn reached through re-passed content runs in the re-pass: dev's
+    # rule includes a complex forward (a spawned sub-pipeline) at the guest's
+    # users, and dev resolves after the guest. Its forwarded content lands.
+    test-repassed-content-spawns = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      let
+        forwarded =
+          { class, aspect-chain }:
+          den.provides.forward {
+            each = [ "nixos" ];
+            fromClass = _: "nix";
+            intoClass = lib.id;
+            intoPath = _: [ "nix" ];
+            fromAspect = _: lib.head aspect-chain;
+          };
+      in
+      {
+        imports = [
+          (rebindFixture {
+            inherit den lib config;
+            withIdHash = true;
+            devFirst = false;
+          })
+        ];
+        den.policies.dev-pol = lib.mkForce (
+          {
+            environment,
+            host,
+            user,
+            ...
+          }:
+          [
+            (den.lib.policy.include {
+              name = "dev-fwd-${user.name}";
+              includes = [ forwarded ];
+              nix.settings.allowed-users = [ "dev-${user.name}" ];
+            })
+          ]
+        );
+        expr = builtins.filter (lib.hasPrefix "dev-") config.flake.nixosConfigurations.igloo.config.nix.settings.allowed-users;
+        expected = [
+          "dev-gentoo"
+          "dev-pingu"
+        ];
       }
     );
 
