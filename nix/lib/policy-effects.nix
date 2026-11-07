@@ -387,8 +387,13 @@ in
       entityHashes = builtins.filter (h: h != null) (map (e: e.id_hash or null) entities);
       # A record's kind is its id_hash prefix (`host:<hash>`): the target's
       # binding is required, so the policy fires where the target is bound.
-      kindOf = e: builtins.head (lib.splitString ":" (e.id_hash or ""));
-      targetKinds = lib.unique (builtins.filter (k: k != "") (map kindOf entities));
+      kindOf =
+        e:
+        let
+          parts = lib.splitString ":" (e.id_hash or "");
+        in
+        if builtins.length parts > 1 then builtins.head parts else null;
+      targetKinds = lib.unique (builtins.filter (k: k != null) (map kindOf entities));
       targetArgs = lib.genAttrs targetKinds (_: builtins.length targetKinds > 1);
       policies = if builtins.isList policiesOrSingle then policiesOrSingle else [ policiesOrSingle ];
       wrap =
@@ -401,10 +406,15 @@ in
           inherit (inner) name;
           fn = withArgs (mergeArgs (policyArgsOf inner) targetArgs) (
             ctx:
-            if builtins.any (k: builtins.elem ((ctx.${k} or { }).id_hash or null) entityHashes) targetKinds then
-              inner.fn ctx
-            else
-              [ ]
+            let
+              # The dispatching scope's own entity, or a binding of the target's kind.
+              ownKind = ctx.__entityKind or null;
+              own = if ownKind == null then null else (ctx.${ownKind} or { }).id_hash or null;
+              matches =
+                builtins.elem own entityHashes
+                || builtins.any (k: builtins.elem ((ctx.${k} or { }).id_hash or null) entityHashes) targetKinds;
+            in
+            if matches then inner.fn ctx else [ ]
           );
         };
     in
