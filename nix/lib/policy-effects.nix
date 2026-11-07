@@ -117,6 +117,19 @@ let
         // lib.optionalAttrs (adaptArgs != null) { inherit adaptArgs; }
         // __extra;
       };
+
+  # A wrapper declares its inner policy's arguments, so a policy fires where
+  # its own relata are bound (#694 §11a R2); an argument either side requires
+  # stays required. lib.setFunctionArgs gives a functor: read it with
+  # lib.functionArgs, never builtins.functionArgs.
+  mergeArgs =
+    a: b:
+    lib.zipAttrsWith (_: builtins.all (optional: optional)) [
+      a
+      b
+    ];
+  withArgs = args: fn: lib.setFunctionArgs fn args;
+  policyArgsOf = inner: if lib.isFunction inner.fn then lib.functionArgs inner.fn else { };
 in
 {
   inherit deliver;
@@ -372,6 +385,16 @@ in
     let
       entities = if builtins.isList entityOrEntities then entityOrEntities else [ entityOrEntities ];
       entityHashes = builtins.filter (h: h != null) (map (e: e.id_hash or null) entities);
+      # A record's kind is its id_hash prefix (`host:<hash>`): the target's
+      # binding is required, so the policy fires where the target is bound.
+      kindOf =
+        e:
+        let
+          parts = lib.splitString ":" (e.id_hash or "");
+        in
+        if builtins.length parts > 1 then builtins.head parts else null;
+      targetKinds = lib.unique (builtins.filter (k: k != null) (map kindOf entities));
+      targetArgs = lib.genAttrs targetKinds (_: builtins.length targetKinds > 1);
       policies = if builtins.isList policiesOrSingle then policiesOrSingle else [ policiesOrSingle ];
       wrap =
         p:
@@ -381,14 +404,18 @@ in
         {
           __isPolicy = true;
           inherit (inner) name;
-          fn =
+          fn = withArgs (mergeArgs (policyArgsOf inner) targetArgs) (
             ctx:
             let
-              entityKind = ctx.__entityKind or null;
-              ctxEntity = if entityKind != null then ctx.${entityKind} or null else null;
-              ctxHash = if ctxEntity != null then ctxEntity.id_hash or null else null;
+              # The dispatching scope's own entity, or a binding of the target's kind.
+              ownKind = ctx.__entityKind or null;
+              own = if ownKind == null then null else (ctx.${ownKind} or { }).id_hash or null;
+              matches =
+                builtins.elem own entityHashes
+                || builtins.any (k: builtins.elem ((ctx.${k} or { }).id_hash or null) entityHashes) targetKinds;
             in
-            if ctxHash != null && builtins.elem ctxHash entityHashes then inner.fn ctx else [ ];
+            if matches then inner.fn ctx else [ ]
+          );
         };
     in
     if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
@@ -426,7 +453,7 @@ in
       # Pre-check the predicate's required args against ctx so the wrapper
       # does not fire in contexts that would crash the predicate's
       # destructuring pattern (e.g. { host, ... } in a home-only scope).
-      predicateArgs = if builtins.isFunction predicate then builtins.functionArgs predicate else { };
+      predicateArgs = if lib.isFunction predicate then lib.functionArgs predicate else { };
       predicateRequiredArgs = builtins.filter (k: !predicateArgs.${k}) (builtins.attrNames predicateArgs);
       wrapAsPolicy =
         p:
@@ -436,9 +463,10 @@ in
         {
           __isPolicy = true;
           inherit (inner) name;
-          fn =
+          fn = withArgs (mergeArgs (policyArgsOf inner) predicateArgs) (
             ctx:
-            if builtins.all (k: ctx ? ${k}) predicateRequiredArgs && predicate ctx then inner.fn ctx else [ ];
+            if builtins.all (k: ctx ? ${k}) predicateRequiredArgs && predicate ctx then inner.fn ctx else [ ]
+          );
         };
       wrap =
         p: if p.__isPolicy or false || builtins.isFunction p then wrapAsPolicy p else wrapAsConditional p;
