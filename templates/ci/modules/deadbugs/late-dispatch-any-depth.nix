@@ -228,6 +228,50 @@ let
     builtins.filter (n: lib.hasPrefix "pp-" n || lib.hasPrefix "dp-" n) (
       builtins.attrNames cfg.environment.etc
     );
+  # dev's rule opts the guest's user gentoo into host-aspects; the projection
+  # carries cuda's homeManager content to gentoo. With dev declared after
+  # prod, the rule only runs in the re-pass.
+  projectionCell =
+    devFirst:
+    denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      {
+        imports = [
+          (rebindFixture {
+            inherit
+              den
+              lib
+              config
+              devFirst
+              ;
+            withIdHash = true;
+          })
+        ];
+        den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
+        den.hosts.x86_64-linux.cuda.users.gentoo.classes = [ "homeManager" ];
+        den.aspects.tux.homeManager.home.stateVersion = "25.11";
+        den.aspects.gentoo.homeManager.home.stateVersion = "25.11";
+        den.aspects.cuda.homeManager.home.sessionVariables.PROJ = "cuda";
+        den.policies.dev-pol = lib.mkForce (
+          { environment, user, ... }:
+          lib.optional (user.name == "gentoo") (
+            den.lib.policy.include {
+              name = "dev-proj-${user.name}";
+              includes = [ den.batteries.host-aspects ];
+            }
+          )
+        );
+        expr =
+          config.flake.nixosConfigurations.igloo.config.home-manager.users.gentoo.home.sessionVariables.PROJ
+            or "<missing>";
+        expected = "cuda";
+      }
+    );
   rebindCell =
     withIdHash: devFirst:
     denTest (
@@ -507,6 +551,9 @@ in
     # A spawn reached through re-passed content runs in the re-pass: dev's
     # rule includes a complex forward (a spawned sub-pipeline) at the guest's
     # users, and dev resolves after the guest. Its forwarded content lands.
+    test-projection-from-bound-rule = projectionCell true;
+    test-projection-from-repassed-rule = projectionCell false;
+
     test-repassed-content-spawns = denTest (
       {
         den,
