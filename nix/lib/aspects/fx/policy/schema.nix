@@ -16,6 +16,7 @@
   mkSupplementalResolution,
 }:
 let
+  inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
@@ -158,7 +159,7 @@ let
 
   # Emit late policy effects into a single sibling scope.
   emitLateForSibling =
-    parentScope: parentFiredPolicies: scopedAspectPolicies: firedPerScope: seen: sib:
+    parentScope: ancestorScopes: parentFiredPolicies: scopedAspectPolicies: firedPerScope: seen: sib:
     let
       # Runtime-include policies are subtree-scoped: a policy registered via a
       # scope's own includes applies only to that scope's subtree, never to
@@ -168,7 +169,8 @@ let
       # (an opt-in battery's policy, a per-user `to-users` policy, …) never fire
       # at OTHER users.
       allAspectPolicies =
-        (scopedAspectPolicies.${parentScope} or { }) // (scopedAspectPolicies.${sib.scopeId} or { });
+        builtins.foldl' (acc: s: (scopedAspectPolicies.${s} or { }) // acc) { } ancestorScopes
+        // (scopedAspectPolicies.${sib.scopeId} or { });
       dispatchKey = "${sib.targetKind}@${sib.scopeId}";
       alreadyFired = firedPerScope.${dispatchKey} or { };
       # Filter policies to those not already fired AND whose entity-kind
@@ -215,7 +217,24 @@ let
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
         # Applied once, outside the lambda — see isPolicyExcluded's currying note.
         excluded = isPolicyExcluded state sib.scopeId constraintRegistry;
-        filteredPolicies = lib.filterAttrs (name: _: !excluded name) latePolicies;
+        # A policy an ancestor scope could already dispatch with the same bound
+        # arguments fired there (late firings are not recorded in the fired
+        # set), so it does not fire again here: offering a grandparent's
+        # registry must not re-fire its `{ system }` policies at every user.
+        scopeCtxs = (state.scopeContexts or (_: { })) null;
+        boundOf =
+          ctx: policy:
+          builtins.filter (k: ctx ? ${k}) (builtins.attrNames (lib.functionArgs (policy.fn or policy)));
+        sameInstanceAbove =
+          policy:
+          builtins.any (
+            a:
+            resolveArgsSatisfied (policy.fn or policy) (scopeCtxs.${a} or { })
+            && boundOf (scopeCtxs.${a} or { }) policy == boundOf sib.scopedCtx policy
+          ) ancestorScopes;
+        filteredPolicies = lib.filterAttrs (
+          name: policy: !excluded name && !(sameInstanceAbove policy)
+        ) latePolicies;
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };
@@ -271,7 +290,10 @@ let
               if fresh == { } then
                 fx.pure null
               else
-                emitLateForSibling parentScope parentFiredPolicies scopedAspectPolicies' firedPerScope seen' sib
+                emitLateForSibling parentScope ancestorScopes parentFiredPolicies scopedAspectPolicies'
+                  firedPerScope
+                  seen'
+                  sib
             )
           )
     );
@@ -300,14 +322,43 @@ let
           # Collect all policies that already fired at the parent scope
           # (under any entity kind). These should not re-fire at children
           # via late dispatch — they already produced their effects.
+          # The parent and every scope above it, nearest first: a policy
+          # registered at any of them fires where its relata are bound, not only
+          # one registered at the parent (an `environment`'s `{ host, user }`
+          # policy reaches the users two levels down).
+          scopeParents = (state.scopeParent or (_: { })) null;
+          ancestorScopes =
+            let
+              go =
+                seen: s:
+                if s == null || seen ? ${s} then
+                  [ ]
+                else
+                  [ s ] ++ go (seen // { ${s} = true; }) (scopeParents.${s} or null);
+            in
+            go { } parentScope;
+          ancestorSet = lib.genAttrs ancestorScopes (_: true);
+          # Policies that already fired at the parent or above (under any entity
+          # kind) do not fire again below.
           parentFiredPolicies = builtins.foldl' (
-            acc: key: if lib.hasSuffix "@${parentScope}" key then acc // (firedPerScope.${key} or { }) else acc
+            acc: key:
+            let
+              parts = lib.splitString "@" key;
+              at = lib.concatStringsSep "@" (builtins.tail parts);
+            in
+            if builtins.length parts > 1 && ancestorSet ? ${at} then
+              acc // (firedPerScope.${key} or { })
+            else
+              acc
           ) { } (builtins.attrNames firedPerScope);
         in
         builtins.foldl' (
           acc: sib:
           fx.bind acc (
-            _: emitLateForSibling parentScope parentFiredPolicies scopedAspectPolicies firedPerScope { } sib
+            _:
+            emitLateForSibling parentScope ancestorScopes parentFiredPolicies scopedAspectPolicies firedPerScope
+              { }
+              sib
           )
         ) (fx.pure null) siblingMetas
       )
