@@ -8,6 +8,8 @@
   # The transition defaults (user-aspects and mutual-provider on every host)
   # apply until the owner acknowledges the migration; den's own suite turns
   # them off to test the end state.
+  # `or`: den used as a library evaluates without these options.
   transitionActive =
-    config.den.internal.transitionDefaults && !config.den.migrations.user-host-content.acknowledged;
+    (config.den.internal.transitionDefaults or true)
+    && !(config.den.migrations.user-host-content.acknowledged or false);
 }
