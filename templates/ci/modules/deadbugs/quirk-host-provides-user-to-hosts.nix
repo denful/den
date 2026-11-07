@@ -37,6 +37,7 @@
         { den, igloo, ... }:
         {
           den.hosts.x86_64-linux.igloo.users.tux = { };
+          den.schema.host.includes = [ den.batteries.mutual-provider ];
           den.aspects.test-consumer.provides.to-hosts.nixos =
             { user, ... }:
             {
