@@ -19,7 +19,10 @@ let
   acceptWith =
     keyOf:
     { host, ... }@ctx:
-    lib.optional (!(ctx ? user) && host ? id_hash) (den.lib.policy.resolve { ${keyOf host} = true; });
+    # Not at a standalone home, which binds a host it doesn't belong to.
+    lib.optional (!(ctx ? user) && !(ctx ? home) && host ? id_hash) (
+      den.lib.policy.resolve { ${keyOf host} = true; }
+    );
 
   # The transition default, on every host until the removal date: its own
   # policy, so an explicit include is told apart from it.

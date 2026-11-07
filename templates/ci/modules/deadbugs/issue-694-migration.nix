@@ -401,6 +401,33 @@ in
       }
     );
 
+    # A standalone home binds a host it doesn't belong to: no transition
+    # default acts there, so it publishes no default key. (It binds `user`
+    # too, so the defaults' user guard already keeps them out; the `home`
+    # guard states it.)
+    test-standalone-home-publishes-no-default-key = denTest (
+      { den, config, ... }:
+      let
+        ctxs = config.den.homes.x86_64-linux."tux@igloo".__resolveResult.scopeContexts or { };
+        defaultKeys = lib.concatMap (
+          ctx: builtins.filter (lib.hasInfix "/default/") (builtins.attrNames ctx)
+        ) (builtins.attrValues ctxs);
+      in
+      {
+        imports = [ transition ];
+        den.hosts.x86_64-linux.igloo = { };
+        den.homes.x86_64-linux."tux@igloo" = { };
+        expr = {
+          resolved = ctxs != { };
+          inherit defaultKeys;
+        };
+        expected = {
+          resolved = true;
+          defaultKeys = [ ];
+        };
+      }
+    );
+
     # A nested kind with its own class that doesn't copy the host's includes
     # (a guest that is its own host) still gets the transition default: its
     # scope publishes user-aspects' default acceptance for itself.

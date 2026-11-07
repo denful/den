@@ -167,9 +167,10 @@ in
                     # host does), marked so the fold drops this copy for a user
                     # the host accepts, whose own copy already arrives (#694
                     # §11a R6, keyed by id_hash: D5).
-                    # Keyed by parent and child: id_hash is parent-blind.
+                    # Keyed by host and child, as the fold reads it: id_hash
+                    # is parent-blind.
                     // lib.optionalAttrs (shared && child ? id_hash) {
-                      __sharedFanOutFor = "${parentRecord.id_hash or ""}>${child.id_hash}";
+                      __sharedFanOutFor = "${(availRecords.host or { }).id_hash or ""}>${child.id_hash}";
                     };
                 };
                 inherit compileFn;

@@ -42,7 +42,8 @@ let
     name = "user-aspects-default";
     fn =
       { host, ... }@ctx:
-      lib.optional (!(ctx ? user) && host ? id_hash) (
+      # Not at a standalone home, which binds a host it doesn't belong to.
+      lib.optional (!(ctx ? user) && !(ctx ? home) && host ? id_hash) (
         den.lib.policy.resolve { ${acceptance.userAspectsDefaultKey host} = true; }
       );
   };
