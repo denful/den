@@ -106,8 +106,8 @@ let
         scopeParentMap = (state.scopeParent or (_: { })) null;
         bucketKey = "name:${p.name}";
         claimRegistry = (state.policyClaimsByName or (_: { })) null;
-        claimedEntries = claimRegistry.${bucketKey} or [ ];
-        claimResult = resolveClaim scopeParentMap scope claimedEntries p;
+        claimsByScope = claimRegistry.${bucketKey} or { };
+        claimResult = resolveClaim scopeParentMap scope claimsByScope p;
         inherit (claimResult) sameScopeEntries matchingClaim;
         parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
         parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
@@ -137,13 +137,15 @@ let
               _:
               claimRegistry
               // {
-                ${bucketKey} = claimedEntries ++ [
-                  {
-                    value = p;
-                    identity = ownerIdentity;
-                    inherit scope;
-                  }
-                ];
+                ${bucketKey} = claimsByScope // {
+                  ${scope} = (claimsByScope.${scope} or [ ]) ++ [
+                    {
+                      value = p;
+                      identity = ownerIdentity;
+                      inherit scope;
+                    }
+                  ];
+                };
               };
           }
         )) (_: registerEffect)
@@ -283,7 +285,7 @@ let
       # walked (compile-static sequences registerConstraints ahead of
       # resolve-children's emitIncludes), so the claim registry a raw-value
       # lookup would need is measurably still empty here — traced empirically,
-      # `state.policyClaimsByName."name:<bucket>"` reads `[ ]` at this exact
+      # `state.policyClaimsByName."name:<bucket>"` reads `{ }` at this exact
       # point even though the excluded record's own self-equality already
       # compares true (`ref == ref`). rawRef carries the record itself so
       # constraint.nix's isPolicyExcluded (shared by dispatch-policies.nix's

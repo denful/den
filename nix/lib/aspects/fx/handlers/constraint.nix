@@ -61,11 +61,14 @@ let
   # its target are matched exactly as registerPolicy would have matched
   # them. Whole-value `==`, not a projection: two claims differing only in
   # an attached label must not read as one registration.
+  # A bucket is keyed by the scope each claim was registered at, so each
+  # visited scope is one lookup: filtering the whole bucket per scope made
+  # every registration cost O(claims under that name), quadratic in fleet size.
   resolveClaim =
-    scopeParentMap: scope: claimedEntries: target:
+    scopeParentMap: scope: claimsByScope: target:
     let
       entriesByAncestorScope = foldScopeAncestors (a: b: a // b) scopeParentMap (s: {
-        ${s} = builtins.filter (e: e.scope == s) claimedEntries;
+        ${s} = claimsByScope.${s} or [ ];
       }) scope;
       sameScopeEntries = builtins.concatLists (builtins.attrValues entriesByAncestorScope);
     in
@@ -128,8 +131,8 @@ let
     let
       scopeParentMap = (state.scopeParent or (_: { })) null;
       claimRegistry = (state.policyClaimsByName or (_: { })) null;
-      claimedEntries = claimRegistry."name:${e.rawRef.name}" or [ ];
-      resolved = resolveClaim scopeParentMap scope claimedEntries e.rawRef;
+      claimsByScope = claimRegistry."name:${e.rawRef.name}" or { };
+      resolved = resolveClaim scopeParentMap scope claimsByScope e.rawRef;
     in
     if resolved.matchingClaim != null then resolved.matchingClaim.identity else null;
 
@@ -164,17 +167,11 @@ let
   #   D = scopes visited per resolveClaim ancestor walk — small (e.g. a
   #       user-scope walk visits 4: self, host, system, and the root ""
   #       scope), bounded by scope-tree depth, not fleet-wide.
-  #   C = size of the claim bucket resolveClaim scans at each visited scope
-  #       (claimRegistry."name:<n>" — builtins.filter + findFirst over it).
-  #       This bucket is FLEET-WIDE, not per-entity: policyClaimsByName
-  #       accumulates every claim under that bare name across the whole run,
-  #       regardless of scope. Traced: N entities each declaring their own
-  #       "tools" policy grows C to N while the entity-scoped walk still
-  #       keeps exactly 1 matching claim. So with R > 0 and multiple entities
-  #       declaring a same-named policy, the R × D × C term is linear in
-  #       fleet size N — do not read E's per-entity bound as covering the
-  #       whole cost; E and C are scoped oppositely and must not be merged
-  #       under one "bounded per-entity" claim.
+  #   C = claims resolveClaim reads at each visited scope: the bucket
+  #       (claimRegistry."name:<n>") is keyed by registration scope, so a
+  #       visit reads only that scope's claims, not every claim under the
+  #       name fleet-wide. N entities each declaring their own "tools" policy
+  #       put one claim in each of N scopes, and a walk reads D of them.
   #
   # The rawRef arm now resolves EVERY rawRef entry rather than stopping at the
   # first whose identity matches. That is deliberate: which entries got
@@ -226,7 +223,11 @@ let
           builtins.attrValues registry
         )
       );
-      isUnmatched = e: !(builtins.any (c: c.value == e.rawRef) (claims."name:${e.rawRef.name}" or [ ]));
+      isUnmatched =
+        e:
+        !(builtins.any (c: c.value == e.rawRef) (
+          builtins.concatLists (builtins.attrValues (claims."name:${e.rawRef.name}" or { }))
+        ));
     in
     lib.unique (
       map (
