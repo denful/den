@@ -62,6 +62,38 @@ let
       chain = [ "pol" ];
       p = { };
     }
+    # one name in two unmerged chunks: the older entry still answers. Nearly
+    # every step indexes (anonymous nodes carry a derived kind), so the index
+    # is a binary counter over steps; "c" places the two "a" entries at 11 and
+    # 13, which stay in separate chunks (sizes 8, 4, 1).
+    {
+      p = {
+        name = "c";
+        __entityKind = "kc";
+      };
+    }
+    {
+      p = {
+        name = "a";
+        __entityKind = "k1";
+      };
+    }
+    {
+      p = {
+        name = "b";
+        __entityKind = "kb";
+      };
+    }
+    {
+      p = {
+        name = "a";
+        __entityKind = "k2";
+      };
+    }
+    {
+      chain = [ "a" ];
+      p = { };
+    }
   ];
   run =
     h:
@@ -92,9 +124,9 @@ let
         in
         {
           inherit (r) state;
-          kinds =
-            acc.kinds
-            ++ [ (map (e: e.entityKind) (lib.drop (builtins.length (acc.state.entries or [ ])) r.state.entries)) ];
+          kinds = acc.kinds ++ [
+            (map (e: e.entityKind) (lib.drop (builtins.length (acc.state.entries or [ ])) r.state.entries))
+          ];
         };
     in
     (builtins.foldl' go {
@@ -122,6 +154,11 @@ in
             "home"
           ]
           [ "home" ]
+          [ "kc" ]
+          [ "k1" ]
+          [ "kb" ]
+          [ "k2" ]
+          [ "k1" ]
         ];
       }
     );

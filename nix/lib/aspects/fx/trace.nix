@@ -39,9 +39,14 @@ let
       };
     };
 
-  # The oldest indexed entry for `id` (chunks are newest first).
+  # The oldest indexed entry for `id`: chunks are newest first, so search them
+  # oldest first and stop at the first hit.
   entryKindOf =
-    chunks: id: builtins.foldl' (acc: c: if c.set ? ${id} then c.set.${id} else acc) null chunks;
+    chunks: id:
+    let
+      hit = lib.findFirst (c: c.set ? ${id}) null (lib.reverseList chunks);
+    in
+    if hit == null then null else hit.set.${id};
 
   # Derive the entity kind for the current node by walking the includes
   # chain upward to find the nearest ancestor with a non-null entityKind.
