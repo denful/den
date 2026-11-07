@@ -47,11 +47,19 @@ let
       firingKind = ctx.__entityKind or null;
       firing = if firingKind == null then null else ctx.${firingKind} or null;
       reg = registrant.record;
+      # Only a firing entity with an identity can be told apart from the
+      # registrant; one without (a hand-built record) is treated as the
+      # registrant's own scope.
       isBelow =
         firing != null
-        && (firing.id_hash or null) != reg.id_hash
+        && (firing.id_hash or null) != null
+        && firing.id_hash != reg.id_hash
         && ((ctx.${registrant.kind} or { }).id_hash or null) == reg.id_hash;
       token = "${reg.id_hash}/${policyName}";
+      registrantClasses = lib.optionals (reg ? class) [
+        reg.class
+        "os"
+      ];
       isInclude = e: e.__policyEffect == "include";
       aimed =
         e:
@@ -61,6 +69,11 @@ let
             "route"
           ]
           && (e.value.receiver or null) == null
+          # appendToParent already names its target.
+          && !(e.value.appendToParent or false)
+          # Only the registrant's own class is its part, as for an include: a
+          # route into a user-side class (homeManager) stays where it fired.
+          && builtins.elem (e.value.intoClass or e.value.class or null) registrantClasses
         then
           e
           // {
