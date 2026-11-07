@@ -1,7 +1,7 @@
 # Effect handler: compile-forward
 # Extracts forward spec from aspect payload, classifies tier, registers route.
 # Resumes [] — forwards bypass dedup + constraints.
-{ ... }:
+{ lib, ... }:
 let
   inherit (import ./state-util.nix) scopedAppend;
 in
@@ -29,7 +29,8 @@ in
           guard = null;
           adaptArgs = null;
           sourceScopeId = scope;
-        };
+        }
+        // lib.optionalAttrs (spec ? receiver) { inherit (spec) receiver; };
 
         # Complex: full forward spec as route with __complexForward marker.
         complexRoute = spec // {

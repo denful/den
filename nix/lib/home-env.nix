@@ -74,15 +74,14 @@ let
       # Keyed module wrapper: the NixOS module system deduplicates imports
       # with the same `key`, so this fires once even when included from
       # multiple user entity resolves.
+      hostModuleKeyed = host: {
+        key = "den:${optionPath}-host-module";
+        imports = [ host.${optionPath}.module ];
+      };
       hostModule =
         { host }:
         {
-          ${host.class}.imports = [
-            {
-              key = "den:${optionPath}-host-module";
-              imports = [ host.${optionPath}.module ];
-            }
-          ];
+          ${host.class}.imports = [ (hostModuleKeyed host) ];
         };
 
       userForward =
@@ -97,15 +96,31 @@ let
           # user scope bind the same ancestor args (e.g. `environment`) they
           # would at the host scope — no manual chainCtx threading needed.
           fromAspect = _: den.lib.resolveEntity "user" { inherit host user; };
+          receiver = host;
         };
 
-      # Includes shared by both host-scope and user-scope detection.
+      # Host-scope arm: the host's own content.
       classIncludes = [
         (den.lib.policy.include hostModule)
       ]
       ++ lib.optional (den.aspects ? os-user-class-fwd) (
         den.lib.policy.include den.aspects.os-user-class-fwd
       );
+
+      # User-scope arm: the same content, delivered to the host. The key
+      # deduplicates it against the host-scope arm.
+      userClassDeliveries =
+        { host, ... }:
+        [
+          (den.lib.policy.provide {
+            class = host.class;
+            module = hostModuleKeyed host;
+            receiver = host;
+          })
+        ]
+        ++ lib.optional (den.aspects ? os-user-class-fwd) (
+          den.lib.policy.include den.aspects.os-user-class-fwd
+        );
 
       policyFn =
         { host, ... }:
@@ -131,18 +146,24 @@ let
       # Complements the host-scope battery which only sees users
       # declared on host.users, not registry or policy-resolved users.
       userDetectFn =
-        { host, user, ... }:
+        {
+          host,
+          user,
+          home ? null,
+          ...
+        }:
         let
           isOsSupported = builtins.elem host.class supportedOses;
           hasClass = lib.elem className user.classes;
         in
-        lib.optionals (isOsSupported && hasClass) (
+        # A standalone home binds a host that is not its ancestor: no receiver.
+        lib.optionals (isOsSupported && hasClass && home == null) (
           [
             (den.lib.policy.include (userForward {
               inherit host user;
             }))
           ]
-          ++ classIncludes
+          ++ userClassDeliveries { inherit host; }
         );
     in
     {
