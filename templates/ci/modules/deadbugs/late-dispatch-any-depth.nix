@@ -76,7 +76,8 @@ in
 
     # A policy that binds only its own layer fires once, at the environment:
     # its content stays there and never reaches igloo, as it would if it fired
-    # again at the host or the user.
+    # again at the host or the user. A guard only: the kind filter already keeps
+    # an `{ environment }` policy off host and user scopes.
     test-environment-only-policy-fires-once = denTest (
       { den, config, ... }:
       let
@@ -91,6 +92,30 @@ in
           den.policies.env-own
         ];
         expr = builtins.filter (m: m == "env-own") igloo.boot.kernelModules;
+        expected = [ ];
+      }
+    );
+
+    # The new path's re-fire risk: a policy with no required entity argument
+    # passes the kind filter at every scope. Registered at the environment, it
+    # fires there and must not fire again at the host or the user. With the
+    # fired set taken from the parent only, it fired again at tux and its
+    # content reached igloo through tux.
+    test-environment-no-arg-policy-fires-once = denTest (
+      { den, config, ... }:
+      let
+        igloo = config.flake.nixosConfigurations.igloo.config;
+      in
+      {
+        imports = [ (envTopology { inherit den; }) ];
+        den.policies.env-noarg = _: [
+          (den.lib.policy.include { nixos.boot.kernelModules = [ "env-noarg" ]; })
+        ];
+        den.schema.environment.includes = [
+          den.policies.env-to-hosts
+          den.policies.env-noarg
+        ];
+        expr = builtins.filter (m: m == "env-noarg") igloo.boot.kernelModules;
         expected = [ ];
       }
     );
