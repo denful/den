@@ -1,6 +1,7 @@
 # Entity identity (#694 §11a R1, #752): by id_hash when both records carry
-# one, else by value with function-valued attributes set aside. A comparison
-# den cannot decide is an error, never a quiet mismatch.
+# one, else by value. A comparison den cannot decide is an error, never a quiet
+# mismatch: two same-named records only one of which carries an id_hash, or
+# two records that differ only in function values.
 { lib }:
 let
   describeRecord =
@@ -72,9 +73,6 @@ let
       builtins.seq (mixedIdHash kind b [ a ]) false
     else
       sameByValue kind a b;
-
-  # A stable key for an entity: its id_hash, or `<kind>:<name>` without one.
-  entityKey = kind: r: r.id_hash or "${kind}:${r.name or "<unnamed>"}";
 in
 {
   inherit
@@ -83,6 +81,5 @@ in
     valueDiff
     sameByValue
     sameEntity
-    entityKey
     ;
 }

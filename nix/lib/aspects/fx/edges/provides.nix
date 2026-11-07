@@ -9,7 +9,8 @@
 #      (perScope.${sid}.${class}), and the default subtree fold carries it to the
 #      entity root exactly like any other collected content.
 #
-# This file emits ONLY the nest edge into the source scope's bucket; the merge
+# This file emits ONLY the nest edge into the target scope's bucket (the source
+# scope's, unless the spec names a `receiver`: edges/route.nix targetScopeOf); the merge
 # half rides the existing default-fold edge (do NOT emit a literal second edge in
 # materialization — the trace keeps the `mergeHalf = "default-fold"` annotation
 # per the §3a oracle convention). M stays the closed enum — provides adds no mode.
@@ -23,8 +24,8 @@
 # Two projections share ONE dedup (dedupProvides):
 #   - the trace-facing edge RECORD (identity + annotations, no content) consumed
 #     by the read-only oracle (edge-trace.nix);
-#   - the MATERIALIZATION (the actual wrapped module appended to the source-scope
-#     bucket) consumed by materializeUnified's ordered-dispatch fold.
+#   - the MATERIALIZATION (the actual wrapped module appended to the target
+#     scope's bucket) consumed by materializeUnified's ordered-dispatch fold.
 { lib, den }:
 let
   inherit (import ./edge.nix { inherit lib; }) mkEdge collected rootTarget;
@@ -32,11 +33,13 @@ let
 
   # Dedup provides by composite key (policyName/class/path). Null-keyed specs
   # (no __providePolicyName) are always kept. First-occurrence wins.
-  # A provide naming a `receiver` also keys on its source entity: one battery
-  # policy firing at every user scope delivers each user's settings separately.
+  # A provide naming a `receiver` also keys on its source entity and its target
+  # scope: one battery policy firing at every user scope delivers each user's
+  # settings separately, and id_hash is parent-blind, so the same user name
+  # under two receivers (a host and its guest) stays two deliveries.
   # `entityOf` maps a source scope to its nearest own entity's id_hash.
   dedupProvides =
-    entityOf:
+    entityOf: targetOf:
     dedupByKey (
       s:
       let
@@ -46,7 +49,7 @@ let
       if pn == null then
         null
       else if (s.receiver or null) != null then
-        "${base}@${entityOf s.sourceScopeId}"
+        "${base}@${entityOf s.sourceScopeId}>${targetOf s}"
       else
         base
     );
@@ -56,7 +59,7 @@ let
   # Each spec → the nest-at-P module (setAttrByPath), wrapped via wrapClassModule
   # (module-identity wrapping, NOT a mode); unsatisfied wraps are DROPPED. The
   # wrapped module is appended to BOTH the flat classImports aggregate AND the
-  # SOURCE scope's perScope bucket — the latter is the merge half (subtree-
+  # TARGET scope's perScope bucket (targetOf) — the latter is the merge half (subtree-
   # collectible, visible to a later route's getCollectedSource / subtree walk).
   #
   #   ctx           — the pipeline base ctx (the wrap context for every provide).
@@ -102,7 +105,7 @@ let
 
   # ===== trace-facing provides edge constructor (§8 identity, no content) =
   # Renders the deduped provides specs as edge RECORDS for the oracle. Each is the
-  # NEST edge into the source scope's bucket (the merge half is the default-fold
+  # NEST edge into the target scope's bucket (the merge half is the default-fold
   # edge, annotated). P=[] degenerates to a merge contribution (no nesting).
   #
   #   name  — sid → stable scope name (edge.nix scopeName).
@@ -116,7 +119,7 @@ let
     }:
     let
       allProvides = builtins.concatLists (lib.attrValues scopedProvides);
-      dedupedProvides = dedupProvides entityOf allProvides;
+      dedupedProvides = dedupProvides entityOf targetOf allProvides;
     in
     map (
       spec:

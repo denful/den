@@ -25,13 +25,19 @@ let
   inherit (import ./entity-identity.nix { inherit lib; })
     mixedIdHash
     sameByValue
-    sameEntity
     ;
 
+  # Identity by id_hash when both records carry one, else by value, minus the
+  # per-scope `hasAspect` decomposeSchemaEffect adds.
+  sameEntity =
+    a: b:
+    if a ? id_hash && b ? id_hash then
+      a.id_hash == b.id_hash
+    else
+      builtins.removeAttrs a [ "hasAspect" ] == builtins.removeAttrs b [ "hasAspect" ];
+
   # Two scopes bind a value the same way: entities by identity, others by value.
-  sameBinding =
-    kind: a: b:
-    if builtins.isAttrs a && builtins.isAttrs b then sameEntity kind a b else a == b;
+  sameBinding = a: b: if builtins.isAttrs a && builtins.isAttrs b then sameEntity a b else a == b;
 
   # The fired set grouped by scope, once per pass, so a sibling's offered
   # scopes are looked up rather than every fired key scanned per sibling.
@@ -371,7 +377,7 @@ let
             in
             resolveArgsSatisfied (policy.fn or policy) actx
             && names == boundOf sib.scopedCtx policy
-            && builtins.all (k: sameBinding k actx.${k} sib.scopedCtx.${k}) names
+            && builtins.all (k: sameBinding actx.${k} sib.scopedCtx.${k}) names
           ) (registeredFrom name);
         # Only an ancestor at or below the farthest one that registers the
         # policy could have run it: one registered at the sibling after its own
@@ -504,7 +510,7 @@ let
                 kind = scopeKinds.${a} or null;
                 own = if kind == null then null else (scopeCtxsL.${a} or { }).${kind} or null;
               in
-              own == null || !(sib.scopedCtx ? ${kind}) || sameEntity kind sib.scopedCtx.${kind} own
+              own == null || !(sib.scopedCtx ? ${kind}) || sameEntity sib.scopedCtx.${kind} own
             ) ancestorScopes;
           boundIndex = (state.boundEntityIndex or (_: { })) null;
           # The scopes of the entity a sibling binds for `kind`, by id_hash, or

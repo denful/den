@@ -403,7 +403,9 @@ let
           let
             own = ownRecordOf s;
           in
-          own != null && sameEntity own.kind own.record receiver;
+          # A scope whose own record carries an id_hash is never this receiver;
+          # one matching nothing still ends in the "not on the chain" error.
+          own != null && !(own.record ? id_hash) && sameEntity own.kind own.record receiver;
       walk =
         s:
         if isReceiver s then
@@ -505,8 +507,9 @@ let
   # before any consumer (fromClass@scope) that reads it. Today this is the
   # single-level partition topoSortRoutes did (a complex forward depending on a
   # producer of its fromClass), generalized to a real toposort with a LOUD cycle
-  # throw printing the edge chain. Simple routes read the original per-scope data
-  # (not the fold state), so they never participate as dependents.
+  # throw printing the edge chain. A simple route reads the original per-scope
+  # data (not the fold state) unless a delivery writes into a bucket it reads;
+  # then it depends on that delivery (edges/materialize-unified.nix readerDeps).
   topoSort =
     targetOf: routes:
     let
