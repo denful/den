@@ -106,8 +106,8 @@ let
         scopeParentMap = (state.scopeParent or (_: { })) null;
         bucketKey = "name:${p.name}";
         claimRegistry = (state.policyClaimsByName or (_: { })) null;
-        claimedEntries = claimRegistry.${bucketKey} or [ ];
-        claimResult = resolveClaim scopeParentMap scope claimedEntries p;
+        claimsByScope = claimRegistry.${bucketKey} or { };
+        claimResult = resolveClaim scopeParentMap scope claimsByScope p;
         inherit (claimResult) sameScopeEntries matchingClaim;
         parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
         parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
@@ -137,13 +137,15 @@ let
               _:
               claimRegistry
               // {
-                ${bucketKey} = claimedEntries ++ [
-                  {
-                    value = p;
-                    identity = ownerIdentity;
-                    inherit scope;
-                  }
-                ];
+                ${bucketKey} = claimsByScope // {
+                  ${scope} = (claimsByScope.${scope} or [ ]) ++ [
+                    {
+                      value = p;
+                      identity = ownerIdentity;
+                      inherit scope;
+                    }
+                  ];
+                };
               };
           }
         )) (_: registerEffect)

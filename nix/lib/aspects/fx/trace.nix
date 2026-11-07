@@ -7,28 +7,38 @@ let
   inherit (den.lib.aspects.fx.identity) aspectPath pathKey ownChain;
   inherit (den.lib.aspects) isMeaningfulName;
 
+  # Append trace entries, keeping `entryKindByPath` (an entry's path or name →
+  # its entityKind, first entry wins) in step, so deriveEntityKind looks an
+  # ancestor up instead of scanning every entry for each chain element: the
+  # scan was quadratic in the number of traced nodes.
+  appendEntries =
+    state: newEntries:
+    let
+      kinded = builtins.filter (e: e.entityKind != null) newEntries;
+    in
+    state
+    // {
+      entries = (state.entries or [ ]) ++ newEntries;
+      entryKindByPath =
+        builtins.listToAttrs (map (e: lib.nameValuePair (e.path or e.name) e.entityKind) kinded)
+        // (state.entryKindByPath or { });
+    };
+
   # Derive the entity kind for the current node by walking the includes
-  # chain upward through accumulated entries to find the nearest ancestor
-  # with a non-null entityKind. O(chain × entries) — acceptable for
-  # diagnostic-only code path.
+  # chain upward to find the nearest ancestor with a non-null entityKind.
   deriveEntityKind =
     state:
     let
       chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
       kindMap = state.entityKindMap or { };
-      entries = state.entries or [ ];
+      entryKinds = state.entryKindByPath or { };
       ancestorKinds = lib.filter (s: s != null) (
         map (
           id:
           # Check the kindMap first (populated by resolve-children before
-          # children fire), then fall back to entries for cross-entity lookups.
-          if kindMap ? ${id} then
-            kindMap.${id}
-          else
-            let
-              hit = lib.findFirst (e: (e.path or e.name) == id && e.entityKind != null) null entries;
-            in
-            if hit != null then hit.entityKind else null
+          # children fire), then fall back to the trace entries for cross-entity
+          # lookups.
+          if kindMap ? ${id} then kindMap.${id} else entryKinds.${id} or null
         ) (lib.reverseList chain)
       );
     in
@@ -96,9 +106,7 @@ let
       in
       {
         resume = param;
-        state = state // {
-          entries = (state.entries or [ ]) ++ [ entry ];
-        };
+        state = appendEntries state [ entry ];
       };
   };
 
@@ -205,10 +213,7 @@ let
       {
         resume = param;
         state =
-          state
-          // {
-            entries = (state.entries or [ ]) ++ [ entry ];
-          }
+          appendEntries state [ entry ]
           // lib.optionalAttrs (entityKind != null && isNewKind) {
             ctxTrace = (state.ctxTrace or [ ]) ++ [ ctxEntry ];
           };
@@ -290,9 +295,7 @@ let
       in
       {
         resume = null;
-        state = state // {
-          entries = (state.entries or [ ]) ++ policyEntries;
-        };
+        state = appendEntries state policyEntries;
       };
   };
 
