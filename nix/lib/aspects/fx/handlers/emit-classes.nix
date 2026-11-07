@@ -66,19 +66,21 @@ let
       isContextDependent,
       sharedFanOutFor ? null,
     }:
-    fx.send "emit-class" {
-      inherit
-        class
-        identity
-        module
-        ctx
-        aspectPolicy
-        globalPolicy
-        isContextDependent
-        ;
-      __rawEntry = true;
-    }
-    // lib.optionalAttrs (sharedFanOutFor != null) { inherit sharedFanOutFor; };
+    fx.send "emit-class" (
+      {
+        inherit
+          class
+          identity
+          module
+          ctx
+          aspectPolicy
+          globalPolicy
+          isContextDependent
+          ;
+        __rawEntry = true;
+      }
+      // lib.optionalAttrs (sharedFanOutFor != null) { inherit sharedFanOutFor; }
+    );
 
   emitClassKey =
     aspect: ctx: aspectPolicy: globalPolicy: contextDep: nodeIdentity: k:

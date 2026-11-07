@@ -546,15 +546,18 @@ let
       acceptedUsers = lib.genAttrs (map (sid: ownEntityOf.${sid}) (
         builtins.filter acceptedUserScope (builtins.attrNames ownEntityOf)
       )) (_: true);
-      droppedLocs = lib.genAttrs (lib.concatLists (
-        lib.mapAttrsToList (
-          token: locs:
-          lib.optionals (
-            lib.hasPrefix sharedFanOutPrefix token
-            && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
-          ) (map den.lib.aspects.fx.identity.stripCtxSuffix locs)
-        ) ((pi.provenanceLocs or { }).${rootScopeId} or { })
-      )) (_: true);
+      droppedLocs = lib.genAttrs (lib.concatMap (
+        byToken:
+        lib.concatLists (
+          lib.mapAttrsToList (
+            token: locs:
+            lib.optionals (
+              lib.hasPrefix sharedFanOutPrefix token
+              && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
+            ) locs
+          ) byToken
+        )
+      ) (builtins.attrValues (pi.provenanceLocs or { }))) (_: true);
       bounded =
         if droppedLocs == { } then
           assembled
@@ -562,10 +565,7 @@ let
           lib.mapAttrs (
             _: mods:
             if builtins.isList mods then
-              builtins.filter (
-                m:
-                !(droppedLocs ? ${den.lib.aspects.fx.identity.stripCtxSuffix (toString (m.key or m._file or ""))})
-              ) mods
+              builtins.filter (m: !(droppedLocs ? ${toString (m.key or m._file or "")})) mods
             else
               mods
           ) assembled;
