@@ -109,13 +109,14 @@ let
           // {
             dispatchedPolicies = _: ((st.dispatchedPolicies or (_: { })) null) // { ${dispatchKey} = true; };
             # The policies this scope's own dispatch ran, whatever they returned:
-            # late dispatch does not run them again here.
+            # late dispatch does not run them again here, under any kind (kind
+            # is not part of an instance).
             installDispatched =
               let
                 prev = (st.installDispatched or (_: { })) null;
                 ran = lib.filterAttrs (_: p: resolveArgsSatisfied (p.fn or p) resolveCtx) aspectPolicies;
               in
-              _: prev // { ${dispatchKey} = (prev.${dispatchKey} or { }) // lib.mapAttrs (_: _: true) ran; };
+              _: prev // { ${scope} = (prev.${scope} or { }) // lib.mapAttrs (_: _: true) ran; };
           }
         )) (_: iterate aspectPolicies entityKind currentCtx 0 { } emptyAcc { } resolveCtx)
     );

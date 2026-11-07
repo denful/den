@@ -322,6 +322,30 @@ in
       }
     );
 
+    # A non-entity kind pushed onto the host's scope (the microvm template's
+    # microvm-host) shares that scope: its policy runs there once, not again
+    # when the host kind is dispatched at the same scope. Kind is not part of
+    # an instance. The include is named per kind so a second firing shows.
+    test-pushed-kind-policy-fires-once-at-host-scope = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.to-pushed = { host, ... }: [ (den.lib.policy.resolve.to "pushed" { inherit host; }) ];
+        den.policies.pushed-pol =
+          { host, ... }@ctx:
+          [
+            (den.lib.policy.include {
+              name = "pushed-${ctx.__entityKind}";
+              nixos.boot.kernelModules = [ "pushed-${ctx.__entityKind}" ];
+            })
+          ];
+        den.schema.host.includes = [ den.policies.to-pushed ];
+        den.schema.pushed.includes = [ den.policies.pushed-pol ];
+        expr = builtins.filter (lib.hasPrefix "pushed-") igloo.boot.kernelModules;
+        expected = [ "pushed-pushed" ];
+      }
+    );
+
     # A lone child's late pass keeps the fresh-registration re-pass: a
     # `to-hosts` reached through `<host>.provides.<user>` registers at the user
     # after the late include, and still lands.

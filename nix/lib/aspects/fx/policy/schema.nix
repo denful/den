@@ -264,7 +264,7 @@ let
           in
           if regIdx == [ ] then [ ] else lib.take (lib.last regIdx + 1) ancestorScopes;
         # The sibling's own dispatch already ran these, whatever they returned.
-        ranAtSib = ((state.installDispatched or (_: { })) null).${dispatchKey} or { };
+        ranAtSib = ((state.installDispatched or (_: { })) null).${sib.scopeId} or { };
         filteredPolicies = lib.filterAttrs (
           name: policy: !excluded name && !(ranAtSib ? ${name}) && !(sameInstanceAbove name policy)
         ) latePolicies;
