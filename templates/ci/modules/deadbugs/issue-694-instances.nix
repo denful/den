@@ -105,5 +105,36 @@ in
         expected = "yes";
       }
     );
+
+    # C4: a policy reached through a host policy's include inherits the host as
+    # its registrant, so its host-class content reaches the host.
+    test-policy-nested-in-host-policy-include = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.inner =
+          { host, user, ... }:
+          [ (den.lib.policy.include { nixos.environment.etc."nested-${user.name}".text = host.name; }) ];
+        den.policies.outer =
+          { host, user, ... }: [ (den.lib.policy.include { includes = [ den.policies.inner ]; }) ];
+        den.aspects.igloo.includes = [ den.policies.outer ];
+        expr = igloo.environment.etc.nested-tux.text or "<missing>";
+        expected = "igloo";
+      }
+    );
+
+    # C4: the same through `provides.to-users`, which the host authors.
+    test-policy-nested-in-provides-to-users = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.inner =
+          { host, user, ... }:
+          [ (den.lib.policy.include { nixos.environment.etc."nested-${user.name}".text = host.name; }) ];
+        den.aspects.igloo.provides.to-users.includes = [ den.policies.inner ];
+        expr = igloo.environment.etc.nested-tux.text or "<missing>";
+        expected = "igloo";
+      }
+    );
   };
 }

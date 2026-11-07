@@ -3,7 +3,7 @@
 { lib, ... }:
 let
   inherit (import ./state-util.nix) scopedMerge;
-  inherit (import ../policy/registrant.nix { inherit lib; }) registrantAt;
+  inherit (import ../policy/registrant.nix { inherit lib; }) registrantOnRegister;
 
   registerAspectPolicyHandler = {
     "register-aspect-policy" =
@@ -13,7 +13,7 @@ let
         # a descendant, it still applies to this entity (#694 §11a R1).
         entry = {
           inherit (param) fn;
-          registrant = registrantAt state state.currentScope;
+          registrant = registrantOnRegister state state.currentScope;
         };
         # The registry is the one scoped field that merges rather than appends,
         # so a repeated key is a silent drop. Derive it here from the owner's

@@ -26,6 +26,36 @@ let
     in
     go { } scope;
 
+  # A policy registered inside a registrant's delivered include (dispatch.nix
+  # wraps it as `den-provides-to-host=<registrant id_hash>/<policy>`) inherits
+  # that registrant, an ancestor of where it registers (#694 §11a C4).
+  marker = "den-provides-to-host=";
+  inheritedAt =
+    state: scope:
+    let
+      chain = ((state.scopedIncludesChain or (_: { })) null).${scope} or [ ];
+      tokens = map (h: lib.last (lib.splitString marker h)) (builtins.filter (lib.hasInfix marker) chain);
+      # A registrant token starts with an entity id_hash (`<kind>:<hash>/…`);
+      # a mutual-provider token names an aspect instead.
+      hashes = builtins.filter (h: builtins.match "[a-z][a-z0-9-]*:[0-9a-f]+" h != null) (
+        map (t: builtins.head (lib.splitString "/" t)) tokens
+      );
+      parents = (state.scopeParent or (_: { })) null;
+      find =
+        hash: seen: s:
+        if s == null || seen ? ${s} then
+          null
+        else
+          let
+            r = registrantAt state s;
+          in
+          if r != null && r.record.id_hash == hash then
+            r
+          else
+            find hash (seen // { ${s} = true; }) (parents.${s} or null);
+    in
+    if hashes == [ ] then null else find (lib.last hashes) { } scope;
+
   # A registration shared with an ancestor scope (den.default, or one policy in
   # both a host's and its users' schema includes) is one instance where both
   # registrations assign the same relata: the ancestor, host side, wins (C2).
@@ -59,11 +89,25 @@ let
         && outerRegistrant != null
         && declared ? ${own.kind}
         && declared ? ${outerRegistrant.kind};
+      # The other registration wins only from above: a scope that binds the
+      # recorded registrant is that registrant or below it (an inherited
+      # registrant, C4, registers below itself).
+      outerCtx = ((state.scopeContexts or (_: { })) null).${outer} or { };
+      outerIsBelowOwn =
+        own != null && ((outerCtx.${own.kind} or { }).id_hash or null) == own.record.id_hash;
     in
-    if outerRegistrant != null && bindsBoth then outerRegistrant else own;
+    if outerRegistrant != null && bindsBoth && !outerIsBelowOwn then outerRegistrant else own;
 in
 {
   inherit registrantAt;
+
+  # The registrant recorded when a policy registers at `scope`.
+  registrantOnRegister =
+    state: scope:
+    let
+      inherited = inheritedAt state scope;
+    in
+    if inherited != null then inherited else registrantAt state scope;
 
   # The policies a scope dispatches, each carrying its registrant.
   withRegistrants =
