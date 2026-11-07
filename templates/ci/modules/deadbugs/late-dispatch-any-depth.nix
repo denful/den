@@ -137,6 +137,7 @@ let
       config,
       withIdHash,
       devFirst,
+      guestIdHash ? true,
     }:
     let
       env =
@@ -148,9 +149,17 @@ let
         // lib.optionalAttrs withIdHash { id_hash = "environment:${name}"; };
       prod = env "prod";
       dev = env "dev";
-      guest = config.den.hosts.x86_64-linux.cuda // {
-        intoAttr = [ ];
-      };
+      # An ad-hoc guest record may carry no id_hash.
+      guest =
+        (
+          if guestIdHash then
+            config.den.hosts.x86_64-linux.cuda
+          else
+            builtins.removeAttrs config.den.hosts.x86_64-linux.cuda [ "id_hash" ]
+        )
+        // {
+          intoAttr = [ ];
+        };
       envPolicy =
         prefix:
         {
@@ -323,8 +332,13 @@ let
         expected = "cuda";
       }
     );
-  rebindCell =
-    withIdHash: devFirst:
+  rebindCell = withIdHash: devFirst: rebindCellWith { inherit withIdHash devFirst; };
+  rebindCellWith =
+    {
+      withIdHash ? true,
+      devFirst,
+      guestIdHash ? true,
+    }:
     denTest (
       {
         den,
@@ -341,6 +355,7 @@ let
               config
               withIdHash
               devFirst
+              guestIdHash
               ;
           })
         ];
@@ -645,7 +660,9 @@ in
 
     # One host resolved under two environments has two scopes with one
     # id_hash. A policy registered only at igloo@dev stays out of
-    # igloo@prod's users: their tree already binds `host`.
+    # igloo@prod's users: their tree already binds `host`. Its basis, until
+    # the owner rules on per-scope against per-entity registrants, is §11a
+    # N1: each instance applies to its own registering scope.
     test-host-in-two-environments-keeps-scope-rules = denTest (
       { den, igloo, ... }:
       {
@@ -696,8 +713,21 @@ in
       }
     );
 
-    # A binding compared with a record of the same kind where only one side
-    # has an id_hash cannot be decided, so it is an error, not no rules.
+    # A guest's ad-hoc record without an id_hash binds `host` to itself; igloo
+    # carries one. They are different entities (different names), so it is
+    # not an error, and the guest still gets dev's rules in either order.
+    test-adhoc-guest-without-id-hash-dev-first = rebindCellWith {
+      devFirst = true;
+      guestIdHash = false;
+    };
+    test-adhoc-guest-without-id-hash-prod-first = rebindCellWith {
+      devFirst = false;
+      guestIdHash = false;
+    };
+
+    # A binding compared with a same-named record of the same kind where only
+    # one side has an id_hash cannot be decided, so it is an error, not no
+    # rules.
     test-binding-mixed-id-hash-is-an-error = denTest (
       {
         den,

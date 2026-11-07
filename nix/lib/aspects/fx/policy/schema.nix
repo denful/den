@@ -62,11 +62,18 @@ let
     r: "${r.name or "<unnamed>"}${lib.optionalString (r ? id_hash) " (id_hash ${r.id_hash})"}";
 
   # A binding is matched to an entity scope by id_hash, or by value when
-  # neither record has one. Either way a match that cannot be decided is an
-  # error: a quiet mismatch would silently fire none of the entity's rules.
+  # neither record has one. A record with an id_hash and one without are
+  # different entities, unless they share a name: then den cannot tell, and a
+  # quiet mismatch would silently fire none of the entity's rules.
   mixedIdHash =
-    kind: a: b:
-    throw "den: two `${kind}` records, ${describeRecord a} and ${describeRecord b}, are compared but only one carries an id_hash, so den cannot tell whether they are one entity; give both an id_hash, or neither";
+    kind: a: others:
+    let
+      clash = lib.findFirst (b: (b.name or null) != null && b.name == (a.name or null)) null others;
+    in
+    if clash == null then
+      [ ]
+    else
+      throw "den: two `${kind}` records, ${describeRecord a} and ${describeRecord clash}, share a name but only one carries an id_hash, so den cannot tell whether they are one entity; give both an id_hash, or neither";
 
   # "eq", "ne", or "fn" when the values differ only in function-valued
   # attributes, which Nix compares unequal unless they are the same value.
@@ -117,21 +124,21 @@ let
       withId = builtins.filter (b: b != "" && byKind.${b} != { }) (builtins.attrNames byKind);
     in
     if record ? id_hash then
-      if noId != { } then
-        mixedIdHash kind record (builtins.head (builtins.attrValues noId)).record
-      else
-        builtins.attrValues (byKind.${record.id_hash} or { })
-    else if withId != [ ] then
-      mixedIdHash kind record (builtins.head (builtins.attrValues byKind.${builtins.head withId})).record
+      mixedIdHash kind record (map (p: p.record) (builtins.attrValues noId))
+      ++ builtins.attrValues (byKind.${record.id_hash} or { })
     else
-      builtins.filter (p: sameByValue kind p.record record) (builtins.attrValues noId);
+      mixedIdHash kind record (
+        lib.concatMap (b: map (p: p.record) (builtins.attrValues byKind.${b})) withId
+      )
+      ++ builtins.filter (p: sameByValue kind p.record record) (builtins.attrValues noId);
 
   # A sibling's binding whose entity has not resolved yet is offered once that
   # entity resolves: a re-pass of the sibling with the entity's registry, so
   # the order in which entities resolve does not decide which rules fire. An
   # entry is consumed when it re-passes and the done set refuses a second
   # (sibling, kind) re-pass, so re-passes are bounded by the entries late
-  # passes add: one per sibling and kind its tree does not bind.
+  # passes add: one per sibling and kind its tree does not bind. That count is
+  # the named cap, maxBoundRepasses, a guard on the construction.
   repassBound =
     targetKind: scopedCtx: entityScope:
     fx.bind fx.effects.state.get (
@@ -149,15 +156,20 @@ let
           else
             builtins.filter (p: !(done ? ${key p})) (pendingFor targetKind byKind record);
         consumed = builtins.groupBy (p: p.record.id_hash or "") pending;
+        count = (state.boundRepassCount or 0) + builtins.length pending;
+        cap = state.maxBoundRepasses or 0;
       in
       if pending == [ ] then
         fx.pure null
+      else if count > cap then
+        throw "den: ${toString count} late re-passes for bindings resolved after their binders exceed maxBoundRepasses (${toString cap}), the number of such bindings late dispatch recorded; each should re-pass at most once"
       else
         fx.bind
           (fx.effects.state.modify (
             st:
             st
             // {
+              boundRepassCount = count;
               boundRepassDone = (st.boundRepassDone or { }) // lib.genAttrs (map key pending) (_: true);
               boundRepassPending =
                 _:
@@ -564,14 +576,11 @@ let
               recordAt = sid: (scopeCtxsL.${sid} or { }).${kind};
             in
             if record ? id_hash then
-              if noId != { } then
-                mixedIdHash kind record (recordAt (builtins.head (builtins.attrNames noId)))
-              else
-                builtins.attrNames (ix.${record.id_hash} or { })
-            else if withId != [ ] then
-              mixedIdHash kind record (recordAt (builtins.head (builtins.attrNames ix.${builtins.head withId})))
+              mixedIdHash kind record (map recordAt (builtins.attrNames noId))
+              ++ builtins.attrNames (ix.${record.id_hash} or { })
             else
-              builtins.filter (sid: sameByValue kind record (recordAt sid)) (builtins.attrNames noId);
+              mixedIdHash kind record (lib.concatMap (b: map recordAt (builtins.attrNames ix.${b})) withId)
+              ++ builtins.filter (sid: sameByValue kind record (recordAt sid)) (builtins.attrNames noId);
           # Plus the scope of every entity the sibling binds outside its tree:
           # a policy applies where the scope's binding for its registrant's
           # kind is that registrant, which for an ordinary host is the tree.
@@ -618,6 +627,10 @@ let
             st:
             st
             // {
+              # The cap on bound re-passes: one per binding a late pass found
+              # unresolved.
+              maxBoundRepasses =
+                (st.maxBoundRepasses or 0) + builtins.foldl' (n: o: n + builtins.length o.unresolved) 0 offers;
               # Behind a thunk: the trampoline deepSeqs state each step, and
               # these hold whole entity records. Keyed by kind, id_hash and
               # sibling, so a repeated batch does not add a sibling twice.
