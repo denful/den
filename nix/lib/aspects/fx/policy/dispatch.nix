@@ -1,6 +1,7 @@
 # Policy dispatch — run policies against a context, return classified results.
 {
   lib,
+  den,
   resolveArgsSatisfied,
   classifyPolicyResult,
   extractTaggedEffects,
@@ -33,6 +34,67 @@ let
         eff
     ) rawEffects;
 
+  # An instance firing below its registrant applies to the registrant too
+  # (#694 §11a R3): its bare includes land in full where it fired, and their
+  # host-class part reaches the registrant through a provenance route (the
+  # mutual-provider mechanism, aspect/provide.nix); a provide or route with no
+  # receiver is aimed at the registrant. A user the registrant accepts through
+  # user-aspects is already unbounded, so the route stands down (R5).
+  provenanceMarker = "den-provides-to-host=";
+  applyToRegistrant =
+    policyName: registrant: ctx: effects:
+    let
+      firingKind = ctx.__entityKind or null;
+      firing = if firingKind == null then null else ctx.${firingKind} or null;
+      reg = registrant.record;
+      isBelow =
+        firing != null
+        && (firing.id_hash or null) != reg.id_hash
+        && ((ctx.${registrant.kind} or { }).id_hash or null) == reg.id_hash;
+      token = "${reg.id_hash}/${policyName}";
+      isInclude = e: e.__policyEffect == "include";
+      aimed =
+        e:
+        if
+          builtins.elem e.__policyEffect [
+            "provide"
+            "route"
+          ]
+          && (e.value.receiver or null) == null
+        then
+          e
+          // {
+            value = e.value // {
+              receiver = reg;
+            };
+          }
+        else
+          e;
+      wrapped =
+        e:
+        e
+        // {
+          value = {
+            name = "${provenanceMarker}${token}";
+            includes = [ e.value ];
+          };
+        };
+      hasIncludes = builtins.any isInclude effects;
+      accepted = firing != null && den.lib.acceptance.accepts ctx reg firing;
+      delivery = lib.optional (hasIncludes && reg ? class && !accepted) (
+        den.lib.policy.route {
+          fromClass = reg.class;
+          intoClass = reg.class;
+          receiver = reg;
+          __fromProvenance = token;
+        }
+      );
+    in
+    if registrant == null || !isBelow then
+      effects
+    else
+      map (e: if isInclude e then wrapped e else aimed e) effects ++ delivery;
+
   # Dispatch aspect policies against a context.
   # Note: caller passes the same aspectPolicies each iteration; Nix memoizes
   # attrsToList per attrset identity, so repeated calls are cheap.
@@ -62,7 +124,9 @@ let
       in
       {
         policyName = entry.name;
-        effects = validateEffects entry.name rawEffects;
+        effects = applyToRegistrant entry.name (entry.value.registrant or null) ctx (
+          validateEffects entry.name rawEffects
+        );
       }
     ) matching;
 

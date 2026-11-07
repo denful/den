@@ -240,9 +240,9 @@ in
       }
     );
 
-    # A `{ host, user }` function in den.default authors nixos only at user
-    # scopes; no root copy exists, so it is a loss.
-    test-default-host-user-function-is-loss = denTest (
+    # A `{ host, user }` function in den.default: den.default is every entity's
+    # include, so its host-side registration applies to the host (§11a).
+    test-default-host-user-function-lands = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
@@ -255,7 +255,7 @@ in
           )
         ];
         expr = igloo.environment.etc.user-tux.text;
-        expectedError = lossError;
+        expected = "tux";
       }
     );
 

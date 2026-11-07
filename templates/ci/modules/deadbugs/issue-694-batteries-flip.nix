@@ -249,5 +249,60 @@ in
         };
       }
     );
+
+    # Guests are their own hosts (§11a): igloo's policy and aspect function
+    # apply to igloo's users only; a schema-registered policy also applies in
+    # the guest, which registered it itself (host = guest).
+    test-registrant-guest-rows = denTest (
+      {
+        den,
+        lib,
+        config,
+        inputs,
+        igloo,
+        ...
+      }:
+      let
+        mk =
+          prefix:
+          { host, user, ... }:
+          {
+            nixos.environment.etc."${prefix}-${host.name}-${user.name}".text = "x";
+          };
+        pick = etc: builtins.attrNames (lib.filterAttrs (n: _: builtins.match "[pas]-.*" n != null) etc);
+      in
+      {
+        imports = [
+          (guestFixture {
+            inherit
+              den
+              lib
+              config
+              inputs
+              ;
+            guestUsers.pingu = { };
+          })
+        ];
+        den.policies.reg-host = { host, user, ... }@ctx: [ (den.lib.policy.include (mk "p" ctx)) ];
+        den.policies.reg-schema = { host, user, ... }@ctx: [ (den.lib.policy.include (mk "s" ctx)) ];
+        den.aspects.igloo.includes = [
+          den.policies.reg-host
+          (mk "a")
+        ];
+        den.schema.host.includes = [ den.policies.reg-schema ];
+        expr = {
+          igloo = pick igloo.environment.etc;
+          guest = pick igloo.microvm.vms.cuda.config.config.environment.etc;
+        };
+        expected = {
+          igloo = [
+            "a-igloo-tux"
+            "p-igloo-tux"
+            "s-igloo-tux"
+          ];
+          guest = [ "s-cuda-pingu" ];
+        };
+      }
+    );
   };
 }

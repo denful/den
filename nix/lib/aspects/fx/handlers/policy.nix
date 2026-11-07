@@ -1,14 +1,20 @@
 # Effect handler: register-aspect-policy
 # Registers policies declared on aspects into scope-partitioned state.
-_:
+{ lib, ... }:
 let
   inherit (import ./state-util.nix) scopedMerge;
+  inherit (import ../policy/registrant.nix { inherit lib; }) registrantAt;
 
   registerAspectPolicyHandler = {
     "register-aspect-policy" =
       { param, state }:
       let
-        entry = { inherit (param) fn; };
+        # The registrant is fixed where the policy registers: dispatched later at
+        # a descendant, it still applies to this entity (#694 §11a R1).
+        entry = {
+          inherit (param) fn;
+          registrant = registrantAt state state.currentScope;
+        };
         # The registry is the one scoped field that merges rather than appends,
         # so a repeated key is a silent drop. Derive it here from the owner's
         # identity instead of letting each caller name its own: a caller that

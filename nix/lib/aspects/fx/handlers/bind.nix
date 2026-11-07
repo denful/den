@@ -133,7 +133,7 @@ in
         # discovers further descendant args per child → cartesian for free.
         # All instances EMIT AT THE CURRENT SCOPE.
         fanOut =
-          argKind:
+          shared: argKind:
           let
             # Enumerate children off argKind's PARENT-kind record (host.users,
             # pet.toys), not the scope root — so a transitive descendant chains
@@ -157,9 +157,17 @@ in
                   # dependence so emit-class keys each by its ctx-qualified
                   # identity (preserving the {ctxId} suffix) rather than
                   # collapsing siblings to a shared base identity.
-                  meta = (augmentedAspect.meta or { }) // {
-                    contextDependent = true;
-                  };
+                  meta =
+                    (augmentedAspect.meta or { })
+                    // {
+                      contextDependent = true;
+                    }
+                    # A source the descendant also includes fans out too (its
+                    # host-class part reaches the host, as an aspect on the
+                    # host does), marked so the fold drops this copy for a user
+                    # the host accepts, whose own copy already arrives (#694
+                    # §11a R6, keyed by id_hash: D5).
+                    // lib.optionalAttrs shared { __sharedFanOutFor = child.id_hash or null; };
                 };
                 inherit compileFn;
                 # Record this intermediate so a deeper descendant's fan reads its
@@ -252,7 +260,7 @@ in
                 # starts a fresh pipeline where `scopeKind` is null and
                 # `arg-class.nix` leaves `descendants` empty. The reason is
                 # semantic, and this comment is the only instrument guarding it.
-                if sharedWithDescendant pick then fx.pure { inert = true; } else fanOut pick
+                fanOut (sharedWithDescendant pick) pick
               )
             # Only non-entity (pipe/conditional/enrichment) args remain → defer.
             else

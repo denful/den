@@ -17,6 +17,7 @@
 }:
 let
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
+  inherit (import ./registrant.nix { inherit lib; }) withRegistrants;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
@@ -392,9 +393,11 @@ let
           if regIdx == [ ] then [ ] else lib.take (lib.last regIdx + 1) ancestorScopes;
         # The sibling's own dispatch already ran these, whatever they returned.
         ranAtSib = ((state.installDispatched or (_: { })) null).${sib.scopeId} or { };
-        filteredPolicies = lib.filterAttrs (
-          name: policy: !excluded name && !(ranAtSib ? ${name}) && !(sameInstanceAbove name policy)
-        ) latePolicies;
+        filteredPolicies = withRegistrants state sib.scopeId (
+          lib.filterAttrs (
+            name: policy: !excluded name && !(ranAtSib ? ${name}) && !(sameInstanceAbove name policy)
+          ) latePolicies
+        );
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };

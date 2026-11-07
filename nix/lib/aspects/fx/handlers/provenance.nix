@@ -10,10 +10,13 @@ let
     let
       hits = builtins.filter (lib.hasInfix marker) chain;
     in
-    if hits == [ ] then null else lib.last (lib.splitString marker (builtins.head hits));
+    # The innermost provider wins: a cross-provider include nested in a
+    # registrant's include stays gated by its own provider (#694 §11a R7).
+    if hits == [ ] then null else lib.last (lib.splitString marker (lib.last hits));
 in
 {
   inherit tokenOf;
+  sharedFanOutPrefix = "shared-fanout:";
 
   # A token's locations: those emitted under it, plus every location an aspect
   # walked first by another path emitted. That aspect was deduplicated under the

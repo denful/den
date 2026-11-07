@@ -64,6 +64,7 @@ let
       aspectPolicy,
       globalPolicy,
       isContextDependent,
+      sharedFanOutFor ? null,
     }:
     fx.send "emit-class" {
       inherit
@@ -76,7 +77,8 @@ let
         isContextDependent
         ;
       __rawEntry = true;
-    };
+    }
+    // lib.optionalAttrs (sharedFanOutFor != null) { inherit sharedFanOutFor; };
 
   emitClassKey =
     aspect: ctx: aspectPolicy: globalPolicy: contextDep: nodeIdentity: k:
@@ -101,6 +103,7 @@ let
           # Content naming an entity kind is per-instance ⇒ keep the {…} suffix
           # through identity computation (wrap-classes.nix finalIdentity).
           isContextDependent = contextDep || entityArgs != [ ];
+          sharedFanOutFor = aspect.meta.__sharedFanOutFor or null;
         };
     in
     fx.seq (lib.imap0 mkEntry modules);
