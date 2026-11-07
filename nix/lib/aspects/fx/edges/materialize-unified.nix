@@ -139,7 +139,10 @@ let
         sid:
         let
           kind = scopeEntityKind.${sid} or null;
-          record = if kind == null then null else (scopeContexts.${sid} or { }).${kind} or null;
+          # A routing kind is recorded in scopeEntityKind too; only an entity
+          # kind has an own entity (§2).
+          isEntity = kind != null && (den.schema.${kind}.isEntity or false);
+          record = if isEntity then (scopeContexts.${sid} or { }).${kind} or null else null;
         in
         if builtins.isAttrs record then { inherit kind record; } else null;
       targetOf = targetScopeOf {
@@ -182,7 +185,7 @@ let
       # paired with its TRACE edge for the unified toposort (the trace edges carry
       # the cell-model identity topoSortEdges reads; the SPEC drives materialization).
 
-      dedupedProvides = dedupProvides entityOf (lib.concatLists (lib.attrValues liveProvides));
+      dedupedProvides = dedupProvides entityOf targetOf (lib.concatLists (lib.attrValues liveProvides));
       providesTraceEdges = providesEdges {
         inherit name entityOf targetOf;
         scopedProvides = liveProvides;
@@ -241,8 +244,9 @@ let
         else
           acc // { ${key} = (acc.${key} or [ ]) ++ [ i ]; }
       ) { } pairIdxs;
-      producerScopes = lib.unique (
-        map (i: targetOf (builtins.elemAt pairs i).spec) (
+      # Keyed, not lib.unique: at the flake root the pairs span the fleet.
+      producerScopes = builtins.attrNames (
+        lib.genAttrs (map (i: targetOf (builtins.elemAt pairs i).spec) (
           builtins.filter (
             i:
             let
@@ -250,7 +254,7 @@ let
             in
             !(p.kind == "route" && isClassAlias p.spec)
           ) pairIdxs
-        )
+        )) (_: true)
       );
       readScopesOf =
         r:
