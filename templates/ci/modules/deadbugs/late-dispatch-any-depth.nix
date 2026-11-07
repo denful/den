@@ -560,7 +560,8 @@ in
     # at its guest's users, whose `host` is the guest. Offering every ancestor
     # reached them through igloo's registry two levels up.
     # A guest with its own class owns its system config: not isolated, its
-    # own nixos stays out of igloo and the loss check doesn't report it.
+    # own nixos stays out of igloo, and the transition-default warning
+    # doesn't list it.
     test-guest-own-content-is-not-a-loss = denTest (
       {
         den,
@@ -718,6 +719,7 @@ in
     test-lone-child-late-include-provides-lands = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feat.provides.to-hosts.nixos.environment.etc.late-provided.text = "x";
         den.aspects.igloo.provides.tux.includes = [ den.aspects.feat ];

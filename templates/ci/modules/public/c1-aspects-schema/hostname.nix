@@ -49,12 +49,9 @@
         den.aspects.tux.includes = [ den.provides.hostname ];
 
         expr = igloo.networking.hostName;
-        # #694: a user's host-class content stays in the user; the loss check
-        # names what no delivery carries.
-        expectedError = {
-          type = "ThrownError";
-          msg = "no longer receives host-class content";
-        };
+        # #694: a user's host-class content stays in the user: the host keeps
+        # NixOS's default name.
+        expected = "nixos";
       }
     );
 
@@ -102,12 +99,9 @@
         den.aspects.tux.includes = [ den.aspects.foo ];
 
         expr = igloo.networking.hostName;
-        # #694: a user's host-class content stays in the user; the loss check
-        # names what no delivery carries.
-        expectedError = {
-          type = "ThrownError";
-          msg = "no longer receives host-class content";
-        };
+        # #694: a user's host-class content stays in the user: the host keeps
+        # NixOS's default name.
+        expected = "nixos";
       }
     );
 

@@ -99,7 +99,7 @@ in
   flake.tests.deadbugs.issue-694-batteries-flip = {
 
     # Included on a user, user-aspects accepts nothing: the user's own nixos
-    # stays in the user, which the loss check reports.
+    # stays in the user.
     test-user-side-placement-inert = denTest (
       { den, igloo, ... }:
       {
@@ -107,15 +107,12 @@ in
         den.aspects.tux.includes = [ den.batteries.user-aspects ];
         den.aspects.tux.nixos.environment.etc.tux-own.text = "tux";
         expr = igloo.environment.etc ? tux-own;
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'tux'";
-        };
+        expected = false;
       }
     );
 
     # `users` filters which users' output the host accepts: tux's arrives,
-    # pingu's does not, which the loss check reports.
+    # pingu's does not.
     test-user-list-filters = denTest (
       { den, igloo, ... }:
       {
@@ -127,10 +124,7 @@ in
         den.aspects.tux.nixos.environment.etc.tux-own.text = "tux";
         den.aspects.pingu.nixos.environment.etc.pingu-own.text = "pingu";
         expr = igloo.environment.etc ? tux-own;
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'pingu'";
-        };
+        expected = true;
       }
     );
 

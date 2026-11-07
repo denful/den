@@ -25,9 +25,77 @@ let
     den.aspects.${name}.homeManager.home.stateVersion = "25.11";
   };
   hmOf = config: name: config.flake.nixosConfigurations.igloo.config.home-manager.users.${name};
+  # What the host's transition-default warning lists, as aspect identities.
+  warned =
+    config:
+    map (e: e.aspect) (
+      config.flake.nixosConfigurations.igloo._module.args.denTransitionDefaultLost or [ ]
+    );
+  # One cell per #694 form: by default it still reaches the host, and the
+  # warning lists it.
+  formCell =
+    form: expectedAspect:
+    denTest (
+      {
+        den,
+        igloo,
+        config,
+        ...
+      }:
+      {
+        imports = [ transition ];
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.feat.nixos.environment.etc.probe.text = "x";
+        den.policies.tux-to-hosts =
+          { host, user, ... }: [ (den.lib.policy.include { nixos.environment.etc.probe.text = "x"; }) ];
+        den.aspects.tux = form den;
+        expr = {
+          delivered = igloo.environment.etc ? probe;
+          warned = builtins.elem expectedAspect (warned config);
+        };
+        expected = {
+          delivered = true;
+          warned = true;
+        };
+      }
+    );
 in
 {
   flake.tests.deadbugs.issue-694-migration = {
+
+    # The #694 table, each form listed by the warning.
+    test-form-own-nixos-warned = formCell (_: { nixos.environment.etc.probe.text = "x"; }) "tux";
+    test-form-include-warned = formCell (den: { includes = [ den.aspects.feat ]; }) "feat";
+    test-form-function-warned = formCell (_: {
+      includes = [
+        (
+          { user, ... }:
+          {
+            nixos.environment.etc.probe.text = "x";
+          }
+        )
+      ];
+    }) "tux/<anon>:0";
+    test-form-policy-warned = formCell (den: {
+      includes = [ den.policies.tux-to-hosts ];
+    }) "<policy:tux-to-hosts>[1]";
+    test-form-os-warned = formCell (_: { os.environment.etc.probe.text = "x"; }) "os@tux";
+    test-form-to-hosts-warned = formCell (_: {
+      provides.to-hosts.nixos.environment.etc.probe.text = "x";
+    }) "tux/to-hosts";
+
+    # Acknowledged, the warning lists nothing.
+    test-acknowledged-warns-nothing = denTest (
+      { den, config, ... }:
+      {
+        imports = [ transition ];
+        den.migrations.user-host-content.acknowledged = true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.nixos.environment.etc.probe.text = "x";
+        expr = warned config;
+        expected = [ ];
+      }
+    );
 
     # Guard: the removal date every message prints is a real date.
     test-removal-date-is-a-date = denTest (

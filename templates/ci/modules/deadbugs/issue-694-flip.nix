@@ -1,13 +1,7 @@
 # Issue #694, PR 3: a user's host-class content stays in the user. Each form in
-# the issue's reproduction table now fails the loss check instead of reaching
-# the host; each sanctioned channel still delivers.
+# the issue's reproduction table no longer reaches the host; each sanctioned
+# channel still delivers.
 { denTest, ... }:
-let
-  lossError = {
-    type = "ThrownError";
-    msg = "no longer receives host-class content";
-  };
-in
 {
   flake.tests.deadbugs.issue-694-flip = {
 
@@ -17,8 +11,9 @@ in
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.nixos.environment.etc.probe.text = "from-tux";
-        expr = igloo.environment.etc.probe.text;
-        expectedError = lossError;
+        expr = igloo.environment.etc.probe.text or "<not delivered>";
+
+        expected = "<not delivered>";
       }
     );
 
@@ -28,8 +23,9 @@ in
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feat.nixos.environment.etc.probe.text = "from-tux";
         den.aspects.tux.includes = [ den.aspects.feat ];
-        expr = igloo.environment.etc.probe.text;
-        expectedError = lossError;
+        expr = igloo.environment.etc.probe.text or "<not delivered>";
+
+        expected = "<not delivered>";
       }
     );
 
@@ -42,8 +38,9 @@ in
           {
             nixos.environment.etc.probe.text = "from-${user.name}";
           };
-        expr = igloo.environment.etc.probe.text;
-        expectedError = lossError;
+        expr = igloo.environment.etc.probe.text or "<not delivered>";
+
+        expected = "<not delivered>";
       }
     );
 
@@ -56,8 +53,9 @@ in
           {
             environment.etc.probe.text = "from-tux";
           };
-        expr = igloo.environment.etc.probe.text;
-        expectedError = lossError;
+        expr = igloo.environment.etc.probe.text or "<not delivered>";
+
+        expected = "<not delivered>";
       }
     );
 
@@ -66,8 +64,9 @@ in
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.os.environment.etc.probe.text = "from-tux";
-        expr = igloo.environment.etc.probe.text;
-        expectedError = lossError;
+        expr = igloo.environment.etc.probe.text or "<not delivered>";
+
+        expected = "<not delivered>";
       }
     );
 
@@ -76,14 +75,15 @@ in
       {
         den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
         den.aspects.tux.nixos.environment.etc.probe.text = "from-tux";
-        expr = igloo.environment.etc.probe.text;
-        expectedError = lossError;
+        expr = igloo.environment.etc.probe.text or "<not delivered>";
+
+        expected = "<not delivered>";
       }
     );
 
     # The legacy pattern: a user-authored `policies.to-hosts` that includes
-    # nixos at the user's scope. The loss error names it and its fixes.
-    test-user-policy-to-hosts-named-in-error = denTest (
+    # nixos at the user's scope. It stays with the user.
+    test-user-policy-to-hosts-stays-in-user = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
@@ -91,12 +91,8 @@ in
           { host, user, ... }:
           [ (den.lib.policy.include { nixos.environment.etc.probe.text = "from-tux"; }) ];
         den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
-        expr = igloo.environment.etc.probe.text;
-        expectedError = {
-          type = "ThrownError";
-          # `msg` is a regex: match the policy-native fix up to its brace.
-          msg = "this policy `include`s host-class content at the user's scope; to deliver it to the host, emit `provide";
-        };
+        expr = igloo.environment.etc.probe.text or "<not delivered>";
+        expected = "<not delivered>";
       }
     );
 
@@ -167,6 +163,7 @@ in
     test-to-hosts-delivers = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.provides.to-hosts.nixos.environment.etc.probe.text = "from-tux";
         expr = igloo.environment.etc.probe.text;
@@ -179,6 +176,7 @@ in
     test-parametric-to-hosts-delivers = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.provides.to-hosts =
           { host, ... }:
@@ -202,10 +200,7 @@ in
         den.aspects.igloo.includes = [ (den.batteries.user-aspects { users = [ "tux" ]; }) ];
         den.aspects.pingu.nixos.environment.etc.pingu-own.text = "pingu";
         expr = igloo.environment.etc ? pingu-own;
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'pingu'";
-        };
+        expected = false;
       }
     );
 
@@ -294,10 +289,7 @@ in
         den.aspects.igloo.settings.fromHost = "igloo";
         den.aspects.tux.settings.fromUser = "tux";
         expr = config.flake.settingsOf.igloo ? fromUser;
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'tux'";
-        };
+        expected = false;
       }
     );
 

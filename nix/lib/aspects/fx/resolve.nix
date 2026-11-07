@@ -51,16 +51,20 @@ let
     if lost == [ ] || !den.lib.migrations.transitionActive then
       modules
     else
-      lib.warn (
-        "den: ${hostName} receives ${class} content only through den's transition default, which ends ${den.lib.migrations.removalDate}:\n"
-        + lib.concatMapStringsSep "\n" (
-          e:
-          "  - from ${e.entity} (${
-              if e.aspect == null then "unidentified content, scope ${e.scope}" else e.aspect
-            })"
-        ) lost
-        + "\nIf the host should have it, include the aspect on the host or add the battery explicitly (`den.batteries.user-aspects`, or `den.batteries.mutual-provider` for `provides.to-hosts`); if it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694."
-      ) modules;
+      lib.warn
+        (
+          "den: ${hostName} receives ${class} content only through den's transition default, which ends ${den.lib.migrations.removalDate}:\n"
+          + lib.concatMapStringsSep "\n" (
+            e:
+            "  - from ${e.entity} (${
+                if e.aspect == null then "unidentified content, scope ${e.scope}" else e.aspect
+              })"
+          ) lost
+          + "\nIf the host should have it, include the aspect on the host or add the battery explicitly (`den.batteries.user-aspects`, or `den.batteries.mutual-provider` for `provides.to-hosts`); if it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694."
+        )
+        # The same list, readable from the host's config (`_module.args`), so a
+        # cell can pin what the warning lists; it sets no option.
+        (modules ++ [ { _module.args.denTransitionDefaultLost = lost; } ]);
 
   # Phase 1: Wrap collected class imports per-scope.
   # Deduplicates modules with identical keys across scopes: when a shared
