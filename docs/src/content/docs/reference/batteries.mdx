@@ -131,6 +131,14 @@ den.hosts.x86_64-linux.igloo.excludes = [ den.batteries.mutual-provider ];
 
 It has no effect on standalone homes, which have no host configuration to deliver into.
 
+<Aside type="caution">
+In this release a user's content still reaches its hosts by nesting, with or
+without this battery, so excluding it doesn't stop `provides.to-hosts` content
+from reaching a host yet. The next release keeps a user's content with the
+user ([#694](https://github.com/denful/den/issues/694)); from then on, this
+battery is how `provides.to-hosts` reaches a host.
+</Aside>
+
 <Aside title="Source" icon="github">
 [`modules/aspects/batteries/mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix)
 </Aside>
@@ -173,7 +181,7 @@ When several includes apply to one host, the host accepts every user any of them
 <Aside type="caution" title="User host-class content still reaches hosts">
 In this release a user's `nixos`, `darwin` and `os` content still reaches every
 host the user lives on, whether or not the host includes `user-aspects`
-([#694](https://github.com/denful/den/issues/694)). A follow-up release keeps
+([#694](https://github.com/denful/den/issues/694)). The next release keeps
 that content with the user unless the host accepts it. Include `user-aspects`
 on the hosts that rely on it, so they keep working after that change.
 </Aside>

@@ -29,20 +29,4 @@ in
   # key (enrichment is merged shallowly, last write wins).
   userAspectsKey =
     host: users: "${userAspectsPrefix host}${builtins.hashString "sha256" (builtins.toJSON users)}";
-
-  # The users a host accepts, from every user-aspects key it published; null
-  # means all of them.
-  acceptedUsers =
-    ctx: host:
-    let
-      lists = map (k: ctx.${k}.users) (
-        builtins.filter (lib.hasPrefix (userAspectsPrefix host)) (builtins.attrNames ctx)
-      );
-    in
-    if lists == [ ] then
-      [ ]
-    else if builtins.any (l: l == null) lists then
-      null
-    else
-      lib.unique (builtins.concatLists lists);
 }

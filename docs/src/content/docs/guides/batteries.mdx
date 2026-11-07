@@ -77,8 +77,7 @@ Delivers a user's `provides.to-hosts` and `provides.<host>` into the host's
 own configuration. Only the host's class (`nixos` or `darwin`) goes to the
 host; other classes, like `homeManager`, stay with the user.
 
-It is in `den.schema.host.includes` by default. To stop users configuring
-hosts through `provides`, exclude it:
+It is in `den.schema.host.includes` by default. To opt out, exclude it:
 
 ```nix
 # every host
@@ -90,6 +89,14 @@ den.hosts.x86_64-linux.igloo.excludes = [ den.batteries.mutual-provider ];
 
 Host-to-user providers (`provides.to-users`, `provides.<user>`) do not depend
 on it. See the [reference](/reference/batteries/#denbatteriesmutual-provider).
+
+<Aside type="caution">
+In this release a user's content still reaches its hosts by nesting, with or
+without this battery, so excluding it doesn't stop `provides.to-hosts` content
+from reaching a host yet. The next release keeps a user's content with the
+user ([#694](https://github.com/denful/den/issues/694)); from then on, this
+battery is how `provides.to-hosts` reaches a host.
+</Aside>
 
 ### `den.batteries.user-aspects`
 
@@ -115,7 +122,7 @@ host.
 
 <Aside type="caution">
 In this release a user's `nixos`, `darwin` and `os` content still reaches its
-hosts without this battery. A follow-up release keeps that content with the
+hosts without this battery. The next release keeps that content with the
 user unless the host includes `user-aspects`
 ([#694](https://github.com/denful/den/issues/694)). See the
 [reference](/reference/batteries/#denbatteriesuser-aspects).
