@@ -17,6 +17,7 @@
 }:
 let
   inherit (import ./registrant.nix { inherit lib; }) withRegistrants;
+  inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
@@ -216,8 +217,22 @@ let
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
         # Applied once, outside the lambda — see isPolicyExcluded's currying note.
         excluded = isPolicyExcluded state sib.scopeId constraintRegistry;
+        # An instance is the assignment of the arguments a policy declares that
+        # the scope binds (#694 §11a R2). One the parent could already dispatch
+        # with the same bound arguments fired there, whatever it returned, so it
+        # does not fire again here: firing never depends on a body's effects.
+        parentCtx = ((state.scopeContexts or (_: { })) null).${parentScope} or { };
+        parentRegistry = scopedAspectPolicies.${parentScope} or { };
+        boundOf =
+          ctx: policy:
+          builtins.filter (k: ctx ? ${k}) (builtins.attrNames (lib.functionArgs (policy.fn or policy)));
+        sameInstanceAtParent =
+          name: policy:
+          parentRegistry ? ${name}
+          && resolveArgsSatisfied (policy.fn or policy) parentCtx
+          && boundOf parentCtx policy == boundOf sib.scopedCtx policy;
         filteredPolicies = withRegistrants state sib.scopeId (
-          lib.filterAttrs (name: _: !excluded name) latePolicies
+          lib.filterAttrs (name: policy: !excluded name && !(sameInstanceAtParent name policy)) latePolicies
         );
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
