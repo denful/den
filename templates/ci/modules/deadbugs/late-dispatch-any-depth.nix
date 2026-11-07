@@ -2,7 +2,7 @@
 # arguments still fires there. Late dispatch offered only the parent's and the
 # sibling's registrations, so an environment's `{ host, user }` policy never
 # reached the users of its hosts.
-{ denTest, ... }:
+{ denTest, lib, ... }:
 let
   # flake → environment → host → user.
   envTopology =
@@ -117,6 +117,30 @@ in
         ];
         expr = builtins.filter (m: m == "env-noarg") igloo.boot.kernelModules;
         expected = [ ];
+      }
+    );
+
+    # A host with a single user: the late pass runs for one child too, so a
+    # policy registered two levels above still reaches that user. Before, a
+    # resolve with one schema child never ran the late pass.
+    test-single-child-gets-late-pass = denTest (
+      { den, config, ... }:
+      let
+        igloo = config.flake.nixosConfigurations.igloo.config;
+      in
+      {
+        imports = [ (envTopology { inherit den; }) ];
+        # No home-manager: igloo resolves a single schema child (tux).
+        den.hosts.x86_64-linux.igloo.users.tux.classes = lib.mkForce [ "user" ];
+        den.policies.env-single =
+          { host, user, ... }:
+          [ (den.lib.policy.include { nixos.environment.etc."single-${user.name}".text = host.name; }) ];
+        den.schema.environment.includes = [
+          den.policies.env-to-hosts
+          den.policies.env-single
+        ];
+        expr = igloo.environment.etc.single-tux.text or "<missing>";
+        expected = "igloo";
       }
     );
   };

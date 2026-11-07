@@ -381,7 +381,10 @@ let
         )
       ) (fx.pure [ ]) schemaEffects;
     in
-    if !isFanOut || isLatePass then
+    # A single child gets the late pass too: whether a policy registered above
+    # fires where its arguments are bound cannot depend on how many children
+    # the resolve has (a guest with one user got none).
+    if schemaEffects == [ ] || isLatePass then
       mainFold
     else
       fx.bind fx.effects.state.get (
