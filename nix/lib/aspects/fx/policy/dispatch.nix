@@ -47,6 +47,11 @@ let
       firingKind = ctx.__entityKind or null;
       firing = if firingKind == null then null else ctx.${firingKind} or null;
       reg = registrant.record;
+      # Where the host-class part lands: the registrant, or for a class-less
+      # registrant the nearest classed entity below it (R3 (a), registrant.nix).
+      target = if (registrant.classTarget or null) == null then null else registrant.classTarget.record;
+      # Firing at the target itself, the content is already where it belongs.
+      atTarget = target != null && (firing.id_hash or null) == target.id_hash;
       # Only a firing entity with an identity can be told apart from the
       # registrant; one without (a hand-built record) is treated as the
       # registrant's own scope.
@@ -56,8 +61,8 @@ let
         && firing.id_hash != reg.id_hash
         && ((ctx.${registrant.kind} or { }).id_hash or null) == reg.id_hash;
       token = "${reg.id_hash}/${policyName}";
-      registrantClasses = lib.optionals (reg ? class) [
-        reg.class
+      registrantClasses = lib.optionals (target != null && !atTarget) [
+        target.class
         "os"
       ];
       isInclude = e: e.__policyEffect == "include";
@@ -78,7 +83,7 @@ let
           e
           // {
             value = e.value // {
-              receiver = reg;
+              receiver = target;
             };
           }
         else
@@ -93,12 +98,12 @@ let
           };
         };
       hasIncludes = builtins.any isInclude effects;
-      accepted = firing != null && den.lib.acceptance.accepts ctx reg firing;
-      delivery = lib.optional (hasIncludes && reg ? class && !accepted) (
+      accepted = firing != null && den.lib.acceptance.accepts ctx target firing;
+      delivery = lib.optional (hasIncludes && target != null && !atTarget && !accepted) (
         den.lib.policy.route {
-          fromClass = reg.class;
-          intoClass = reg.class;
-          receiver = reg;
+          fromClass = target.class;
+          intoClass = target.class;
+          receiver = target;
           __fromProvenance = token;
         }
       );

@@ -56,6 +56,36 @@ let
     in
     if hashes == [ ] then null else find (lib.last hashes) { } scope;
 
+  # Where a registrant's host-class part lands (#694 §11a R3 (a)): the
+  # registrant itself when it has a class, else the nearest entity with a class
+  # on the scope path from the registrant down to the firing scope.
+  classTargetFor =
+    state: scope: registrant:
+    let
+      parents = (state.scopeParent or (_: { })) null;
+      # Own entities from the firing scope up to (not including) the
+      # registrant's, nearest-to-firing first.
+      go =
+        seen: s:
+        if s == null || seen ? ${s} then
+          [ ]
+        else
+          let
+            r = registrantAt state s;
+          in
+          if r != null && r.record.id_hash == registrant.record.id_hash then
+            [ ]
+          else
+            lib.optional (r != null) r ++ go (seen // { ${s} = true; }) (parents.${s} or null);
+      classed = builtins.filter (r: r.record ? class) (lib.unique (go { } scope));
+    in
+    if registrant.record ? class then
+      registrant
+    else if classed == [ ] then
+      null
+    else
+      lib.last classed;
+
   # A registration shared with an ancestor scope (den.default, or one policy in
   # both a host's and its users' schema includes) is one instance where both
   # registrations assign the same relata: the ancestor, host side, wins (C2).
@@ -112,5 +142,18 @@ in
   # The policies a scope dispatches, each carrying its registrant.
   withRegistrants =
     state: scope: policies:
-    lib.mapAttrs (key: entry: entry // { registrant = registrantFor state scope key entry; }) policies;
+    lib.mapAttrs (
+      key: entry:
+      let
+        registrant = registrantFor state scope key entry;
+      in
+      entry
+      // {
+        registrant =
+          if registrant == null then
+            null
+          else
+            registrant // { classTarget = classTargetFor state scope registrant; };
+      }
+    ) policies;
 }
