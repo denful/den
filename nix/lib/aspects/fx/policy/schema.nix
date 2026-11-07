@@ -232,8 +232,10 @@ let
             resolveArgsSatisfied (policy.fn or policy) (scopeCtxs.${a} or { })
             && boundOf (scopeCtxs.${a} or { }) policy == boundOf sib.scopedCtx policy
           ) ancestorScopes;
+        # The sibling's own dispatch already ran these, whatever they returned.
+        ranAtSib = ((state.installDispatched or (_: { })) null).${sib.scopeId} or { };
         filteredPolicies = lib.filterAttrs (
-          name: policy: !excluded name && !(sameInstanceAbove policy)
+          name: policy: !excluded name && !(ranAtSib ? ${name}) && !(sameInstanceAbove policy)
         ) latePolicies;
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
