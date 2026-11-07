@@ -660,9 +660,9 @@ in
 
     # One host resolved under two environments has two scopes with one
     # id_hash. A policy registered only at igloo@dev stays out of
-    # igloo@prod's users: their tree already binds `host`. Its basis, until
-    # the owner rules on per-scope against per-entity registrants, is §11a
-    # N1: each instance applies to its own registering scope.
+    # igloo@prod's users: their tree already binds `host`. A registration
+    # applies to its own registering scope, not to every scope of the same
+    # entity (§11a N1, ruled per scope).
     test-host-in-two-environments-keeps-scope-rules = denTest (
       { den, igloo, ... }:
       {
