@@ -187,7 +187,7 @@ let
       latePolicies = lib.filterAttrs (
         name: policy:
         let
-          policyArgs = builtins.functionArgs (policy.fn or policy);
+          policyArgs = lib.functionArgs (policy.fn or policy);
           requiredEntityArgs = builtins.filter (
             k: builtins.elem k entityKinds && !(policyArgs.${k} or false)
           ) (builtins.attrNames policyArgs);
