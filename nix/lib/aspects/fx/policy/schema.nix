@@ -16,6 +16,7 @@
   mkSupplementalResolution,
 }:
 let
+  inherit (import ./registrant.nix { inherit lib; }) withRegistrants;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
@@ -215,7 +216,9 @@ let
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
         # Applied once, outside the lambda — see isPolicyExcluded's currying note.
         excluded = isPolicyExcluded state sib.scopeId constraintRegistry;
-        filteredPolicies = lib.filterAttrs (name: _: !excluded name) latePolicies;
+        filteredPolicies = withRegistrants state sib.scopeId (
+          lib.filterAttrs (name: _: !excluded name) latePolicies
+        );
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };

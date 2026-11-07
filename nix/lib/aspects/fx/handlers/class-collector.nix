@@ -4,6 +4,7 @@
 let
   # Everything emitted under a cross-provider include records the provider, so
   # the delivery can select exactly its modules (handlers/provenance.nix).
+  inherit (import ./provenance.nix { inherit lib; }) sharedFanOutPrefix;
   provenanceOf = (import ./provenance.nix { inherit lib; }).tokenOf;
 
   classCollectorHandler = {
@@ -34,7 +35,14 @@ let
         scopeLocs = emittedLocs.${scope} or { };
         alreadyEmitted = scopeLocs ? ${loc};
         chain = ((state.scopedIncludesChain or (_: { })) null).${scope} or [ ];
-        provenance = provenanceOf chain;
+        # A shared source's fan-out copy (bind.nix) is recorded under a token
+        # naming the user it was fanned for: the fold drops it where that user
+        # is accepted, whose own copy arrives (#694 §11a R6).
+        provenance =
+          if (param.sharedFanOutFor or null) != null then
+            "${sharedFanOutPrefix}${param.sharedFanOutFor}"
+          else
+            provenanceOf chain;
         allProvenance = (state.scopedProvenanceLocs or (_: { })) null;
         # Recorded on a skipped emission too: content provided and also reached
         # another way still crosses, since the other path does not revoke the

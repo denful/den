@@ -20,6 +20,7 @@ let
   inherit (den.lib.aspects.fx.pipeline) mkScopeId;
   inherit (den.lib.aspects.fx) identity;
   inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
+  inherit (import ./registrant.nix { inherit lib; }) withRegistrants;
 
   classify = import ./classify.nix { inherit lib schemaEntityKinds schemaEntityKindsSet; };
   inherit (classify) classifyPolicyResult hasEffects extractTaggedEffects;
@@ -27,6 +28,7 @@ let
   dispatch = import ./dispatch.nix {
     inherit
       lib
+      den
       resolveArgsSatisfied
       classifyPolicyResult
       extractTaggedEffects
@@ -95,7 +97,9 @@ let
         alreadyDispatched = ((state.dispatchedPolicies or (_: { })) null) ? ${dispatchKey};
         # Policies fire where they're registered — scope-local only.
         # Cascade happens through effects (resolves/includes), not re-dispatch.
-        aspectPolicies = ((state.scopedAspectPolicies or (_: { })) null).${scope} or { };
+        aspectPolicies = withRegistrants state scope (
+          ((state.scopedAspectPolicies or (_: { })) null).${scope} or { }
+        );
         resolveCtx = currentCtx // {
           __entityKind = entityKind;
         };
