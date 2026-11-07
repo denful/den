@@ -508,6 +508,22 @@ let
             )
             || (id != null && rootIds ? ${id});
           entityOf = sid: (scopeContexts.${sid} or { }).${scopeEntityKind.${sid} or ""} or null;
+          # A nested entity with its own class (a guest that is its own host)
+          # owns its host-class content: it is that entity's system config, not
+          # content lost from the root (#694 §6). Its users' content is its own
+          # too. What an edge delivers to the root is read above either way.
+          ownedBelow =
+            let
+              go =
+                seen: s:
+                if s == null || s == rootScopeId || seen ? ${s} then
+                  false
+                else if (entityOf s) ? class then
+                  true
+                else
+                  go (seen // { ${s} = true; }) (scopeParent.${s} or null);
+            in
+            go { };
         in
         lib.concatMap (
           sid:
@@ -527,7 +543,7 @@ let
                 )
               ) (acc.perScope.${sid}.${cls} or [ ])
             )
-        ) (builtins.filter (sid: !(readScopes ? ${sid})) nested);
+        ) (builtins.filter (sid: !(readScopes ? ${sid}) && !(ownedBelow sid)) nested);
       # The root's class content: its own bounded subtree after delivery. An
       # "aware" walk takes the entity boundary; a "blind" one (spawn extraction)
       # is unchanged.

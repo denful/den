@@ -58,8 +58,8 @@ let
 
   # envTopology plus a guest of igloo: cuda (a host-like entity, parent kind
   # host, with two users) binds `host` to itself. The guest is a bounded entity
-  # (#694): its subtree's content stays at its own scopes, never in igloo's
-  # config, so the cells read it there (guestValues).
+  # with its own class (#694): its subtree's content stays at its own scopes,
+  # never in igloo's config, so the cells read it there (guestValues).
   guestTopology =
     {
       den,
@@ -84,9 +84,6 @@ let
       den.schema.guest-kind = {
         isEntity = true;
         parent = "host";
-        # The walks are bounded either way (#694); `isolated` tells the loss
-        # check this guest never merged into igloo on main, either.
-        isolated = true;
         includes = [ den.policies.host-to-users ];
       };
       den.policies.to-guest =
@@ -243,9 +240,6 @@ let
       den.schema.guest-kind = {
         isEntity = true;
         parent = "host";
-        # The walks are bounded either way (#694); `isolated` tells the loss
-        # check this guest never merged into igloo on main, either.
-        isolated = true;
         includes = [ den.policies.host-to-users ];
       };
       den.policies.to-guest =
@@ -565,6 +559,31 @@ in
     # Guests are their own hosts: igloo's `{ host, user }` policy does not fire
     # at its guest's users, whose `host` is the guest. Offering every ancestor
     # reached them through igloo's registry two levels up.
+    # A guest with its own class owns its system config: not isolated, its
+    # own nixos stays out of igloo and the loss check doesn't report it.
+    test-guest-own-content-is-not-a-loss = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      {
+        imports = [ (guestTopology { inherit den lib config; }) ];
+        den.schema.environment.includes = [ den.policies.env-to-hosts ];
+        den.aspects.cuda.nixos.environment.etc.cuda-own.text = "x";
+        expr =
+          let
+            etc = config.flake.nixosConfigurations.igloo.config.environment.etc;
+          in
+          builtins.tryEval (builtins.deepSeq (builtins.attrNames etc) (etc ? cuda-own));
+        expected = {
+          success = true;
+          value = false;
+        };
+      }
+    );
+
     test-host-policy-stays-out-of-guest = denTest (
       {
         den,
