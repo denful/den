@@ -569,13 +569,20 @@ let
             && (p.spec.__transitionDefault or false)
             && (p.spec.__fromProvenance or null) != null
           ) orderedPairs;
+          # Content the root also has without the default is not listed.
           defaultDelivered = lib.concatMap (
             p:
-            map (l: {
-              scope = p.spec.sourceScopeId;
-              entity = (entityOf p.spec.sourceScopeId).name or p.spec.sourceScopeId;
-              aspect = identityOf { key = l; };
-            }) (((pi.provenanceLocs or { }).${p.spec.sourceScopeId} or { }).${p.spec.__fromProvenance} or [ ])
+            map
+              (l: {
+                scope = p.spec.sourceScopeId;
+                entity = (entityOf p.spec.sourceScopeId).name or p.spec.sourceScopeId;
+                aspect = identityOf { key = l; };
+              })
+              (
+                builtins.filter (l: !(reachesRoot { key = l; })) (
+                  ((pi.provenanceLocs or { }).${p.spec.sourceScopeId} or { }).${p.spec.__fromProvenance} or [ ]
+                )
+              )
           ) defaultRoutes;
         in
         lib.concatMap

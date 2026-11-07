@@ -48,7 +48,7 @@ let
   # design and nothing is reported.
   checkLost =
     hostName: class: lost: modules:
-    if lost == [ ] || !den.lib.migrations.transitionActive then
+    if !den.lib.migrations.transitionActive || lost == [ ] then
       modules
     else
       lib.warn
@@ -60,7 +60,7 @@ let
                 if e.aspect == null then "unidentified content, scope ${e.scope}" else e.aspect
               })"
           ) lost
-          + "\nIf the host should have it, include the aspect on the host or add the battery explicitly (`den.batteries.user-aspects`, or `den.batteries.mutual-provider` for `provides.to-hosts`); if it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694."
+          + "\nIf the host should have it, include the aspect on the host or add the battery explicitly: `den.schema.host.includes = [ den.batteries.user-aspects ];` for a user's own content, `den.schema.host.includes = [ den.batteries.mutual-provider ];` for `provides.to-hosts`. If it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694."
         )
         # The same list, readable from the host's config (`_module.args`), so a
         # cell can pin what the warning lists; it sets no option.
