@@ -55,6 +55,50 @@ let
     nixos.environment.etc."env-${user.name}".text = host.name;
     homeManager.home.sessionVariables.ENVPOL = host.name;
   };
+
+  # envTopology plus a guest of igloo: cuda (a host-like entity, parent kind
+  # host, with two users) binds `host` to itself. Not isolated, so on main's
+  # semantics the guest's subtree merges into igloo and its users' content
+  # is readable in igloo's config.
+  guestTopology =
+    {
+      den,
+      lib,
+      config,
+      ...
+    }:
+    let
+      guest = config.den.hosts.x86_64-linux.cuda // {
+        intoAttr = [ ];
+      };
+    in
+    {
+      imports = [ (envTopology { inherit den; }) ];
+      den.hosts.x86_64-linux.cuda = {
+        intoAttr = [ ];
+        users = {
+          pingu = { };
+          gentoo = { };
+        };
+      };
+      den.schema.guest-kind = {
+        isEntity = true;
+        parent = "host";
+        includes = [ den.policies.host-to-users ];
+      };
+      den.policies.to-guest =
+        { host, ... }:
+        lib.optionals (host.name == "igloo") [
+          (den.lib.policy.resolve.to "guest-kind" {
+            guest-kind = guest;
+            host = guest;
+          })
+        ];
+      den.schema.host.includes = [ den.policies.to-guest ];
+    };
+  etcNames =
+    lib: prefix: cfg:
+    builtins.filter (lib.hasPrefix prefix) (builtins.attrNames cfg.environment.etc);
 in
 {
   flake.tests.deadbugs.late-dispatch-any-depth = {
@@ -96,11 +140,10 @@ in
       }
     );
 
-    # The new path's re-fire risk: a policy with no required entity argument
-    # passes the kind filter at every scope. Registered at the environment, it
-    # fires there and must not fire again at the host or the user. With the
-    # fired set taken from the parent only, it fired again at tux and its
-    # content reached igloo through tux.
+    # A policy with no required entity argument passes the kind filter at every
+    # scope. Registered at the environment, it fires there and must not fire
+    # again at the host or the user. A guard: both the ancestor fired set and
+    # the instance rule keep it from firing again.
     test-environment-no-arg-policy-fires-once = denTest (
       { den, config, ... }:
       let
@@ -141,6 +184,113 @@ in
         ];
         expr = igloo.environment.etc.single-tux.text or "<missing>";
         expected = "igloo";
+      }
+    );
+
+    # Guests are their own hosts: igloo's `{ host, user }` policy does not fire
+    # at its guest's users, whose `host` is the guest. Offering every ancestor
+    # reached them through igloo's registry two levels up.
+    test-host-policy-stays-out-of-guest = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      {
+        imports = [ (guestTopology { inherit den lib config; }) ];
+        den.policies.igloo-pol =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include {
+              name = "ig-${user.name}";
+              nixos.environment.etc."ig-${host.name}-${user.name}".text = "x";
+            })
+          ];
+        # Registered on the host kind; the guest is a guest-kind, so only igloo
+        # registers it.
+        den.schema.host.includes = [ den.policies.igloo-pol ];
+        den.schema.environment.includes = [ den.policies.env-to-hosts ];
+        expr = etcNames lib "ig-" config.flake.nixosConfigurations.igloo.config;
+        expected = [ "ig-igloo-tux" ];
+      }
+    );
+
+    # An instance is the bound arguments' values, not their names: the
+    # environment's policy, empty at igloo (`host = igloo`), is a new instance
+    # at the guest (`host = cuda`) and fires there. A names-only check took it
+    # for igloo's instance.
+    test-rebound-argument-is-a-new-instance = denTest (
+      {
+        den,
+        lib,
+        config,
+        ...
+      }:
+      {
+        imports = [ (guestTopology { inherit den lib config; }) ];
+        den.policies.env-guest =
+          {
+            host ? null,
+            ...
+          }@ctx:
+          lib.optional ((host.name or "") == "cuda" && !(ctx ? user)) (
+            den.lib.policy.include { nixos.environment.etc.ev-cuda.text = "x"; }
+          );
+        den.schema.environment.includes = [
+          den.policies.env-to-hosts
+          den.policies.env-guest
+        ];
+        expr = etcNames lib "ev-" config.flake.nixosConfigurations.igloo.config;
+        expected = [ "ev-cuda" ];
+      }
+    );
+
+    # The fired set covers every ancestor: a policy that fired at the
+    # environment does not fire again at tux, two levels down, even with more
+    # of its optional arguments bound there. With the fired set taken from the
+    # parent only (igloo, where it did not fire), it fired again at tux.
+    test-fired-at-grandparent-not-again = denTest (
+      { den, config, ... }:
+      {
+        imports = [ (envTopology { inherit den; }) ];
+        den.policies.env-opt =
+          {
+            environment ? null,
+            host ? null,
+            user ? null,
+            ...
+          }:
+          [ (den.lib.policy.include { nixos.boot.kernelModules = [ "env-opt" ]; }) ];
+        den.schema.environment.includes = [
+          den.policies.env-to-hosts
+          den.policies.env-opt
+        ];
+        expr = builtins.filter (
+          m: m == "env-opt"
+        ) config.flake.nixosConfigurations.igloo.config.boot.kernelModules;
+        expected = [ ];
+      }
+    );
+
+    # The instance rule: a policy that returned nothing at the environment
+    # (so it is not in the fired set) has the same instance at igloo and does
+    # not fire again there.
+    test-same-instance-does-not-fire-again = denTest (
+      { den, config, ... }:
+      {
+        imports = [ (envTopology { inherit den; }) ];
+        den.policies.env-branch =
+          ctx:
+          lib.optional (ctx ? host) (den.lib.policy.include { nixos.boot.kernelModules = [ "env-branch" ]; });
+        den.schema.environment.includes = [
+          den.policies.env-to-hosts
+          den.policies.env-branch
+        ];
+        expr = builtins.filter (
+          m: m == "env-branch"
+        ) config.flake.nixosConfigurations.igloo.config.boot.kernelModules;
+        expected = [ ];
       }
     );
   };

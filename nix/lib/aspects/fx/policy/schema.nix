@@ -22,6 +22,18 @@ let
     isPolicyExcluded
     ;
 
+  # Identity by id_hash when both records carry one, else by value, minus the
+  # per-scope `hasAspect` decomposeSchemaEffect adds.
+  sameEntity =
+    a: b:
+    if a ? id_hash && b ? id_hash then
+      a.id_hash == b.id_hash
+    else
+      builtins.removeAttrs a [ "hasAspect" ] == builtins.removeAttrs b [ "hasAspect" ];
+
+  # Two scopes bind a value the same way: entities by identity, others by value.
+  sameBinding = a: b: if builtins.isAttrs a && builtins.isAttrs b then sameEntity a b else a == b;
+
   # Determine target entity kind from a schema effect.
   resolveTargetKind =
     entityKind: schemaEffect:
@@ -225,12 +237,20 @@ let
         boundOf =
           ctx: policy:
           builtins.filter (k: ctx ? ${k}) (builtins.attrNames (lib.functionArgs (policy.fn or policy)));
+        # The same instance: the same declared arguments bound, to the same
+        # values. Names alone are not enough where a scope rebinds one (a guest
+        # binds `host` to itself).
         sameInstanceAbove =
           policy:
           builtins.any (
             a:
-            resolveArgsSatisfied (policy.fn or policy) (scopeCtxs.${a} or { })
-            && boundOf (scopeCtxs.${a} or { }) policy == boundOf sib.scopedCtx policy
+            let
+              actx = scopeCtxs.${a} or { };
+              names = boundOf actx policy;
+            in
+            resolveArgsSatisfied (policy.fn or policy) actx
+            && names == boundOf sib.scopedCtx policy
+            && builtins.all (k: sameBinding actx.${k} sib.scopedCtx.${k}) names
           ) ancestorScopes;
         # The sibling's own dispatch already ran these, whatever they returned.
         ranAtSib = ((state.installDispatched or (_: { })) null).${sib.scopeId} or { };
@@ -340,6 +360,21 @@ let
             in
             go { } parentScope;
           ancestorSet = lib.genAttrs ancestorScopes (_: true);
+          # A tree ancestor whose own entity the sibling binds to a different
+          # entity is not offered: a guest binds `host` to itself, so its host's
+          # policies stay with the host, as guests are their own hosts.
+          scopeKinds = (state.scopeEntityKind or (_: { })) null;
+          scopeCtxsL = (state.scopeContexts or (_: { })) null;
+          keptAncestorsFor =
+            sib:
+            builtins.filter (
+              a:
+              let
+                kind = scopeKinds.${a} or null;
+                own = if kind == null then null else (scopeCtxsL.${a} or { }).${kind} or null;
+              in
+              own == null || !(sib.scopedCtx ? ${kind}) || sameEntity sib.scopedCtx.${kind} own
+            ) ancestorScopes;
           # Policies that already fired at the parent or above (under any entity
           # kind) do not fire again below.
           parentFiredPolicies = builtins.foldl' (
@@ -358,7 +393,8 @@ let
           acc: sib:
           fx.bind acc (
             _:
-            emitLateForSibling parentScope ancestorScopes parentFiredPolicies scopedAspectPolicies firedPerScope
+            emitLateForSibling parentScope (keptAncestorsFor sib) parentFiredPolicies scopedAspectPolicies
+              firedPerScope
               { }
               sib
           )
