@@ -135,7 +135,21 @@ let
           ) (builtins.attrValues rootCtx)
         )
       );
-      targetOf = targetScopeOf { inherit scopeParent ownEntityOf outerEntities; };
+      ownRecordOf =
+        sid:
+        let
+          kind = scopeEntityKind.${sid} or null;
+          record = if kind == null then null else (scopeContexts.${sid} or { }).${kind} or null;
+        in
+        if builtins.isAttrs record then { inherit kind record; } else null;
+      targetOf = targetScopeOf {
+        inherit
+          scopeParent
+          ownEntityOf
+          outerEntities
+          ownRecordOf
+          ;
+      };
       # A delivery to an entity this resolve does not build has no target here.
       landsHere = spec: targetOf spec != null;
       liveProvides = lib.mapAttrs (_: builtins.filter landsHere) scopedProvides;
