@@ -2,6 +2,10 @@
 # registrant is the nearest own entity of the registering scope, by identity.
 { lib }:
 let
+  inherit (import ./entity-identity.nix { inherit lib; }) sameEntity entityKey;
+  # Two registrants (or a registrant and a scope's own entity) are one entity.
+  isRegistrant = a: b: a.kind == b.kind && sameEntity a.kind a.record b.record;
+
   # { kind; record; } for the nearest scope on or above `scope` that has an
   # own entity, or null (a flake-level scope).
   registrantAt =
@@ -19,7 +23,7 @@ let
             kind = kinds.${s} or null;
             record = if kind == null then null else (ctxs.${s} or { }).${kind} or null;
           in
-          if record != null && record ? id_hash then
+          if builtins.isAttrs record then
             { inherit kind record; }
           else
             go (seen // { ${s} = true; }) (parents.${s} or null);
@@ -27,34 +31,34 @@ let
     go { } scope;
 
   # A policy registered inside a registrant's delivered include (dispatch.nix
-  # wraps it as `den-provides-to-host=<registrant id_hash>/<policy>`) inherits
+  # wraps it as `den-provides-to-host=<registrant key>/<policy>`) inherits
   # that registrant, an ancestor of where it registers (#694 §11a C4).
   marker = "den-provides-to-host=";
   inheritedAt =
     state: scope:
     let
       chain = ((state.scopedIncludesChain or (_: { })) null).${scope} or [ ];
+      # A registrant token starts with an entity key (`<kind>:<id_hash or
+      # name>/…`); a mutual-provider token names an aspect instead, so it
+      # matches no registrant on the path.
       tokens = map (h: lib.last (lib.splitString marker h)) (builtins.filter (lib.hasInfix marker) chain);
-      # A registrant token starts with an entity id_hash (`<kind>:<hash>/…`);
-      # a mutual-provider token names an aspect instead.
-      hashes = builtins.filter (h: builtins.match "[a-z][a-z0-9-]*:[0-9a-f]+" h != null) (
-        map (t: builtins.head (lib.splitString "/" t)) tokens
-      );
       parents = (state.scopeParent or (_: { })) null;
-      find =
-        hash: seen: s:
+      # The registrants on the path, nearest first.
+      path =
+        seen: s:
         if s == null || seen ? ${s} then
-          null
+          [ ]
         else
           let
             r = registrantAt state s;
           in
-          if r != null && r.record.id_hash == hash then
-            r
-          else
-            find hash (seen // { ${s} = true; }) (parents.${s} or null);
+          lib.optional (r != null) r ++ path (seen // { ${s} = true; }) (parents.${s} or null);
+      onPath = path { } scope;
+      named = t: builtins.filter (r: lib.hasPrefix "${entityKey r.kind r.record}/" t) onPath;
+      # The innermost registrant token wins, as its nearest registrant.
+      matched = builtins.filter (rs: rs != [ ]) (map named tokens);
     in
-    if hashes == [ ] then null else find (lib.last hashes) { } scope;
+    if matched == [ ] then null else builtins.head (lib.last matched);
 
   # Where a registrant's host-class part lands (#694 §11a R3 (a)): the
   # registrant itself when it has a class, else the nearest entity with a class
@@ -73,7 +77,7 @@ let
           let
             r = registrantAt state s;
           in
-          if r != null && r.record.id_hash == registrant.record.id_hash then
+          if r != null && isRegistrant r registrant then
             [ ]
           else
             lib.optional (r != null) r ++ go (seen // { ${s} = true; }) (parents.${s} or null);
@@ -124,12 +128,14 @@ let
       # registrant, C4, registers below itself).
       outerCtx = ((state.scopeContexts or (_: { })) null).${outer} or { };
       outerIsBelowOwn =
-        own != null && ((outerCtx.${own.kind} or { }).id_hash or null) == own.record.id_hash;
+        own != null
+        && builtins.isAttrs (outerCtx.${own.kind} or null)
+        && sameEntity own.kind outerCtx.${own.kind} own.record;
     in
     if outerRegistrant != null && bindsBoth && !outerIsBelowOwn then outerRegistrant else own;
 in
 {
-  inherit registrantAt;
+  inherit registrantAt entityKey;
 
   # The registrant recorded when a policy registers at `scope`.
   registrantOnRegister =

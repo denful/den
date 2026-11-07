@@ -411,6 +411,77 @@ in
       den: { host, user, ... }: [ (den.lib.policy.include (envPolicyBody host user)) ]
     );
 
+    # Two environments without id_hash, told apart by value: each registers
+    # its own `{ host, user }` policy through its aspect, and each policy
+    # reaches only the users of its own environment's host.
+    test-environments-without-id-hash-keep-their-own-rules = denTest (
+      { den, config, ... }:
+      let
+        etc =
+          h:
+          builtins.filter (n: lib.hasPrefix "pp-" n || lib.hasPrefix "dp-" n) (
+            builtins.attrNames config.flake.nixosConfigurations.${h}.config.environment.etc
+          );
+        envPol =
+          prefix:
+          { host, user, ... }:
+          [
+            (den.lib.policy.include {
+              name = "${prefix}-${user.name}";
+              nixos.environment.etc."${prefix}-${host.name}-${user.name}".text = "x";
+            })
+          ];
+      in
+      {
+        den.schema.environment.isEntity = true;
+        den.schema.host.parent = "environment";
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.pingu = { };
+        den.policies.to-env = _: [
+          (den.lib.policy.resolve.to "environment" {
+            environment = {
+              name = "prod";
+              aspect = den.aspects.prod-env;
+            };
+          })
+          (den.lib.policy.resolve.to "environment" {
+            environment = {
+              name = "dev";
+              aspect = den.aspects.dev-env;
+            };
+          })
+        ];
+        den.policies.env-to-hosts =
+          { environment, ... }:
+          let
+            h =
+              if environment.name == "prod" then den.hosts.x86_64-linux.igloo else den.hosts.x86_64-linux.iceberg;
+          in
+          [
+            (den.lib.policy.resolve.to "host" { host = h; })
+            (den.lib.policy.instantiate h)
+          ];
+        den.schema.flake.includes = [ den.policies.to-env ];
+        den.schema.environment.includes = [ den.policies.env-to-hosts ];
+        den.schema.flake-system.excludes = [
+          den.policies.system-to-os-outputs
+          den.policies.system-to-hm-outputs
+        ];
+        den.policies.prod-pol = envPol "pp";
+        den.policies.dev-pol = envPol "dp";
+        den.aspects.prod-env.includes = [ den.policies.prod-pol ];
+        den.aspects.dev-env.includes = [ den.policies.dev-pol ];
+        expr = {
+          igloo = etc "igloo";
+          iceberg = etc "iceberg";
+        };
+        expected = {
+          igloo = [ "pp-igloo-tux" ];
+          iceberg = [ "dp-iceberg-pingu" ];
+        };
+      }
+    );
+
     test-environment-policy-declaring-environment-reaches-user = envPolicyCell (
       den:
       {

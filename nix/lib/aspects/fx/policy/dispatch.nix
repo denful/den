@@ -41,6 +41,7 @@ let
   # receiver is aimed at the registrant. A user the registrant accepts through
   # user-aspects is already unbounded, so the route stands down (R5).
   provenanceMarker = "den-provides-to-host=";
+  inherit (import ./entity-identity.nix { inherit lib; }) sameEntity entityKey;
   applyToRegistrant =
     policyName: registrant: ctx: effects:
     let
@@ -50,17 +51,19 @@ let
       # Where the host-class part lands: the registrant, or for a class-less
       # registrant the nearest classed entity below it (R3 (a), registrant.nix).
       target = if (registrant.classTarget or null) == null then null else registrant.classTarget.record;
+      isEntity =
+        kind: record: other:
+        firingKind == kind && builtins.isAttrs record && sameEntity kind record other;
       # Firing at the target itself, the content is already where it belongs.
-      atTarget = target != null && (firing.id_hash or null) == target.id_hash;
-      # Only a firing entity with an identity can be told apart from the
-      # registrant; one without (a hand-built record) is treated as the
-      # registrant's own scope.
+      atTarget = target != null && isEntity registrant.classTarget.kind firing target;
+      # Below the registrant: the firing entity is not the registrant, and the
+      # scope binds the registrant's kind to it.
       isBelow =
         firing != null
-        && (firing.id_hash or null) != null
-        && firing.id_hash != reg.id_hash
-        && ((ctx.${registrant.kind} or { }).id_hash or null) == reg.id_hash;
-      token = "${reg.id_hash}/${policyName}";
+        && !(isEntity registrant.kind firing reg)
+        && builtins.isAttrs (ctx.${registrant.kind} or null)
+        && sameEntity registrant.kind ctx.${registrant.kind} reg;
+      token = "${entityKey registrant.kind reg}/${policyName}";
       registrantClasses = lib.optionals (target != null && !atTarget) [
         target.class
         "os"

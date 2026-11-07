@@ -83,6 +83,9 @@ let
       builtins.seq (mixedIdHash kind b [ a ]) false
     else
       sameByValue kind a b;
+  # A registrant's key in a provenance token: its id_hash, or `<kind>:<name>`
+  # without one.
+  entityKey = kind: r: r.id_hash or "${kind}:${r.name or "<unnamed>"}";
 in
 {
   inherit
@@ -91,5 +94,6 @@ in
     valueDiff
     sameByValue
     sameEntity
+    entityKey
     ;
 }
