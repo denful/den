@@ -39,8 +39,9 @@ den.default.includes = [ den.batteries.hostname ];
 ### Mutual providers (hosts and users configuring each other)
 
 Hosts and users can contribute configuration **to each other** through the
-aspect's `provides` namespace (aliased `_`). This routing is built into the
-pipeline — no battery is required.
+aspect's `provides` namespace (aliased `_`). Host-to-user providers are built
+in. User-to-host providers go through `den.batteries.mutual-provider`, which
+every host includes by default, so neither direction needs any setup.
 
 ```nix
 # host contributes to ALL its users
@@ -70,9 +71,61 @@ A named target (`provides.igloo`, `provides.alice`) only fires when the matching
 host or user is in scope, so the value can be a plain attrset. See
 [Host&lt;-&gt;User Mutual Providers](/guides/mutual/) for the full mechanism.
 
-<Aside>
-`den.batteries.mutual-provider` is an inert compatibility shim — cross-entity
-routing is now built in, so including it has no effect.
+### `den.batteries.mutual-provider`
+
+Delivers a user's `provides.to-hosts` and `provides.<host>` into the host's
+own configuration. Only the host's class (`nixos` or `darwin`) goes to the
+host; other classes, like `homeManager`, stay with the user.
+
+It is in `den.schema.host.includes` by default. To opt out, exclude it:
+
+```nix
+# every host
+den.schema.host.excludes = [ den.batteries.mutual-provider ];
+
+# one host
+den.hosts.x86_64-linux.igloo.excludes = [ den.batteries.mutual-provider ];
+```
+
+Host-to-user providers (`provides.to-users`, `provides.<user>`) do not depend
+on it. See the [reference](/reference/batteries/#denbatteriesmutual-provider).
+
+<Aside type="caution">
+In this release a user's content still reaches its hosts by nesting, with or
+without this battery, so excluding it doesn't stop `provides.to-hosts` content
+from reaching a host yet. The next release keeps a user's content with the
+user ([#694](https://github.com/denful/den/issues/694)); from then on, this
+battery is how `provides.to-hosts` reaches a host.
+</Aside>
+
+### `den.batteries.user-aspects`
+
+Lets a host accept everything its users write to the host's class (`nixos`,
+`darwin`, `os`), not only what they send through `provides`. Include it on the
+host side:
+
+```nix
+# igloo accepts all of its users
+den.aspects.igloo.includes = [ den.batteries.user-aspects ];
+
+# igloo accepts tux only
+den.aspects.igloo.includes = [
+  (den.batteries.user-aspects { users = [ "tux" ]; })
+];
+
+# every host accepts all of its users
+den.schema.host.includes = [ den.batteries.user-aspects ];
+```
+
+Included on a user, it does nothing: a user cannot grant itself access to a
+host.
+
+<Aside type="caution">
+In this release a user's `nixos`, `darwin` and `os` content still reaches its
+hosts without this battery. The next release keeps that content with the
+user unless the host includes `user-aspects`
+([#694](https://github.com/denful/den/issues/694)). See the
+[reference](/reference/batteries/#denbatteriesuser-aspects).
 </Aside>
 
 ### `den.batteries.primary-user`
