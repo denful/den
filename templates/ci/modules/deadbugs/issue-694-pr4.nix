@@ -42,6 +42,130 @@ let
       ctx = fxLib.aspect.ctxFromHandlers (hostRoot.__scopeHandlers or { });
       self = den.lib.aspects.normalizeRoot hostRoot;
     }).state;
+  # A user policy forwarding a user class into the host, naming the host as
+  # receiver (the shape of makeHomeEnv's user arm).
+  forwardToIgloo = forwardToIglooWith (f: f);
+  forwardToIglooWith = shape: den: {
+    den.hosts.x86_64-linux.igloo.users.tux = { };
+    den.aspects.tux.policies.fw =
+      { host, user, ... }:
+      [
+        (den.lib.policy.include (
+          shape (
+            den.batteries.forward {
+              each = [ true ];
+              fromClass = _: "smug";
+              intoClass = _: host.class;
+              intoPath = _: [ ];
+              fromAspect = _: den.lib.resolveEntity "user" { inherit host user; };
+              receiver = host;
+            }
+          )
+        ))
+      ];
+    den.aspects.tux.includes = [ den.aspects.tux.policies.fw ];
+    den.aspects.tux.smug.environment.etc.fw.text = "x";
+  };
+  forgedToHosts =
+    { den, ... }:
+    {
+      den.hosts.x86_64-linux.igloo.users.tux = { };
+      den.schema.host.includes = [ den.batteries.mutual-provider ];
+      den.aspects.tux.provides.to-hosts.nixos.environment.etc.real.text = "x";
+      # Named as mutual-provider's per-user cross policy registers.
+      den.policies."tux/to-hosts" =
+        { host, user, ... }:
+        [
+          (den.lib.policy.provide {
+            class = "nixos";
+            receiver = host;
+            module.environment.etc.forged.text = "x";
+          })
+        ];
+      den.aspects.tux.includes = [ den.policies."tux/to-hosts" ];
+    };
+  # A user policy routing the user's own nixos bucket to its host.
+  authorRoute =
+    extra:
+    { den, ... }:
+    {
+      den.hosts.x86_64-linux.igloo.users.tux = { };
+      den.aspects.tux.nixos.environment.etc.own.text = "x";
+      den.aspects.tux.policies.rt =
+        { host, user, ... }:
+        [
+          (den.lib.policy.route (
+            {
+              fromClass = "nixos";
+              intoClass = "nixos";
+              receiver = host;
+            }
+            // extra
+          ))
+        ];
+      den.aspects.tux.includes = [ den.aspects.tux.policies.rt ];
+    };
+  # An author's own home environment, built with den's factory.
+  customHomeEnv =
+    den:
+    den.lib.home-env.makeHomeEnv {
+      className = "smug";
+      optionPath = "smug";
+      getModule =
+        { ... }:
+        { lib, ... }:
+        {
+          options.smug.users = lib.mkOption {
+            type = lib.types.attrsOf (
+              lib.types.submoduleWith {
+                modules = [ { config._module.freeformType = lib.types.lazyAttrsOf lib.types.unspecified; } ];
+              }
+            );
+            default = { };
+          };
+        };
+      forwardPathFn =
+        { user, ... }:
+        [
+          "smug"
+          "users"
+          user.userName
+        ];
+    };
+  customHomeEnvConfig = env: {
+    den.schema.host.imports = [ env.hostConf ];
+    den.schema.host.includes = [ env.battery ];
+    den.schema.user.includes = [ env.userDetect ];
+    den.classes.smug.description = "an author's home environment";
+    den.hosts.x86_64-linux.igloo.users.tux.classes = [ "smug" ];
+    den.aspects.tux.smug.FROM = "tux";
+  };
+  sameNamedOn =
+    on:
+    { den, ... }:
+    {
+      den.hosts.x86_64-linux.igloo.users.tux = { };
+      den.schema.host.includes = [ den.batteries.mutual-provider ];
+      den.aspects.tux.provides.to-hosts.nixos.environment.etc.real.text = "x";
+      den.policies."tux/to-hosts" =
+        { host, user, ... }:
+        [
+          (den.lib.policy.provide {
+            class = "nixos";
+            receiver = host;
+            module.environment.etc.forged.text = "x";
+          })
+        ];
+      imports = [ { den.aspects.${on}.includes = [ den.policies."tux/to-hosts" ]; } ];
+    };
+  userAspectsOnIgloo =
+    { den, ... }:
+    {
+      den.hosts.x86_64-linux.igloo.users.tux = { };
+      den.aspects.igloo.includes = [ den.batteries.user-aspects ];
+      den.aspects.tux.nixos.environment.etc.ua.text = "x";
+      den.aspects.tux.user.description = "tux";
+    };
   hpOf = igloo: igloo.home-manager.users.tux.home.sessionVariables.HP or "<missing>";
   # A user-registered author delivery to the host.
   toIgloo = den: {
@@ -408,28 +532,207 @@ in
         };
       }
     );
-    # A forged policy named like the provides mechanism doesn't inherit its
-    # origin: excluding mutual-provider leaves it alone.
-    test-forged-to-hosts-name-keeps-own-origin = denTest (
+    # A policy named like the provides mechanism (`tux/to-hosts`) is its own
+    # record, beside the real `provides.to-hosts` that mutual-provider
+    # delivers: each is matched by its own origin, never by the shared name.
+    # A same-named author policy and den's provides policy both land, in
+    # either registration order: included on the user (registered beside it)
+    # and on the host (merged with it by late dispatch).
+    test-same-named-policy-on-user-both-land = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (sameNamedOn "tux") ];
+        expr = {
+          forged = igloo.environment.etc ? forged;
+          real = igloo.environment.etc ? real;
+        };
+        expected = {
+          forged = true;
+          real = true;
+        };
+      }
+    );
+    test-same-named-policy-on-host-both-land = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (sameNamedOn "igloo") ];
+        expr = {
+          forged = igloo.environment.etc ? forged;
+          real = igloo.environment.etc ? real;
+        };
+        expected = {
+          forged = true;
+          real = true;
+        };
+      }
+    );
+    # Excluding a provided aspect on the host stops its delivery, and leaves
+    # the user's other provides.
+    test-host-exclude-of-provided-aspect-stops-delivery = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
-        den.aspects.tux.policies.to-hosts =
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.real.text = "x";
+        den.aspects.tux.provides.igloo.nixos.environment.etc.named.text = "x";
+        den.aspects.igloo.excludes = [ den.aspects.tux.provides.to-hosts ];
+        expr = {
+          real = igloo.environment.etc ? real;
+          named = igloo.environment.etc ? named;
+        };
+        expected = {
+          real = false;
+          named = true;
+        };
+      }
+    );
+    # A policy's `exclude` effect naming a policy record removes it (the
+    # shape a downstream battery uses to drop user-to-host on one host
+    # class); it is matched by the policy's identity.
+    test-policy-exclude-effect-removes-policy = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.aspects.tux.user.description = "tux";
+        den.policies.drop-user-to-host = {
+          __isPolicy = true;
+          name = "drop-user-to-host";
+          fn =
+            { host, ... }:
+            lib.optional (host.name == "igloo") (den.lib.policy.exclude den.policies.user-to-host);
+        };
+        den.default.includes = [ den.policies.drop-user-to-host ];
+        expr = igloo.users.users.tux.description or "<absent>";
+        expected = "<absent>";
+      }
+    );
+    # O5 for den's provides policies: a provider reached twice delivers once,
+    # and a parametric provider once per user.
+    test-shared-provider-reached-twice-delivers-once = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.shared.provides.to-hosts.nixos.boot.kernelModules = [ "sh" ];
+        den.aspects.tux.includes = [ den.aspects.shared ];
+        den.schema.user.includes = [ den.aspects.shared ];
+        expr = builtins.filter (m: m == "sh") igloo.boot.kernelModules;
+        expected = [ "sh" ];
+      }
+    );
+    test-parametric-provider-delivers-once-per-user = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users = {
+          tux = { };
+          pingu = { };
+        };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.shared.provides.to-hosts =
+          { host, user, ... }:
+          {
+            nixos.boot.kernelModules = [ "p-${user.name}" ];
+          };
+        den.schema.user.includes = [ den.aspects.shared ];
+        expr = lib.sort (a: b: a < b) (builtins.filter (lib.hasPrefix "p-") igloo.boot.kernelModules);
+        expected = [
+          "p-pingu"
+          "p-tux"
+        ];
+      }
+    );
+    # Control: both land.
+    test-forged-to-hosts-both-land = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ forgedToHosts ];
+        expr = {
+          forged = igloo.environment.etc ? forged;
+          real = igloo.environment.etc ? real;
+        };
+        expected = {
+          forged = true;
+          real = true;
+        };
+      }
+    );
+    test-forged-to-hosts-name-keeps-own-origin = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ forgedToHosts ];
+        den.aspects.igloo.admits.deny = [ den.policies."tux/to-hosts" ];
+        expr = {
+          forged = igloo.environment.etc ? forged;
+          real = igloo.environment.etc ? real;
+        };
+        expected = {
+          forged = false;
+          real = true;
+        };
+      }
+    );
+    test-forged-to-hosts-battery-deny-withholds-only-real = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ forgedToHosts ];
+        den.aspects.igloo.admits.deny = [ den.batteries.mutual-provider ];
+        expr = {
+          forged = igloo.environment.etc ? forged;
+          real = igloo.environment.etc ? real;
+        };
+        expected = {
+          forged = true;
+          real = false;
+        };
+      }
+    );
+
+    # Den's own delivery fields are read only from den's deliveries: an
+    # author route or provide that sets them is an ordinary delivery.
+    test-author-route-stand-down-ignored = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (authorRoute { __standDown = true; }) ];
+        expr = igloo.environment.etc ? own;
+        expected = true;
+      }
+    );
+    test-author-provide-stand-down-ignored = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.sd =
           { host, user, ... }:
           [
             (den.lib.policy.provide {
               class = "nixos";
               receiver = host;
-              module.environment.etc.forged.text = "x";
+              module.environment.etc.sd.text = "x";
+              __standDown = true;
             })
           ];
-        den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
-        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
-        expr = igloo.environment.etc ? forged;
+        den.aspects.tux.includes = [ den.aspects.tux.policies.sd ];
+        expr = igloo.environment.etc ? sd;
         expected = true;
       }
     );
-
+    # A provenance token on an author route is ignored: the route moves the
+    # whole bucket, not only what mutual-provider tagged.
+    test-author-route-provenance-token-ignored = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (authorRoute { __fromProvenance = "tux/to-hosts"; }) ];
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.tagged.text = "x";
+        expr = {
+          own = igloo.environment.etc ? own;
+          tagged = igloo.environment.etc ? tagged;
+        };
+        expected = {
+          own = true;
+          tagged = true;
+        };
+      }
+    );
     # 3. admits
     test-admits-deny-withholds-channel = denTest (
       { den, igloo, ... }:
@@ -517,6 +820,88 @@ in
       }
     );
 
+    # Den's home environments are its channels, by record: home-manager lands
+    # on a default-deny host.
+    test-admits-default-deny-keeps-home-manager = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ hmUser ];
+        den.aspects.igloo.admits.default = "deny";
+        den.aspects.tux.homeManager.home.sessionVariables.HM = "x";
+        expr = igloo.home-manager.users.tux.home.sessionVariables.HM or "<missing>";
+        expected = "x";
+      }
+    );
+    # The channel list can't be extended by config: a definition at den's key
+    # has no effect.
+    test-admits-channel-list-not-writable = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (toIgloo den) ];
+        den.internal.channelPolicies.maid = [ den.aspects.tux.policies.to-igloo ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? ud;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    test-admits-channel-list-not-writable-registry-policy = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.mine =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.mine.text = "x";
+            })
+          ];
+        den.aspects.tux.includes = [ den.policies.mine ];
+        den.internal.channelPolicies.maid = [ den.policies.mine ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? mine;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    # An environment an author builds with den's makeHomeEnv is not one of
+    # den's channels: refused on a default-deny host unless allowed.
+    test-admits-default-deny-refuses-custom-home-env = denTest (
+      { den, igloo, ... }:
+      let
+        env = customHomeEnv den;
+      in
+      {
+        imports = [ (customHomeEnvConfig env) ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.smug.users.tux.FROM or "<missing>";
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    test-admits-allows-custom-home-env = denTest (
+      { den, igloo, ... }:
+      let
+        env = customHomeEnv den;
+      in
+      {
+        imports = [ (customHomeEnvConfig env) ];
+        den.aspects.igloo.admits = {
+          default = "deny";
+          allow = env.battery.includes ++ env.userDetect.includes;
+        };
+        expr = igloo.smug.users.tux.FROM or "<missing>";
+        expected = "tux";
+      }
+    );
     # The receiver's own kind decides: a user-kind deny withholds a delivery
     # to a user, and a host-kind deny doesn't apply to it.
     test-admits-receiver-kind-layer = denTest (
@@ -595,6 +980,38 @@ in
     );
     # The registrant's part is told apart by construction, not by a field on
     # the delivery: an author provide carrying `__registrantPart` is refused.
+    # A same-named author policy on the host displaces den's provides policy
+    # to a qualified registry key; the denial still names it as written.
+    test-admits-denial-names-displaced-policy-as-written = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.real.text = "x";
+        den.aspects.igloo.includes = [
+          (den.lib.policy.mkPolicy "tux/to-hosts" ({ host, user, ... }: [ ]))
+        ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? real;
+        expectedError = {
+          type = "ThrownError";
+          msg = "den: delivery of `tux/to-hosts` from tux denied on igloo: `admits.default = \"deny\"`; to admit it, add `den.batteries.mutual-provider` to `admits.allow`";
+        };
+      }
+    );
+    # An author's delivery names its policy as the entry to allow.
+    test-admits-denial-names-source-and-policy = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (toIgloo den) ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? ud;
+        expectedError = {
+          type = "ThrownError";
+          msg = "delivery of `[^`]*to-igloo` from tux denied on igloo.*add the policy `[^`]*to-igloo`";
+        };
+      }
+    );
     test-admits-default-deny-refuses-forged-registrant-part = denTest (
       { den, igloo, ... }:
       {
@@ -638,6 +1055,164 @@ in
         expected = false;
       }
     );
+    # mutual-provider's delivery is matched by the battery (§11a R7): allowed
+    # it lands on a default-deny host, denied it is withheld, and neither
+    # allowed nor default it is refused.
+    test-admits-allows-mutual-provider = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.mp.text = "x";
+        den.aspects.igloo.admits = {
+          default = "deny";
+          allow = [ den.batteries.mutual-provider ];
+        };
+        expr = igloo.environment.etc ? mp;
+        expected = true;
+      }
+    );
+    test-admits-denies-mutual-provider = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.mp.text = "x";
+        den.aspects.tux.user.description = "tux";
+        den.aspects.igloo.admits.deny = [ den.batteries.mutual-provider ];
+        expr = {
+          mp = igloo.environment.etc ? mp;
+          # Positive control: the user's own delivery still lands.
+          description = igloo.users.users.tux.description or "<absent>";
+        };
+        expected = {
+          mp = false;
+          description = "tux";
+        };
+      }
+    );
+    test-admits-default-deny-refuses-unallowed-mutual-provider = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.mp.text = "x";
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? mp;
+        # The message names the source and the battery to allow.
+        expectedError = {
+          type = "ThrownError";
+          msg = "from tux denied on igloo.*add `den.batteries.mutual-provider` to `admits.allow`";
+        };
+      }
+    );
+    # The transition default's delivery is the battery's too. user-aspects'
+    # default is excluded: its lift isn't gated by admits in this release.
+    test-admits-denies-mutual-provider-default = denTest (
+      { den, igloo, ... }:
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.mp.text = "x";
+        den.aspects.igloo.excludes = [ den.batteries.user-aspects ];
+        den.aspects.igloo.admits.deny = [ den.batteries.mutual-provider ];
+        expr = igloo.environment.etc ? mp;
+        expected = false;
+      }
+    );
+    # Control: without the deny, the default delivers it.
+    test-admits-mutual-provider-default-delivers = denTest (
+      { den, igloo, ... }:
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.provides.to-hosts.nixos.environment.etc.mp.text = "x";
+        den.aspects.igloo.excludes = [ den.batteries.user-aspects ];
+        expr = igloo.environment.etc ? mp;
+        expected = true;
+      }
+    );
+    # A forward naming a receiver is a delivery to it (§11a R7).
+    test-admits-default-deny-refuses-forward-to-receiver = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (forwardToIgloo den) ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? fw;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    # The forward item itself, not wrapped in `includes`.
+    test-admits-default-deny-refuses-forward-item-to-receiver = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (forwardToIglooWith (f: builtins.head f.includes) den) ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? fw;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    # Nested deeper in the policy include.
+    test-admits-default-deny-refuses-nested-forward-to-receiver = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [
+          (forwardToIglooWith (f: {
+            name = "wrap";
+            includes = [ f ];
+          }) den)
+        ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? fw;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    # The walk for a forward visits a named aspect once: a policy including an
+    # aspect on an include cycle still evaluates.
+    test-admits-forward-walk-survives-include-cycle = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.cya.includes = [ den.aspects.cyb ];
+        den.aspects.cyb.includes = [ den.aspects.cya ];
+        den.aspects.cyb.nixos.environment.etc.cy.text = "x";
+        den.policies.pc = { host, ... }: [ (den.lib.policy.include den.aspects.cya) ];
+        den.aspects.igloo.includes = [ den.policies.pc ];
+        expr = igloo.environment.etc ? cy;
+        expected = true;
+      }
+    );
+    test-admits-deny-withholds-forward-to-receiver = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (forwardToIgloo den) ];
+        den.aspects.igloo.admits.deny = [ den.aspects.tux.policies.fw ];
+        expr = igloo.environment.etc ? fw;
+        expected = false;
+      }
+    );
+    # Control: allowed, the forward lands.
+    test-admits-allows-forward-to-receiver = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (forwardToIgloo den) ];
+        den.aspects.igloo.admits = {
+          default = "deny";
+          allow = [ den.aspects.tux.policies.fw ];
+        };
+        expr = igloo.environment.etc ? fw;
+        expected = true;
+      }
+    );
     # Origins match by value: of two policies named `deliver`, only the one
     # allowed lands; the other is refused.
     test-admits-same-name-matched-by-value = denTest (
@@ -673,6 +1248,113 @@ in
         expectedError = {
           type = "ThrownError";
           msg = "denied on igloo";
+        };
+      }
+    );
+
+    # user-aspects' lift is not an effect admits checks, so the battery reads
+    # the host's admits itself (§11a R7): on a default-deny host it must be
+    # allowed by record; denied, the host accepts nothing and the content
+    # stays with its users.
+    test-admits-default-deny-refuses-unallowed-user-aspects = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ userAspectsOnIgloo ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? ua;
+        expectedError = {
+          type = "ThrownError";
+          msg = "igloo includes den.batteries.user-aspects but admits.default = \"deny\" and it is not in admits.allow";
+        };
+      }
+    );
+    test-admits-allows-user-aspects = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ userAspectsOnIgloo ];
+        den.aspects.igloo.admits = {
+          default = "deny";
+          allow = [ den.batteries.user-aspects ];
+        };
+        expr = igloo.environment.etc ? ua;
+        expected = true;
+      }
+    );
+    test-admits-denies-user-aspects = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ userAspectsOnIgloo ];
+        den.aspects.igloo.admits.deny = [ den.batteries.user-aspects ];
+        expr = {
+          ua = igloo.environment.etc ? ua;
+          # Positive control: den's channels still deliver.
+          description = igloo.users.users.tux.description or "<absent>";
+        };
+        expected = {
+          ua = false;
+          description = "tux";
+        };
+      }
+    );
+    # The schema layer gates it too.
+    test-admits-schema-default-deny-refuses-unallowed-user-aspects = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ userAspectsOnIgloo ];
+        den.schema.host.admits.default = "deny";
+        expr = igloo.environment.etc ? ua;
+        expectedError = {
+          type = "ThrownError";
+          msg = "and it is not in admits.allow";
+        };
+      }
+    );
+    # The transition default is the battery: on a default-deny host it needs
+    # the same allow, and with the defaults off nothing is required.
+    test-admits-default-deny-refuses-user-aspects-default = denTest (
+      { den, igloo, ... }:
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.nixos.environment.etc.ua.text = "x";
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? ua;
+        expectedError = {
+          type = "ThrownError";
+          msg = "igloo receives users' content through the transition default \\(den.batteries.user-aspects\\) but admits.default = \"deny\"; add den.batteries.user-aspects to admits.allow, or set den.migrations.user-host-content.acknowledged = true";
+        };
+      }
+    );
+    test-admits-allows-user-aspects-default = denTest (
+      { den, igloo, ... }:
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.nixos.environment.etc.ua.text = "x";
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        den.aspects.igloo.admits = {
+          default = "deny";
+          allow = [ den.batteries.user-aspects ];
+        };
+        expr = igloo.environment.etc ? ua;
+        expected = true;
+      }
+    );
+    test-admits-default-deny-without-defaults-needs-nothing = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.nixos.environment.etc.ua.text = "x";
+        den.aspects.tux.user.description = "tux";
+        den.aspects.igloo.admits.default = "deny";
+        expr = {
+          ua = igloo.environment.etc ? ua;
+          description = igloo.users.users.tux.description;
+        };
+        expected = {
+          ua = false;
+          description = "tux";
         };
       }
     );

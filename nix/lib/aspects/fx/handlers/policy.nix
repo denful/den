@@ -32,6 +32,12 @@ let
           # The record it registered from, matched by value by `admits` (#694).
           ref = param.ref or null;
           denChannel = param.denChannel or false;
+          # Den's records it delivers for (a battery), matched by value too.
+          originPolicies = param.originPolicies or [ ];
+          # Defined by den where it sets den's own delivery fields.
+          denMade = param.denMade or false;
+          # The name it was written with, for messages.
+          displayName = param.displayName or param.ownerIdentity;
         }
         // (if param ? fnSlot then { inherit (param) fnSlot; } else { });
         # The registry is the one scoped field that merges rather than appends,

@@ -20,13 +20,42 @@ let
   # `all` and no separator can join two lists into one name.
   argsName = users: if users == null then "all" else den.lib.argsName.setOf users;
 
+  # The lift is not an effect `admits` sees, so the battery reads the host's
+  # admits itself (#694 §11a R7): denied, the host accepts nothing; under
+  # `default = "deny"` it must be allowed, by the battery's record. The layers
+  # are as for a delivery: the host's kind's schema, then its own aspect.
+  gate =
+    byDefault: host: publish:
+    let
+      kind = builtins.head (lib.splitString ":" host.id_hash);
+      layers = [
+        ((den.schema.${kind} or { }).admits or { })
+        ((host.aspect or { }).admits or { })
+      ];
+      has = l: builtins.any (layer: builtins.elem den.batteries.user-aspects (layer.${l} or [ ])) layers;
+      defaultDeny = builtins.any (layer: (layer.default or null) == "deny") layers;
+    in
+    if has "deny" then
+      [ ]
+    else if defaultDeny && !(has "allow") then
+      throw (
+        if byDefault then
+          "den: ${host.name} receives users' content through the transition default (den.batteries.user-aspects) but admits.default = \"deny\"; add den.batteries.user-aspects to admits.allow, or set den.migrations.user-host-content.acknowledged = true"
+        else
+          "den: ${host.name} includes den.batteries.user-aspects but admits.default = \"deny\" and it is not in admits.allow; add it to admits.allow"
+      )
+    else
+      publish;
+
   acceptFor = users: {
     __isPolicy = true;
     name = "user-aspects-accept(${argsName users})";
     fn =
       { host, ... }@ctx:
-      lib.optional (!(ctx ? user) && host ? id_hash) (
-        den.lib.policy.resolve { ${acceptance.userAspectsKey host users} = { inherit users; }; }
+      lib.optionals (!(ctx ? user) && host ? id_hash) (
+        gate false host [
+          (den.lib.policy.resolve { ${acceptance.userAspectsKey host users} = { inherit users; }; })
+        ]
       );
   };
 
@@ -52,8 +81,8 @@ let
     fn =
       { host, ... }@ctx:
       # Not at a standalone home, which binds a host it doesn't belong to.
-      lib.optional (!(ctx ? user) && !(ctx ? home) && host ? id_hash) (
-        den.lib.policy.resolve { ${acceptance.userAspectsDefaultKey host} = true; }
+      lib.optionals (!(ctx ? user) && !(ctx ? home) && host ? id_hash) (
+        gate true host [ (den.lib.policy.resolve { ${acceptance.userAspectsDefaultKey host} = true; }) ]
       );
   };
 in

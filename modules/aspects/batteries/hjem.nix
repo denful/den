@@ -1,6 +1,7 @@
 {
   den,
   inputs,
+  lib,
   ...
 }:
 let
@@ -24,12 +25,26 @@ let
       ];
   };
 
+  # This environment's policy records, den's channels by value (#694 §12).
+  # Read by isDenChannel at this one key; `apply` ignores any definition, so
+  # a config can't add a channel.
+  channelPolicies = result.battery.includes ++ result.userDetect.includes;
 in
 {
-  den.schema.host.imports = [ result.hostConf ];
-  den.schema.host.includes = [ result.battery ];
+  options.den.internal.channelPolicies.hjem = lib.mkOption {
+    internal = true;
+    visible = false;
+    type = lib.types.listOf lib.types.raw;
+    default = channelPolicies;
+    apply = _: channelPolicies;
+  };
 
-  den.schema.user.includes = [ result.userDetect ];
+  config = {
+    den.schema.host.imports = [ result.hostConf ];
+    den.schema.host.includes = [ result.battery ];
 
-  den.classes.hjem.description = "Hjem user environment";
+    den.schema.user.includes = [ result.userDetect ];
+
+    den.classes.hjem.description = "Hjem user environment";
+  };
 }

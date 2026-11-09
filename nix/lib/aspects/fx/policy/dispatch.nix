@@ -34,6 +34,30 @@ let
         eff
     ) rawEffects;
 
+  # Fields only den's own deliveries carry (#694): a provenance token, a
+  # stand-down, the transition default's mark. Dropped from the effects of a
+  # policy den didn't make, so an author can't set them.
+  # `__standDownAspect` and `__transitionDefault` act only beside the other
+  # two; they're dropped for completeness.
+  denOnlyFields = [
+    "__fromProvenance"
+    "__standDown"
+    "__standDownAspect"
+    "__transitionDefault"
+  ];
+  scrub =
+    entry: e:
+    if
+      (entry.value.denMade or false)
+      || !(builtins.elem e.__policyEffect [
+        "provide"
+        "route"
+      ])
+    then
+      e
+    else
+      e // { value = builtins.removeAttrs e.value denOnlyFields; };
+
   # An instance firing below its registrant applies to the registrant too
   # (#694 §11a R3): its bare includes land in full where it fired, and their
   # host-class part reaches the registrant through a provenance route (the
@@ -168,7 +192,7 @@ let
   originMatches =
     entry: ref:
     if builtins.isAttrs ref && ref.__isPolicy or false then
-      (entry.value.ref or null) == ref
+      (entry.value.ref or null) == ref || builtins.elem ref (entry.value.originPolicies or [ ])
     else
       let
         id = den.lib.aspects.fx.identity.key ref;
@@ -185,26 +209,75 @@ let
           ]
         )
       ) (entry.value.origin or [ ]);
+  # A forward naming a receiver anywhere in a policy include's static
+  # tree: the include itself, or nested in `includes` at any depth
+  # (`den.batteries.forward` returns one level). A forward behind a function
+  # isn't built until it is walked, so it isn't seen here.
+  forwardReceiver =
+    let
+      # Named aspects are visited once: an include cycle (cya <-> cyb) is a
+      # finite tree to the pipeline, and must be one here too.
+      go =
+        seen: v:
+        if !(builtins.isAttrs v) then
+          null
+        else if (v.meta.__forward.receiver or null) != null then
+          v.meta.__forward.receiver
+        else if builtins.isList (v.includes or null) then
+          let
+            id = if v ? name then den.lib.aspects.fx.identity.key v else null;
+          in
+          if id != null && seen ? ${id} then
+            null
+          else
+            lib.findFirst (r: r != null) null (
+              map (go (seen // lib.optionalAttrs (id != null) { ${id} = true; })) v.includes
+            )
+        else
+          null;
+    in
+    go { };
+
   admitted =
     ctx: entry: e:
     let
-      receiver = e.value.receiver or null;
+      isInclude = e.__policyEffect == "include";
+      receiver = if isInclude then forwardReceiver e.value else e.value.receiver or null;
       a = admitsOf ctx receiver;
       denied = builtins.any (originMatches entry) a.deny;
       allowed = (entry.value.denChannel or false) || builtins.any (originMatches entry) a.allow;
     in
     if
       !(builtins.isAttrs receiver)
-      || !(builtins.elem e.__policyEffect [
-        "provide"
-        "route"
-      ])
+      || !(
+        isInclude
+        || builtins.elem e.__policyEffect [
+          "provide"
+          "route"
+        ]
+      )
     then
       true
     else if denied then
       false
     else if a.default == "deny" && !allowed then
-      throw "den: delivery of `${entry.name}` denied on ${receiver.name or "<unnamed>"}: `admits.default = \"deny\"`, not in `admits.allow`"
+      let
+        kind = ctx.__entityKind or null;
+        source = if kind == null then null else (ctx.${kind} or { }).name or null;
+        # What to add: the battery for its own delivery, else the policy or an
+        # aspect it is included through.
+        # The name the policy was written with, not its registry key, which
+        # a same-named policy displaces to a chain-qualified one.
+        name = entry.value.displayName or entry.name;
+        allowHint =
+          if (entry.value.originPolicies or [ ]) != [ ] then
+            "`den.batteries.${(builtins.head entry.value.originPolicies).name}`"
+          else
+            "the policy `${name}`, or an aspect it is included through";
+      in
+      throw "den: delivery of `${name}`${
+        lib.optionalString (source != null) " from ${source}"
+      } denied on ${receiver.name or "<unnamed>"}: `admits.default = \"deny\"`; to admit it, add ${allowHint} to `admits.allow`"
     else
       true;
 
@@ -297,8 +370,14 @@ let
       let
         result = entry.value.fn ctx;
         rawEffects = if builtins.isList result then result else [ result ];
+        placed = map (e: denProvenance entry (placeAt ctx (scrub entry e))) (
+          validateEffects entry.name rawEffects
+        );
+        isInclude = e: e.__policyEffect == "include";
+        # Includes are checked as written (a forward with a receiver),
+        # provides and routes once aimed at the registrant.
         applied = applyToRegistrant entry.name (entry.value.registrant or null) ctx (
-          map (e: denProvenance entry (placeAt ctx e)) (validateEffects entry.name rawEffects)
+          builtins.filter (e: !(isInclude e) || admitted ctx entry e) placed
         );
       in
       {
@@ -306,7 +385,8 @@ let
         # R3's host-class part of a registrant's own bare include is its own
         # content, not a delivery (§11a R7), so only the author's effects are
         # checked against admits.
-        effects = builtins.filter (admitted ctx entry) applied.effects ++ applied.registrantPart;
+        effects =
+          builtins.filter (e: isInclude e || admitted ctx entry e) applied.effects ++ applied.registrantPart;
       }
     ) matching;
 

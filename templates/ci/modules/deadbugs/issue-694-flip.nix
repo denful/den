@@ -96,10 +96,10 @@
       }
     );
 
-    # Records a fact for the acceptance design, fixes nothing: a policy the
-    # author writes on tux and the policy `tux.provides.to-hosts` compiles to
-    # register under one name, `tux/to-hosts`, so a policy's name cannot tell
-    # them apart.
+    # An author policy named `tux/to-hosts` and the policy
+    # `tux.provides.to-hosts` compiles to share one name. Both are registered:
+    # the second claimant takes its own identity, as any two same-named
+    # policies do, instead of one silently replacing the other.
     test-policy-name-collides-with-provides = denTest (
       { den, config, ... }:
       let
@@ -114,13 +114,15 @@
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.schema.host.includes = [ den.batteries.user-aspects ];
-        den.aspects.tux.policies.to-hosts = { host, user, ... }: [ ];
-        den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
+        den.aspects.tux.includes = [ (den.lib.policy.mkPolicy "tux/to-hosts" ({ host, user, ... }: [ ])) ];
         den.aspects.tux.provides.to-hosts.nixos.environment.etc.probe.text = "tux";
-        expr = builtins.length (builtins.filter (n: n == "tux/to-hosts") names);
-        # Both register at the user scope under the same key; the registry
-        # merges them, so one name stands for two policies.
-        expected = 1;
+        expr = builtins.length (
+          builtins.filter (n: builtins.match ".*tux/to-hosts(#[0-9]+)?" n != null) names
+        );
+        # Both register at the user scope under one name; the second claimant
+        # is displaced to its own identity, so the name stands for one policy
+        # and both are registered.
+        expected = 2;
       }
     );
 
