@@ -77,8 +77,16 @@ Delivers a user's `provides.to-hosts` and `provides.<host>` into the host's
 own configuration. Only the host's class (`nixos` or `darwin`) goes to the
 host; other classes, like `homeManager`, stay with the user.
 
-It is in `den.schema.host.includes` by default. To stop users configuring
-hosts through `provides`, exclude it:
+Include it on the hosts that should receive what users provide:
+
+```nix
+den.schema.host.includes = [ den.batteries.mutual-provider ];
+```
+
+Until 2027-01-01 it is also on by default, as a [transition
+default](/explanation/crossing-scopes/#the-transition-defaults); on that date it
+becomes opt-in only. To stop users configuring hosts through `provides`,
+exclude it:
 
 ```nix
 # every host

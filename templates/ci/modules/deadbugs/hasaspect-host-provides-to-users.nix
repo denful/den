@@ -20,9 +20,6 @@
         ...
       }:
       {
-        # #694: these hosts accept their users' host-class output, which is
-        # setup for this cell, not its subject.
-        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         den.aspects.test.nixos = { };

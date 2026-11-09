@@ -10,7 +10,11 @@ let
       in
       {
         resume = null;
-        state = scopedAppend state "scopedProvides" scope (param // { sourceScopeId = scope; });
+        # Stood down because a transition default already carries its content
+        # (#694): never delivered, only read by the migration warning.
+        state = scopedAppend state (
+          if param.__standDown or false then "scopedStandDownProvides" else "scopedProvides"
+        ) scope (param // { sourceScopeId = scope; });
       };
   };
 in

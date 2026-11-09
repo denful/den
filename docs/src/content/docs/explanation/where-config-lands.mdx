@@ -223,8 +223,9 @@ For anything else on the host, name the host explicitly. For one host, use
 <Aside type="caution" title="Untargeted nixos/os on a user aspect (#694)">
 `den.aspects.tux.nixos` (and `darwin`, `os`) does not reach tux's hosts on its
 own: one user's aspect must not change a shared host for everyone. When a host
-is built, den fails with [the loss error](/explanation/crossing-scopes/#the-loss-error)
-listing such content. Use the `user` class or `provides.<host>` /
+is built, it receives such content only through a [transition
+default](/explanation/crossing-scopes/#the-transition-defaults) until 2027-01-01, with a
+warning listing it. Use the `user` class or `provides.<host>` /
 `provides.to-hosts` above, or let the host accept its users' content with the
 [`user-aspects`](/reference/batteries/#denbatteriesuser-aspects) battery,
 the counterpart of `host-aspects`.

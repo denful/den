@@ -32,21 +32,26 @@ let
       # A user the host already accepts through user-aspects delivers its whole
       # host-class bucket, this include's copy with it; delivering the provided
       # aspect as well would land it twice.
-      viaUserAspects = den.lib.acceptance.accepts ctx host user;
+      viaUserAspects = den.lib.acceptance.acceptsExplicitly ctx host user;
+      # Accepted only through user-aspects' transition default: the bucket
+      # still reaches the host whole, so the route stands down, recorded for
+      # the migration warning (#694).
+      viaDefaultUserAspects = !viaUserAspects && den.lib.acceptance.accepts ctx host user;
+      explicit = ctx ? ${den.lib.acceptance.mutualProviderKey host};
+      byDefault = ctx ? ${den.lib.acceptance.mutualProviderDefaultKey host};
     in
     lib.optional
-      (
-        host ? class
-        && (ctx.home or null) == null
-        && ctx ? ${den.lib.acceptance.mutualProviderKey host}
-        && !viaUserAspects
-      )
+      (host ? class && (ctx.home or null) == null && (explicit || byDefault) && !viaUserAspects)
       (
         policy.route {
           fromClass = host.class;
           intoClass = host.class;
           receiver = host;
           __fromProvenance = token;
+          # Made only by mutual-provider's transition default: the migration
+          # warning lists what it delivers.
+          __transitionDefault = !explicit;
+          __standDown = viaDefaultUserAspects;
         }
       );
 

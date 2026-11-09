@@ -2,17 +2,11 @@
 # reads the option values a host ends up with; a host that keeps the battery is
 # the positive control in the same config.
 { denTest, ... }:
-let
-  lossError = {
-    type = "ThrownError";
-    msg = "no longer receives host-class content";
-  };
-in
 {
   flake.tests.deadbugs.issue-694-mutual-provider-exclude = {
 
-    # `provides.to-hosts`: excluded on igloo, kept on iceberg. igloo reports
-    # the content it no longer receives; iceberg still gets it.
+    # `provides.to-hosts`: excluded on igloo, kept on iceberg. igloo doesn't
+    # receive it; iceberg still gets it.
     test-to-hosts-excluded-on-one-host = denTest (
       {
         den,
@@ -21,6 +15,7 @@ in
         ...
       }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
@@ -29,7 +24,10 @@ in
           iceberg = iceberg.environment.etc.probe.text;
           igloo = igloo.environment.etc ? probe;
         };
-        expectedError = lossError;
+        expected = {
+          iceberg = "from-tux";
+          igloo = false;
+        };
       }
     );
 
@@ -37,6 +35,7 @@ in
     test-to-hosts-kept-on-other-host = denTest (
       { den, iceberg, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
@@ -50,11 +49,13 @@ in
     test-named-host-provide-excluded = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
         den.aspects.tux.provides.igloo.nixos.environment.etc.probe.text = "from-tux";
         expr = igloo.environment.etc ? probe;
-        expectedError = lossError;
+
+        expected = false;
       }
     );
 
@@ -62,28 +63,27 @@ in
     test-fleet-wide-exclude = denTest (
       { den, iceberg, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
         den.schema.host.excludes = [ den.batteries.mutual-provider ];
         den.aspects.tux.provides.to-hosts.nixos.environment.etc.probe.text = "from-tux";
         expr = iceberg.environment.etc ? probe;
-        expectedError = lossError;
+
+        expected = false;
       }
     );
 
-    # Excluding it is not silent: the loss check names the content and the
-    # mutual-provider fix.
-    test-excluded-names-the-fix = denTest (
+    # With it excluded, a user's provides.to-hosts does not reach the host.
+    test-excluded-not-delivered = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
         den.aspects.tux.provides.to-hosts.nixos.environment.etc.probe.text = "from-tux";
         expr = igloo.environment.etc ? probe;
-        expectedError = {
-          type = "ThrownError";
-          msg = "keep `den.batteries.mutual-provider` for content from `provides.to-hosts`";
-        };
+        expected = false;
       }
     );
 
@@ -92,6 +92,7 @@ in
     test-excluded-with-user-aspects-arrives = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
         den.aspects.igloo.includes = [ den.batteries.user-aspects ];

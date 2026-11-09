@@ -30,7 +30,12 @@ let
       {
         resume = null;
         state =
-          if alreadyRegistered then
+          # Stood down because a transition default already carries its
+          # content (#694): never delivered, only read by the migration
+          # warning (provenance.nix locsOf).
+          if route.__standDown or false then
+            scopedAppend state "scopedStandDowns" scope route
+          else if alreadyRegistered then
             state
           else
             scopedAppend state "scopedRoutes" scope route

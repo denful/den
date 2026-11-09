@@ -37,7 +37,7 @@
       ];
 
     # Alice configures NixOS hosts it lives on: what a user provides to its
-    # hosts crosses to them (the default mutual-provider battery).
+    # hosts crosses to them (the mutual-provider battery, defaults.nix).
     # `eg.autologin` comes from the `eg` namespace.
     provides.to-hosts = {
       includes = [

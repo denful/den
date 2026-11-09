@@ -62,12 +62,23 @@ in
     );
 
     # Default-included: the host publishes its acceptance key.
+    # The battery is opt-in: without it a host publishes no key; included, it
+    # publishes its own. (Its transition default: issue-694-migration.nix.)
     test-mutual-provider-key-published = denTest (
       { config, den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
         expected = [ (den.lib.acceptance.mutualProviderKey config.den.hosts.x86_64-linux.igloo) ];
+      }
+    );
+    test-mutual-provider-no-key-without-it = denTest (
+      { config, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
+        expected = [ ];
       }
     );
 
@@ -76,6 +87,7 @@ in
       { config, den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.schema.host.excludes = [ den.batteries.mutual-provider ];
         expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
         expected = [ ];
@@ -87,6 +99,7 @@ in
     test-mutual-provider-per-host-exclude = denTest (
       { config, den, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
         den.hosts.x86_64-linux.igloo.excludes = [ den.batteries.mutual-provider ];
@@ -105,6 +118,7 @@ in
       { config, den, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
         expr = keysWith "den-mutual-provider/" (hostCtx config "igloo");
         expected = [ ];
@@ -128,6 +142,7 @@ in
     test-two-users-to-hosts = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users = {
           tux = { };
           pingu = { };
@@ -215,6 +230,7 @@ in
         hasToHosts = names: builtins.any (n: builtins.match ".*to-hosts" n != null) names;
       in
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.homes.x86_64-linux."tux@igloo" = { };
         den.aspects.tux.homeManager.home = {

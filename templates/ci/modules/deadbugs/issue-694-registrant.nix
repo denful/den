@@ -149,6 +149,7 @@
     test-host-policy-include-with-to-hosts-crosses = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feature = {
           nixos.environment.etc.own.text = "own";
@@ -168,11 +169,11 @@
     );
 
     # D4: with mutual-provider excluded on igloo, the `to-hosts` content is
-    # gated by its own (innermost) provider and is reported as lost, while the
-    # policy's own content is not.
+    # gated by its own (innermost) provider and does not reach igloo.
     test-host-policy-include-to-hosts-gated-by-mutual-provider = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feature = {
           nixos.environment.etc.own.text = "own";
@@ -181,10 +182,13 @@
         den.policies.wrap = { host, user, ... }: [ (den.lib.policy.include den.aspects.feature) ];
         den.aspects.igloo.includes = [ den.policies.wrap ];
         den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
-        expr = igloo.environment.etc.provided.text or "<missing>";
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'tux'.*feature/to-hosts";
+        expr = {
+          own = igloo.environment.etc.own.text or "<missing>";
+          provided = igloo.environment.etc.provided.text or "<missing>";
+        };
+        expected = {
+          own = "own";
+          provided = "<missing>";
         };
       }
     );

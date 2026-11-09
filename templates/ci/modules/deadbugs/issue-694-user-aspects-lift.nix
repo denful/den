@@ -1,7 +1,7 @@
 # Issue #694: user-aspects lifts the entity boundary for the users a host
 # accepts, so everything an accepted user emits for the host reaches it as on
 # main. Each cell has a twin without the battery, where the bounded merge keeps
-# the content in the user and the loss check names it.
+# the content in the user.
 { denTest, lib, ... }:
 let
   listSlot =
@@ -75,10 +75,7 @@ in
       {
         imports = [ (customClassRoute { inherit den; }) ];
         expr = igloo.combo-box.items;
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'tux'";
-        };
+        expected = [ ];
       }
     );
 
@@ -97,10 +94,7 @@ in
       {
         imports = [ (customClassForward { inherit den; }) ];
         expr = builtins.elem "tux" igloo.nix.settings.allowed-users;
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'tux'";
-        };
+        expected = false;
       }
     );
 
@@ -126,10 +120,7 @@ in
         den.aspects.igloo.includes = [ den.batteries.user-aspects ];
         den.aspects.tux.nixos.environment.etc.tux-own.text = "tux";
         expr = iceberg.environment.etc ? tux-own;
-        expectedError = {
-          type = "ThrownError";
-          msg = "from 'tux'";
-        };
+        expected = false;
       }
     );
 
@@ -249,9 +240,7 @@ in
 
     # An entity resolved per user (as class-module-partial-apply does) is lifted
     # only for a user the host accepts: igloo accepts pingu, not tux, so the
-    # entity bound to tux stays bounded. The loss check does not name it here:
-    # pingu's copy of the same anonymous aspect reaches igloo under the same
-    # positional identity (stable identities for anonymous aspects: #694 PR 4).
+    # entity bound to tux stays bounded.
     test-per-user-entity-of-unaccepted-user-bounded = denTest (
       { den, igloo, ... }:
       {
@@ -312,10 +301,7 @@ in
           den.policies.host-to-per-user-probe
         ];
         expr = igloo.environment.etc ? probe-tux;
-        expectedError = {
-          type = "ThrownError";
-          msg = "user=tux.*per-user-probe";
-        };
+        expected = false;
       }
     );
   };

@@ -1,6 +1,6 @@
 ---
 title: Crossing Scopes
-description: Content stays with the entity that wrote it. How a user, guest or other nested entity delivers content to its host, how context flows down to child scopes, and what the loss error asks you to fix.
+description: Content stays with the entity that wrote it. How a user, guest or other nested entity delivers content to its host, how context flows down to child scopes, and the transition defaults that keep the old behaviour until 2027-01-01.
 ---
 
 import { Aside } from '@astrojs/starlight/components';
@@ -33,8 +33,8 @@ den.aspects.tux = {
 
 The `homeManager` and `user` lines reach their targets because den's own
 channels deliver them. The `nixos` line has no delivery. It stays in tux's
-scope, and den fails the evaluation with the [loss error](#the-loss-error)
-rather than drop it silently.
+scope. Until 2027-01-01 a [transition default](#the-transition-defaults) still
+carries it to the host, with a warning.
 
 The same holds for anything tux includes, for a parametric
 `den.aspects.tux = { user, ... }: { nixos = …; }`, and for a
@@ -286,20 +286,29 @@ in the provided aspect, such as `homeManager`, stay with the user and reach
 the user's home as before. Host to user (`provides.to-users`,
 `provides.<user>`) needs no battery.
 
-It is on by default: den includes it in `den.schema.host.includes`. To opt
-out on one host or on every host, exclude it:
+Include it on the hosts that should receive what their users provide:
+
+```nix
+den.schema.host.includes = [ den.batteries.mutual-provider ];
+```
+
+Until 2027-01-01 it is also on by default, as one of the [transition
+defaults](#the-transition-defaults). To opt out on one host or on every host,
+exclude it; the exclude covers the default too:
 
 ```nix
 den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];   # one host
 den.schema.host.excludes = [ den.batteries.mutual-provider ];     # every host
 ```
 
-An excluded host no longer receives `to-hosts` content. The loss error
-reports it, so the exclude is never silent.
+An excluded host no longer receives `to-hosts` content.
 
 ### `den.batteries.user-aspects`
 
-Lets a host accept everything its users produce for it, as before #694: their
+Lets a host accept everything its users produce for it, as before #694. Until
+2027-01-01 it is on by default, as one of the [transition
+defaults](#the-transition-defaults); include it explicitly to keep it. It
+carries their
 own `nixos`, `darwin` and `os`, what they include, custom classes they route or
 forward into the host's class, what their policies provide in their own scope,
 and a host-rooted `den.lib.aspects.resolve`. It is opt-in and declared on the
@@ -311,8 +320,7 @@ den.aspects.igloo.includes = [ (den.batteries.user-aspects { users = [ "tux" ]; 
 den.schema.host.includes   = [ den.batteries.user-aspects ];                          # every host, every user
 ```
 
-With `{ users = [ "tux" ]; }`, pingu's host-class content is not accepted, and
-the loss error reports it if pingu has any. Including the battery twice, or
+With `{ users = [ "tux" ]; }`, pingu's host-class content is not accepted. Including the battery twice, or
 with the same list twice, accepts once. Including it on a user
 (`den.aspects.tux.includes`) or in `den.schema.user.includes` does nothing:
 a user cannot opt itself into a host.
@@ -321,7 +329,7 @@ a user cannot opt itself into a host.
 
 | Situation | Use |
 |---|---|
-| A user aspect states what it adds to hosts | `mutual-provider` (default) with `provides.to-hosts` / `provides.<host>` |
+| A user aspect states what it adds to hosts | `mutual-provider` on the host, with `provides.to-hosts` / `provides.<host>` |
 | The host trusts its users' `nixos` / `darwin` / `os` as written | `user-aspects` on the host |
 | Only some users may change the host | `user-aspects { users = [ … ]; }` |
 | A fleet wants the old behaviour everywhere while migrating | `den.schema.host.includes = [ den.batteries.user-aspects ]` |
@@ -332,32 +340,57 @@ a user cannot opt itself into a host.
 The two are independent. With `mutual-provider` excluded and `user-aspects`
 included, a user's `to-hosts` content still arrives through `user-aspects`.
 
-## The loss error
+## The transition defaults
 
-When a host is built, den checks every entity nested in it for host-class
-content that no delivery carries to the host. If it finds any, evaluation
-fails with one error per host that lists all of it:
+Content an aspect placed on a user writes to its host's class (`nixos`,
+`darwin`, `os`) stays with the user. That is by design: an aspect can carry
+host-class content for when it is placed on a host, and a home part for when it
+is placed on a user.
+
+To give configs time to move, until 2027-01-01 den keeps two transition
+defaults on every host (and on any nested kind with its own class, such as a
+guest): `den.batteries.user-aspects` and
+`den.batteries.mutual-provider`, each through a default form of its own. With
+them a config behaves as before #694. A host warns once, listing the
+host-class content that reaches it only through a default:
 
 ```
-den: host 'igloo' no longer receives host-class content from the entities nested in it (#694). Nesting no longer merges an entity's content into its host:
-  - from 'tux' (scope …): tux
-Fixes, in order: include `den.batteries.user-aspects` on the host (optionally `{ users = [ ... ]; }`); keep `den.batteries.mutual-provider` for content from `provides.to-hosts` / `provides.<host>`; move account settings to the `user` class; deliver host-wide settings with `provide { receiver = host; }` or put them on the host's own aspect. See https://github.com/denful/den/issues/694.
+den: igloo receives nixos content only through den's transition default, which ends 2027-01-01:
+  - from tux (steam)
+  - from tux (tux/to-hosts)
+If the host should have it, include the aspect on the host or add the battery explicitly: `den.schema.host.includes = [ den.batteries.user-aspects ];` for a user's own content, `den.schema.host.includes = [ den.batteries.mutual-provider ];` for `provides.to-hosts`. If it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694.
 ```
 
-Each entry names the entity the content came from and the aspect that wrote
-it. Content with no aspect identity is listed as unidentified content, with
-its scope.
+Each entry names the nested entity (usually a user) and the aspect that wrote
+the content. The warning covers the host's class only: content in another
+class, such as a custom class a host route collects, changes without an entry
+when the defaults go. Content a
+host also receives another way, such as a `{ host, ... }` function in
+`den.default` that runs at the host scope too, is not listed. Neither is the
+content of a nested entity with its own class, such as a guest that is its own
+host.
 
-Content is not reported when it also reaches the host by another way, such as
-a `{ host, ... }` function in `den.default` that runs at the host scope too.
+### Adopting the end state
 
-### Fixes, in order
+When every entry is meant to stay with the user, or the host now receives what
+it needs another way, set the migration flag once:
+
+```nix
+den.migrations.user-host-content.acknowledged = true;
+```
+
+It turns both transition defaults off. Batteries included explicitly still
+apply, and the warning stops. On 2027-01-01 the defaults, the warning and the
+flag are removed, and setting the flag after that is an error that asks you to
+remove it.
+
+### When the host needs it
 
 1. **Include `den.batteries.user-aspects` on the host**, optionally with
    `{ users = [ … ]; }`. This keeps the content as written and makes the
    host's acceptance explicit.
-2. **Keep `den.batteries.mutual-provider`** if the content came from
-   `provides.to-hosts` or `provides.<host>` and you excluded the battery.
+2. **Use `provides.to-hosts`** or `provides.<host>`, with
+   `den.batteries.mutual-provider` included on the host.
 3. **Move account settings to the `user` class.** `nixos.users.users.tux.*`
    on tux becomes `user.*`:
    ```nix
@@ -380,9 +413,8 @@ den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
 ```
 
 `policy.include` adds the aspect to the scope the policy fires in, which is
-tux's. Its `nixos` stays with tux. The loss error marks the entry as included
-by a policy at the user's scope. Write it as a provide instead, which
-`mutual-provider` delivers:
+tux's. Its `nixos` stays with tux. Write it as a provide instead, which
+`mutual-provider` delivers when the host includes it:
 
 ```nix
 den.aspects.tux.provides.to-hosts.nixos.services.openssh.enable = true;
@@ -399,8 +431,8 @@ nothing for entity scopes. What it still does:
 - It keeps the kind's content out of its ancestors, also for a scope of that
   kind that has no entity of its own.
 - It never blocks a delivery that names its receiver. Those still cross.
-- Content of an isolated kind that no delivery carries is dropped without the
-  loss error, as before. Remove the flag to have den report it.
+- Content of an isolated kind that no delivery carries stays with that kind,
+  without a transition-default warning, as before.
 
 ## See also
 

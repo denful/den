@@ -9,6 +9,7 @@
     test-static = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.provides.to-hosts.nixos.environment.etc.p.text = "static";
         expr = igloo.environment.etc.p.text;
@@ -19,6 +20,7 @@
     test-parametric = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.provides.to-hosts =
           { host, user, ... }:
@@ -38,6 +40,7 @@
         ...
       }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
         den.aspects.tux.provides.igloo.nixos.environment.etc.p.text = "igloo-only";
@@ -55,6 +58,7 @@
     test-two-owners = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.x.provides.to-hosts.nixos.environment.etc.x.text = "x";
         den.aspects.tux.provides.to-hosts.nixos.environment.etc.t.text = "t";
@@ -75,6 +79,7 @@
     test-named-sub-include-delivered = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feat.nixos.environment.etc.feat.text = "feat";
         den.aspects.tux.provides.to-hosts.includes = [ den.aspects.feat ];
@@ -87,14 +92,13 @@
     test-direct-include-does-not-cross = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feat.nixos.environment.etc.feat.text = "feat";
         den.aspects.tux.includes = [ den.aspects.feat ];
         expr = igloo.environment.etc ? feat;
-        expectedError = {
-          type = "ThrownError";
-          msg = "no longer receives host-class content";
-        };
+
+        expected = false;
       }
     );
 
@@ -102,6 +106,7 @@
     test-with-user-aspects-no-doubling = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.igloo.includes = [ den.batteries.user-aspects ];
         den.aspects.tux.provides.to-hosts.nixos.boot.kernelModules = [ "tux-mod" ];
@@ -115,6 +120,7 @@
     test-provided-and-direct = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feat.nixos.boot.kernelModules = [ "feat-mod" ];
         den.aspects.tux.includes = [ den.aspects.feat ];
@@ -127,6 +133,7 @@
     test-direct-after-provided = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.feat.nixos.boot.kernelModules = [ "feat-mod" ];
         den.aspects.tux.provides.to-hosts.includes = [ den.aspects.feat ];
@@ -141,6 +148,7 @@
     test-provided-and-direct-pipe-once = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.quirks.probe-pipe.description = "";
         den.aspects.producer.probe-pipe = "p";
@@ -161,6 +169,7 @@
     test-direct-after-provided-pipe-once = denTest (
       { den, igloo, ... }:
       {
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.quirks.probe-pipe.description = "";
         den.aspects.producer.probe-pipe = "p";

@@ -209,12 +209,11 @@
           igloo.programs.fish.enable
           iceberg.programs.fish.enable
         ];
-        # #694: a user's host-class content stays in the user; the loss check
-        # names what no delivery carries.
-        expectedError = {
-          type = "ThrownError";
-          msg = "no longer receives host-class content";
-        };
+        # #694: a user's host-class content stays in the user.
+        expected = [
+          false
+          false
+        ];
       }
     );
 
@@ -267,12 +266,11 @@
           igloo.programs.fish.enable
           iceberg.programs.fish.enable
         ];
-        # #694: a user's host-class content stays in the user; the loss check
-        # names what no delivery carries.
-        expectedError = {
-          type = "ThrownError";
-          msg = "no longer receives host-class content";
-        };
+        # #694: a user's host-class content stays in the user.
+        expected = [
+          false
+          false
+        ];
       }
     );
 
@@ -332,12 +330,11 @@
           igloo.programs.fish.enable
           iceberg.programs.fish.enable
         ];
-        # #694: a user's host-class content stays in the user; the loss check
-        # names what no delivery carries.
-        expectedError = {
-          type = "ThrownError";
-          msg = "no longer receives host-class content";
-        };
+        # #694: a user's host-class content stays in the user.
+        expected = [
+          false
+          false
+        ];
       }
     );
 

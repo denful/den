@@ -6,6 +6,7 @@
 }:
 let
   inherit (config) den;
+  inherit (import ./../nix/lib/migrations.nix { inherit config; }) removalDate;
   types = import ./../nix/lib/types.nix {
     inherit
       inputs
@@ -172,6 +173,28 @@ in
   # Built-in entity topology: users nest inside hosts, homes nest inside hosts.
   config.den.schema.user.parent = "host";
   config.den.schema.home.parent = "host";
+
+  options.den.migrations.user-host-content.acknowledged = lib.mkOption {
+    description = ''
+      Adopt #694's end state now. Until ${removalDate}, den keeps two
+      transition defaults on every host, the `user-aspects` and
+      `mutual-provider` batteries, so content a user-placed aspect writes to
+      its host's class still reaches the host, with a warning. Setting this
+      turns both defaults off: that content stays with the user, and only
+      batteries included explicitly apply.
+    '';
+    type = lib.types.bool;
+    default = false;
+  };
+
+  # Internal: den's own test suite runs without the transition defaults, so it
+  # tests the end state; one dedicated file re-enables them.
+  options.den.internal.transitionDefaults = lib.mkOption {
+    internal = true;
+    visible = false;
+    type = lib.types.bool;
+    default = true;
+  };
 
   options.den.reservedKeys = lib.mkOption {
     description = "Additional aspect keys reserved from pipeline dispatch. These keys are treated as structural — the pipeline ignores them, letting consumers use them for metadata.";

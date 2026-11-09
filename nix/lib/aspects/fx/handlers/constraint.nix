@@ -223,11 +223,19 @@ let
           builtins.attrValues registry
         )
       );
+      registered =
+        ref:
+        builtins.any (c: c.value == ref) (
+          builtins.concatLists (builtins.attrValues (claims."name:${ref.name}" or { }))
+        );
+      # A battery's exclude and the exclude of its transition default (#694)
+      # are one: matched when either registered; the default's own entry is
+      # never reported.
       isUnmatched =
         e:
-        !(builtins.any (c: c.value == e.rawRef) (
-          builtins.concatLists (builtins.attrValues (claims."name:${e.rawRef.name}" or { }))
-        ));
+        !(e.defaultFormOf or false)
+        && !(registered e.rawRef)
+        && !(e.rawRef ? __defaultForm && registered e.rawRef.__defaultForm);
     in
     lib.unique (
       map (
@@ -285,6 +293,8 @@ let
             # (null for every non-policy constraint — see children.nix's
             # excludeList).
             rawRef = param.rawRef or null;
+            # A battery's transition-default exclude (children.nix).
+            defaultFormOf = param.defaultFormOf or false;
             inherit scope ownerChain;
           };
         in
