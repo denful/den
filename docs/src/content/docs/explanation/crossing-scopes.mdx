@@ -1,0 +1,411 @@
+---
+title: Crossing Scopes
+description: Content stays with the entity that wrote it. How a user, guest or other nested entity delivers content to its host, how context flows down to child scopes, and what the loss error asks you to fix.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+Every entity resolves in its own scope: one for the host `igloo`, one for each
+user on it (`tux`, `pingu`), one for each guest or VM a policy resolves under
+it. This page covers how content and context move between those scopes.
+
+There are two directions:
+
+- **Content goes up** only through a delivery that names its receiver.
+- **Context goes down** through `policy.resolve`. Child scopes see what their
+  ancestors published.
+
+## Content stays where it was written
+
+An entity's class content belongs to that entity. A user that sits on a host
+does not give the host its `nixos`, `darwin` or `os` content just by sitting
+there.
+
+```nix
+den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
+
+den.aspects.tux = {
+  homeManager.programs.git.enable = true;     # tux's home
+  user.extraGroups = [ "wheel" ];             # users.users.tux on igloo
+  nixos.services.openssh.enable = true;       # stays in tux, does not reach igloo
+};
+```
+
+The `homeManager` and `user` lines reach their targets because den's own
+channels deliver them. The `nixos` line has no delivery. It stays in tux's
+scope, and den fails the evaluation with the [loss error](#the-loss-error)
+rather than drop it silently.
+
+The same holds for anything tux includes, for a parametric
+`den.aspects.tux = { user, ... }: { nixos = …; }`, and for a
+`{ host, user, ... }` function in `den.default` that writes `nixos`. Those all
+run in tux's scope.
+
+Two things do not change:
+
+- Content written on the host (`den.aspects.igloo`, its includes,
+  `den.schema.host.includes`) lands on the host.
+- A `{ host, ... }` function in `den.default` also fires in every user scope.
+  Its content still lands on the host once, from the host scope, and is not
+  reported as lost.
+
+## Crossing up: name the receiver
+
+To move content from a scope to an ancestor, a delivery names the entity that
+receives it: `receiver = host`. Three delivery forms take `receiver`:
+`den.lib.policy.provide`, `den.lib.policy.route` and
+`den.batteries.forward`. Without `receiver` a delivery stays in its source
+scope.
+
+### `policy.provide`: a module for the host
+
+Each user adds a message to igloo's `/etc`. The policy fires once per user
+scope, and each user's module lands on the host.
+
+```nix
+den.policies.user-motd =
+  { host, user, ... }:
+  [
+    (den.lib.policy.provide {
+      class = host.class;
+      module.environment.etc."motd.d/${user.userName}".text = "Hello, ${user.userName}";
+      receiver = host;
+    })
+  ];
+
+den.schema.user.includes = [ den.policies.user-motd ];
+```
+
+`igloo.environment.etc."motd.d/tux".text` is `"Hello, tux"`. Two users get two
+separate entries. A provide from one policy at several user scopes is kept
+once per user, not once in total.
+
+### `policy.route`: a class that lands on the host
+
+A custom `firewall` class lets a user say which ports it needs. A route moves
+the user's `firewall` content into the host's `networking.firewall`. This is
+the same shape den's own `user` class uses.
+
+```nix
+den.classes.firewall.description = "Firewall ports a user needs on its host";
+
+den.policies.firewall-to-host =
+  {
+    host,
+    user,
+    home ? null,
+    ...
+  }:
+  lib.optional (host ? class && home == null) (
+    den.lib.policy.route {
+      fromClass = "firewall";
+      intoClass = host.class;
+      path = [ "networking" "firewall" ];
+      receiver = host;
+    }
+  );
+
+den.schema.user.includes = [ den.policies.firewall-to-host ];
+
+den.aspects.tux.firewall.allowedTCPPorts = [ 8080 ];
+```
+
+The guard `host ? class && home == null` keeps the route inert for a
+standalone home. A standalone home binds a `host` that is not its ancestor, so
+`receiver = host` would fail there (see [below](#how-the-receiver-is-found)).
+Den's own batteries carry the same guard.
+
+### `den.batteries.forward`: the same class, as a forward
+
+`forward` takes `receiver` as one of its arguments. This forward moves a
+user's `account` class into `users.users.<name>` on the host:
+
+```nix
+den.classes.account.description = "Settings for the user's account on its host";
+
+den.schema.user.includes = [
+  (
+    { host, user }:
+    den.batteries.forward {
+      each = [ user ];
+      fromClass = _: "account";
+      intoClass = _: host.class;
+      intoPath = u: [ "users" "users" u.userName ];
+      receiver = host;
+    }
+  )
+];
+
+den.aspects.tux.account.description = "Tux";
+```
+
+`igloo.users.users.tux.description` is `"Tux"`. Den's Home Manager, hjem and
+maid integrations are forwards of this kind, each with `receiver = host`.
+
+<Aside type="note">
+A forward places the source module at `intoPath` as-is. That works when the
+option at `intoPath` is a submodule, like `users.users.<name>`. For a plain
+attribute set of options, like `networking.firewall`, add `adaptArgs = lib.id`
+so the forward evaluates the source first, or use `policy.route` as above.
+</Aside>
+
+## How the receiver is found
+
+`receiver` is an entity record: `host`, `user`, or any record your schema
+declares. Den looks for that record on the source scope's chain of ancestors,
+starting at the source itself. The first scope whose own entity is that record
+receives the delivery.
+
+A record is matched by its identity, not by its name or kind. A copy of a
+record made with `//` keeps the original's identity, so it delivers to the
+original's scope.
+
+A receiver that is not on the chain is an error. A user on igloo cannot
+deliver to iceberg:
+
+```nix
+receiver = config.den.hosts.x86_64-linux.iceberg;
+```
+
+```
+den: delivery receiver 'iceberg' is not an entity on the chain of scope '…' —
+`receiver` must name the source entity or one of its ancestors
+```
+
+A value without an identity (not an entity record) is also an error. To reach
+an entity that is not an ancestor, deliver from a scope that has it as an
+ancestor, or let a [pipe](/guides/quirks-cross-scope/) carry data across.
+
+### Scopes without their own entity
+
+Some scopes bind `host` without being a host. The microvm template resolves a
+`microvm-guest` scope under each host, and binds `host` to the real host
+there. That scope has no entity of its own, so the search passes over it. A
+`receiver = host` delivery from a microvm guest lands on the real host.
+
+### Guests that rebind `host`
+
+A guest kind can bind `host` to the guest itself, so that host batteries and
+policies treat the guest as a host. Inside that scope, `host` is the guest,
+and `receiver = host` delivers into the guest, not into its parent.
+
+The guest's delivery must name the parent record. Capture it in the policy
+that resolves the guest, where `host` is still the parent:
+
+```nix
+den.schema.guest = {
+  isEntity = true;
+  parent = "host";
+};
+
+deliverGuest =
+  parent:
+  den.lib.policy.mkPolicy "deliver-guest" (
+    { ... }@args:
+    lib.optionals (!(args ? user) && !(args ? home)) [
+      (den.lib.policy.route {
+        fromClass = "nixos";
+        intoClass = "nixos";
+        collectSubtree = true;
+        reinstantiate = true;
+        path = [ "microvm" "vms" "cuda" "config" ];
+        receiver = parent;   # igloo, not the guest
+      })
+    ]
+  );
+
+den.policies.resolve-guests =
+  { host, ... }:
+  lib.optionals (host.name == "igloo") [
+    (den.lib.policy.resolve.to.withIncludes "guest" [ (deliverGuest host) ] {
+      guest = cuda;
+      host = cuda;
+    })
+  ];
+
+den.schema.host.includes = [ den.policies.resolve-guests ];
+```
+
+Here `cuda` is the guest's record. The guest's `nixos` lands at
+`igloo.microvm.vms.cuda.config`, and none of it reaches igloo's own config.
+Users inside the guest see `host = cuda`, so their `user` class and Home
+Manager config reach the guest, and the guest's delivery carries them on to
+igloo's `microvm.vms.cuda`.
+
+## Crossing down: context through `policy.resolve`
+
+Context flows the other way. `policy.resolve` with keys that are not entity
+kinds adds those keys to the current scope's context. Every child scope sees
+them too.
+
+```nix
+den.policies.office-site =
+  { host, ... }:
+  lib.optional (host.name == "igloo") (den.lib.policy.resolve { site = "office"; });
+
+den.schema.host.includes = [ den.policies.office-site ];
+
+den.aspects.tux.includes = [
+  ({ site, ... }: { homeManager.home.sessionVariables.SITE = site; })
+];
+```
+
+tux on igloo gets `SITE=office`. An aspect that takes `site` only runs where
+`site` is bound, so tux on a host without the policy skips it. This publishes
+data, not modules. It moves no class content. See
+[Enrichment vs entity resolution](/explanation/policies/#enrichment-vs-entity-resolution).
+
+The two batteries below use this. Each is a host-side policy that publishes
+"this host accepts its users' content" as context. `mutual-provider`'s
+delivery, at each user scope, reads it and delivers with `receiver = host` if
+the user's own host published it. For `user-aspects`, den reads it when it
+assembles the host: an accepted user's scope is not a boundary, so its content
+merges into the host as before. The published value is tied to the host's
+identity. A guest nested under an accepting host inherits the context, but its
+users see `host = guest`, which did not publish it, so nothing is delivered
+into a guest that did not opt in.
+
+## mutual-provider and user-aspects
+
+Two batteries deliver a user's host-class content to its hosts. They differ in
+what they carry and in who chooses.
+
+### `den.batteries.mutual-provider`
+
+Delivers what a user explicitly provides to its hosts:
+`provides.to-hosts` (every host the user is on) and `provides.<host>` (one
+host).
+
+```nix
+den.aspects.tux.provides.to-hosts.nixos.services.openssh.enable = true;
+den.aspects.tux.provides.igloo.nixos.programs.emacs.enable = true;
+```
+
+Only the host-class part (`nixos` on igloo) crosses to the host. Other classes
+in the provided aspect, such as `homeManager`, stay with the user and reach
+the user's home as before. Host to user (`provides.to-users`,
+`provides.<user>`) needs no battery.
+
+It is on by default: den includes it in `den.schema.host.includes`. To opt
+out on one host or on every host, exclude it:
+
+```nix
+den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];   # one host
+den.schema.host.excludes = [ den.batteries.mutual-provider ];     # every host
+```
+
+An excluded host no longer receives `to-hosts` content. The loss error
+reports it, so the exclude is never silent.
+
+### `den.batteries.user-aspects`
+
+Lets a host accept everything its users produce for it, as before #694: their
+own `nixos`, `darwin` and `os`, what they include, custom classes they route or
+forward into the host's class, what their policies provide in their own scope,
+and a host-rooted `den.lib.aspects.resolve`. It is opt-in and declared on the
+host side only. A user excluded by `den.schema.user.isolated` stays isolated.
+
+```nix
+den.aspects.igloo.includes = [ den.batteries.user-aspects ];                          # every user on igloo
+den.aspects.igloo.includes = [ (den.batteries.user-aspects { users = [ "tux" ]; }) ]; # only tux
+den.schema.host.includes   = [ den.batteries.user-aspects ];                          # every host, every user
+```
+
+With `{ users = [ "tux" ]; }`, pingu's host-class content is not accepted, and
+the loss error reports it if pingu has any. Including the battery twice, or
+with the same list twice, accepts once. Including it on a user
+(`den.aspects.tux.includes`) or in `den.schema.user.includes` does nothing:
+a user cannot opt itself into a host.
+
+### Which one
+
+| Situation | Use |
+|---|---|
+| A user aspect states what it adds to hosts | `mutual-provider` (default) with `provides.to-hosts` / `provides.<host>` |
+| The host trusts its users' `nixos` / `darwin` / `os` as written | `user-aspects` on the host |
+| Only some users may change the host | `user-aspects { users = [ … ]; }` |
+| A fleet wants the old behaviour everywhere while migrating | `den.schema.host.includes = [ den.batteries.user-aspects ]` |
+| The setting is about the user's own account | the `user` class, no battery |
+| One policy computes a setting per user | `policy.provide { receiver = host; }`, no battery |
+| A host must not take `to-hosts` content | exclude `mutual-provider` on that host |
+
+The two are independent. With `mutual-provider` excluded and `user-aspects`
+included, a user's `to-hosts` content still arrives through `user-aspects`.
+
+## The loss error
+
+When a host is built, den checks every entity nested in it for host-class
+content that no delivery carries to the host. If it finds any, evaluation
+fails with one error per host that lists all of it:
+
+```
+den: host 'igloo' no longer receives host-class content from the entities nested in it (#694). Nesting no longer merges an entity's content into its host:
+  - from 'tux' (scope …): tux
+Fixes, in order: include `den.batteries.user-aspects` on the host (optionally `{ users = [ ... ]; }`); keep `den.batteries.mutual-provider` for content from `provides.to-hosts` / `provides.<host>`; move account settings to the `user` class; deliver host-wide settings with `provide { receiver = host; }` or put them on the host's own aspect. See https://github.com/denful/den/issues/694.
+```
+
+Each entry names the entity the content came from and the aspect that wrote
+it. Content with no aspect identity is listed as unidentified content, with
+its scope.
+
+Content is not reported when it also reaches the host by another way, such as
+a `{ host, ... }` function in `den.default` that runs at the host scope too.
+
+### Fixes, in order
+
+1. **Include `den.batteries.user-aspects` on the host**, optionally with
+   `{ users = [ … ]; }`. This keeps the content as written and makes the
+   host's acceptance explicit.
+2. **Keep `den.batteries.mutual-provider`** if the content came from
+   `provides.to-hosts` or `provides.<host>` and you excluded the battery.
+3. **Move account settings to the `user` class.** `nixos.users.users.tux.*`
+   on tux becomes `user.*`:
+   ```nix
+   den.aspects.tux.user.extraGroups = [ "wheel" ];
+   ```
+4. **Deliver host-wide settings** with `policy.provide { receiver = host; }`
+   ([above](#policyprovide-a-module-for-the-host)), or move them to the host's
+   own aspect (`den.aspects.igloo`).
+
+### A user's `policies.to-hosts`
+
+A common older pattern is a user policy that includes host content from the
+user's scope:
+
+```nix
+den.aspects.tux.policies.to-hosts =
+  { host, user, ... }:
+  [ (den.lib.policy.include { nixos.services.openssh.enable = true; }) ];
+den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
+```
+
+`policy.include` adds the aspect to the scope the policy fires in, which is
+tux's. Its `nixos` stays with tux. The loss error marks the entry as included
+by a policy at the user's scope. Write it as a provide instead, which
+`mutual-provider` delivers:
+
+```nix
+den.aspects.tux.provides.to-hosts.nixos.services.openssh.enable = true;
+```
+
+Or include `den.batteries.user-aspects` on the host.
+
+### `isolated` is deprecated
+
+`den.schema.<kind>.isolated = true` is deprecated, and den warns when a kind
+sets it. Every entity already keeps its content to itself, so the flag adds
+nothing for entity scopes. What it still does:
+
+- It keeps the kind's content out of its ancestors, also for a scope of that
+  kind that has no entity of its own.
+- It never blocks a delivery that names its receiver. Those still cross.
+- Content of an isolated kind that no delivery carries is dropped without the
+  loss error, as before. Remove the flag to have den report it.
+
+## See also
+
+- [Where Does My Config Land?](/explanation/where-config-lands/): scope rules for each class
+- [Choosing a Mechanism](/explanation/choosing-a-mechanism/)
+- [Policies](/explanation/policies/) and the [policy effects reference](/reference/policies/#policy-effects)
+- [Host↔User Mutual Config](/guides/mutual/)
+- [Batteries reference](/reference/batteries/)

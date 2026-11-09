@@ -1,7 +1,11 @@
 # Effect handler: emit-class
 # Collects class modules into scope-partitioned buckets with dedup.
-{ den, ... }:
+{ lib, den, ... }:
 let
+  # Everything emitted under a cross-provider include records the provider, so
+  # the delivery can select exactly its modules (handlers/provenance.nix).
+  provenanceOf = (import ./provenance.nix { inherit lib; }).tokenOf;
+
   classCollectorHandler = {
     "emit-class" =
       { param, state }:
@@ -29,12 +33,34 @@ let
         emittedLocs = (state.scopedEmittedLocs or (_: { })) null;
         scopeLocs = emittedLocs.${scope} or { };
         alreadyEmitted = scopeLocs ? ${loc};
+        chain = ((state.scopedIncludesChain or (_: { })) null).${scope} or [ ];
+        provenance = provenanceOf chain;
+        allProvenance = (state.scopedProvenanceLocs or (_: { })) null;
+        # Recorded on a skipped emission too: content provided and also reached
+        # another way still crosses, since the other path does not revoke the
+        # provide's edge.
+        updatedProvenance =
+          if provenance == null then
+            allProvenance
+          else
+            allProvenance
+            // {
+              ${scope} = (allProvenance.${scope} or { }) // {
+                ${provenance} = ((allProvenance.${scope} or { }).${provenance} or [ ]) ++ [ loc ];
+              };
+            };
       in
       {
         resume = null;
         state =
           if alreadyEmitted then
-            state
+            if provenance == null then
+              state
+            else
+              state
+              // {
+                scopedProvenanceLocs = builtins.seq (builtins.attrNames updatedProvenance) (_: updatedProvenance);
+              }
           else
             let
               allImports = state.scopedClassImports null;
@@ -59,11 +85,21 @@ let
               # per force while the bodies stay unforced. `seq (attrNames m)` is O(scopes), so the
               # accumulation stays linear.
               forceHead = m: builtins.seq (builtins.attrNames m) m;
+              allLocChains = (state.scopedLocChains or (_: { })) null;
+              updatedLocChains = allLocChains // {
+                ${scope} = (allLocChains.${scope} or { }) // {
+                  ${loc} = chain;
+                };
+              };
             in
             state
             // {
               scopedClassImports = builtins.seq (forceHead updatedImports) (_: updatedImports);
               scopedEmittedLocs = builtins.seq (forceHead updatedEmittedLocs) (_: updatedEmittedLocs);
+              scopedProvenanceLocs = builtins.seq (forceHead updatedProvenance) (_: updatedProvenance);
+              # Each location's include chain at its first emission, read when a
+              # repeat under a provide was deduplicated (handlers/provenance.nix).
+              scopedLocChains = builtins.seq (forceHead updatedLocChains) (_: updatedLocChains);
             };
       };
   };

@@ -22,6 +22,9 @@
     test-user-takes-host-qualified-aspect = denTest (
       { den, igloo, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # setup for this cell, not its subject.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects."tux@igloo".nixos.environment.etc."qualified".text = "yes";
 
@@ -36,6 +39,9 @@
     test-user-falls-back-to-bare-aspect = denTest (
       { den, igloo, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # setup for this cell, not its subject.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.nixos.environment.etc."bare".text = "yes";
 
@@ -50,6 +56,9 @@
     test-user-composes-qualified-with-bare = denTest (
       { den, igloo, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # setup for this cell, not its subject.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.tux.nixos.environment.etc."bare".text = "yes";
         den.aspects."tux@igloo".nixos.environment.etc."qualified".text = "yes";
@@ -71,6 +80,9 @@
     test-user-qualified-is-per-host = denTest (
       { den, config, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # setup for this cell, not its subject.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
         den.aspects."tux@igloo".nixos.environment.etc."on-igloo".text = "yes";

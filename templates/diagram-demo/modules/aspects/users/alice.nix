@@ -80,11 +80,8 @@
       den.aspects.home-productivity
       den.aspects.alice-dotfiles
     ];
-    nixos =
-      { ... }:
-      {
-        users.users.alice.isNormalUser = true;
-      };
+    user.isNormalUser = true;
+
     homeManager =
       { pkgs, ... }:
       {
