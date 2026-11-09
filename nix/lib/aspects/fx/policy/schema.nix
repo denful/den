@@ -17,6 +17,7 @@
 }:
 let
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
+  inherit (import ./registrant.nix { inherit lib; }) withRegistrants;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
@@ -438,13 +439,15 @@ let
             && builtins.attrNames prev.inst == builtins.attrNames inst
             && builtins.all (k: sameBinding prev.inst.${k} inst.${k}) (builtins.attrNames inst)
           ) (lateRanAtSib.${name} or [ ]);
-        filteredPolicies = lib.filterAttrs (
-          name: policy:
-          !excluded name
-          && !(ranAtSib ? ${name})
-          && !(lateRan name policy)
-          && !(sameInstanceAbove name policy)
-        ) latePolicies;
+        filteredPolicies = withRegistrants state sib.scopeId (
+          lib.filterAttrs (
+            name: policy:
+            !excluded name
+            && !(ranAtSib ? ${name})
+            && !(lateRan name policy)
+            && !(sameInstanceAbove name policy)
+          ) latePolicies
+        );
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };

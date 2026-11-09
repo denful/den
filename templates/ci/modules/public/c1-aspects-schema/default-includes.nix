@@ -74,12 +74,9 @@
         ];
 
         expr = igloo.users.users.tux.description;
-        # #694: a user's host-class content stays in the user; the loss check
-        # names what no delivery carries.
-        expectedError = {
-          type = "ThrownError";
-          msg = "no longer receives host-class content";
-        };
+        # #694: den.default is every entity's include, so its host-side
+        # registration applies to the host (§11a R6), as on main.
+        expected = "tux on igloo";
       }
     );
 

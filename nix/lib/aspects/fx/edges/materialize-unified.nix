@@ -38,6 +38,7 @@ let
   inherit (import ./materialize.nix { inherit lib den; }) assembleSubtree;
   inherit (import ./toposort.nix { inherit lib; }) topoSortEdges;
   inherit (import ../scope-walk.nix { inherit lib; }) subtreeScopes;
+  inherit (import ../handlers/provenance.nix { inherit lib; }) sharedFanOutPrefix;
 
   appendAt =
     perScope: sid: cls: mods:
@@ -530,7 +531,7 @@ let
       # The root's class content: its own bounded subtree after delivery. An
       # "aware" walk takes the entity boundary; a "blind" one (spawn extraction)
       # is unchanged.
-      bounded = assembleSubtree {
+      assembled = assembleSubtree {
         root = rootScopeId;
         pi =
           pi
@@ -539,6 +540,35 @@ let
             scopeIsolated = entityBoundary;
           };
       };
+      # A shared source fanned out at a host for a user the host accepts: the
+      # lifted merge already carries that user's own copy, so this one goes
+      # (#694 §11a R6). Users are matched by id_hash (D5).
+      acceptedUsers = lib.genAttrs (map (sid: ownEntityOf.${sid}) (
+        builtins.filter acceptedUserScope (builtins.attrNames ownEntityOf)
+      )) (_: true);
+      droppedLocs = lib.genAttrs (lib.concatMap (
+        byToken:
+        lib.concatLists (
+          lib.mapAttrsToList (
+            token: locs:
+            lib.optionals (
+              lib.hasPrefix sharedFanOutPrefix token
+              && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
+            ) locs
+          ) byToken
+        )
+      ) (builtins.attrValues (pi.provenanceLocs or { }))) (_: true);
+      bounded =
+        if droppedLocs == { } then
+          assembled
+        else
+          lib.mapAttrs (
+            _: mods:
+            if builtins.isList mods then
+              builtins.filter (m: !(droppedLocs ? ${toString (m.key or m._file or "")})) mods
+            else
+              mods
+          ) assembled;
 
       # The folded edge records, in fold (post-toposort) order — the exact trace
       # edges the dispatch above consumed. Captured for the literal-object trace.

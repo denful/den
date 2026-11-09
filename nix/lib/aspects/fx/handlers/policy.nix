@@ -1,15 +1,19 @@
 # Effect handler: register-aspect-policy
 # Registers policies declared on aspects into scope-partitioned state.
-_:
+{ lib, ... }:
 let
   inherit (import ./state-util.nix) scopedMerge;
+  inherit (import ../policy/registrant.nix { inherit lib; }) registrantOnRegister;
 
   registerAspectPolicyHandler = {
     "register-aspect-policy" =
       { param, state }:
       let
-        entry = {
+        # The registrant is fixed where the policy registers: dispatched later at
+        # a descendant, it still applies to this entity (#694 §11a R1).
+        entry =  {
           inherit (param) fn;
+          registrant = registrantOnRegister state state.currentScope;
         }
         // (if param ? fnSlot then { inherit (param) fnSlot; } else { });
         # The registry is the one scoped field that merges rather than appends,
