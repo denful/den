@@ -16,7 +16,9 @@ let
   # scope, so including it on a user accepts nothing.
   # Named per argument set: identical includes deduplicate, different ones
   # each publish.
-  argsName = users: if users == null then "all" else builtins.concatStringsSep "," users;
+  # `all` for the bare battery; a list renders as JSON, so it never reads
+  # `all` and no separator can join two lists into one name.
+  argsName = users: if users == null then "all" else den.lib.argsName.setOf users;
 
   acceptFor = users: {
     __isPolicy = true;
@@ -30,6 +32,12 @@ let
 
   battery = users: {
     name = "user-aspects(${argsName users})";
+    # Keyed by den's path wherever it is included, so equal arguments
+    # included twice at a scope are one battery (gate dedup), as unfree is.
+    meta.aspect-chain = [
+      "den"
+      "batteries"
+    ];
     inherit description;
     includes = [ (acceptFor users) ];
   };

@@ -25,13 +25,20 @@ let
     name = "tty-autologin(${username})";
     meta.aspect-chain = [
       "den"
-      "provides"
+      "batteries"
+      "tty-autologin"
     ];
     nixos = tty-autologin-module username;
   };
 in
 {
+  # Named, so `excludes = [ den.batteries.tty-autologin ]` reaches every instance.
   den.batteries.tty-autologin = {
+    name = "tty-autologin";
+    meta.aspect-chain = [
+      "den"
+      "batteries"
+    ];
     inherit description __functor;
   };
 }

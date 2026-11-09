@@ -13,10 +13,11 @@ let
   '';
 
   __functor = _self: allowed-names: {
-    name = "insecure(${builtins.concatStringsSep "," allowed-names})";
+    name = "insecure(${den.lib.argsName.setOf allowed-names})";
     meta.aspect-chain = [
       "den"
-      "provides"
+      "batteries"
+      "insecure"
     ];
     __fn =
       {
@@ -51,7 +52,7 @@ let
               includes = [
                 {
                   __isPolicy = true;
-                  name = "insecure-host(${builtins.concatStringsSep "," allowed-names})";
+                  name = "insecure-host(${den.lib.argsName.setOf allowed-names})";
                   fn =
                     { host, ... }:
                     [
@@ -59,7 +60,7 @@ let
                         class = host.class;
                         # Keyed, so the same list from several users lands once.
                         module = {
-                          key = "den/insecure-host/${builtins.concatStringsSep "," allowed-names}";
+                          key = "den/insecure-host/${den.lib.argsName.setOf allowed-names}";
                           permittedInsecurePackages.packages = allowed-names;
                         };
                         receiver = host;
@@ -78,7 +79,13 @@ let
   };
 in
 {
+  # Named, so `excludes = [ den.batteries.insecure ]` reaches every instance.
   den.batteries.insecure = {
+    name = "insecure";
+    meta.aspect-chain = [
+      "den"
+      "batteries"
+    ];
     inherit description __functor;
   };
 }

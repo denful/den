@@ -25,13 +25,20 @@ let
     name = "vm-autologin(${username})";
     meta.aspect-chain = [
       "den"
-      "provides"
+      "batteries"
+      "vm-autologin"
     ];
     nixos.virtualisation.vmVariant = vm-autologin-module username;
   };
 in
 {
+  # Named, so `excludes = [ den.batteries.vm-autologin ]` reaches every instance.
   den.batteries.vm-autologin = {
+    name = "vm-autologin";
+    meta.aspect-chain = [
+      "den"
+      "batteries"
+    ];
     inherit description __functor;
   };
 }
