@@ -107,6 +107,30 @@ in
       provides.to-hosts.nixos.environment.etc.probe.text = "x";
     }) "tux/to-hosts";
 
+    # An import-tree root is listed without its store hash.
+    test-import-tree-root-warned-readable = denTest (
+      { den, config, ... }:
+      let
+        root = builtins.path {
+          path = ../../non-dendritic/collide/a;
+          name = "source";
+        };
+      in
+      {
+        imports = [ transition ];
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.includes = [ (den.batteries.import-tree "${root}/disko") ];
+        expr = {
+          listed = builtins.elem "den/batteries/import-tree/import-tree(source/disko)" (warned config);
+          hashed = builtins.any (lib.hasInfix builtins.storeDir) (warned config);
+        };
+        expected = {
+          listed = true;
+          hashed = false;
+        };
+      }
+    );
+
     # Acknowledged, the warning lists nothing.
     test-acknowledged-warns-nothing = denTest (
       { den, config, ... }:

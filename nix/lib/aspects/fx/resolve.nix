@@ -47,7 +47,14 @@ let
   # the acknowledgement, or with the defaults off, that content is inert by
   # design and nothing is reported.
   checkLost =
-    hostName: class: lost: modules:
+    hostName: class: lost0: modules:
+    let
+      # An import-tree root's identity keeps its store hash; readers don't.
+      lost = map (
+        e:
+        e // lib.optionalAttrs (e.aspect != null) { aspect = den.lib.argsName.withoutStoreHash e.aspect; }
+      ) lost0;
+    in
     if !den.lib.migrations.transitionActive || lost == [ ] then
       modules
     else
