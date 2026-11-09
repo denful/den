@@ -99,6 +99,8 @@ let
             name = "${provenanceMarker}${token}";
             includes = [ e.value ];
           };
+          # Outermost: a provider inside the delivered include stays innermost.
+          __denProvenance = [ token ] ++ e.__denProvenance or [ ];
         };
       hasIncludes = builtins.any isInclude effects;
       accepted = firing != null && den.lib.acceptance.acceptsExplicitly ctx target firing;
@@ -120,6 +122,33 @@ let
       effects
     else
       map (e: if isInclude e then wrapped e else aimed e) effects ++ delivery;
+
+  # Den's provenance fields on an effect (#694): the tokens its include is
+  # walked under, outermost first, and the registration chain of the policy
+  # that emitted it. Only den sets them; whatever an author's effect carries
+  # is replaced. A policy registered inside a cross-provider include emits
+  # under that provider, as the include's static content is; den's provides
+  # policies (aspect/provide.nix) set their own.
+  denProvenance =
+    entry: e:
+    let
+      clean = builtins.removeAttrs e [
+        "__denProvenance"
+        "__denRegChain"
+      ];
+    in
+    if e.__policyEffect != "include" then
+      clean
+    else
+      clean
+      // {
+        __denProvenance =
+          if entry.value.setsProvenance or false then
+            e.__denProvenance or [ ]
+          else
+            lib.optional ((entry.value.provenance or null) != null) entry.value.provenance;
+        __denRegChain = entry.value.chain or [ ];
+      };
 
   # Dispatch aspect policies against a context.
   # Note: caller passes the same aspectPolicies each iteration; Nix memoizes
@@ -151,7 +180,7 @@ let
       {
         policyName = entry.name;
         effects = applyToRegistrant entry.name (entry.value.registrant or null) ctx (
-          validateEffects entry.name rawEffects
+          map (denProvenance entry) (validateEffects entry.name rawEffects)
         );
       }
     ) matching;

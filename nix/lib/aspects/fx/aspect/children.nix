@@ -157,6 +157,22 @@ let
 
   isPolicy = v: builtins.isAttrs v && v.__isPolicy or false;
 
+  # Den's provenance wrappers (#694) are named with this marker; an author's
+  # aspect may not be. Den's own are told apart by where their `name` is
+  # defined, which an author can't place.
+  provenanceMarker = "den-provides-to-host=";
+  provenanceMarkerLength = builtins.stringLength provenanceMarker;
+  denWrapperFiles = map (f: "${toString ../../../../..}/${f}") [
+    "nix/lib/aspects/fx/aspect/provide.nix"
+    "nix/lib/aspects/fx/policy/dispatch.nix"
+  ];
+  isDenProvenanceWrapper =
+    v:
+    let
+      pos = if builtins.isAttrs v then builtins.unsafeGetAttrPos "name" v else null;
+    in
+    pos != null && builtins.elem pos.file denWrapperFiles;
+
   processInclude =
     {
       parentScopeHandlers,
@@ -196,7 +212,12 @@ let
           # A marker set here, rather than a shape compile-static infers from
           # the name, can't be confused with an author's own name choice.
           child =
-            if skipNameAnon then
+            if
+              builtins.substring 0 provenanceMarkerLength childName == provenanceMarker
+              && !(isDenProvenanceWrapper rawChild)
+            then
+              throw "den: aspect name `${childName}` is reserved: names beginning `${provenanceMarker}` are den's provenance wrappers"
+            else if skipNameAnon then
               withScope
             else if !(isMeaningfulName childName) then
               withScope

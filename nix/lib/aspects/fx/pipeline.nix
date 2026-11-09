@@ -207,6 +207,8 @@ let
     scopedProvenanceLocs = _: { };
     scopedProvenanceAspects = _: { };
     scopedLocChains = _: { };
+    # scope → [ { token; regChain; } ] (handlers/chain.nix provenance-push).
+    scopedProvenanceStack = _: { };
 
     # --- Scope-prefixed bookkeeping (future: scope-prefixed keys) ---
     includeSeen = _: { };

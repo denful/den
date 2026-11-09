@@ -27,11 +27,7 @@ in
         # A repeat under a cross-provider include is not walked again, which
         # would apply its effects twice; it is recorded so the delivery reads
         # what its first walk emitted (handlers/provenance.nix).
-        token =
-          if isDuplicate then
-            provenance.tokenOf (((state.scopedIncludesChain or (_: { })) null).${scope} or [ ])
-          else
-            null;
+        token = if isDuplicate then provenance.stackTokenOf state scope else null;
         allDeduped = (state.scopedProvenanceAspects or (_: { })) null;
         recordDeduped =
           s:

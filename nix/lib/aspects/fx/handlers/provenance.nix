@@ -1,21 +1,28 @@
 # Provenance of content a cross-provider include delivers (#694 F1).
-# The include's wrapper (aspect/provide.nix) puts a marker on the include chain;
-# what is emitted under it records the provider's token.
+# Den pushes the provider's token onto a den-only state stack around the
+# include's walk (policy/apply.nix); what is emitted under it records the
+# innermost token. Aspect names are never read: an author can set those.
 { lib }:
 let
-  marker = "den-provides-to-host=";
-
-  tokenOf =
-    chain:
+  stackAt = state: scope: ((state.scopedProvenanceStack or (_: { })) null).${scope} or [ ];
+  # The innermost token den pushed at `scope`, or null.
+  stackTokenOf =
+    state: scope:
     let
-      hits = builtins.filter (lib.hasInfix marker) chain;
+      ts = stackTokensOf state scope;
     in
-    # The innermost provider wins: a cross-provider include nested in a
-    # registrant's include stays gated by its own provider (#694 §11a R7).
-    if hits == [ ] then null else lib.last (lib.splitString marker (lib.last hits));
+    if ts == [ ] then null else lib.last ts;
+  # Every token den pushed at `scope`, outermost first.
+  stackTokensOf = state: scope: lib.concatMap (f: f.tokens) (stackAt state scope);
+  # The registration chains of the policies whose includes are being walked.
+  stackRegChainsOf = state: scope: lib.concatMap (f: f.regChain) (stackAt state scope);
 in
 {
-  inherit tokenOf;
+  inherit
+    stackTokenOf
+    stackTokensOf
+    stackRegChainsOf
+    ;
   sharedFanOutPrefix = "shared-fanout:";
 
   # A token's locations: those emitted under it, plus every location an aspect

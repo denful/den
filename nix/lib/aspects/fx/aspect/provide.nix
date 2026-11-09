@@ -25,6 +25,9 @@ let
     policy.include {
       name = "${provenanceMarker}${token}";
       includes = [ result ];
+    }
+    // {
+      __denProvenance = [ token ];
     };
   hostDelivery =
     token: ctx: host: user:
@@ -109,6 +112,8 @@ let
       fn = policyFn;
       ownerIdentity = nodeIdentity;
       label = key;
+      # Its include effects carry their provider's token (providedInclude).
+      setsProvenance = true;
     };
 
   # Extract the inner function and args from a provider value.

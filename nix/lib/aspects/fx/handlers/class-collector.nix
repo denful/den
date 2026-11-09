@@ -5,7 +5,7 @@ let
   # Everything emitted under a cross-provider include records the provider, so
   # the delivery can select exactly its modules (handlers/provenance.nix).
   inherit (import ./provenance.nix { inherit lib; }) sharedFanOutPrefix;
-  provenanceOf = (import ./provenance.nix { inherit lib; }).tokenOf;
+  inherit (import ./provenance.nix { inherit lib; }) stackTokenOf stackRegChainsOf;
 
   classCollectorHandler = {
     "emit-class" =
@@ -42,7 +42,7 @@ let
           if (param.sharedFanOutFor or null) != null then
             "${sharedFanOutPrefix}${param.sharedFanOutFor}"
           else
-            provenanceOf chain;
+            stackTokenOf state scope;
         allProvenance = (state.scopedProvenanceLocs or (_: { })) null;
         # Recorded on a skipped emission too: content provided and also reached
         # another way still crosses, since the other path does not revoke the
@@ -96,7 +96,11 @@ let
               allLocChains = (state.scopedLocChains or (_: { })) null;
               updatedLocChains = allLocChains // {
                 ${scope} = (allLocChains.${scope} or { }) // {
-                  ${loc} = chain;
+                  # A policy's emission carries where the policy registered, so
+                  # a repeat deduplicated under a provider tags it as it tags
+                  # the aspect's static content. Only untagged emissions: one
+                  # under a provider is that provider's, innermost (§11a R7).
+                  ${loc} = chain ++ lib.optionals (provenance == null) (stackRegChainsOf state scope);
                 };
               };
             in

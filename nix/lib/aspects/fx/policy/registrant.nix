@@ -31,17 +31,16 @@ let
     go { } scope;
 
   # A policy registered inside a registrant's delivered include (dispatch.nix
-  # wraps it as `den-provides-to-host=<registrant key>/<policy>`) inherits
+  # sets the token `<registrant key>/<policy>` on it) inherits
   # that registrant, an ancestor of where it registers (#694 §11a C4).
-  marker = "den-provides-to-host=";
   inheritedAt =
     state: scope:
     let
-      chain = ((state.scopedIncludesChain or (_: { })) null).${scope} or [ ];
       # A registrant token starts with an entity key (its id_hash, or
       # `<kind>:<name>` without one) and `/`; a mutual-provider token names an
-      # aspect instead, so it matches no registrant on the path.
-      tokens = map (h: lib.last (lib.splitString marker h)) (builtins.filter (lib.hasInfix marker) chain);
+      # aspect instead, so it matches no registrant on the path. Read from
+      # den's provenance stack, never from aspect names.
+      tokens = (import ../handlers/provenance.nix { inherit lib; }).stackTokensOf state scope;
       parents = (state.scopeParent or (_: { })) null;
       # The registrants on the path, nearest first.
       path =

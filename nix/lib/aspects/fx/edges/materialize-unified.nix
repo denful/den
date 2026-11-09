@@ -510,7 +510,20 @@ let
               noClass = lib.removePrefix "${cls}@" raw;
             in
             if raw == "" then null else dropKindRoot (den.lib.aspects.fx.identity.stripCtxSuffix noClass);
+          provenanceMarker = "den-provides-to-host=";
           rootMods = lib.concatMap (sid: acc.perScope.${sid}.${cls} or [ ]) boundedScopes;
+          # The collision validator den adds beside a parametric class module
+          # (wrap-classes.nix) is bookkeeping, made after the pipeline, so no
+          # delivery records it: its module is listed or not on its own.
+          inherit (den.lib.aspects.fx.wrapClasses) validatorSuffix;
+          isValidator =
+            m:
+            let
+              f = toString (m._file or "");
+              n = builtins.stringLength validatorSuffix;
+              l = builtins.stringLength f;
+            in
+            l >= n && builtins.substring (l - n) n f == validatorSuffix;
           # A module's keys, its own and those of the attrset modules it
           # imports: an anonymous wrapper around a keyed module (the
           # home-manager host-module import) is the keyed module.
@@ -589,13 +602,24 @@ let
               id = identityOf m;
             in
             id != null && seedIds ? ${id};
+          # Content a policy emitted under a provider is listed by that
+          # provider, as the provider's static content is, not by den's
+          # synthetic name for the policy's include or wrapper. A named aspect
+          # inside the provider keeps its own name.
+          isSynthetic =
+            id:
+            let
+              starts = p: builtins.substring 0 (builtins.stringLength p) id == p;
+            in
+            starts provenanceMarker || starts "<policy:";
+          shownAs = id: token: if token != null && id != null && isSynthetic id then token else id;
           defaultDelivered = lib.concatMap (
             p:
             map
               (l: {
                 scope = p.spec.sourceScopeId;
                 entity = (entityOf p.spec.sourceScopeId).name or p.spec.sourceScopeId;
-                aspect = identityOf { key = l; };
+                aspect = shownAs (identityOf { key = l; }) p.spec.__fromProvenance;
               })
               (
                 builtins.filter (l: !(onRootUndelivered { key = l; })) (
@@ -611,12 +635,19 @@ let
               (m: {
                 scope = sid;
                 entity = (entityOf sid).name or sid;
-                aspect = identityOf m;
+                aspect =
+                  let
+                    l = den.lib.aspects.fx.identity.stripCtxSuffix (toString (m.key or m._file or ""));
+                    byToken = (pi.provenanceLocs or { }).${sid} or { };
+                    under = lib.findFirst (t: builtins.elem l (byToken.${t} or [ ])) null (builtins.attrNames byToken);
+                  in
+                  shownAs (identityOf m) under;
               })
               (
                 builtins.filter (
                   m:
-                  !(reachesRoot m)
+                  !(isValidator m)
+                  && !(reachesRoot m)
                   && !(standDownAspects ? "${sid}\n${toString (identityOf m)}")
                   && !(
                     provenanceRead

@@ -349,7 +349,9 @@ let
       # Registered at the sibling itself (a late include's own policies): its
       # own dispatch would fire them wherever their arguments are bound, so
       # the entity-kind filter, which keeps an ancestor's policies from
-      # re-firing at deeper kinds, does not apply to them.
+      # re-firing at deeper kinds, does not apply to them. In a resolve that
+      # filter is redundant with sameInstanceAbove below; it is what keeps a
+      # capture from a host root (no context above it) from re-firing them.
       ownPolicies = scopedAspectPolicies.${sib.scopeId} or { };
       latePolicies = lib.filterAttrs (
         name: policy:
