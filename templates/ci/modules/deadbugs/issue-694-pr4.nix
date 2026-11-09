@@ -368,6 +368,506 @@ in
       }
     );
 
+    # #754 P3: `include.at <host>` from a policy nested in an aspect that
+    # reaches the user late. It resolves its aspect outside the late-include
+    # mechanism, as a delivery to the host, on every path, in the end state.
+    # A `{ host }` policy: the shape late dispatch's entity-kind filter dropped.
+    "test-late-nested-include-at-host--to-users--n0" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.dev.provides.to-users.includes = [
+          ({
+            includes = [
+              (den.lib.policy.mkPolicy "g" (
+                { host, ... }@ctx:
+                [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+              ))
+            ];
+          })
+        ];
+        den.aspects.igloo.includes = [ den.aspects.dev ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--to-users--n1" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.dev.provides.to-users.includes = [
+          ({
+            includes = [
+              {
+                name = "inner";
+                includes = [
+                  (den.lib.policy.mkPolicy "g" (
+                    { host, ... }@ctx:
+                    [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                  ))
+                ];
+              }
+            ];
+          })
+        ];
+        den.aspects.igloo.includes = [ den.aspects.dev ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--to-users--n2" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.dev.provides.to-users.includes = [
+          ({
+            includes = [
+              (
+                { host, ... }:
+                {
+                  includes = [
+                    (den.lib.policy.mkPolicy "g" (
+                      { host, ... }@ctx:
+                      [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                    ))
+                  ];
+                }
+              )
+            ];
+          })
+        ];
+        den.aspects.igloo.includes = [ den.aspects.dev ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--named-user--n0" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.dev.provides.tux.includes = [
+          ({
+            includes = [
+              (den.lib.policy.mkPolicy "g" (
+                { host, ... }@ctx:
+                [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+              ))
+            ];
+          })
+        ];
+        den.aspects.igloo.includes = [ den.aspects.dev ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--named-user--n1" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.dev.provides.tux.includes = [
+          ({
+            includes = [
+              {
+                name = "inner";
+                includes = [
+                  (den.lib.policy.mkPolicy "g" (
+                    { host, ... }@ctx:
+                    [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                  ))
+                ];
+              }
+            ];
+          })
+        ];
+        den.aspects.igloo.includes = [ den.aspects.dev ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--named-user--n2" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.dev.provides.tux.includes = [
+          ({
+            includes = [
+              (
+                { host, ... }:
+                {
+                  includes = [
+                    (den.lib.policy.mkPolicy "g" (
+                      { host, ... }@ctx:
+                      [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                    ))
+                  ];
+                }
+              )
+            ];
+          })
+        ];
+        den.aspects.igloo.includes = [ den.aspects.dev ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--to-hosts--n0" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.provides.to-hosts.includes = [
+          ({
+            includes = [
+              (den.lib.policy.mkPolicy "g" (
+                { host, ... }@ctx:
+                [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+              ))
+            ];
+          })
+        ];
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--to-hosts--n1" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.provides.to-hosts.includes = [
+          ({
+            includes = [
+              {
+                name = "inner";
+                includes = [
+                  (den.lib.policy.mkPolicy "g" (
+                    { host, ... }@ctx:
+                    [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                  ))
+                ];
+              }
+            ];
+          })
+        ];
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--to-hosts--n2" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.provides.to-hosts.includes = [
+          ({
+            includes = [
+              (
+                { host, ... }:
+                {
+                  includes = [
+                    (den.lib.policy.mkPolicy "g" (
+                      { host, ... }@ctx:
+                      [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                    ))
+                  ];
+                }
+              )
+            ];
+          })
+        ];
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--host-policy--n0" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.hp =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include ({
+              includes = [
+                (den.lib.policy.mkPolicy "g" (
+                  { host, ... }@ctx:
+                  [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                ))
+              ];
+            }))
+          ];
+        den.aspects.igloo.includes = [ den.policies.hp ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--host-policy--n1" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.hp =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include ({
+              includes = [
+                {
+                  name = "inner";
+                  includes = [
+                    (den.lib.policy.mkPolicy "g" (
+                      { host, ... }@ctx:
+                      [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                    ))
+                  ];
+                }
+              ];
+            }))
+          ];
+        den.aspects.igloo.includes = [ den.policies.hp ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--host-policy--n2" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.hp =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include ({
+              includes = [
+                (
+                  { host, ... }:
+                  {
+                    includes = [
+                      (den.lib.policy.mkPolicy "g" (
+                        { host, ... }@ctx:
+                        [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                      ))
+                    ];
+                  }
+                )
+              ];
+            }))
+          ];
+        den.aspects.igloo.includes = [ den.policies.hp ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--user-direct--n0" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.includes = [
+          ({
+            includes = [
+              (den.lib.policy.mkPolicy "g" (
+                { host, ... }@ctx:
+                [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+              ))
+            ];
+          })
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--user-direct--n1" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.includes = [
+          ({
+            includes = [
+              {
+                name = "inner";
+                includes = [
+                  (den.lib.policy.mkPolicy "g" (
+                    { host, ... }@ctx:
+                    [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                  ))
+                ];
+              }
+            ];
+          })
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--user-direct--n2" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.includes = [
+          ({
+            includes = [
+              (
+                { host, ... }:
+                {
+                  includes = [
+                    (den.lib.policy.mkPolicy "g" (
+                      { host, ... }@ctx:
+                      [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                    ))
+                  ];
+                }
+              )
+            ];
+          })
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--schema-user--n0" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.user.includes = [
+          ({
+            includes = [
+              (den.lib.policy.mkPolicy "g" (
+                { host, ... }@ctx:
+                [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+              ))
+            ];
+          })
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--schema-user--n1" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.user.includes = [
+          ({
+            includes = [
+              {
+                name = "inner";
+                includes = [
+                  (den.lib.policy.mkPolicy "g" (
+                    { host, ... }@ctx:
+                    [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                  ))
+                ];
+              }
+            ];
+          })
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--schema-user--n2" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.user.includes = [
+          ({
+            includes = [
+              (
+                { host, ... }:
+                {
+                  includes = [
+                    (den.lib.policy.mkPolicy "g" (
+                      { host, ... }@ctx:
+                      [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                    ))
+                  ];
+                }
+              )
+            ];
+          })
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--user-schema-policy--n0" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.user.includes = [
+          (den.lib.policy.mkPolicy "up" (
+            { host, user, ... }:
+            [
+              (den.lib.policy.include ({
+                includes = [
+                  (den.lib.policy.mkPolicy "g" (
+                    { host, ... }@ctx:
+                    [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                  ))
+                ];
+              }))
+            ]
+          ))
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--user-schema-policy--n1" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.user.includes = [
+          (den.lib.policy.mkPolicy "up" (
+            { host, user, ... }:
+            [
+              (den.lib.policy.include ({
+                includes = [
+                  {
+                    name = "inner";
+                    includes = [
+                      (den.lib.policy.mkPolicy "g" (
+                        { host, ... }@ctx:
+                        [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                      ))
+                    ];
+                  }
+                ];
+              }))
+            ]
+          ))
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    "test-late-nested-include-at-host--user-schema-policy--n2" = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.user.includes = [
+          (den.lib.policy.mkPolicy "up" (
+            { host, user, ... }:
+            [
+              (den.lib.policy.include ({
+                includes = [
+                  (
+                    { host, ... }:
+                    {
+                      includes = [
+                        (den.lib.policy.mkPolicy "g" (
+                          { host, ... }@ctx:
+                          [ (den.lib.policy.include.at host { nixos.environment.etc.g.text = ctx.user.name; }) ]
+                        ))
+                      ];
+                    }
+                  )
+                ];
+              }))
+            ]
+          ))
+        ];
+        expr = igloo.environment.etc.g.text or "<missing>";
+        expected = "tux";
+      }
+    );
+
     # 2 and 5. Origin-matched excludes: den's channels, host side and user side.
     test-define-user-excluded-host-side = denTest (
       { den, igloo, ... }:
@@ -604,6 +1104,46 @@ in
         den.default.includes = [ den.policies.drop-user-to-host ];
         expr = igloo.users.users.tux.description or "<absent>";
         expected = "<absent>";
+      }
+    );
+    # In the collision shape, where a same-named author policy holds the bare
+    # name and den's provides policy is displaced, excluding the provided
+    # aspect still stops den's delivery and leaves the author's policy.
+    test-host-exclude-of-provided-aspect-reaches-displaced-policy = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (sameNamedOn "igloo") ];
+        den.aspects.igloo.excludes = [ den.aspects.tux.provides.to-hosts ];
+        expr = {
+          real = igloo.environment.etc ? real;
+          forged = igloo.environment.etc ? forged;
+        };
+        expected = {
+          real = false;
+          forged = true;
+        };
+      }
+    );
+    # And a policy's `exclude` effect naming the author's record still removes
+    # it, by the bare key the author's policy holds.
+    test-policy-exclude-effect-reaches-author-policy-in-collision = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (sameNamedOn "igloo") ];
+        den.policies.drop-forged = {
+          __isPolicy = true;
+          name = "drop-forged";
+          fn = { host, ... }: [ (den.lib.policy.exclude den.policies."tux/to-hosts") ];
+        };
+        den.default.includes = [ den.policies.drop-forged ];
+        expr = {
+          real = igloo.environment.etc ? real;
+          forged = igloo.environment.etc ? forged;
+        };
+        expected = {
+          real = true;
+          forged = false;
+        };
       }
     );
     # O5 for den's provides policies: a provider reached twice delivers once,
@@ -1103,6 +1643,57 @@ in
         expectedError = {
           type = "ThrownError";
           msg = "from tux denied on igloo.*add `den.batteries.mutual-provider` to `admits.allow`";
+        };
+      }
+    );
+    # A policy nested in `provides.to-hosts` is part of what mutual-provider
+    # delivers (owner ruling 2026-11-08), so denying the battery withholds
+    # its host-class content too, as it withholds the provide's own.
+    test-admits-denies-mutual-provider-nested-policy = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.provides.to-hosts = {
+          nixos.environment.etc.static.text = "x";
+          includes = [
+            (den.lib.policy.mkPolicy "g" (
+              { host, user, ... }: [ (den.lib.policy.include { nixos.environment.etc.nested.text = "x"; }) ]
+            ))
+          ];
+        };
+        den.aspects.igloo.admits.deny = [ den.batteries.mutual-provider ];
+        expr = {
+          static = igloo.environment.etc ? static;
+          nested = igloo.environment.etc ? nested;
+        };
+        expected = {
+          static = false;
+          nested = false;
+        };
+      }
+    );
+    # Control: without the deny, both arrive.
+    test-mutual-provider-nested-policy-delivers = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.provides.to-hosts = {
+          nixos.environment.etc.static.text = "x";
+          includes = [
+            (den.lib.policy.mkPolicy "g" (
+              { host, user, ... }: [ (den.lib.policy.include { nixos.environment.etc.nested.text = "x"; }) ]
+            ))
+          ];
+        };
+        expr = {
+          static = igloo.environment.etc ? static;
+          nested = igloo.environment.etc ? nested;
+        };
+        expected = {
+          static = true;
+          nested = true;
         };
       }
     );

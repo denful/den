@@ -521,7 +521,9 @@ let
           let
             p = (builtins.head policyDefs).value;
           in
-          p // { name = p.name or (lib.last loc); }
+          # Only a name it lacks: re-stamping one it has would move `name`'s
+          # position, which tells den's renames from an author's (#694).
+          if p ? name then p else p // { name = lib.last loc; }
         else
           let
             parametrics = builtins.filter (d: isParametricWrapper d.value) defs';

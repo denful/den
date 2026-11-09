@@ -268,7 +268,9 @@ let
         # aspect it is included through.
         # The name the policy was written with, not its registry key, which
         # a same-named policy displaces to a chain-qualified one.
-        name = entry.value.displayName or entry.name;
+        # A guard: no policy name carries a store path today, but an
+        # import-tree identity does, and readers never show its hash.
+        name = den.lib.argsName.withoutStoreHash (entry.value.displayName or entry.name);
         allowHint =
           if (entry.value.originPolicies or [ ]) != [ ] then
             "`den.batteries.${(builtins.head entry.value.originPolicies).name}`"

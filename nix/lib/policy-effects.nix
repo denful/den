@@ -130,6 +130,21 @@ let
     ];
   withArgs = args: fn: lib.setFunctionArgs fn args;
   policyArgsOf = inner: if lib.isFunction inner.fn then lib.functionArgs inner.fn else { };
+  # A den combinator's record: its own record, plus the record it wraps, which
+  # an exclude of that record reaches. `__denWrap` ties the two together:
+  # the record counts as den's combinator only while it is still `core`
+  # (handlers/constraint.nix), so neither half can be grafted onto another.
+  denWrapped =
+    core: inner:
+    core
+    // {
+      __wraps = inner;
+      __denWrap = {
+        inherit core;
+        wraps = inner;
+      };
+    };
+
 in
 {
   inherit deliver;
@@ -418,22 +433,25 @@ in
         let
           inner = toInnerPolicy p;
         in
-        {
-          __isPolicy = true;
-          inherit (inner) name;
-          fn = withArgs (mergeArgs (policyArgsOf inner) targetArgs) (
-            ctx:
-            let
-              # The dispatching scope's own entity, or a binding of the target's kind.
-              ownKind = ctx.__entityKind or null;
-              own = if ownKind == null then null else (ctx.${ownKind} or { }).id_hash or null;
-              matches =
-                builtins.elem own entityHashes
-                || builtins.any (k: builtins.elem ((ctx.${k} or { }).id_hash or null) entityHashes) targetKinds;
-            in
-            if matches then inner.fn ctx else [ ]
-          );
-        };
+        let
+          core = {
+            __isPolicy = true;
+            inherit (inner) name;
+            fn = withArgs (mergeArgs (policyArgsOf inner) targetArgs) (
+              ctx:
+              let
+                # The dispatching scope's own entity, or a binding of the target's kind.
+                ownKind = ctx.__entityKind or null;
+                own = if ownKind == null then null else (ctx.${ownKind} or { }).id_hash or null;
+                matches =
+                  builtins.elem own entityHashes
+                  || builtins.any (k: builtins.elem ((ctx.${k} or { }).id_hash or null) entityHashes) targetKinds;
+              in
+              if matches then inner.fn ctx else [ ]
+            );
+          };
+        in
+        denWrapped core inner;
     in
     if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
 
@@ -477,14 +495,17 @@ in
         let
           inner = toInnerPolicy p;
         in
-        {
-          __isPolicy = true;
-          inherit (inner) name;
-          fn = withArgs (mergeArgs (policyArgsOf inner) predicateArgs) (
-            ctx:
-            if builtins.all (k: ctx ? ${k}) predicateRequiredArgs && predicate ctx then inner.fn ctx else [ ]
-          );
-        };
+        let
+          core = {
+            __isPolicy = true;
+            inherit (inner) name;
+            fn = withArgs (mergeArgs (policyArgsOf inner) predicateArgs) (
+              ctx:
+              if builtins.all (k: ctx ? ${k}) predicateRequiredArgs && predicate ctx then inner.fn ctx else [ ]
+            );
+          };
+        in
+        denWrapped core inner;
       wrap =
         p: if p.__isPolicy or false || builtins.isFunction p then wrapAsPolicy p else wrapAsConditional p;
     in
@@ -503,7 +524,12 @@ in
   strict =
     p:
     if builtins.isAttrs p && p.__isPolicy or false then
-      p // { __strict = true; }
+      p
+      // {
+        __strict = true;
+        # The record it wraps, which an exclude of that record reaches.
+        __wraps = p;
+      }
     else
       {
         __isPolicy = true;

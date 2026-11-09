@@ -57,12 +57,17 @@ let
     go 0 (fx.pure [ ]);
 
   # Emit policy exclude effects.
-  policyEmitExcludes = sendEach "register-constraint" (e: {
-    type = "exclude";
-    scope = "subtree";
-    identity = identity.key e.value;
-    owner = "policy";
-  });
+  policyEmitExcludes = sendEach "register-constraint" (
+    e:
+    {
+      type = "exclude";
+      scope = "subtree";
+      identity = identity.key e.value;
+      owner = "policy";
+    }
+    # A policy record is named by value, as a list exclude names it.
+    // (if e.value.__isPolicy or false then { rawRef = e.value; } else { })
+  );
 
   # Emit policy route, instantiate, and provide effects.
   policyEmitEffects =

@@ -417,6 +417,7 @@ let
                 identity = identity.key e.value;
                 owner = "policy";
               }
+              // lib.optionalAttrs (e.value.__isPolicy or false) { rawRef = e.value; }
               # A battery's transition default is excluded with it, as excludeList
               # pairs it (#694, until removalDate).
               // lib.optionalAttrs (builtins.isAttrs e.value && e.value ? __transitionDefaultPolicy) {

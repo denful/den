@@ -38,12 +38,47 @@ in
           else
             identity.pathKey (parentChainSegments ++ [ "${name}#${toString claimIndex}" ]);
       in
+      let
+        # A record wrapping others (`policy.when`, `policy.for`,
+        # `policy.strict`) is also found under each wrapped record's name, so
+        # an exclude of the record reaches it whatever it was renamed to
+        # (`den.policies.sw = policy.strict w`). A separate index: `w`'s own
+        # bucket, which decides displacement, is untouched. Whether a wrap is
+        # den's is decided where it is read (handlers/constraint.nix).
+        wrappedNames =
+          v:
+          if builtins.isAttrs v && v ? __wraps then
+            [ (v.__wraps.name or null) ] ++ wrappedNames v.__wraps
+          else
+            [ ];
+        wrappedIndex =
+          st: id:
+          let
+            names = builtins.filter (n: n != null && n != name) (wrappedNames value);
+            all = (st.policyClaimsByWrapped or (_: { })) null;
+            add =
+              acc: n:
+              acc
+              // {
+                "name:${n}" = (acc."name:${n}" or { }) // {
+                  ${scope} = ((acc."name:${n}" or { }).${scope} or [ ]) ++ [
+                    {
+                      inherit value scope;
+                      identity = id;
+                    }
+                  ];
+                };
+              };
+          in
+          if names == [ ] then { } else { policyClaimsByWrapped = _: builtins.foldl' add all names; };
+      in
       if matchingClaim != null then
         k ownerIdentity
       else
         fx.bind (fx.effects.state.modify (
           st:
           st
+          // wrappedIndex st ownerIdentity
           // {
             policyClaimsByName =
               _:

@@ -38,6 +38,7 @@ let
           denMade = param.denMade or false;
           # The name it was written with, for messages.
           displayName = param.displayName or param.ownerIdentity;
+          providesToken = param.providesToken or null;
         }
         // (if param ? fnSlot then { inherit (param) fnSlot; } else { });
         # The registry is the one scoped field that merges rather than appends,

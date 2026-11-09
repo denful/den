@@ -120,6 +120,8 @@ let
         fn = policyFn;
         inherit ownerIdentity;
         displayName = token;
+        # An exclude of the provided aspect names this policy by it.
+        providesToken = token;
         # Its routes carry den's provenance fields.
         denMade = true;
         # Its include effects carry their provider's token (providedInclude).

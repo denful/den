@@ -132,12 +132,81 @@ let
   resolveRawRefIdentity =
     state: scope: e:
     let
+      ids = resolveRawRefIdentities state scope e;
+    in
+    if ids == [ ] then null else builtins.head ids;
+
+  # Every claim the exclude's record names: the record itself, and a den
+  # combinator's record wrapping it (`policy.when`, `policy.for`,
+  # `policy.strict` record what they wrap in `__wraps`, defined in den's
+  # policy-effects.nix, which an author can't place a definition in).
+  policyEffectsFile = "${toString ../../..}/policy-effects.nix";
+  wrapsRecord =
+    target: v:
+    let
+      pos = if builtins.isAttrs v then builtins.unsafeGetAttrPos "__wraps" v else null;
+      bundle = v.__denWrap or null;
+      bundlePos = if builtins.isAttrs v then builtins.unsafeGetAttrPos "__denWrap" v else null;
+      # policy.when / policy.for: still exactly the record den built, as a
+      # whole attrset (functions compare by identity), with the wrapped record
+      # read from the same bundle; a graft of either half onto another
+      # record, or a `//` that replaces `fn`, is not den's combinator.
+      combinator =
+        bundle != null
+        && bundlePos != null
+        && bundlePos.file == policyEffectsFile
+        && sameDenRecord v bundle.core;
+      # policy.strict: the record is the wrapped one plus den's fields. Both
+      # sides stripped: the wrapped record may itself be strict.
+      strict =
+        pos != null
+        && pos.file == policyEffectsFile
+        && v.__strict or false
+        && builtins.isAttrs v.__wraps
+        && sameDenRecord v v.__wraps;
+      wrapped = if combinator then bundle.wraps else v.__wraps;
+    in
+    (combinator || strict) && (wrapped == target || wrapsRecord target wrapped);
+  # A name den's own `den.policies` merge set (policy-type.nix) is den's
+  # rename, not a change; an author's `// { name = … }` is.
+  policyTypeFile = "${toString ../..}/policy-type.nix";
+  renamedByDen =
+    v:
+    let
+      pos = builtins.unsafeGetAttrPos "name" v;
+    in
+    pos != null && pos.file == policyTypeFile;
+  # `v` is `w` up to den's fields, and up to `name` where den's merge renamed
+  # `v` (the rename moves nothing else).
+  sameDenRecord =
+    v: w:
+    let
+      drop = lib.optional (renamedByDen v) "name";
+    in
+    builtins.removeAttrs (denFieldsRemoved v) drop == builtins.removeAttrs (denFieldsRemoved w) drop;
+  denFieldsRemoved =
+    v:
+    builtins.removeAttrs v [
+      "__strict"
+      "__wraps"
+      "__denWrap"
+    ];
+  namesRecord = target: v: v == target || wrapsRecord target v;
+  resolveRawRefIdentities =
+    state: scope: e:
+    let
       scopeParentMap = (state.scopeParent or (_: { })) null;
       claimRegistry = (state.policyClaimsByName or (_: { })) null;
-      claimsByScope = claimRegistry."name:${e.rawRef.name}" or { };
+      wrapped = ((state.policyClaimsByWrapped or (_: { })) null)."name:${e.rawRef.name}" or { };
+      claimsByScope = lib.zipAttrsWith (_: builtins.concatLists) [
+        (claimRegistry."name:${e.rawRef.name}" or { })
+        wrapped
+      ];
       resolved = resolveClaim scopeParentMap scope claimsByScope e.rawRef;
     in
-    if resolved.matchingClaim != null then resolved.matchingClaim.identity else null;
+    lib.unique (
+      map (c: c.identity) (builtins.filter (c: namesRecord e.rawRef c.value) resolved.sameScopeEntries)
+    );
 
   # Is `name` excluded by `registry` (a constraint registry already scoped to
   # `scope` — see scopedConstraintsFor/scopedConstraintsForScope)? Two arms:
@@ -198,16 +267,20 @@ let
         builtins.concatLists (builtins.attrValues registry)
       );
       rawRefByName = builtins.groupBy (e: e.__id) (
-        builtins.filter (e: e.__id != null) (
-          map (e: e // { __id = resolveRawRefIdentity state scope e; }) rawRefEntries
-        )
+        lib.concatMap (
+          e: map (id: e // { __id = id; }) (resolveRawRefIdentities state scope e)
+        ) rawRefEntries
       );
       may = mayExclude state;
     in
     name: policy:
     let
-      directEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) == null) (
-        registry.${name} or [ ]
+      # Den's provides policy answers to an exclude of the aspect it
+      # provides, by its token. No other policy is matched by name: a policy
+      # exclude names its record by value (rawRef).
+      token = policy.providesToken or null;
+      directEntries = lib.optionals (token != null) (
+        builtins.filter (e: e.type == "exclude" && (e.rawRef or null) == null) (registry.${token} or [ ])
       );
     in
     builtins.any (e: may name policy e) (directEntries ++ (rawRefByName.${name} or [ ]));
@@ -317,6 +390,7 @@ let
     let
       registry = (state.scopedConstraintRegistry or (_: { })) null;
       claims = (state.policyClaimsByName or (_: { })) null;
+      wrappedClaims = (state.policyClaimsByWrapped or (_: { })) null;
       rawRefEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) != null) (
         builtins.concatMap (scopeData: builtins.concatLists (builtins.attrValues scopeData)) (
           builtins.attrValues registry
@@ -324,8 +398,11 @@ let
       );
       registered =
         ref:
-        builtins.any (c: c.value == ref) (
-          builtins.concatLists (builtins.attrValues (claims."name:${ref.name}" or { }))
+        builtins.any (c: namesRecord ref c.value) (
+          builtins.concatLists (
+            builtins.attrValues (claims."name:${ref.name}" or { })
+            ++ builtins.attrValues (wrappedClaims."name:${ref.name}" or { })
+          )
         );
       # A battery and its transition default (#694) are one entry: matched
       # when either registered.
@@ -338,6 +415,10 @@ let
       map (
         e:
         "den: exclude in aspect '${e.owner}' names policy '${e.rawRef.name}', which never registered in this resolution — the exclude suppresses nothing"
+        # The name only picks the hint; it never matches.
+        +
+          lib.optionalString (claims ? "name:${e.rawRef.name}")
+            "; a policy named `${e.rawRef.name}` did register: if it is built by a constructor, bind it once and use that value in both places, or register it under `den.policies`"
       ) (builtins.filter isUnmatched rawRefEntries)
     );
 
@@ -428,7 +509,11 @@ let
         # ancestors), NOT the fleet-wide flat registry — a sibling entity's exclude
         # must not suppress this node. filterByScope still applies for within-scope
         # include nesting.
-        allEntries = lookupEntries (scopedConstraintsFor state) nodeIdentity;
+        # An exclude naming a policy record names a policy, never an aspect
+        # that shares its name.
+        allEntries = builtins.filter (e: (e.rawRef or null) == null) (
+          lookupEntries (scopedConstraintsFor state) nodeIdentity
+        );
         scopedEntries = filterByScope currentChain allEntries;
         firstEntry = if scopedEntries == [ ] then null else builtins.head scopedEntries;
       in
