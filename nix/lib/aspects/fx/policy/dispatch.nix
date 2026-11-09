@@ -232,6 +232,42 @@ let
         __denRegChain = entry.value.chain or [ ];
       };
 
+  # `include.at` (#694 §12): at the firing entity a plain include; at another
+  # entity a delivery to it, the aspect resolved for its class at the firing
+  # scope's context, as user-aspects delivers.
+  placeAt =
+    ctx: e:
+    if e.__policyEffect != "include" || !(e ? __at) then
+      e
+    else
+      let
+        target = e.__at;
+        firingKind = ctx.__entityKind or null;
+        firing = if firingKind == null then null else ctx.${firingKind} or null;
+        # The head names one of the instance's relata: an entity bound in the
+        # policy's context.
+        boundAs = lib.findFirst (
+          k: builtins.isAttrs (ctx.${k} or null) && ctx.${k} ? name && sameEntity k ctx.${k} target
+        ) null (builtins.filter (k: ((den.schema.${k} or { }).isEntity or false)) (builtins.attrNames ctx));
+        atFiring = boundAs != null && boundAs == firingKind;
+        class = e.__atClass or target.class or null;
+      in
+      if !(builtins.isAttrs target) || boundAs == null then
+        throw "den: include.at names ${target.name or "an entity"}, which is not one of this policy instance's relata (bound in its context)"
+      else if atFiring then
+        builtins.removeAttrs e [
+          "__at"
+          "__atClass"
+        ]
+      else if class == null then
+        throw "den: include.at names ${target.name or "an entity"}, which has no class to deliver into; give one with include.atClass"
+      else
+        den.lib.policy.provide {
+          inherit class;
+          receiver = target;
+          module = _: den.lib.aspects.resolve class (den.lib.acceptance.atCtx ctx e.value);
+        };
+
   # Dispatch aspect policies against a context.
   # Note: caller passes the same aspectPolicies each iteration; Nix memoizes
   # attrsToList per attrset identity, so repeated calls are cheap.
@@ -263,7 +299,7 @@ let
         policyName = entry.name;
         effects = builtins.filter (admitted ctx entry) (
           applyToRegistrant entry.name (entry.value.registrant or null) ctx (
-            map (denProvenance entry) (validateEffects entry.name rawEffects)
+            map (e: denProvenance entry (placeAt ctx e)) (validateEffects entry.name rawEffects)
           )
         );
       }

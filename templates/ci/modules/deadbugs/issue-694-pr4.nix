@@ -73,6 +73,163 @@ in
       }
     );
 
+    # A user policy's plain include stays with the user; include.at host is
+    # what moves it, and include.at the firing user is a plain include.
+    test-include-at-firing-entity-is-plain-include = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ hmUser ];
+        den.aspects.tux.policies.here =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include.at user {
+              nixos.environment.etc.here.text = "x";
+              homeManager.home.sessionVariables.HERE = "x";
+            })
+          ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.here ];
+        expr = {
+          host = igloo.environment.etc ? here;
+          home = igloo.home-manager.users.tux.home.sessionVariables.HERE or "<missing>";
+        };
+        expected = {
+          host = false;
+          home = "x";
+        };
+      }
+    );
+    # include.at host is a delivery: admits applies to it.
+    test-include-at-host-is-admitted = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.to-host =
+          { host, user, ... }: [ (den.lib.policy.include.at host { nixos.environment.etc.at.text = "x"; }) ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-host ];
+        den.aspects.igloo.admits.deny = [ den.aspects.tux.policies.to-host ];
+        expr = igloo.environment.etc ? at;
+        expected = false;
+      }
+    );
+
+    # include.atClass gives the class to resolve for, overriding the target's:
+    # a delivery to igloo resolved for homeManager carries the aspect's
+    # homeManager part, not its nixos part.
+    test-include-at-class-overrides-target-class = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.to-host =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include.atClass "homeManager" host {
+              homeManager.home.sessionVariables.HMC = "x";
+              nixos.environment.etc.wrong.text = "x";
+            })
+          ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-host ];
+        expr =
+          let
+            st = (den.lib.aspects.resolveWithState "nixos" (den.lib.resolveEntity "flake" { })).state;
+            prov = builtins.filter (p: (p.__providePolicyName or null) == "to-host") (
+              builtins.concatLists (builtins.attrValues ((st.scopedProvides or (_: { })) null))
+            );
+          in
+          map (p: p.class) prov;
+        expected = [ "homeManager" ];
+      }
+    );
+    # A class-less target (an environment) with a given class lands; without
+    # one it is an error naming the target.
+    test-include-at-classless-target-with-class = denTest (
+      { den, config, ... }:
+      {
+        den.schema.environment.isEntity = true;
+        den.schema.host.parent = "environment";
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.to-env = _: [
+          (den.lib.policy.resolve.to "environment" {
+            environment = {
+              name = "prod";
+              id_hash = "environment:prod";
+            };
+          })
+        ];
+        den.policies.env-to-hosts =
+          { environment, ... }:
+          [
+            (den.lib.policy.resolve.to "host" { host = den.hosts.x86_64-linux.igloo; })
+            (den.lib.policy.instantiate den.hosts.x86_64-linux.igloo)
+          ];
+        den.schema.flake.includes = [ den.policies.to-env ];
+        den.schema.environment.includes = [ den.policies.env-to-hosts ];
+        den.policies.to-environment =
+          { environment, host, ... }:
+          [ (den.lib.policy.include.atClass "nixos" environment { nixos.environment.etc.env.text = "x"; }) ];
+        den.aspects.igloo.includes = [ den.policies.to-environment ];
+        expr =
+          let
+            st = (den.lib.aspects.resolveWithState "nixos" (den.lib.resolveEntity "flake" { })).state;
+            prov = builtins.concatLists (builtins.attrValues ((st.scopedProvides or (_: { })) null));
+          in
+          builtins.any (p: (p.receiver.name or null) == "prod" && p.class == "nixos") prov;
+        expected = true;
+      }
+    );
+    test-include-at-classless-target-without-class-errors = denTest (
+      { den, config, ... }:
+      {
+        den.schema.environment.isEntity = true;
+        den.schema.host.parent = "environment";
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.to-env = _: [
+          (den.lib.policy.resolve.to "environment" {
+            environment = {
+              name = "prod";
+              id_hash = "environment:prod";
+            };
+          })
+        ];
+        den.policies.env-to-hosts =
+          { environment, ... }:
+          [
+            (den.lib.policy.resolve.to "host" { host = den.hosts.x86_64-linux.igloo; })
+            (den.lib.policy.instantiate den.hosts.x86_64-linux.igloo)
+          ];
+        den.schema.flake.includes = [ den.policies.to-env ];
+        den.schema.environment.includes = [ den.policies.env-to-hosts ];
+        den.policies.to-environment =
+          { environment, host, ... }:
+          [ (den.lib.policy.include.at environment { nixos.environment.etc.env.text = "x"; }) ];
+        den.aspects.igloo.includes = [ den.policies.to-environment ];
+        expr = config.flake.nixosConfigurations.igloo.config.environment.etc ? env;
+        expectedError = {
+          type = "ThrownError";
+          msg = "include.at names prod, which has no class";
+        };
+      }
+    );
+    # The head names one of the instance's relata: a host the policy doesn't
+    # bind is refused.
+    test-include-at-non-relatum-refused = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg = { };
+        den.policies.cross =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include.at den.hosts.x86_64-linux.iceberg { nixos.environment.etc.x.text = "x"; })
+          ];
+        den.aspects.igloo.includes = [ den.policies.cross ];
+        expr = igloo.environment.etc ? x;
+        expectedError = {
+          type = "ThrownError";
+          msg = "include.at names iceberg, which is not one of this policy instance's relata";
+        };
+      }
+    );
+
     # 2 and 5. Origin-matched excludes: den's channels, host side and user side.
     test-define-user-excluded-host-side = denTest (
       { den, igloo, ... }:
@@ -563,6 +720,21 @@ in
         den.schema.host.policyEnforcement = "strict";
         den.aspects.igloo.excludes = [ den.policies.inner ];
         expr = igloo.home-manager.users.tux.home.sessionVariables.IN or "<missing>";
+        expected = "<missing>";
+      }
+    );
+    # policy.strict on a two-sided registration has no effect: every relatum
+    # is a registrant, so tux may still exclude it.
+    test-enforcement-policy-strict-two-sided-no-effect = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ hmUser ];
+        den.policies.both = den.lib.policy.strict (
+          { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.BOTH = "x"; }) ]
+        );
+        den.default.includes = [ den.policies.both ];
+        den.aspects.tux.excludes = [ den.policies.both ];
+        expr = igloo.home-manager.users.tux.home.sessionVariables.BOTH or "<missing>";
         expected = "<missing>";
       }
     );

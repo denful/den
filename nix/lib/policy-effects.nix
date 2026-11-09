@@ -185,9 +185,26 @@ in
 
   # Inject an aspect into the current resolution context.
   # Accepts aspect references and inline attrsets (coerced to anonymous aspects).
-  include = aspect: {
-    __policyEffect = "include";
-    value = aspect;
+  # `include.at <entity> <aspect>` names the entity the content attaches to
+  # (#694 §12): at the firing scope's own entity it is a plain include,
+  # anywhere else a delivery to that entity, resolved for its class.
+  include = {
+    __functor = _: aspect: {
+      __policyEffect = "include";
+      value = aspect;
+    };
+    at = entity: aspect: {
+      __policyEffect = "include";
+      value = aspect;
+      __at = entity;
+    };
+    # The same, resolved for `class` rather than the target's own class.
+    atClass = class: entity: aspect: {
+      __policyEffect = "include";
+      value = aspect;
+      __at = entity;
+      __atClass = class;
+    };
   };
 
   # Remove/gate an aspect from the current resolution tree.
