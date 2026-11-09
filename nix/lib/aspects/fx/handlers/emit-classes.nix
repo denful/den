@@ -65,6 +65,7 @@ let
       globalPolicy,
       isContextDependent,
       sharedFanOutFor ? null,
+      defPos ? null,
     }:
     fx.send "emit-class" (
       {
@@ -80,6 +81,7 @@ let
         __rawEntry = true;
       }
       // lib.optionalAttrs (sharedFanOutFor != null) { inherit sharedFanOutFor; }
+      // lib.optionalAttrs (defPos != null) { inherit defPos; }
     );
 
   emitClassKey =
@@ -106,6 +108,9 @@ let
           # through identity computation (wrap-classes.nix finalIdentity).
           isContextDependent = contextDep || entityArgs != [ ];
           sharedFanOutFor = aspect.meta.__sharedFanOutFor or null;
+          # An anonymous aspect's definition position, a stable key the
+          # transition warning reads (#694 F2); its walk identity is not.
+          defPos = if aspect.__walkStamped or false then builtins.unsafeGetAttrPos k aspect else null;
         };
     in
     fx.seq (lib.imap0 mkEntry modules);

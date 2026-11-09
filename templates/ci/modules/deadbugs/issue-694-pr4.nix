@@ -10,6 +10,7 @@
 #   4. `policyEnforcement` and `den.lib.policy.strict`.
 #   5. Stable origins for den's channels (the held excludability cells).
 #   6. Stable identity for anonymous aspects.
+#   7. The transition defaults are excluded with their batteries by origin.
 { denTest, lib, ... }:
 let
   hmUser = {
@@ -28,6 +29,19 @@ let
       { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.HP = "x"; }) ];
     den.aspects.igloo.includes = [ den.policies.hp ];
   };
+  # The finished pipeline state for igloo, which the unmatched-exclude
+  # diagnostic reads (internal/unmatched-policy-exclude.nix).
+  hostState =
+    den:
+    let
+      fxLib = den.lib.aspects.fx;
+      hostRoot = den.lib.resolveEntity "host" { host = den.hosts.x86_64-linux.igloo; };
+    in
+    (fxLib.pipeline.fxFullResolve {
+      class = "nixos";
+      ctx = fxLib.aspect.ctxFromHandlers (hostRoot.__scopeHandlers or { });
+      self = den.lib.aspects.normalizeRoot hostRoot;
+    }).state;
   hpOf = igloo: igloo.home-manager.users.tux.home.sessionVariables.HP or "<missing>";
   # A user-registered author delivery to the host.
   toIgloo = den: {
@@ -579,6 +593,51 @@ in
         };
       }
     );
+    # The registrant's part is told apart by construction, not by a field on
+    # the delivery: an author provide carrying `__registrantPart` is refused.
+    test-admits-default-deny-refuses-forged-registrant-part = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.to-igloo =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.ud.text = "x";
+              __registrantPart = true;
+            })
+          ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-igloo ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? ud;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    test-admits-deny-withholds-forged-registrant-part = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.to-igloo =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.ud.text = "x";
+              __registrantPart = true;
+            })
+          ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-igloo ];
+        den.aspects.igloo.admits.deny = [ den.aspects.tux.policies.to-igloo ];
+        expr = igloo.environment.etc ? ud;
+        expected = false;
+      }
+    );
     # Origins match by value: of two policies named `deliver`, only the one
     # allowed lands; the other is refused.
     test-admits-same-name-matched-by-value = denTest (
@@ -752,6 +811,24 @@ in
       }
     );
 
+    # Different values from one definition position (a `map`) are different
+    # content: the one only the user has stays listed.
+    test-anonymous-aspect-same-position-different-value-listed = denTest (
+      { den, config, ... }:
+      let
+        mk = x: { nixos.boot.kernelModules = [ x ]; };
+      in
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ (mk "on-host") ];
+        den.schema.user.includes = [ (mk "user-only") ];
+        expr = builtins.length (
+          config.flake.nixosConfigurations.igloo._module.args.denTransitionDefaultLost or [ ]
+        );
+        expected = 1;
+      }
+    );
     # 6. An anonymous aspect included on the host and on its users is one
     # aspect, whatever its position: the host's copy covers the user's, so the
     # transition warning doesn't list it (F2: positional `<anon>:N` identities
@@ -776,6 +853,188 @@ in
           config.flake.nixosConfigurations.igloo._module.args.denTransitionDefaultLost or [ ]
         );
         expected = 1;
+      }
+    );
+
+    # 7. A transition default is a policy named below its battery's path: the
+    # battery's exclude reaches it by origin, and an explicit include of the
+    # battery is not deduplicated against it, even on den.default beside it.
+    test-default-form-not-deduplicated-against-explicit-include = denTest (
+      { den, config, ... }:
+      let
+        ctx = config.den.hosts.x86_64-linux.igloo.__resolveResult.scopeContexts."host=igloo" or { };
+        id = config.den.hosts.x86_64-linux.igloo.id_hash;
+        has =
+          prefix:
+          builtins.any (k: builtins.substring 0 (builtins.stringLength prefix) k == prefix) (
+            builtins.attrNames ctx
+          );
+      in
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.default.includes = [
+          den.batteries.user-aspects
+          den.batteries.mutual-provider
+        ];
+        expr = {
+          userAspects = has "den-user-aspects/${id}/";
+          userAspectsDefault = ctx ? "den-user-aspects/default/${id}";
+          mutualProvider = ctx ? "den-mutual-provider/${id}";
+          mutualProviderDefault = ctx ? "den-mutual-provider/default/${id}";
+        };
+        expected = {
+          userAspects = true;
+          userAspectsDefault = true;
+          mutualProvider = true;
+          mutualProviderDefault = true;
+        };
+      }
+    );
+    # An exclude in an aspect the host includes is not on den.default's
+    # include tree, so the gate never meets the defaults; origin matching
+    # stops both. user-aspects is an aspect exclude, mutual-provider a policy
+    # exclude.
+    test-off-tree-exclude-stops-default-forms = denTest (
+      { den, config, ... }:
+      let
+        ctx = config.den.hosts.x86_64-linux.igloo.__resolveResult.scopeContexts."host=igloo" or { };
+        id = config.den.hosts.x86_64-linux.igloo.id_hash;
+      in
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.no-defaults.excludes = [
+          den.batteries.user-aspects
+          den.batteries.mutual-provider
+        ];
+        den.aspects.igloo.includes = [ den.aspects.no-defaults ];
+        expr = {
+          userAspectsDefault = ctx ? "den-user-aspects/default/${id}";
+          mutualProviderDefault = ctx ? "den-mutual-provider/default/${id}";
+        };
+        expected = {
+          userAspectsDefault = false;
+          mutualProviderDefault = false;
+        };
+      }
+    );
+    # The pairing is by value, not by name: an author policy named below a
+    # battery survives the battery's exclude, and the exclude, which does
+    # suppress the battery, is not reported as suppressing nothing.
+    test-policy-named-below-battery-survives-its-exclude = denTest (
+      { den, igloo, ... }:
+      let
+        mine = den.lib.policy.mkPolicy "mutual-provider/mine" (
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.mine.text = "x";
+            })
+          ]
+        );
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ den.batteries.mutual-provider ];
+        den.aspects.tux.includes = [ mine ];
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        expr = {
+          mine = igloo.environment.etc ? mine;
+          messages = den.lib.aspects.fx.handlers.unmatchedRawRefExcludes (hostState den);
+        };
+        expected = {
+          mine = true;
+          messages = [ ];
+        };
+      }
+    );
+    # An author policy named exactly as the battery is still its own record:
+    # the battery's exclude leaves it.
+    test-policy-named-as-battery-survives-its-exclude = denTest (
+      { den, igloo, ... }:
+      let
+        mine = den.lib.policy.mkPolicy "mutual-provider" (
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.mine.text = "x";
+            })
+          ]
+        );
+      in
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.includes = [ mine ];
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        expr = igloo.environment.etc ? mine;
+        expected = true;
+      }
+    );
+    # A policy exclude names one record: excluding the policy `tools` leaves
+    # the policies the aspect `tools` carries.
+    test-policy-exclude-leaves-namesake-aspect = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.tools = { host, ... }: [ ];
+        den.policies.tools-to-host =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.tt.text = "x";
+            })
+          ];
+        den.aspects.tools.includes = [ den.policies.tools-to-host ];
+        den.aspects.tux.includes = [ den.aspects.tools ];
+        den.aspects.igloo.includes = [ den.policies.tools ];
+        den.aspects.igloo.excludes = [ den.policies.tools ];
+        expr = igloo.environment.etc ? tt;
+        expected = true;
+      }
+    );
+    # A battery and its default are one exclude entry: excluding the battery
+    # while only its default registers suppresses the default, so it is not
+    # reported as suppressing nothing.
+    test-default-form-exclude-not-unmatched = denTest (
+      { den, ... }:
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        expr = den.lib.aspects.fx.handlers.unmatchedRawRefExcludes (hostState den);
+        expected = [ ];
+      }
+    );
+    # The same with no user scope below the host.
+    test-default-form-exclude-not-unmatched-no-users = denTest (
+      { den, ... }:
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo = { };
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        expr = den.lib.aspects.fx.handlers.unmatchedRawRefExcludes (hostState den);
+        expected = [ ];
+      }
+    );
+    # Control: without the default, the same exclude suppresses nothing, and
+    # says so once.
+    test-default-form-exclude-unmatched-without-default = denTest (
+      { den, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        expr = den.lib.aspects.fx.handlers.unmatchedRawRefExcludes (hostState den);
+        expected = [
+          "den: exclude in aspect 'igloo' names policy 'mutual-provider', which never registered in this resolution — the exclude suppresses nothing"
+        ];
       }
     );
   };

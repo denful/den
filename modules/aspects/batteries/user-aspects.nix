@@ -44,10 +44,11 @@ let
 
   # The transition default, on every host until den.lib.migrations
   # removalDate: its own policy and key, so an explicit include is told apart
-  # from it.
-  defaultForm = {
+  # from it. Named below the battery's path, so excluding the battery
+  # excludes it by origin.
+  transitionDefault = {
     __isPolicy = true;
-    name = "user-aspects-default";
+    name = "${(battery null).name}/transition-default";
     fn =
       { host, ... }@ctx:
       # Not at a standalone home, which binds a host it doesn't belong to.
@@ -59,13 +60,11 @@ in
 {
   den.batteries.user-aspects = battery null // {
     __functor = _: { users }: battery users;
-    # Excluding the battery excludes its transition default too. Temporary:
-    # PR 4's origin-matched excludes cover this generally.
-    __defaultForm = defaultForm;
+    __transitionDefaultPolicy = transitionDefault;
   };
 
   # On every entity kind, so a nested kind with its own class (a guest that is
   # its own host) gets it too; it acts only where `host` is bound and `user`
   # is not.
-  den.default.includes = lib.optional den.lib.migrations.transitionActive defaultForm;
+  den.default.includes = lib.optional den.lib.migrations.transitionActive transitionDefault;
 }

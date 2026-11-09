@@ -350,24 +350,17 @@ let
       # can resolve it later, once dispatch has run past this aspect's own
       # includes and the registry actually holds the claim.
       policyExclude = policyExcludeOf;
-      excludeList = lib.concatMap (
+      excludeList = map (
         ref:
-        [
-          (
-            {
-              type = "exclude";
-              scope = "subtree";
-              identity = excludeIdentity ref;
-            }
-            // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
-          )
-        ]
-        # A battery's transition default is excluded with it (#694, until
-        # den.lib.migrations.removalDate). Temporary: PR 4's origin-matched
-        # excludes cover this generally.
-        ++ lib.optional (builtins.isAttrs ref && ref ? __defaultForm) (
-          policyExclude ref.__defaultForm // { defaultFormOf = true; }
-        )
+        {
+          type = "exclude";
+          scope = "subtree";
+          identity = excludeIdentity ref;
+        }
+        // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+        // lib.optionalAttrs (builtins.isAttrs ref && ref ? __transitionDefaultPolicy) {
+          defaultPolicy = ref.__transitionDefaultPolicy;
+        }
       ) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
@@ -431,26 +424,20 @@ let
           );
         in
         fx.seq (
-          lib.concatMap (
+          map (
             e:
-            [
-              (fx.send "register-constraint" {
+            fx.send "register-constraint" (
+              {
                 type = "exclude";
                 scope = "subtree";
                 identity = identity.key e.value;
                 owner = "policy";
-              })
-            ]
-            # A battery's transition default is excluded with it, as excludeList
-            # does (#694, until removalDate).
-            ++ lib.optional (builtins.isAttrs e.value && e.value ? __defaultForm) (
-              fx.send "register-constraint" (
-                policyExcludeOf e.value.__defaultForm
-                // {
-                  defaultFormOf = true;
-                  owner = "policy";
-                }
-              )
+              }
+              # A battery's transition default is excluded with it, as excludeList
+              # pairs it (#694, until removalDate).
+              // lib.optionalAttrs (builtins.isAttrs e.value && e.value ? __transitionDefaultPolicy) {
+                defaultPolicy = e.value.__transitionDefaultPolicy;
+              }
             )
           ) excludes
         )

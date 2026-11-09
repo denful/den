@@ -115,15 +115,21 @@ let
           receiver = target;
           __fromProvenance = token;
           __standDown = acceptedByDefault;
-          # The registrant's own content (§11a R7): not a delivery for admits.
-          __registrantPart = true;
         }
       );
     in
+    # The registrant's own part comes back apart from the author's effects,
+    # so admits never has to tell them apart by a field an author can set.
     if registrant == null || !isBelow then
-      effects
+      {
+        inherit effects;
+        registrantPart = [ ];
+      }
     else
-      map (e: if isInclude e then wrapped e else aimed e) effects ++ delivery;
+      {
+        effects = map (e: if isInclude e then wrapped e else aimed e) effects;
+        registrantPart = delivery;
+      };
 
   # Receiver acceptance (#694 §12, §11a R7). A delivery naming a receiver is
   # checked against what the receiver admits: its kind's schema layer and its
@@ -187,15 +193,12 @@ let
       denied = builtins.any (originMatches entry) a.deny;
       allowed = (entry.value.denChannel or false) || builtins.any (originMatches entry) a.allow;
     in
-    # R3's host-class part of a registrant's own bare include is its own
-    # content, not a delivery (§11a R7).
     if
       !(builtins.isAttrs receiver)
       || !(builtins.elem e.__policyEffect [
         "provide"
         "route"
       ])
-      || (e.value.__registrantPart or false)
     then
       true
     else if denied then
@@ -294,14 +297,16 @@ let
       let
         result = entry.value.fn ctx;
         rawEffects = if builtins.isList result then result else [ result ];
+        applied = applyToRegistrant entry.name (entry.value.registrant or null) ctx (
+          map (e: denProvenance entry (placeAt ctx e)) (validateEffects entry.name rawEffects)
+        );
       in
       {
         policyName = entry.name;
-        effects = builtins.filter (admitted ctx entry) (
-          applyToRegistrant entry.name (entry.value.registrant or null) ctx (
-            map (e: denProvenance entry (placeAt ctx e)) (validateEffects entry.name rawEffects)
-          )
-        );
+        # R3's host-class part of a registrant's own bare include is its own
+        # content, not a delivery (§11a R7), so only the author's effects are
+        # checked against admits.
+        effects = builtins.filter (admitted ctx entry) applied.effects ++ applied.registrantPart;
       }
     ) matching;
 

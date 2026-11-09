@@ -256,13 +256,20 @@ let
   isOriginExcluded =
     state: registry:
     let
-      # The registry is keyed by identity.
+      excludes = builtins.mapAttrs (
+        _: entries: builtins.filter (e: e.type == "exclude") entries
+      ) registry;
+      # The registry is keyed by identity; a policy exclude's key is only its
+      # name, so only aspect excludes match origins.
       byId = lib.filterAttrs (_: entries: entries != [ ]) (
-        builtins.mapAttrs (
-          _: entries: builtins.filter (e: e.type == "exclude" && (e.rawRef or null) == null) entries
-        ) registry
+        builtins.mapAttrs (_: builtins.filter (e: (e.rawRef or null) == null)) excludes
       );
       ids = builtins.attrNames byId;
+      # A battery's transition default (#694) is excluded with the battery,
+      # paired by value: an author can't name a policy into the pair.
+      pairing = builtins.filter (e: (e.defaultPolicy or null) != null) (
+        builtins.concatLists (builtins.attrValues excludes)
+      );
       # The aspect itself, a path below it, or a parametric instance of it
       # (`primary-user(tux@igloo)` originates from `primary-user`).
       under =
@@ -280,10 +287,12 @@ let
         );
     in
     name: entry:
-    ids != [ ]
-    && builtins.any (
-      c: builtins.any (id: under id c && builtins.any (mayExclude state name entry) byId.${id}) ids
-    ) (entry.origin or [ ]);
+    let
+      may = mayExclude state name entry;
+      matches = c: builtins.any (id: under id c && builtins.any may byId.${id}) ids;
+      paired = builtins.any (e: (entry.ref or null) == e.defaultPolicy && may e) pairing;
+    in
+    (pairing != [ ] && paired) || (ids != [ ] && builtins.any matches (entry.origin or [ ]));
 
   # The `den:` diagnostics for raw-ref excludes that resolved to no claim
   # ANYWHERE in a finished resolution — a user naming a record den never found,
@@ -318,14 +327,12 @@ let
         builtins.any (c: c.value == ref) (
           builtins.concatLists (builtins.attrValues (claims."name:${ref.name}" or { }))
         );
-      # A battery's exclude and the exclude of its transition default (#694)
-      # are one: matched when either registered; the default's own entry is
-      # never reported.
+      # A battery and its transition default (#694) are one entry: matched
+      # when either registered.
       isUnmatched =
         e:
-        !(e.defaultFormOf or false)
-        && !(registered e.rawRef)
-        && !(e.rawRef ? __defaultForm && registered e.rawRef.__defaultForm);
+        !(registered e.rawRef)
+        && !(e.rawRef ? __transitionDefaultPolicy && registered e.rawRef.__transitionDefaultPolicy);
     in
     lib.unique (
       map (
@@ -386,8 +393,8 @@ let
             # Where the exclude was declared: under a strict mode only a
             # policy's registrants may exclude it (#694 §11a O2).
             atScope = currentScope;
-            # A battery's transition-default exclude (children.nix).
-            defaultFormOf = param.defaultFormOf or false;
+            # The excluded battery's transition default, paired by value.
+            defaultPolicy = param.defaultPolicy or null;
             inherit scope ownerChain;
           };
         in
