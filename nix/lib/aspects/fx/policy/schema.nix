@@ -20,7 +20,8 @@ let
   inherit (import ./registrant.nix { inherit lib; }) withRegistrants;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
-    isPolicyExcluded
+    isPolicyInstanceExcluded
+    isOriginExcluded
     ;
 
   inherit (import ./entity-identity.nix { inherit lib; })
@@ -387,7 +388,8 @@ let
         # excludes) register at the sibling/descendant scope, not an ancestor.
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
         # Applied once, outside the lambda — see isPolicyExcluded's currying note.
-        excluded = isPolicyExcluded state sib.scopeId constraintRegistry;
+        excluded = isPolicyInstanceExcluded state sib.scopeId constraintRegistry;
+        originExcluded = isOriginExcluded state constraintRegistry;
         # A policy an ancestor scope could already dispatch with the same bound
         # arguments fired there (late firings are not recorded in the fired
         # set), so it does not fire again here: offering a grandparent's
@@ -444,7 +446,8 @@ let
         filteredPolicies = withRegistrants state sib.scopeId (
           lib.filterAttrs (
             name: policy:
-            !excluded name
+            !(excluded name policy)
+            && !(originExcluded name policy)
             && !(ranAtSib ? ${name})
             && !(lateRan name policy)
             && !(sameInstanceAbove name policy)

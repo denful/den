@@ -119,6 +119,37 @@ in
         merge = acc: val: acc ++ map (checkCollectionElement "excludes") val;
         identity = false;
       };
+      # What a receiver of this kind admits (#694 §12). Set values only: a
+      # layer that leaves `default` unset doesn't loosen a "deny".
+      admits = {
+        default = {
+          default = null;
+          allow = [ ];
+          deny = [ ];
+        };
+        merge = acc: val: {
+          default =
+            if acc.default == "deny" || (val.default or null) == "deny" then
+              "deny"
+            else
+              val.default or acc.default;
+          allow = acc.allow ++ (val.allow or [ ]);
+          deny = acc.deny ++ (val.deny or [ ]);
+        };
+        identity = false;
+      };
+      # Who may exclude the policies registered by this kind (#694 §11a O2):
+      # the strictest value any layer sets wins.
+      policyEnforcement = {
+        default = null;
+        merge =
+          acc: val:
+          (import ./../nix/lib/enforcement.nix { inherit lib; }).strictest [
+            acc
+            val
+          ];
+        identity = false;
+      };
       isEntity = {
         default = false;
         merge = acc: val: acc || val;
@@ -144,6 +175,8 @@ in
             collectionKeys = [
               "includes"
               "excludes"
+              "admits"
+              "policyEnforcement"
               "isEntity"
               "isolated"
               "isStrict"

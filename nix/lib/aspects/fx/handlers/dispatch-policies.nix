@@ -10,7 +10,11 @@
 }:
 let
   inherit (den.lib) fx;
-  inherit (import ./constraint.nix { inherit lib den; }) scopedConstraintsFor isPolicyExcluded;
+  inherit (import ./constraint.nix { inherit lib den; })
+    scopedConstraintsFor
+    isPolicyInstanceExcluded
+    isOriginExcluded
+    ;
 in
 {
   mkDispatchPoliciesHandler = mkDispatch: {
@@ -21,8 +25,11 @@ in
         # policy-exclude must not filter this scope's policies (#613 analog).
         registry = scopedConstraintsFor state;
         # Applied once, outside the lambda — see isPolicyExcluded's currying note.
-        excluded = isPolicyExcluded state state.currentScope registry;
-        filteredPolicies = lib.filterAttrs (name: _: !excluded name) param.aspectPolicies;
+        excluded = isPolicyInstanceExcluded state state.currentScope registry;
+        originExcluded = isOriginExcluded state registry;
+        filteredPolicies = lib.filterAttrs (
+          name: p: !(excluded name p) && !(originExcluded name p)
+        ) param.aspectPolicies;
       in
       {
         resume = mkDispatch filteredPolicies param.firedPolicies param.resolveCtx;

@@ -97,6 +97,27 @@ let
   # the SAME chain segments, so without the index the second and third (and
   # every later) distinct claimant would collide with EACH OTHER under one
   # identical qualified string.
+  # One of den's channels (#694 §12): its `fn` is defined in one of den's
+  # channel files (an author can't place a definition there), or it is den's
+  # one `den.policies` channel, user-to-host, by value. A record extended with
+  # `//` keeps its `fn`'s position: `den.batteries.define-user // { … }` that
+  # keeps den's `fn` is still den's channel, by design; one that redefines
+  # `fn` is the author's.
+  denChannelFiles = map (f: "${toString ../../../../..}/${f}") [
+    "modules/aspects/batteries/define-user.nix"
+    "modules/aspects/batteries/primary-user.nix"
+    "modules/aspects/batteries/user-shell.nix"
+    "modules/aspects/batteries/unfree/unfree.nix"
+    "modules/aspects/batteries/insecure/insecure.nix"
+    "nix/lib/home-env.nix"
+  ];
+  isDenChannel =
+    p:
+    let
+      pos = builtins.unsafeGetAttrPos "fn" p;
+    in
+    (pos != null && builtins.elem pos.file denChannelFiles) || p == (den.policies.user-to-host or null);
+
   registerPolicy =
     p:
     fx.bind fx.effects.state.get (
@@ -128,6 +149,8 @@ let
           # registrations of one record compare equal under `==`, two records
           # sharing a name don't (policy/schema.nix samePolicy).
           fnSlot = builtins.intersectAttrs { fn = null; } p;
+          ref = p;
+          denChannel = isDenChannel p;
         };
       in
       if matchingClaim != null then

@@ -7,6 +7,9 @@
   ...
 }:
 let
+  inherit (import ../policy/registrant.nix { inherit lib; }) registrantAt;
+  entityIdentity = import ../policy/entity-identity.nix { inherit lib; };
+  enforcement = import ../../../enforcement.nix { inherit lib; };
   lookupEntries =
     registry: nodeIdentity:
     let
@@ -178,22 +181,109 @@ let
   # resolved previously depended on the order candidate names arrived in, so
   # any error reachable through resolveClaim surfaced for some dispatch orders
   # and not others.
+  # Policy-free form: any exclude counts, whoever declared it.
   isPolicyExcluded =
+    state: scope: registry:
+    let
+      byInstance = isPolicyInstanceExcluded state scope registry;
+    in
+    name: byInstance name { };
+
+  # Is this policy instance excluded? As isPolicyExcluded, with the policy's
+  # registry entry so enforcement can decide who may exclude it.
+  isPolicyInstanceExcluded =
     state: scope: registry:
     let
       rawRefEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) != null) (
         builtins.concatLists (builtins.attrValues registry)
       );
-      rawRefExcluded = lib.genAttrs (builtins.filter (id: id != null) (
-        map (resolveRawRefIdentity state scope) rawRefEntries
-      )) (_: true);
+      rawRefByName = builtins.groupBy (e: e.__id) (
+        builtins.filter (e: e.__id != null) (
+          map (e: e // { __id = resolveRawRefIdentity state scope e; }) rawRefEntries
+        )
+      );
+      may = mayExclude state;
     in
-    name:
+    name: policy:
     let
-      directEntries = registry.${name} or [ ];
-      directApplies = e: e.type == "exclude" && (e.rawRef or null) == null;
+      directEntries = builtins.filter (e: e.type == "exclude" && (e.rawRef or null) == null) (
+        registry.${name} or [ ]
+      );
     in
-    builtins.any directApplies directEntries || rawRefExcluded ? ${name};
+    builtins.any (e: may name policy e) (directEntries ++ (rawRefByName.${name} or [ ]));
+
+  # May an exclude declared at `e.atScope` remove `policy` (#694 §11a O2)? The
+  # registrant's mode is the strictest `policyEnforcement` its kind's schema
+  # and its own aspect set ("per-policy" when neither does). Under "strict",
+  # or "per-policy" with the policy marked `den.lib.policy.strict`, only a
+  # registrant may: the excluding scope's own entity is the registrant, or the
+  # policy is registered at that scope too (a two-sided registration such as
+  # den.default). Otherwise any relatum may.
+  mayExclude =
+    state: name: policy: e:
+    let
+      reg = policy.registrant or null;
+      modeOf =
+        r:
+        let
+          vals = [
+            ((den.schema.${r.kind} or { }).policyEnforcement or null)
+            ((r.record.aspect or { }).policyEnforcement or null)
+          ];
+        in
+        enforcement.strictest vals;
+      mode = if reg == null then null else modeOf reg;
+      strict = mode == "strict" || (mode != "lenient" && ((policy.ref or { }).__strict or false));
+      excluder = registrantAt state (e.atScope or null);
+      registeredThere = (
+        (((state.scopedAspectPolicies or (_: { })) null).${e.atScope or ""} or { }) ? ${name}
+      );
+    in
+    !strict
+    || registeredThere
+    || (
+      excluder != null
+      && excluder.kind == reg.kind
+      && entityIdentity.sameEntity reg.kind excluder.record reg.record
+    );
+
+  # Is a policy excluded by origin (#694 §12)? An aspect exclude visible at
+  # `scope` (the scope and its ancestors, so the excluding entity is a relatum
+  # of every instance firing there) excludes the policies included through that
+  # aspect: its identity, or a path below it, is on the policy's origin chain.
+  # Unlike an aspect's own content (#613), the include's tree position doesn't
+  # matter. Curried like isPolicyExcluded: the identity set is built once.
+  isOriginExcluded =
+    state: registry:
+    let
+      # The registry is keyed by identity.
+      byId = lib.filterAttrs (_: entries: entries != [ ]) (
+        builtins.mapAttrs (
+          _: entries: builtins.filter (e: e.type == "exclude" && (e.rawRef or null) == null) entries
+        ) registry
+      );
+      ids = builtins.attrNames byId;
+      # The aspect itself, a path below it, or a parametric instance of it
+      # (`primary-user(tux@igloo)` originates from `primary-user`).
+      under =
+        id: c:
+        let
+          n = builtins.stringLength id;
+        in
+        c == id
+        || (
+          builtins.substring 0 n c == id
+          && builtins.elem (builtins.substring n 1 c) [
+            "/"
+            "("
+          ]
+        );
+    in
+    name: entry:
+    ids != [ ]
+    && builtins.any (
+      c: builtins.any (id: under id c && builtins.any (mayExclude state name entry) byId.${id}) ids
+    ) (entry.origin or [ ]);
 
   # The `den:` diagnostics for raw-ref excludes that resolved to no claim
   # ANYWHERE in a finished resolution — a user naming a record den never found,
@@ -293,6 +383,9 @@ let
             # (null for every non-policy constraint — see children.nix's
             # excludeList).
             rawRef = param.rawRef or null;
+            # Where the exclude was declared: under a strict mode only a
+            # policy's registrants may exclude it (#694 §11a O2).
+            atScope = currentScope;
             # A battery's transition-default exclude (children.nix).
             defaultFormOf = param.defaultFormOf or false;
             inherit scope ownerChain;
@@ -368,6 +461,8 @@ in
     foldScopeAncestors
     resolveClaim
     isPolicyExcluded
+    isPolicyInstanceExcluded
+    isOriginExcluded
     unmatchedRawRefExcludes
     collectScopedConstraints
     scopedConstraintsFor

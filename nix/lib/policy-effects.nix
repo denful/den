@@ -479,4 +479,19 @@ in
     __isPolicy = true;
     inherit name fn;
   };
+
+  # A policy its relata can't exclude, unless its registrant's mode is
+  # "lenient" (#694 §11a O2). On a policy registered on both sides
+  # (den.default) every relatum is a registrant, so it has no effect.
+  strict =
+    p:
+    if builtins.isAttrs p && p.__isPolicy or false then
+      p // { __strict = true; }
+    else
+      {
+        __isPolicy = true;
+        name = "<strict>";
+        fn = p;
+        __strict = true;
+      };
 }

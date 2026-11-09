@@ -115,6 +115,8 @@ let
           receiver = target;
           __fromProvenance = token;
           __standDown = acceptedByDefault;
+          # The registrant's own content (§11a R7): not a delivery for admits.
+          __registrantPart = true;
         }
       );
     in
@@ -122,6 +124,86 @@ let
       effects
     else
       map (e: if isInclude e then wrapped e else aimed e) effects ++ delivery;
+
+  # Receiver acceptance (#694 §12, §11a R7). A delivery naming a receiver is
+  # checked against what the receiver admits: its kind's schema layer and its
+  # own aspect. An entry matches the emitting policy by value (the record it
+  # registered from), or an aspect on its origin chain by identity, so a name
+  # can't forge an origin. Den's channels always land.
+  admitsOf =
+    ctx: receiver:
+    let
+      # The receiver's kind: an id_hash starts with it (`host:…`); a record
+      # without one is found among the context's bindings.
+      kind =
+        if receiver ? id_hash then
+          builtins.head (lib.splitString ":" receiver.id_hash)
+        else
+          lib.findFirst (k: builtins.isAttrs (ctx.${k} or null) && sameEntity k ctx.${k} receiver) null (
+            builtins.filter (k: ((den.schema.${k} or { }).isEntity or false)) (builtins.attrNames ctx)
+          );
+      layers = lib.optional (kind != null) ((den.schema.${kind} or { }).admits or { }) ++ [
+        ((receiver.aspect or { }).admits or { })
+      ];
+    in
+    builtins.foldl'
+      (acc: l: {
+        default =
+          if acc.default == "deny" || (l.default or null) == "deny" then "deny" else l.default or acc.default;
+        allow = acc.allow ++ (l.allow or [ ]);
+        deny = acc.deny ++ (l.deny or [ ]);
+      })
+      {
+        default = null;
+        allow = [ ];
+        deny = [ ];
+      }
+      (lib.optionals (kind != null || true) layers);
+  originMatches =
+    entry: ref:
+    if builtins.isAttrs ref && ref.__isPolicy or false then
+      (entry.value.ref or null) == ref
+    else
+      let
+        id = den.lib.aspects.fx.identity.key ref;
+        n = builtins.stringLength id;
+      in
+      builtins.any (
+        c:
+        c == id
+        || (
+          builtins.substring 0 n c == id
+          && builtins.elem (builtins.substring n 1 c) [
+            "/"
+            "("
+          ]
+        )
+      ) (entry.value.origin or [ ]);
+  admitted =
+    ctx: entry: e:
+    let
+      receiver = e.value.receiver or null;
+      a = admitsOf ctx receiver;
+      denied = builtins.any (originMatches entry) a.deny;
+      allowed = (entry.value.denChannel or false) || builtins.any (originMatches entry) a.allow;
+    in
+    # R3's host-class part of a registrant's own bare include is its own
+    # content, not a delivery (§11a R7).
+    if
+      !(builtins.isAttrs receiver)
+      || !(builtins.elem e.__policyEffect [
+        "provide"
+        "route"
+      ])
+      || (e.value.__registrantPart or false)
+    then
+      true
+    else if denied then
+      false
+    else if a.default == "deny" && !allowed then
+      throw "den: delivery of `${entry.name}` denied on ${receiver.name or "<unnamed>"}: `admits.default = \"deny\"`, not in `admits.allow`"
+    else
+      true;
 
   # Den's provenance fields on an effect (#694): the tokens its include is
   # walked under, outermost first, and the registration chain of the policy
@@ -179,8 +261,10 @@ let
       in
       {
         policyName = entry.name;
-        effects = applyToRegistrant entry.name (entry.value.registrant or null) ctx (
-          map (denProvenance entry) (validateEffects entry.name rawEffects)
+        effects = builtins.filter (admitted ctx entry) (
+          applyToRegistrant entry.name (entry.value.registrant or null) ctx (
+            map (denProvenance entry) (validateEffects entry.name rawEffects)
+          )
         );
       }
     ) matching;

@@ -13,6 +13,8 @@ let
     "meta"
     "includes"
     "excludes"
+    "admits"
+    "policyEnforcement"
     "provides"
     "policies"
     "into"
@@ -30,7 +32,9 @@ let
   # exists, not the moment someone remembers to add it here. Listing them was
   # a standing silent-drop hazard — a forgotten marker got dispatched as class
   # or nested-aspect content instead of being handled by the pipeline.
-  isStructuralKey = k: lib.hasPrefix "__" k || listedStructuralKeys ? ${k};
+  # builtins.substring, not lib.hasPrefix: this runs for every key of every
+  # aspect, and lib.hasPrefix goes through a deprecation check per call.
+  isStructuralKey = k: builtins.substring 0 2 k == "__" || listedStructuralKeys ? ${k};
 
   # Schema registry for key classification.
   # Top-level den.classes lives outside den.schema, breaking

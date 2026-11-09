@@ -1,0 +1,610 @@
+# Issue #694, PR 4 (spec §12, §11a O2): a policy effect names its target, and a
+# receiver decides what it admits.
+#
+#   1. `include.at <entity> <aspect>`: the head names its relatum; elsewhere it
+#      is a delivery, resolved for the receiver's class.
+#   2. Relatum-scoped excludes, matched by origin: excluding an aspect excludes
+#      the policies originating from it, for instances where the entity is a
+#      relatum.
+#   3. `admits.deny` and `admits = { default = "deny"; allow = [ … ]; }`.
+#   4. `policyEnforcement` and `den.lib.policy.strict`.
+#   5. Stable origins for den's channels (the held excludability cells).
+#   6. Stable identity for anonymous aspects.
+{ denTest, lib, ... }:
+let
+  hmUser = {
+    den.hosts.x86_64-linux.igloo.users.tux.classes = [ "homeManager" ];
+    den.aspects.tux.homeManager.home.stateVersion = "25.11";
+  };
+  twoUsers = {
+    den.hosts.x86_64-linux.igloo.users = {
+      tux = { };
+      pingu = { };
+    };
+  };
+  # A host-registered { host, user } policy placing content on the user.
+  hostPolicy = den: {
+    den.policies.hp =
+      { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.HP = "x"; }) ];
+    den.aspects.igloo.includes = [ den.policies.hp ];
+  };
+  hpOf = igloo: igloo.home-manager.users.tux.home.sessionVariables.HP or "<missing>";
+  # A user-registered author delivery to the host.
+  toIgloo = den: {
+    den.hosts.x86_64-linux.igloo.users.tux = { };
+    den.aspects.tux.policies.to-igloo =
+      { host, user, ... }:
+      [
+        (den.lib.policy.provide {
+          class = "nixos";
+          receiver = host;
+          module.environment.etc.ud.text = "x";
+        })
+      ];
+    den.aspects.tux.includes = [ den.aspects.tux.policies.to-igloo ];
+  };
+in
+{
+  flake.tests.deadbugs.issue-694-pr4 = {
+
+    # 1. include.at
+    test-include-at-host-from-user-policy = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.to-host =
+          { host, user, ... }:
+          [ (den.lib.policy.include.at host { nixos.environment.etc.at.text = user.name; }) ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-host ];
+        expr = igloo.environment.etc.at.text or "<missing>";
+        expected = "tux";
+      }
+    );
+    test-include-at-user-from-host-policy = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ hmUser ];
+        den.policies.to-user =
+          { host, user, ... }:
+          [ (den.lib.policy.include.at user { homeManager.home.sessionVariables.AT = host.name; }) ];
+        den.aspects.igloo.includes = [ den.policies.to-user ];
+        expr = igloo.home-manager.users.tux.home.sessionVariables.AT or "<missing>";
+        expected = "igloo";
+      }
+    );
+
+    # 2 and 5. Origin-matched excludes: den's channels, host side and user side.
+    test-define-user-excluded-host-side = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.aspects.tux.includes = [ den.batteries.define-user ];
+        den.aspects.igloo.excludes = [ den.batteries.define-user ];
+        expr = igloo.users.users.tux.isNormalUser or false;
+        expected = false;
+      }
+    );
+    test-primary-user-excluded-host-side = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.aspects.tux.includes = [ den.batteries.primary-user ];
+        den.aspects.igloo.excludes = [ den.batteries.primary-user ];
+        expr = builtins.elem "wheel" (igloo.users.users.tux.extraGroups or [ ]);
+        expected = false;
+      }
+    );
+    test-user-shell-excluded-host-side = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.aspects.tux.includes = [ (den.batteries.user-shell "fish") ];
+        den.aspects.igloo.excludes = [ den.batteries.user-shell ];
+        expr = igloo.programs.fish.enable;
+        expected = false;
+      }
+    );
+    test-user-shell-excluded-user-side = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.aspects.tux.includes = [ (den.batteries.user-shell "fish") ];
+        den.schema.user.excludes = [ den.batteries.user-shell ];
+        expr = igloo.programs.fish.enable;
+        expected = false;
+      }
+    );
+    # Excluding a shared aspect on a host reaches the policies it carries for
+    # that host's users (widens #613 for policies); its content is unchanged.
+    test-shared-aspect-excluded-on-host-removes-its-policy = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.policies.tools-to-host =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc."tools-${user.name}".text = "x";
+            })
+          ];
+        den.aspects.tools.includes = [ den.policies.tools-to-host ];
+        den.aspects.tux.includes = [ den.aspects.tools ];
+        den.aspects.igloo.excludes = [ den.aspects.tools ];
+        expr = igloo.environment.etc ? tools-tux;
+        expected = false;
+      }
+    );
+    # A sub-aspect originates from its aspect: excluding `tools` on the host
+    # reaches the policy of `tools.provides.extra` included directly.
+    test-origin-exclude-reaches-sub-aspect = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.policies.extra-to-host =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc."extra-${user.name}".text = "x";
+            })
+          ];
+        den.aspects.tools.provides.extra.includes = [ den.policies.extra-to-host ];
+        den.aspects.tux.includes = [ den.aspects.tools.provides.extra ];
+        den.aspects.igloo.excludes = [ den.aspects.tools ];
+        expr = igloo.environment.etc ? extra-tux;
+        expected = false;
+      }
+    );
+    # A host-registered policy reaches users only through late dispatch: a
+    # user's exclude of the aspect it came from removes it there, for that
+    # user only.
+    test-origin-exclude-applies-in-late-dispatch = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.policies.tools-to-host =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc."tools-${user.name}".text = "x";
+            })
+          ];
+        den.aspects.tools.includes = [ den.policies.tools-to-host ];
+        den.aspects.igloo.includes = [ den.aspects.tools ];
+        den.aspects.tux.excludes = [ den.aspects.tools ];
+        expr = {
+          tux = igloo.environment.etc ? tools-tux;
+          pingu = igloo.environment.etc ? tools-pingu;
+        };
+        expected = {
+          tux = false;
+          pingu = true;
+        };
+      }
+    );
+    # The match stops at a path boundary: excluding `tools` leaves `toolsx`
+    # (a sibling whose name only starts the same) and its policy alone.
+    test-origin-match-stops-at-path-boundary = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.policies.toolsx-to-host =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc."toolsx-${user.name}".text = "x";
+            })
+          ];
+        den.aspects.toolsx.includes = [ den.policies.toolsx-to-host ];
+        den.aspects.tools.nixos.environment.etc.tools.text = "x";
+        den.aspects.tux.includes = [
+          den.aspects.tools
+          den.aspects.toolsx
+        ];
+        den.aspects.igloo.excludes = [ den.aspects.tools ];
+        expr = igloo.environment.etc ? toolsx-tux;
+        expected = true;
+      }
+    );
+    # Only an exclude whose entity is a relatum applies: iceberg's exclude of
+    # define-user leaves igloo's tux defined.
+    test-origin-exclude-on-other-host-not-applied = denTest (
+      {
+        den,
+        igloo,
+        iceberg,
+        ...
+      }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.tux = { };
+        den.aspects.tux.includes = [ den.batteries.define-user ];
+        den.aspects.iceberg.excludes = [ den.batteries.define-user ];
+        expr = {
+          igloo = igloo.users.users.tux.isNormalUser or false;
+          iceberg = iceberg.users.users.tux.isNormalUser or false;
+        };
+        expected = {
+          igloo = true;
+          iceberg = false;
+        };
+      }
+    );
+    # A forged policy named like the provides mechanism doesn't inherit its
+    # origin: excluding mutual-provider leaves it alone.
+    test-forged-to-hosts-name-keeps-own-origin = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.to-hosts =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.forged.text = "x";
+            })
+          ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-hosts ];
+        den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];
+        expr = igloo.environment.etc ? forged;
+        expected = true;
+      }
+    );
+
+    # 3. admits
+    test-admits-deny-withholds-channel = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.aspects.igloo.admits.deny = [ den.policies.user-to-host ];
+        den.aspects.tux.user.description = "tux";
+        den.aspects.pingu.includes = [ (den.batteries.user-shell "fish") ];
+        expr = {
+          description = igloo.users.users.tux.description or "<absent>";
+          # Positive control: another channel still lands.
+          shell = igloo.programs.fish.enable;
+        };
+        expected = {
+          description = "<absent>";
+          shell = true;
+        };
+      }
+    );
+    test-admits-default-allow-lands-author-provide = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (toIgloo den) ];
+        expr = igloo.environment.etc ? ud;
+        expected = true;
+      }
+    );
+    test-admits-default-deny-refuses-by-name = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (toIgloo den) ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? ud;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    test-admits-default-deny-allow-lands = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (toIgloo den) ];
+        den.aspects.igloo.admits = {
+          default = "deny";
+          allow = [ den.aspects.tux.policies.to-igloo ];
+        };
+        expr = igloo.environment.etc ? ud;
+        expected = true;
+      }
+    );
+    test-admits-deny-beats-allow = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (toIgloo den) ];
+        den.schema.host.admits.allow = [ den.aspects.tux.policies.to-igloo ];
+        den.aspects.igloo.admits.deny = [ den.aspects.tux.policies.to-igloo ];
+        expr = igloo.environment.etc ? ud;
+        expected = false;
+      }
+    );
+    # A host can tighten a fleet default but not loosen it.
+    test-admits-default-deny-not-loosened = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ (toIgloo den) ];
+        den.schema.host.admits.default = "deny";
+        den.aspects.igloo.admits.default = "allow";
+        expr = igloo.environment.etc ? ud;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    # Den's channels land under default-deny.
+    test-admits-default-deny-keeps-channels = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.aspects.igloo.admits.default = "deny";
+        den.aspects.tux.user.description = "tux";
+        expr = igloo.users.users.tux.description;
+        expected = "tux";
+      }
+    );
+
+    # The receiver's own kind decides: a user-kind deny withholds a delivery
+    # to a user, and a host-kind deny doesn't apply to it.
+    test-admits-receiver-kind-layer = denTest (
+      { den, igloo, ... }:
+      let
+        toUser = name: {
+          den.policies."to-${name}" =
+            { host, user, ... }:
+            [
+              (den.lib.policy.provide {
+                class = "homeManager";
+                receiver = user;
+                module.home.sessionVariables.${lib.toUpper name} = "x";
+              })
+            ];
+          den.aspects.igloo.includes = [ den.policies."to-${name}" ];
+        };
+      in
+      {
+        imports = [
+          hmUser
+          (toUser "a")
+          (toUser "b")
+        ];
+        den.schema.user.admits.deny = [ den.policies.to-a ];
+        den.schema.host.admits.deny = [ den.policies.to-b ];
+        expr = {
+          a = igloo.home-manager.users.tux.home.sessionVariables.A or "<missing>";
+          b = igloo.home-manager.users.tux.home.sessionVariables.B or "<missing>";
+        };
+        expected = {
+          a = "<missing>";
+          b = "x";
+        };
+      }
+    );
+    # A registrant's own host-class part is its content, not a delivery: it
+    # lands on a default-deny host (§11a R7).
+    test-admits-default-deny-keeps-registrant-part = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.policies.hostwide =
+          { host, user, ... }:
+          [ (den.lib.policy.include { nixos.environment.etc."hw-${user.name}".text = "x"; }) ];
+        den.aspects.igloo.includes = [ den.policies.hostwide ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? hw-tux;
+        expected = true;
+      }
+    );
+    # A delivery marked like one of den's channels isn't one: den's channels
+    # are known by definition site.
+    test-admits-default-deny-refuses-forged-channel-marker = denTest (
+      { den, igloo, ... }:
+      {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.aspects.tux.policies.to-igloo =
+          { host, user, ... }:
+          [
+            (den.lib.policy.provide {
+              class = "nixos";
+              receiver = host;
+              module.environment.etc.ud.text = "x";
+              __denChannel = true;
+            })
+          ];
+        den.aspects.tux.includes = [ den.aspects.tux.policies.to-igloo ];
+        den.aspects.igloo.admits.default = "deny";
+        expr = igloo.environment.etc ? ud;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+    # Origins match by value: of two policies named `deliver`, only the one
+    # allowed lands; the other is refused.
+    test-admits-same-name-matched-by-value = denTest (
+      { den, igloo, ... }:
+      let
+        deliver =
+          file:
+          den.lib.policy.mkPolicy "deliver" (
+            { host, user, ... }:
+            [
+              (den.lib.policy.provide {
+                class = "nixos";
+                receiver = host;
+                module.environment.etc.${file}.text = "x";
+              })
+            ]
+          );
+        allowedOne = deliver "allowed";
+        otherOne = deliver "other";
+      in
+      {
+        den.hosts.x86_64-linux.igloo.users = {
+          tux = { };
+          pingu = { };
+        };
+        den.aspects.tux.includes = [ allowedOne ];
+        den.aspects.pingu.includes = [ otherOne ];
+        den.aspects.igloo.admits = {
+          default = "deny";
+          allow = [ allowedOne ];
+        };
+        expr = igloo.environment.etc ? other;
+        expectedError = {
+          type = "ThrownError";
+          msg = "denied on igloo";
+        };
+      }
+    );
+
+    # 4. policyEnforcement
+    test-enforcement-lenient-user-excludes = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [
+          hmUser
+          (hostPolicy den)
+        ];
+        den.aspects.tux.excludes = [ den.policies.hp ];
+        expr = hpOf igloo;
+        expected = "<missing>";
+      }
+    );
+    test-enforcement-strict-schema-blocks-user-exclude = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [
+          hmUser
+          (hostPolicy den)
+        ];
+        den.schema.host.policyEnforcement = "strict";
+        den.aspects.tux.excludes = [ den.policies.hp ];
+        expr = hpOf igloo;
+        expected = "x";
+      }
+    );
+    test-enforcement-policy-strict-blocks-user-exclude = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ hmUser ];
+        den.policies.hp = den.lib.policy.strict (
+          { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.HP = "x"; }) ]
+        );
+        den.aspects.igloo.includes = [ den.policies.hp ];
+        den.aspects.tux.excludes = [ den.policies.hp ];
+        expr = hpOf igloo;
+        expected = "x";
+      }
+    );
+    test-enforcement-lenient-overrides-policy-strict = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ hmUser ];
+        den.policies.hp = den.lib.policy.strict (
+          { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.HP = "x"; }) ]
+        );
+        den.aspects.igloo.includes = [ den.policies.hp ];
+        den.aspects.igloo.policyEnforcement = "lenient";
+        den.aspects.tux.excludes = [ den.policies.hp ];
+        expr = hpOf igloo;
+        expected = "<missing>";
+      }
+    );
+    test-enforcement-host-lenient-cannot-loosen-fleet-strict = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [
+          hmUser
+          (hostPolicy den)
+        ];
+        den.schema.host.policyEnforcement = "strict";
+        den.aspects.igloo.policyEnforcement = "lenient";
+        den.aspects.tux.excludes = [ den.policies.hp ];
+        expr = hpOf igloo;
+        expected = "x";
+      }
+    );
+    # Under "strict" the registrant itself may still exclude.
+    test-enforcement-strict-registrant-may-exclude = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [
+          hmUser
+          (hostPolicy den)
+        ];
+        den.schema.host.policyEnforcement = "strict";
+        den.aspects.igloo.excludes = [ den.policies.hp ];
+        expr = hpOf igloo;
+        expected = "<missing>";
+      }
+    );
+    # A policy carried by a host policy's include registers at the user but
+    # inherits the host as its registrant (§11a C4): under "strict" the host
+    # may exclude it, the user may not.
+    test-enforcement-strict-inherited-registrant = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ hmUser ];
+        den.policies.inner =
+          { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.IN = "x"; }) ];
+        den.policies.outer =
+          { host, user, ... }:
+          [
+            (den.lib.policy.include {
+              name = "carrier";
+              includes = [ den.policies.inner ];
+            })
+          ];
+        den.aspects.igloo.includes = [ den.policies.outer ];
+        den.schema.host.policyEnforcement = "strict";
+        den.aspects.igloo.excludes = [ den.policies.inner ];
+        expr = igloo.home-manager.users.tux.home.sessionVariables.IN or "<missing>";
+        expected = "<missing>";
+      }
+    );
+    # den.default is registered on both sides, so it stays user-excludable
+    # under a fleet "strict".
+    test-enforcement-den-default-stays-user-excludable = denTest (
+      { den, igloo, ... }:
+      {
+        imports = [ twoUsers ];
+        den.schema.host.policyEnforcement = "strict";
+        den.schema.user.excludes = [ den.policies.user-to-host ];
+        den.aspects.tux.user.description = "tux";
+        expr = igloo.users.users.tux.description or "<absent>";
+        expected = "<absent>";
+      }
+    );
+
+    # 6. An anonymous aspect included on the host and on its users is one
+    # aspect, whatever its position: the host's copy covers the user's, so the
+    # transition warning doesn't list it (F2: positional `<anon>:N` identities
+    # differed between the two scopes).
+    test-anonymous-aspect-identity-is-stable = denTest (
+      { den, config, ... }:
+      let
+        anon = {
+          nixos.boot.kernelModules = [ "anon" ];
+        };
+      in
+      {
+        den.internal.transitionDefaults = lib.mkForce true;
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.schema.host.includes = [ anon ];
+        den.schema.user.includes = [
+          { nixos.boot.kernelModules = [ "other" ]; }
+          anon
+        ];
+        # Only the user-only aspect is listed.
+        expr = builtins.length (
+          config.flake.nixosConfigurations.igloo._module.args.denTransitionDefaultLost or [ ]
+        );
+        expected = 1;
+      }
+    );
+  };
+}
