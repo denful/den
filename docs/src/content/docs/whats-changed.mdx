@@ -24,7 +24,7 @@ You don't have to upgrade one release at a time. Most old forms still work throu
 | [0.10–0.11](#010--011-2026-02--03) | 2026-02 – 03 | `user.classes`. The `user`, `hjem` and `maid` classes. Home environments follow the users. |
 | [0.12–0.13](#012--013-2026-03) | 2026-03 | Every aspect is parametric. `den.base` becomes `den.schema`. Bidirectionality gives way to explicit `provides`. |
 | [0.14–0.16](#014--016-2026-03--04) | 2026-03 – 04 | Zero dependencies. `entity.aspect` is a reference. `hasAspect`. |
-| [0.17–0.18](#017--018-2026-05--06) | 2026-05 – 06 | Effects core. `den.ctx` becomes `den.schema` plus `den.policies`. `den.batteries`. Scoped context. |
+| [0.17–0.18](#017--018-2026-05--06) | 2026-05 – 06 | Effects core, **policies** (relations between entities become rules) and **entity identity**. Quirks. `den.ctx` splits into `den.schema` plus `den.policies`. `den.batteries`. Scoped context. |
 | [0.19](#019-2026-09) | 2026-09 | Stabilisation: silent drops fixed. |
 | [next](#next) | | A user's aspects stop leaking into hosts. Hosts choose what they receive. |
 
@@ -109,15 +109,31 @@ Forward classes (`den._.forward`) also arrived, which deliver one class's settin
 
 ## 0.17 – 0.18 (2026-05 – 06)
 
-- **Effects-based core** (0.17). The resolver was replaced by an [effects](/explanation/effects/) pipeline. Nothing in user code changes, but later features build on it.
+0.17 rewrote Den's core around [effects](/explanation/effects/). That rewrite brought **policies**, the biggest new idea since parametric aspects, and **entity identity**.
+
+- **Policies** (0.17). A [policy](/explanation/policies/) states a relation between entities as a rule: given the entities it names, it returns effects that Den carries out.
+  - `resolve.to` reaches another entity, for example a host's users;
+  - `include` applies an aspect;
+  - `provide` and `route` deliver content to a class or another entity;
+  - `exclude`, `instantiate` and `spawn` cover the rest.
+
+  Policies live in the `den.policies` registry, and take effect once you include them, on an entity kind, an entity or an aspect. How a host reaches its users, how outputs reach `nixosConfigurations`, and your own fleet relations are all policies now:
+
+  ```nix
+  den.policies.host-to-users = { host, ... }:
+    map (user: den.lib.policy.resolve.to "user" { inherit host user; })
+      (lib.attrValues host.users);
+  ```
 - **`den.ctx` was split in two** (0.17):
   - **`den.schema.<kind>`** says what an entity is, and which aspects apply to every entity of that kind (`den.schema.host.includes`);
-  - **[`den.policies`](/explanation/policies/)** says how entities relate, for example "for each host, its users". A policy is a function of the entities it names, returning effects such as `resolve.to`, `include`, `provide` and `route`.
+  - **`den.policies`** says how entities relate.
 
   A shim still forwards `den.ctx`. See [Migrating from den.ctx](/guides/migrate-ctx/).
+- **Identity** (0.17). Every entity, whether host, user, home or one of your own kinds, carries a stable identity (`id_hash`). Den uses it to tell entities apart, so a policy can target one exactly with `policy.for`. Aspects are tracked by identity too, so the same aspect reached by two paths applies once rather than duplicating its settings. 0.18 builds on this: entities became schema-typed values that own their identity.
+- **Quirks and pipes** (0.17). [Quirks](/explanation/quirks-and-pipes/) are named data that aspects emit and other scopes collect, for example DNS records or firewall ports gathered across a fleet. Policies build pipes to move them between scopes.
 - **`den.batteries`** (0.17). The built-in aspects live at `den.batteries.*`. `den.provides` and `den._` remain aliases, so `den._.unfree [ … ]` still works ([batteries](/reference/batteries/)).
 - **`._` includes every child aspect** (0.17), so `den.aspects.dev._` includes them all.
-- **Schema-typed entities** (0.18). Entities are typed values with an identity.
+- **Schema-typed entities** (0.18). Entities are typed values that own the identity 0.17 introduced.
 - **Scoped context** (0.18). An aspect only sees the entities bound where it's applied, and content reaches another entity only through a policy or `provides`.
 
 ## 0.19 (2026-09)
