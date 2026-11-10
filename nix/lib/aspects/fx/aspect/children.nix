@@ -124,6 +124,10 @@ let
         registerEffect = fx.send "register-aspect-policy" {
           inherit (p) fn;
           inherit ownerIdentity;
+          # The record's own `fn` slot, shared by every copy of the record: two
+          # registrations of one record compare equal under `==`, two records
+          # sharing a name don't (policy/schema.nix samePolicy).
+          fnSlot = builtins.intersectAttrs { fn = null; } p;
         };
       in
       if matchingClaim != null then

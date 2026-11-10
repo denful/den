@@ -223,6 +223,7 @@ let
     # same-name entities on different systems share an id_hash but have distinct
     # parent (system=…) scopes. See resolve.nix entityScopeFor.
     scopeByEntity = _: { };
+    boundEntityIndex = _: { };
 
     # --- Policy dispatch tracking ---
     firedPolicyNames = _: { };
