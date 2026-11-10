@@ -33,21 +33,40 @@ den.aspects.tux = {
 
 The `homeManager` and `user` lines reach their targets because den's own
 channels deliver them. The `nixos` line has no delivery. It stays in tux's
-scope. Until 2027-01-01 a [transition default](#the-transition-defaults) still
-carries it to the host, with a warning.
+scope. While the [transition defaults](#the-transition-defaults) are on, one
+of them still carries it to the host, with a warning.
 
-The same holds for anything tux includes, for a parametric
-`den.aspects.tux = { user, ... }: { nixos = …; }`, and for a
-`{ host, user, ... }` function in `den.default` that writes `nixos`. Those all
-run in tux's scope.
+The same holds for anything tux includes and for a parametric
+`den.aspects.tux = { user, ... }: { nixos = …; }`. Those run in tux's scope.
 
-Two things do not change:
+Three things do not change:
 
 - Content written on the host (`den.aspects.igloo`, its includes,
   `den.schema.host.includes`) lands on the host.
-- A `{ host, ... }` function in `den.default` also fires in every user scope.
-  Its content still lands on the host once, from the host scope, and is not
-  reported as lost.
+- `den.default` is every entity's include, so it is also the host's. A
+  `{ host, ... }` function there fires in every user scope too, and its
+  content lands on the host once, from the host scope. A
+  `{ host, user, ... }` function there that writes `nixos` lands on the host
+  as well: the host registered it, and a policy applies to the entity it is
+  registered on, below.
+- A policy registered on the host applies to the host, wherever it fires.
+
+### Where a policy applies
+
+A policy applies to the entity it is registered on, its *registrant*: the
+host for `den.aspects.igloo.includes` or `den.schema.host.includes`, the user
+for `den.aspects.tux.includes`. Fired at a user below its host, a host's
+`{ host, user, ... }` policy still puts its host-class part on the host and
+the rest on the user.
+
+The registrant is matched by the binding, not by tree position. A policy
+registered at an entity applies wherever a scope binds that entity for its
+kind, by `id_hash`, or by value for a record without one. So a policy
+registered on an environment reaches a guest that binds `environment = dev`
+even though the guest sits under a `prod` host, and a guest that rebinds
+`environment` to another one stops getting the first environment's
+policies. One entity resolved at two places (igloo under `dev` and under
+`prod`) is two placements: a policy registered at one applies only there.
 
 ## Crossing up: name the receiver
 
@@ -292,23 +311,33 @@ Include it on the hosts that should receive what their users provide:
 den.schema.host.includes = [ den.batteries.mutual-provider ];
 ```
 
-Until 2027-01-01 it is also on by default, as one of the [transition
-defaults](#the-transition-defaults). To opt out on one host or on every host,
-exclude it; the exclude covers the default too:
+While the [transition defaults](#the-transition-defaults) are on, it is also
+on by default. To opt out on one host or on every host, exclude it; the
+exclude covers its default too:
 
 ```nix
 den.aspects.igloo.excludes = [ den.batteries.mutual-provider ];   # one host
 den.schema.host.excludes = [ den.batteries.mutual-provider ];     # every host
 ```
 
-An excluded host no longer receives `to-hosts` content.
+Once the transition defaults are off (acknowledged, or after they are
+removed), an excluded host no longer receives `to-hosts` content. While they
+are on, `user-aspects`' default form still lifts the user's whole host-class
+output, `to-hosts` content included, so excluding `mutual-provider` alone
+leaves it arriving. Exclude both to stop it during the transition:
+
+```nix
+den.aspects.igloo.excludes = [
+  den.batteries.mutual-provider
+  den.batteries.user-aspects
+];
+```
 
 ### `den.batteries.user-aspects`
 
-Lets a host accept everything its users produce for it, as before #694. Until
-2027-01-01 it is on by default, as one of the [transition
-defaults](#the-transition-defaults); include it explicitly to keep it. It
-carries their
+Lets a host accept everything its users produce for it, as before #694. While
+the [transition defaults](#the-transition-defaults) are on, it is on by
+default; include it explicitly to keep it. It carries their
 own `nixos`, `darwin` and `os`, what they include, custom classes they route or
 forward into the host's class, what their policies provide in their own scope,
 and a host-rooted `den.lib.aspects.resolve`. It is opt-in and declared on the
@@ -347,11 +376,13 @@ Content an aspect placed on a user writes to its host's class (`nixos`,
 host-class content for when it is placed on a host, and a home part for when it
 is placed on a user.
 
-To give configs time to move, until 2027-01-01 den keeps two transition
-defaults on every host (and on any nested kind with its own class, such as a
+To give configs time to move, den keeps two transition defaults on every host (and on any nested kind with its own class, such as a
 guest): `den.batteries.user-aspects` and
 `den.batteries.mutual-provider`, each through a default form of its own. With
-them a config behaves as before #694. A host warns once, listing the
+them a config behaves as before #694. They stay on until you acknowledge the
+migration (below), or until a den release planned for 2027-01-01 removes
+them. The date names that release; nothing in den reads the clock, so
+updating den is what changes behaviour. A host warns once, listing the
 host-class content that reaches it only through a default:
 
 ```
@@ -380,9 +411,29 @@ den.migrations.user-host-content.acknowledged = true;
 ```
 
 It turns both transition defaults off. Batteries included explicitly still
-apply, and the warning stops. On 2027-01-01 the defaults, the warning and the
-flag are removed, and setting the flag after that is an error that asks you to
-remove it.
+apply, and the warning stops. The release that removes the defaults also
+removes the warning and the flag; setting the flag after that release is an
+error that asks you to remove it.
+
+### A migration that works both ways
+
+Include the batteries the host should keep, explicitly. That gives the same
+result with the defaults on and after acknowledging, and the host gives no
+warning for that content:
+
+```nix
+den.schema.host.includes = [
+  den.batteries.user-aspects
+  den.batteries.mutual-provider
+];
+den.aspects.tux = {
+  nixos.boot.kernelModules = [ "own" ];
+  provides.to-hosts.nixos.boot.kernelModules = [ "provided" ];
+};
+```
+
+Both modules reach igloo either way. Then set the acknowledgement; nothing
+changes for that content.
 
 ### When the host needs it
 
@@ -421,6 +472,34 @@ den.aspects.tux.provides.to-hosts.nixos.services.openssh.enable = true;
 ```
 
 Or include `den.batteries.user-aspects` on the host.
+
+### Known limits
+
+- **A `policy.exclude` from a policy another policy delivers removes
+  nothing.** The exclude effect of a policy that is itself delivered by
+  another policy's `include` is registered when that policy dispatches,
+  after the includes it names were gated, so it takes effect too late. It
+  is the same on releases before #694. Write the exclude on the aspect that
+  includes what it removes (`excludes = [ … ]`), or return it from a policy
+  listed directly in that aspect's `includes`. A later den release fixes it.
+
+```nix
+# Removes nothing: `ex` is delivered by `outer`'s include.
+den.aspects.igloo.includes = [
+  den.aspects.plain
+  (den.lib.policy.mkPolicy "outer" ({ host, ... }: [
+    (den.lib.policy.include
+      (den.lib.policy.mkPolicy "ex" ({ host, ... }: [ (den.lib.policy.exclude den.aspects.plain) ])))
+  ]))
+];
+
+# Either of these removes it.
+den.aspects.igloo.excludes = [ den.aspects.plain ];
+den.aspects.igloo.includes = [
+  den.aspects.plain
+  (den.lib.policy.mkPolicy "ex" ({ host, ... }: [ (den.lib.policy.exclude den.aspects.plain) ]))
+];
+```
 
 ### `isolated` is deprecated
 
