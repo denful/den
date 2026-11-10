@@ -4,9 +4,9 @@
 # Every host carries its own copy of a SAME-NAMED policy (`tools`), included
 # via den.schema.host.includes so it registers once per host scope — this is
 # the shape D4 (nix/lib/aspects/fx/handlers/constraint.nix `isPolicyExcluded`)
-# needs to be visible at all: policyClaimsByName."name:tools" accumulates one
-# claim per host regardless of scope, while each host's own scoped registry
-# keeps exactly one. One host excludes the policy by rawRef (R > 0) so the
+# needs to be visible at all: policyClaimsByName."name:tools" holds one claim
+# per host, keyed by host scope, while each host's own scoped registry keeps
+# exactly one. One host excludes the policy by rawRef (R > 0) so the
 # cell also proves exclude resolution still names the right claimant once N
 # grows past 1. This cell asserts correctness only — it is not a timing
 # instrument; use `just bench` for that, with N raised well past this file's
