@@ -209,40 +209,79 @@ let
           ]
         )
       ) (entry.value.origin or [ ]);
-  # A forward naming a receiver anywhere in a policy include's static
-  # tree: the include itself, or nested in `includes` at any depth
-  # (`den.batteries.forward` returns one level). A forward behind a function
-  # isn't built until it is walked, so it isn't seen here.
-  forwardReceiver =
+  # An include's value with every forward it carries checked on its own: one
+  # naming a receiver anywhere in the include's static tree (the include
+  # itself, a list at any depth, or nested in `includes`), walked as the
+  # include walker walks it (aspect/children.nix processInclude). A withheld
+  # forward is dropped and its siblings stay. A forward behind a function
+  # isn't built until it is walked, so it isn't seen here. Returns
+  # `{ keep; value; }`: `keep` is false only when the value was itself one
+  # withheld forward.
+  pruneForwards =
+    ctx: entry:
     let
       # Named aspects are visited once: an include cycle (cya <-> cyb) is a
       # finite tree to the pipeline, and must be one here too.
       go =
         seen: v:
-        if !(builtins.isAttrs v) then
-          null
+        if builtins.isList v then
+          let
+            rs = map (go seen) v;
+          in
+          {
+            keep = true;
+            changed = builtins.any (r: r.changed || !r.keep) rs;
+            value = map (r: r.value) (builtins.filter (r: r.keep) rs);
+          }
+        else if !(builtins.isAttrs v) then
+          unchanged v
         else if (v.meta.__forward.receiver or null) != null then
-          v.meta.__forward.receiver
+          if admitsDelivery ctx entry "include" v.meta.__forward.receiver then
+            unchanged v
+          else
+            {
+              keep = false;
+              changed = true;
+              value = v;
+            }
         else if builtins.isList (v.includes or null) then
           let
             id = if v ? name then den.lib.aspects.fx.identity.key v else null;
+            inner = go (seen // lib.optionalAttrs (id != null) { ${id} = true; }) v.includes;
           in
           if id != null && seen ? ${id} then
-            null
+            unchanged v
+          else if inner.changed then
+            {
+              keep = true;
+              changed = true;
+              value = v // {
+                includes = inner.value;
+              };
+            }
           else
-            lib.findFirst (r: r != null) null (
-              map (go (seen // lib.optionalAttrs (id != null) { ${id} = true; })) v.includes
-            )
+            unchanged v
         else
-          null;
+          unchanged v;
+      unchanged = v: {
+        keep = true;
+        changed = false;
+        value = v;
+      };
     in
     go { };
 
   admitted =
     ctx: entry: e:
+    admitsDelivery ctx entry e.__policyEffect (e.value.receiver or null);
+
+  # One delivery to `receiver`, from a `provide`, a `route` or a forward an
+  # include carries: true to land it, false to withhold it (`admits.deny`), or
+  # a throw under `admits.default = "deny"`.
+  admitsDelivery =
+    ctx: entry: effectType: receiver:
     let
-      isInclude = e.__policyEffect == "include";
-      receiver = if isInclude then forwardReceiver e.value else e.value.receiver or null;
+      isInclude = effectType == "include";
       a = admitsOf ctx receiver;
       denied = builtins.any (originMatches entry) a.deny;
       allowed = (entry.value.denChannel or false) || builtins.any (originMatches entry) a.allow;
@@ -251,7 +290,7 @@ let
       !(builtins.isAttrs receiver)
       || !(
         isInclude
-        || builtins.elem e.__policyEffect [
+        || builtins.elem effectType [
           "provide"
           "route"
         ]
@@ -379,7 +418,16 @@ let
         # Includes are checked as written (a forward with a receiver),
         # provides and routes once aimed at the registrant.
         applied = applyToRegistrant entry.name (entry.value.registrant or null) ctx (
-          builtins.filter (e: !(isInclude e) || admitted ctx entry e) placed
+          lib.concatMap (
+            e:
+            if isInclude e then
+              let
+                r = pruneForwards ctx entry e.value;
+              in
+              lib.optional r.keep (e // { inherit (r) value; })
+            else
+              [ e ]
+          ) placed
         );
       in
       {
