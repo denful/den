@@ -25,6 +25,7 @@ let
     __findFile = ./den-brackets.nix;
     forward = ./forward.nix;
     home-env = ./home-env.nix;
+    migrations = ./migrations.nix;
     nh = ./nh.nix;
     nixModule = ../nixModule;
     nsTypes = ./namespace-types.nix;

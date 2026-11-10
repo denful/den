@@ -157,6 +157,22 @@ let
 
   isPolicy = v: builtins.isAttrs v && v.__isPolicy or false;
 
+  # Den's provenance wrappers (#694) are named with this marker; an author's
+  # aspect may not be. Den's own are told apart by where their `name` is
+  # defined, which an author can't place.
+  provenanceMarker = "den-provides-to-host=";
+  provenanceMarkerLength = builtins.stringLength provenanceMarker;
+  denWrapperFiles = map (f: "${toString ../../../../..}/${f}") [
+    "nix/lib/aspects/fx/aspect/provide.nix"
+    "nix/lib/aspects/fx/policy/dispatch.nix"
+  ];
+  isDenProvenanceWrapper =
+    v:
+    let
+      pos = if builtins.isAttrs v then builtins.unsafeGetAttrPos "name" v else null;
+    in
+    pos != null && builtins.elem pos.file denWrapperFiles;
+
   processInclude =
     {
       parentScopeHandlers,
@@ -196,7 +212,12 @@ let
           # A marker set here, rather than a shape compile-static infers from
           # the name, can't be confused with an author's own name choice.
           child =
-            if skipNameAnon then
+            if
+              builtins.substring 0 provenanceMarkerLength childName == provenanceMarker
+              && !(isDenProvenanceWrapper rawChild)
+            then
+              throw "den: aspect name `${childName}` is reserved: names beginning `${provenanceMarker}` are den's provenance wrappers"
+            else if skipNameAnon then
               withScope
             else if !(isMeaningfulName childName) then
               withScope
@@ -248,6 +269,15 @@ let
       revChunks: fx.pure (builtins.concatLists (lib.reverseList revChunks))
     );
 
+  # A policy record's exclude: by its name, resolved by value (rawRef) once the
+  # claim registry holds it (handlers/constraint.nix isPolicyExcluded).
+  policyExcludeOf = ref: {
+    type = "exclude";
+    scope = "subtree";
+    identity = ref.name;
+    rawRef = ref;
+  };
+
   registerConstraints =
     aspect:
     let
@@ -296,14 +326,25 @@ let
       # initial dispatch and policy/schema.nix's late-sibling re-dispatch)
       # can resolve it later, once dispatch has run past this aspect's own
       # includes and the registry actually holds the claim.
-      excludeList = map (
+      policyExclude = policyExcludeOf;
+      excludeList = lib.concatMap (
         ref:
-        {
-          type = "exclude";
-          scope = "subtree";
-          identity = excludeIdentity ref;
-        }
-        // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+        [
+          (
+            {
+              type = "exclude";
+              scope = "subtree";
+              identity = excludeIdentity ref;
+            }
+            // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+          )
+        ]
+        # A battery's transition default is excluded with it (#694, until
+        # den.lib.migrations.removalDate). Temporary: PR 4's origin-matched
+        # excludes cover this generally.
+        ++ lib.optional (builtins.isAttrs ref && ref ? __defaultForm) (
+          policyExclude ref.__defaultForm // { defaultFormOf = true; }
+        )
       ) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
@@ -367,14 +408,27 @@ let
           );
         in
         fx.seq (
-          map (
+          lib.concatMap (
             e:
-            fx.send "register-constraint" {
-              type = "exclude";
-              scope = "subtree";
-              identity = identity.key e.value;
-              owner = "policy";
-            }
+            [
+              (fx.send "register-constraint" {
+                type = "exclude";
+                scope = "subtree";
+                identity = identity.key e.value;
+                owner = "policy";
+              })
+            ]
+            # A battery's transition default is excluded with it, as excludeList
+            # does (#694, until removalDate).
+            ++ lib.optional (builtins.isAttrs e.value && e.value ? __defaultForm) (
+              fx.send "register-constraint" (
+                policyExcludeOf e.value.__defaultForm
+                // {
+                  defaultFormOf = true;
+                  owner = "policy";
+                }
+              )
+            )
           ) excludes
         )
       );

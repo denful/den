@@ -40,6 +40,39 @@ let
     else
       parent == ancestor || isAncestorOf scopeParent ancestor parent;
 
+  # The user-host-content migration (#694), until den.lib.migrations
+  # removalDate. While the transition defaults are on, a host warns once,
+  # listing the host-class content that reaches it only through them: what its
+  # nested entities' aspects write, which the end state leaves with them. Past
+  # the acknowledgement, or with the defaults off, that content is inert by
+  # design and nothing is reported.
+  checkLost =
+    hostName: class: lost0: modules:
+    let
+      # An import-tree root's identity keeps its store hash; readers don't.
+      lost = map (
+        e:
+        e // lib.optionalAttrs (e.aspect != null) { aspect = den.lib.argsName.withoutStoreHash e.aspect; }
+      ) lost0;
+    in
+    if !den.lib.migrations.transitionActive || lost == [ ] then
+      modules
+    else
+      lib.warn
+        (
+          "den: ${hostName} receives ${class} content only through den's transition default, which ends ${den.lib.migrations.removalDate}:\n"
+          + lib.concatMapStringsSep "\n" (
+            e:
+            "  - from ${e.entity} (${
+                if e.aspect == null then "unidentified content, scope ${e.scope}" else e.aspect
+              })"
+          ) lost
+          + "\nIf the host should have it, include the aspect on the host or add the battery explicitly: `den.schema.host.includes = [ den.batteries.user-aspects ];` for a user's own content, `den.schema.host.includes = [ den.batteries.mutual-provider ];` for `provides.to-hosts`. If it's meant to stay with the user, set `den.migrations.user-host-content.acknowledged = true;` to adopt the new behaviour now. See https://github.com/denful/den/issues/694."
+        )
+        # The same list, readable from the host's config (`_module.args`), so a
+        # cell can pin what the warning lists; it sets no option.
+        (modules ++ [ { _module.args.denTransitionDefaultLost = lost; } ]);
+
   # Phase 1: Wrap collected class imports per-scope.
   # Deduplicates modules with identical keys across scopes: when a shared
   # aspect is included by both host and user, it emits class modules in
@@ -251,6 +284,23 @@ let
       hostClass = spec.class or "nixos";
       rawHostScopeId = entityScopeFor scopeByEntity spec;
       hostScopeId = if rawHostScopeId != null then rawHostScopeId else spec.sourceScopeId;
+      # (a′) An instantiate with no entity on its source's ancestor-or-self
+      # chain (a flake-level aggregate over entities below it) collects across
+      # them, as flake routes do; any other is bounded at its own entity.
+      entityScopes = lib.genAttrs (builtins.attrValues scopeByEntity) (_: true);
+      chainHasEntity =
+        sid:
+        sid != null
+        && (
+          entityScopes ? ${sid}
+          || (
+            let
+              p = scopeParent.${sid} or null;
+            in
+            p != null && p != sid && chainHasEntity p
+          )
+        );
+      unbounded = rawHostScopeId == null && !(chainHasEntity spec.sourceScopeId);
     in
     if hostScopeId == null then
       null
@@ -299,6 +349,7 @@ let
         inherit
           hostScopeId
           hostClass
+          unbounded
           subtreeScopeIds
           subtreeContexts
           subtreeProvides
@@ -327,6 +378,7 @@ let
       scopeEntityKind ? { },
       scopeIsolated ? { },
       ownEntityOf,
+      provenanceLocs,
       spawnNodeFn,
       ctx,
     }:
@@ -338,6 +390,7 @@ let
       projBundle = builtins.removeAttrs argBundle [
         "scopeEntityKind"
         "ownEntityOf"
+        "provenanceLocs"
       ];
       proj = perHostProjection projBundle spec;
       preWalkedModules =
@@ -366,8 +419,9 @@ let
                 isolationMode = "aware";
               })
               // {
-                inherit scopeEntityKind ownEntityOf;
-              };
+                inherit scopeEntityKind ownEntityOf provenanceLocs;
+              }
+              // lib.optionalAttrs proj.unbounded { unboundedCollect = true; };
             materialized = materializeUnified {
               inherit pi ctx;
               seed = seed;
@@ -376,7 +430,13 @@ let
               spawnNode = spawnNodeFn;
               inherit (handlers) buildForwardAspect;
             } { doFinalMerge = true; };
-            hostModules = materialized.${hostClass} or [ ];
+            hostModules =
+              if proj.unbounded then
+                materialized.${hostClass} or [ ]
+              else
+                checkLost (spec.name or hostScopeId) hostClass (materialized.__lostAt hostClass) (
+                  materialized.${hostClass} or [ ]
+                );
           in
           if hostModules == [ ] then null else hostModules
         else
@@ -425,6 +485,7 @@ let
       scopeEntityKind ? { },
       scopeIsolated ? { },
       ownEntityOf,
+      provenanceLocs,
       spawnNodeFn,
       ctx,
     }:
@@ -442,6 +503,7 @@ let
           scopeEntityKind
           scopeIsolated
           ownEntityOf
+          provenanceLocs
           spawnNodeFn
           ctx
           ;
@@ -501,6 +563,7 @@ let
         rootScopeId = result.state.rootScopeId;
         rootIdHash = rootIdHashOf self ctx;
       };
+      provenanceLocs = (import ./handlers/provenance.nix { inherit lib; }).locsOf result.state;
 
       # Scan raw pipe values for config-dependent thunks. If none exist, hostConfigs
       # stays null and assemblePipes skips cross-host instantiation entirely.
@@ -587,7 +650,12 @@ let
                 scopeByEntity
                 ;
               scopeEntityClass = result.state.scopeEntityClass or (_: { });
-              inherit scopeIsolated scopeEntityKind ownEntityOf;
+              inherit
+                scopeIsolated
+                scopeEntityKind
+                ownEntityOf
+                provenanceLocs
+                ;
               spawnNodeFn = spawnNode;
               inherit ctx;
             };
@@ -932,7 +1000,7 @@ let
           isolationMode = "aware";
         })
         // {
-          inherit scopeEntityKind ownEntityOf;
+          inherit scopeEntityKind ownEntityOf provenanceLocs;
         };
       materialized =
         materializeUnified
@@ -959,7 +1027,12 @@ let
       phase4 = applyInstantiates {
         scopedInstantiates = result.state.scopedInstantiates null;
         scopeEntityClass = result.state.scopeEntityClass or (_: { });
-        inherit scopeIsolated scopeEntityKind ownEntityOf;
+        inherit
+          scopeIsolated
+          scopeEntityKind
+          ownEntityOf
+          provenanceLocs
+          ;
         inherit
           augmentedScopeContexts
           scopedProvides
@@ -973,6 +1046,18 @@ let
         scopedClassImportsRaw = drainedClassImportsRaw;
         spawnNodeFn = spawnNode;
       } materialized.classImports;
+
+      # TODO(#694): remove with the `isolated` alias. Every entity scope now
+      # bounds its ancestors' merge, so the flag only matters for a scope of an
+      # isolated kind that has no own entity.
+      isolatedKinds = lib.unique (
+        builtins.filter (k: k != null) (
+          map (sid: scopeEntityKind.${sid} or null) (builtins.attrNames scopeIsolated)
+        )
+      );
+      isolatedKindWarnings =
+        lib.optional (isolatedKinds != [ ])
+          "den: `den.schema.<kind>.isolated` is deprecated (${lib.concatStringsSep ", " isolatedKinds}): an entity's content no longer merges into its ancestors, so the flag is no longer needed. A delivery out of the entity names its receiver (`receiver = <record>`).";
 
       # ===== unifiedEdges component construction =========================
       # The TOP-LEVEL mechanism edge components (default fold + provides + routes +
@@ -1025,7 +1110,7 @@ let
                 isolationMode = "aware";
               })
               // {
-                inherit scopeEntityKind ownEntityOf;
+                inherit scopeEntityKind ownEntityOf provenanceLocs;
               };
             materialized =
               materializeUnified
@@ -1123,6 +1208,16 @@ let
         ++ perHostEdges
         ++ bprimeEdges
       );
+      # The loss check covers host-class content only (spec §6): a custom class
+      # resolved at a host root is bounded too, but not checked.
+      rootIsHost = (self.__entityKind or null) == "host" && class == (ctx.host.class or null);
+      flatImports =
+        if rootIsHost then
+          checkLost (ctx.host.name or result.state.rootScopeId) class (materialized.__lostAt class) (
+            phase4.${class} or [ ]
+          )
+        else
+          phase4.${class} or [ ];
     in
     {
       # Terminal position for the unmatched-raw-ref-exclude diagnostic: both
@@ -1131,8 +1226,8 @@ let
       # unmatchedRawRefExcludes in handlers/constraint.nix). Attached to
       # `imports` so it surfaces exactly when the resolved module set is
       # consumed, not when a path-set or edge-trace reader touches the bundle.
-      imports = lib.foldl' (v: msg: lib.warn msg v) (phase4.${class} or [ ]) (
-        handlers.unmatchedRawRefExcludes result.state
+      imports = lib.foldl' (v: msg: lib.warn msg v) flatImports (
+        handlers.unmatchedRawRefExcludes result.state ++ isolatedKindWarnings
       );
       # Surfaced from the SAME result.state — this is thunked onto state.
       pathSetByScope = result.state.pathSetByScope null;
@@ -1174,6 +1269,7 @@ let
         rootScopeId = result.state.rootScopeId;
         rootIdHash = rootIdHashOf self ctx;
       };
+      provenanceLocs = (import ./handlers/provenance.nix { inherit lib; }).locsOf result.state;
 
       # policy.spawn requests (host-aspects) materialize here too, or a static
       # resolve silently drops every projection (#742). A directly resolved
@@ -1261,7 +1357,7 @@ let
           isolationMode = "aware";
         })
         // {
-          inherit scopeEntityKind ownEntityOf;
+          inherit scopeEntityKind ownEntityOf provenanceLocs;
         };
       materialized = materializeUnified {
         inherit pi ctx spawnNode;

@@ -17,6 +17,7 @@
 }:
 let
   inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
+  inherit (import ./registrant.nix { inherit lib; }) withRegistrants;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
@@ -348,7 +349,9 @@ let
       # Registered at the sibling itself (a late include's own policies): its
       # own dispatch would fire them wherever their arguments are bound, so
       # the entity-kind filter, which keeps an ancestor's policies from
-      # re-firing at deeper kinds, does not apply to them.
+      # re-firing at deeper kinds, does not apply to them. In a resolve that
+      # filter is redundant with sameInstanceAbove below; it is what keeps a
+      # capture from a host root (no context above it) from re-firing them.
       ownPolicies = scopedAspectPolicies.${sib.scopeId} or { };
       latePolicies = lib.filterAttrs (
         name: policy:
@@ -438,13 +441,15 @@ let
             && builtins.attrNames prev.inst == builtins.attrNames inst
             && builtins.all (k: sameBinding prev.inst.${k} inst.${k}) (builtins.attrNames inst)
           ) (lateRanAtSib.${name} or [ ]);
-        filteredPolicies = lib.filterAttrs (
-          name: policy:
-          !excluded name
-          && !(ranAtSib ? ${name})
-          && !(lateRan name policy)
-          && !(sameInstanceAbove name policy)
-        ) latePolicies;
+        filteredPolicies = withRegistrants state sib.scopeId (
+          lib.filterAttrs (
+            name: policy:
+            !excluded name
+            && !(ranAtSib ? ${name})
+            && !(lateRan name policy)
+            && !(sameInstanceAbove name policy)
+          ) latePolicies
+        );
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };

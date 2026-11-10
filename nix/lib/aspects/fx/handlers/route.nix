@@ -11,7 +11,9 @@ let
     fallbackScope: r:
     "${r.fromClass or "?"}>${r.intoClass or "?"}@${r.sourceScopeId or fallbackScope}/${
       lib.concatStringsSep "/" (r.path or [ ])
-    }";
+    }"
+    # mutual-provider registers one route per provider at a scope (#694).
+    + lib.optionalString ((r.__fromProvenance or null) != null) "#${r.__fromProvenance}";
 
   registerRouteHandler = {
     "register-route" =
@@ -28,7 +30,12 @@ let
       {
         resume = null;
         state =
-          if alreadyRegistered then
+          # Stood down because a transition default already carries its
+          # content (#694): never delivered, only read by the migration
+          # warning (provenance.nix locsOf).
+          if route.__standDown or false then
+            scopedAppend state "scopedStandDowns" scope route
+          else if alreadyRegistered then
             state
           else
             scopedAppend state "scopedRoutes" scope route

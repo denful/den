@@ -191,7 +191,7 @@
       }
     );
 
-    test-user-owned-configures-all-hosts = denTest (
+    test-user-owned-stays-in-user = denTest (
       {
         den,
         igloo,
@@ -209,6 +209,34 @@
           igloo.programs.fish.enable
           iceberg.programs.fish.enable
         ];
+        # #694: a user's host-class content stays in the user.
+        expected = [
+          false
+          false
+        ];
+      }
+    );
+
+    test-user-owned-with-user-aspects = denTest (
+      {
+        den,
+        igloo,
+        iceberg,
+        ...
+      }:
+      {
+
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.tux = { };
+        # The hosts accept their users' host-class output (today's behaviour).
+        den.schema.host.includes = [ den.batteries.user-aspects ];
+
+        den.aspects.tux.nixos.programs.fish.enable = true;
+
+        expr = [
+          igloo.programs.fish.enable
+          iceberg.programs.fish.enable
+        ];
         expected = [
           true
           true
@@ -216,7 +244,7 @@
       }
     );
 
-    test-user-static-unidirectional-configures-all-hosts = denTest (
+    test-user-static-unidirectional-stays-in-user = denTest (
       {
         den,
         igloo,
@@ -238,14 +266,15 @@
           igloo.programs.fish.enable
           iceberg.programs.fish.enable
         ];
+        # #694: a user's host-class content stays in the user.
         expected = [
-          true
-          true
+          false
+          false
         ];
       }
     );
 
-    test-user-function-configures-all-hosts = denTest (
+    test-user-static-unidirectional-with-user-aspects = denTest (
       {
         den,
         igloo,
@@ -256,6 +285,72 @@
 
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
+        # The hosts accept their users' host-class output (today's behaviour).
+        den.schema.host.includes = [ den.batteries.user-aspects ];
+
+        den.aspects.tux.includes = [
+          {
+            nixos.programs.fish.enable = true;
+          }
+        ];
+
+        expr = [
+          igloo.programs.fish.enable
+          iceberg.programs.fish.enable
+        ];
+        expected = [
+          true
+          true
+        ];
+      }
+    );
+
+    test-user-function-stays-in-user = denTest (
+      {
+        den,
+        igloo,
+        iceberg,
+        ...
+      }:
+      {
+
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.tux = { };
+
+        den.aspects.tux.includes = [
+          (
+            { host, user }:
+            {
+              nixos.programs.fish.enable = true;
+            }
+          )
+        ];
+
+        expr = [
+          igloo.programs.fish.enable
+          iceberg.programs.fish.enable
+        ];
+        # #694: a user's host-class content stays in the user.
+        expected = [
+          false
+          false
+        ];
+      }
+    );
+
+    test-user-function-with-user-aspects = denTest (
+      {
+        den,
+        igloo,
+        iceberg,
+        ...
+      }:
+      {
+
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+        den.hosts.x86_64-linux.iceberg.users.tux = { };
+        # The hosts accept their users' host-class output (today's behaviour).
+        den.schema.host.includes = [ den.batteries.user-aspects ];
 
         den.aspects.tux.includes = [
           (

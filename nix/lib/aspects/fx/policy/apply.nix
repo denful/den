@@ -36,17 +36,23 @@ let
                 e.value // { name = "<policy:${policyName}>${suffix}"; }
               else
                 e.value;
+            emit = fx.send "emit-include" {
+              inherit child;
+              idx = null;
+              __parentScopeHandlers = parentScopeHandlers;
+            };
+            # Den's provenance for the walk: set by dispatch only (#694).
+            tokens = e.__denProvenance or [ ];
+            regChain = e.__denRegChain or [ ];
+            walk =
+              if tokens == [ ] && regChain == [ ] then
+                emit
+              else
+                fx.bind (fx.send "provenance-push" { inherit tokens regChain; }) (
+                  _: fx.bind emit (r: fx.bind (fx.send "provenance-pop" null) (_: fx.pure r))
+                );
           in
-          go (idx + 1) (
-            fx.bind acc (
-              prev:
-              fx.bind (fx.send "emit-include" {
-                inherit child;
-                idx = null;
-                __parentScopeHandlers = parentScopeHandlers;
-              }) (r: fx.pure (prev ++ r))
-            )
-          );
+          go (idx + 1) (fx.bind acc (prev: fx.bind walk (r: fx.pure (prev ++ r))));
     in
     go 0 (fx.pure [ ]);
 

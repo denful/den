@@ -10,11 +10,8 @@
       den.aspects.gnome
       den.aspects.dev-tools
     ];
-    nixos =
-      { ... }:
-      {
-        users.users.bob.isNormalUser = true;
-      };
+    user.isNormalUser = true;
+
     homeManager =
       { pkgs, ... }:
       {

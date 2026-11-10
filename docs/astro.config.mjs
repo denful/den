@@ -93,6 +93,7 @@ export default defineConfig({
 						{ label: 'Core Principles', slug: 'explanation/core-principles' },
 						{ label: 'Where Does My Config Land?', slug: 'explanation/where-config-lands', badge: { text: 'new', variant: 'success' } },
 						{ label: 'Choosing a Mechanism', slug: 'explanation/choosing-a-mechanism', badge: { text: 'new', variant: 'success' } },
+						{ label: 'Crossing Scopes', slug: 'explanation/crossing-scopes' },
 						{
 							label: 'Entities',
 							collapsed: false,

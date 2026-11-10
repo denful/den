@@ -28,10 +28,7 @@
         # from local bindings.
         customEmacs
         # from the aspect tree, cooper example is defined bellow
-        den.aspects.cooper
         den.aspects.setHost
-        # from the `eg` namespace.
-        eg.autologin
         # den included batteries that provide common configs.
         <den/primary-user> # alice is admin always.
         (<den/user-shell> "fish") # default user shell
@@ -39,12 +36,20 @@
         den.aspects.alice.policies.to-igloo
       ];
 
-    # Alice configures NixOS hosts it lives on.
-    nixos =
-      { pkgs, ... }:
-      {
-        users.users.alice.packages = [ pkgs.vim ];
-      };
+    # Alice configures NixOS hosts it lives on: what a user provides to its
+    # hosts crosses to them (the mutual-provider battery, defaults.nix).
+    # `eg.autologin` comes from the `eg` namespace.
+    provides.to-hosts = {
+      includes = [
+        den.aspects.cooper
+        eg.autologin
+      ];
+      nixos =
+        { pkgs, ... }:
+        {
+          users.users.alice.packages = [ pkgs.vim ];
+        };
+    };
 
     # Alice home-manager.
     homeManager =
@@ -61,6 +66,7 @@
         den.lib.policy.provide {
           class = "nixos";
           module.programs.nh.enable = true;
+          receiver = host;
         }
       );
 

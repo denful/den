@@ -145,6 +145,17 @@ let
       host,
     }:
     [
+      # The home-manager module import, from the host arm at the host scope
+      # and from the user arm; one key, so the host module system keeps one.
+      (edge {
+        source = collected "host:${host}" os;
+        target = rootT "host:${host}" os;
+        mode = "merge";
+        annotations = {
+          mergeHalf = "default-fold";
+          providesPolicyName = "host-to-hm-users";
+        };
+      })
       (edge {
         source = collected "user:${user}" os;
         target = rootT "host:${host}" os;
@@ -577,10 +588,10 @@ in
               sourceVia = "unresolved";
             };
           });
-          # host folds (2) + host os route + user os route + the tail (3, from
+          # host folds (2) + the host arm's module provide + host os route + user os route + the tail (3, from
           # userForwardTail) + the spawn's copies (forward, user route, os
           # route) + the spawn's user-scope folds (2).
-          count = 12;
+          count = 13;
         };
       }
     );
@@ -897,6 +908,7 @@ in
           && e.target ? root
           && e.target.root == "host:igloo"
           && e.target.class == "nixos"
+          && (e.annotations or { }) ? collectedScopes
         ) trace;
       in
       {

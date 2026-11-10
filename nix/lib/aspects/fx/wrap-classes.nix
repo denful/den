@@ -93,6 +93,9 @@ let
         imports = [ finalModule ];
       };
 
+  # A validator's location: its module's, with this suffix.
+  validatorSuffix = "/<collision-validator>";
+
   # Construct the collision validator module.
   buildValidatorModule =
     {
@@ -101,7 +104,7 @@ let
       result,
     }:
     let
-      validatorLoc = "${class}@${nodeIdentity}/<collision-validator>";
+      validatorLoc = "${class}@${nodeIdentity}${validatorSuffix}";
       validatorModule = lib.setFunctionArgs result.validator (
         result.validatorAdvertisedArgs or result.advertisedArgs or { }
       );
@@ -186,5 +189,5 @@ let
     ) classImports;
 in
 {
-  inherit wrapCollectedClasses;
+  inherit wrapCollectedClasses validatorSuffix;
 }

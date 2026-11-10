@@ -148,6 +148,9 @@ in
         den.aspects.tux.probe-cls.own = "tux";
         # Only the host-aspects projection binds `user` while walking igloo's tree.
         den.aspects.igloo.includes = [
+          # #694: the host-rooted flat resolve reads tux's class content only
+          # where the host accepts tux.
+          den.batteries.user-aspects
           (
             { user, ... }:
             {

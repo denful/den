@@ -133,7 +133,7 @@
           inherit lib schemaEntityKinds schemaEntityKindsSet;
         };
         dispatch = import ../../../../nix/lib/aspects/fx/policy/dispatch.nix {
-          inherit lib resolveArgsSatisfied;
+          inherit lib den resolveArgsSatisfied;
           inherit (classify)
             classifyPolicyResult
             extractTaggedEffects

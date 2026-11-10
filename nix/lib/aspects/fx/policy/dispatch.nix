@@ -1,6 +1,7 @@
 # Policy dispatch — run policies against a context, return classified results.
 {
   lib,
+  den,
   resolveArgsSatisfied,
   classifyPolicyResult,
   extractTaggedEffects,
@@ -33,6 +34,122 @@ let
         eff
     ) rawEffects;
 
+  # An instance firing below its registrant applies to the registrant too
+  # (#694 §11a R3): its bare includes land in full where it fired, and their
+  # host-class part reaches the registrant through a provenance route (the
+  # mutual-provider mechanism, aspect/provide.nix); a provide or route with no
+  # receiver is aimed at the registrant. A user the registrant accepts through
+  # user-aspects is already unbounded, so the route stands down (R5).
+  provenanceMarker = "den-provides-to-host=";
+  inherit (import ./entity-identity.nix { inherit lib; }) sameEntity entityKey;
+  applyToRegistrant =
+    policyName: registrant: ctx: effects:
+    let
+      firingKind = ctx.__entityKind or null;
+      firing = if firingKind == null then null else ctx.${firingKind} or null;
+      reg = registrant.record;
+      # Where the host-class part lands: the registrant, or for a class-less
+      # registrant the nearest classed entity below it (R3 (a), registrant.nix).
+      target = if (registrant.classTarget or null) == null then null else registrant.classTarget.record;
+      isEntity =
+        kind: record: other:
+        firingKind == kind && builtins.isAttrs record && sameEntity kind record other;
+      # Firing at the target itself, the content is already where it belongs.
+      atTarget = target != null && isEntity registrant.classTarget.kind firing target;
+      # Below the registrant: the firing entity is not the registrant, and the
+      # scope binds the registrant's kind to it.
+      isBelow =
+        firing != null
+        && !(isEntity registrant.kind firing reg)
+        && builtins.isAttrs (ctx.${registrant.kind} or null)
+        && sameEntity registrant.kind ctx.${registrant.kind} reg;
+      token = "${entityKey registrant.kind reg}/${policyName}";
+      registrantClasses = lib.optionals (target != null && !atTarget) [
+        target.class
+        "os"
+      ];
+      isInclude = e: e.__policyEffect == "include";
+      aimed =
+        e:
+        if
+          builtins.elem e.__policyEffect [
+            "provide"
+            "route"
+          ]
+          && (e.value.receiver or null) == null
+          # appendToParent already names its target.
+          && !(e.value.appendToParent or false)
+          # Only the registrant's own class is its part, as for an include: a
+          # route into a user-side class (homeManager) stays where it fired.
+          && builtins.elem (e.value.intoClass or e.value.class or null) registrantClasses
+        then
+          e
+          // {
+            value = e.value // {
+              receiver = target;
+            };
+          }
+        else
+          e;
+      wrapped =
+        e:
+        e
+        // {
+          value = {
+            name = "${provenanceMarker}${token}";
+            includes = [ e.value ];
+          };
+          # Outermost: a provider inside the delivered include stays innermost.
+          __denProvenance = [ token ] ++ e.__denProvenance or [ ];
+        };
+      hasIncludes = builtins.any isInclude effects;
+      accepted = firing != null && den.lib.acceptance.acceptsExplicitly ctx target firing;
+      # Accepted only through user-aspects' transition default: the bucket
+      # reaches the target whole, so the route stands down, recorded for the
+      # migration warning (#694).
+      acceptedByDefault = !accepted && firing != null && den.lib.acceptance.accepts ctx target firing;
+      delivery = lib.optional (hasIncludes && target != null && !atTarget && !accepted) (
+        den.lib.policy.route {
+          fromClass = target.class;
+          intoClass = target.class;
+          receiver = target;
+          __fromProvenance = token;
+          __standDown = acceptedByDefault;
+        }
+      );
+    in
+    if registrant == null || !isBelow then
+      effects
+    else
+      map (e: if isInclude e then wrapped e else aimed e) effects ++ delivery;
+
+  # Den's provenance fields on an effect (#694): the tokens its include is
+  # walked under, outermost first, and the registration chain of the policy
+  # that emitted it. Only den sets them; whatever an author's effect carries
+  # is replaced. A policy registered inside a cross-provider include emits
+  # under that provider, as the include's static content is; den's provides
+  # policies (aspect/provide.nix) set their own.
+  denProvenance =
+    entry: e:
+    let
+      clean = builtins.removeAttrs e [
+        "__denProvenance"
+        "__denRegChain"
+      ];
+    in
+    if e.__policyEffect != "include" then
+      clean
+    else
+      clean
+      // {
+        __denProvenance =
+          if entry.value.setsProvenance or false then
+            e.__denProvenance or [ ]
+          else
+            lib.optional ((entry.value.provenance or null) != null) entry.value.provenance;
+        __denRegChain = entry.value.chain or [ ];
+      };
+
   # Dispatch aspect policies against a context.
   # Note: caller passes the same aspectPolicies each iteration; Nix memoizes
   # attrsToList per attrset identity, so repeated calls are cheap.
@@ -62,7 +179,9 @@ let
       in
       {
         policyName = entry.name;
-        effects = validateEffects entry.name rawEffects;
+        effects = applyToRegistrant entry.name (entry.value.registrant or null) ctx (
+          map (denProvenance entry) (validateEffects entry.name rawEffects)
+        );
       }
     ) matching;
 

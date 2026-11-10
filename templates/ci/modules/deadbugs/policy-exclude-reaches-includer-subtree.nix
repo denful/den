@@ -1,6 +1,8 @@
 # A `policy.exclude` returned by a policy listed in an aspect's `includes` must
 # act like that aspect's own `excludes`: it covers everything the aspect
-# includes, wherever the policy sits in the list. Before the fix the policy
+# includes, wherever the policy sits in the list. This is the early path only:
+# a policy delivered by another policy's include registers its excludes at
+# dispatch, too late (known-limit-dispatch-time-exclude-effect). Before the fix the policy
 # fired only at the scope's dispatch, after the static includes had passed the
 # gate, and its exclude reached only what the policy itself included.
 { denTest, lib, ... }:

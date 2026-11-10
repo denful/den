@@ -5,6 +5,34 @@ let
   inherit (import ./state-util.nix) scopedAppend;
 
   chainHandler = {
+    # Den's provenance (#694): the cross-provider tokens and the emitting
+    # policy's registration chain a policy-emitted include is walked under.
+    # Pushed only by den's include emitter (policy/apply.nix), from fields den
+    # sets on the effect; read innermost-first (handlers/provenance.nix).
+    "provenance-push" =
+      { param, state }:
+      {
+        resume = null;
+        state = scopedAppend state "scopedProvenanceStack" state.currentScope param;
+      };
+    "provenance-pop" =
+      { param, state }:
+      let
+        all = (state.scopedProvenanceStack or (_: { })) null;
+        stack = all.${state.currentScope} or [ ];
+      in
+      {
+        resume = null;
+        state = state // {
+          scopedProvenanceStack =
+            _:
+            all
+            // {
+              ${state.currentScope} =
+                if stack == [ ] then throw "fx: provenance-pop on an empty stack" else lib.init stack;
+            };
+        };
+      };
     "chain-push" =
       { param, state }:
       {

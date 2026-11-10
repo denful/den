@@ -49,6 +49,22 @@
         den.aspects.tux.includes = [ den.provides.hostname ];
 
         expr = igloo.networking.hostName;
+        # #694: a user's host-class content stays in the user: the host keeps
+        # NixOS's default name.
+        expected = "nixos";
+      }
+    );
+
+    test-included-in-user-with-user-aspects = denTest (
+      { den, igloo, ... }:
+      {
+        # The host accepts its users' host-class output.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        den.aspects.tux.includes = [ den.provides.hostname ];
+
+        expr = igloo.networking.hostName;
         expected = "igloo";
       }
     );
@@ -73,6 +89,27 @@
     test-included-in-user-includes = denTest (
       { den, igloo, ... }:
       {
+        den.hosts.x86_64-linux.igloo.users.tux = { };
+
+        # NOTE: foo needs parametric to pass over `{host}` context into den.provides.hostname
+        den.aspects.foo = den.lib.parametric {
+          includes = [ den.provides.hostname ];
+        };
+
+        den.aspects.tux.includes = [ den.aspects.foo ];
+
+        expr = igloo.networking.hostName;
+        # #694: a user's host-class content stays in the user: the host keeps
+        # NixOS's default name.
+        expected = "nixos";
+      }
+    );
+
+    test-included-in-user-includes-with-user-aspects = denTest (
+      { den, igloo, ... }:
+      {
+        # The host accepts its users' host-class output.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
 
         # NOTE: foo needs parametric to pass over `{host}` context into den.provides.hostname

@@ -110,6 +110,7 @@
           homeManager = { };
         };
         den.schema.crew.includes = [
+          den.policies.test-crew-to-home
           den.aspects.svc.feature
           (
             { crew, ... }:
@@ -136,6 +137,17 @@
             })
           ];
         den.schema.home.includes = [ den.policies.test-home-to-crew ];
+        # #694: nesting merges nothing, so crew's homeManager crosses to the
+        # home by a receiver route (setup, not this cell's subject).
+        den.policies.test-crew-to-home =
+          { crew, home, ... }:
+          [
+            (den.lib.policy.route {
+              fromClass = "homeManager";
+              intoClass = "homeManager";
+              receiver = home;
+            })
+          ];
 
         expr = config.flake.homeConfigurations.tux.config.home.sessionVariables.HAS_FEATURE or "MISSING";
         expected = "true";

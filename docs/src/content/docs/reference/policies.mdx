@@ -60,6 +60,12 @@ Inject an aspect into the current resolution:
 policy.include { nixos.environment.variables.MARKER = "yes"; }
 ```
 
+The aspect lands in the scope where the policy fires. A policy that binds
+`{ host, user }` fires at the user scope, so host-class content it includes
+stays in the user ([#694](https://github.com/denful/den/issues/694)). To reach
+the host, deliver it:
+`policy.provide { receiver = host; class = host.class; module = …; }`.
+
 ### `policy.exclude aspect`
 
 Remove an aspect via the constraint registry:

@@ -38,6 +38,7 @@ let
   inherit (import ./materialize.nix { inherit lib den; }) assembleSubtree;
   inherit (import ./toposort.nix { inherit lib; }) topoSortEdges;
   inherit (import ../scope-walk.nix { inherit lib; }) subtreeScopes;
+  inherit (import ../handlers/provenance.nix { inherit lib; }) sharedFanOutPrefix;
 
   appendAt =
     perScope: sid: cls: mods:
@@ -127,6 +128,39 @@ let
         scopeEntityKind
         ;
       inherit (pi) ownEntityOf;
+      # Nesting moves no content: every scope with an own entity bounds the
+      # walks that assemble class content (the default fold, collectSubtree
+      # routes). The kind-level isolation marks stay in the set (the
+      # deprecated `isolated` alias). The walk's root is always included.
+      # A scope binding a user its host accepts through user-aspects (the
+      # user's own, or an entity resolved for that user) is not a boundary: its
+      # content reaches the host as on main.
+      acceptedUserScope =
+        sid:
+        let
+          ctx = scopeContexts.${sid} or { };
+        in
+        ctx ? host
+        && ctx ? user
+        && (ctx.home or null) == null
+        && ownEntityOf.${sid} != (ctx.host.id_hash or null)
+        && den.lib.acceptance.accepts ctx ctx.host ctx.user;
+      entityBoundary =
+        scopeIsolated
+        // lib.mapAttrs (_: _: true) (lib.filterAttrs (sid: _: !(acceptedUserScope sid)) ownEntityOf);
+      # The boundary with the transition defaults off: only an explicit
+      # user-aspects acceptance lifts a user (#694 migration).
+      explicitBoundary =
+        scopeIsolated
+        // lib.mapAttrs (_: _: true) (
+          lib.filterAttrs (
+            sid: _:
+            let
+              ctx = scopeContexts.${sid} or { };
+            in
+            !(acceptedUserScope sid && den.lib.acceptance.acceptsExplicitly ctx ctx.host ctx.user)
+          ) ownEntityOf
+        );
       rootCtx = scopeContexts.${rootScopeId} or { };
       outerEntities = lib.listToAttrs (
         map (r: lib.nameValuePair r.id_hash true) (
@@ -261,7 +295,7 @@ let
         if (r.collectSubtree or false) || r.intoClass == "flake" then
           subtreeScopes {
             inherit scopeParent;
-            isolated = scopeIsolated;
+            isolated = if r.intoClass == "flake" then scopeIsolated else entityBoundary;
             root = r.sourceScopeId;
             allScopeIds = producerScopes;
           }
@@ -359,13 +393,7 @@ let
               inherit (pair) spec;
               target = targetOf spec;
             in
-            # TODO(#694): a battery delivery the old subtree merge still
-            # carries; delivering it as well would double unkeyed modules. Its
-            # receiver is still resolved, so a delivery that cannot land fails
-            # now. The flip removes the marker.
-            if spec.__deliverAfterFlip or false then
-              builtins.seq target prev
-            else if pair.kind == "provide" then
+            if pair.kind == "provide" then
               recordDelivery prev (applyOneProvide targetOf ctx prev.acc spec) target spec.class
             else if spec.__complexForward or false then
               recordDelivery prev (applyComplexRouteEdge prev.acc {
@@ -391,7 +419,13 @@ let
                       withDelivered prev.delivered
                     else
                       aliasedPerScope;
-                  inherit scopeParent scopeIsolated targetOf;
+                  inherit
+                    scopeParent
+                    scopeIsolated
+                    entityBoundary
+                    targetOf
+                    ;
+                  provenanceLocs = pi.provenanceLocs or { };
                 };
               in
               if isClassAlias spec then
@@ -406,6 +440,276 @@ let
           orderedPairs;
       inherit (folded) acc;
 
+      # The user-host-content migration (#694), removed on
+      # den.lib.migrations.removalDate. For class `cls`: content in a nested
+      # entity's bucket that would not reach the root with the transition
+      # defaults off. Read from this fold's state: the explicit-only boundary,
+      # the routes the end state delivers (stood-down ones included, ones only
+      # a default makes excluded), and the root's buckets inside that boundary.
+      # Each entry is { scope; entity; aspect; }.
+      lostAt =
+        cls:
+        let
+          isolatedOnly = subtreeScopes {
+            inherit scopeParent;
+            isolated = scopeIsolated;
+            root = rootScopeId;
+            allScopeIds = builtins.attrNames acc.perScope;
+          };
+          boundedScopes = subtreeScopes {
+            inherit scopeParent;
+            isolated = explicitBoundary;
+            root = rootScopeId;
+            allScopeIds = builtins.attrNames acc.perScope;
+          };
+          boundedSet = lib.genAttrs boundedScopes (_: true);
+          nested = builtins.filter (sid: !(boundedSet ? ${sid})) isolatedOnly;
+          # A scope whose `cls` bucket a receiver route moves on whole is read.
+          # A provenance route (mutual-provider) reads only the locations
+          # emitted under its provider.
+          receiverRoutes =
+            builtins.filter (
+              p:
+              p.kind == "route"
+              && (p.spec.receiver or null) != null
+              && p.spec.fromClass == cls
+              && !(p.spec.__transitionDefault or false)
+            ) orderedPairs
+            ++ map (spec: { inherit spec; }) (
+              builtins.filter (spec: spec.fromClass == cls && !(spec.__transitionDefault or false)) (
+                (pi.provenanceLocs or { }).__standDown or [ ]
+              )
+            );
+          readScopes = lib.genAttrs (map (p: p.spec.sourceScopeId) (
+            builtins.filter (p: (p.spec.__fromProvenance or null) == null) receiverRoutes
+          )) (_: true);
+          provenanceRead = lib.genAttrs (lib.concatMap (
+            p:
+            map (l: "${p.spec.sourceScopeId}\n${den.lib.aspects.fx.identity.stripCtxSuffix l}") (
+              ((pi.provenanceLocs or { }).${p.spec.sourceScopeId} or { }).${p.spec.__fromProvenance} or [ ]
+            )
+          ) (builtins.filter (p: (p.spec.__fromProvenance or null) != null) receiverRoutes)) (_: true);
+          # An identity is rooted at the entity it was walked under
+          # (`user/<anon>:6` at a user scope, `host/<anon>:6` at the host for the
+          # same `den.default` include), so the leading entity-kind segment is
+          # dropped before comparing.
+          entityKinds = lib.genAttrs den.lib.schemaUtil.schemaEntityKinds (_: true);
+          dropKindRoot =
+            id:
+            let
+              segs = lib.splitString "/" id;
+            in
+            if builtins.length segs > 1 && entityKinds ? ${builtins.head segs} then
+              lib.concatStringsSep "/" (builtins.tail segs)
+            else
+              id;
+          identityOf =
+            m:
+            let
+              raw = toString (m.key or m._file or "");
+              noClass = lib.removePrefix "${cls}@" raw;
+            in
+            if raw == "" then null else dropKindRoot (den.lib.aspects.fx.identity.stripCtxSuffix noClass);
+          provenanceMarker = "den-provides-to-host=";
+          rootMods = lib.concatMap (sid: acc.perScope.${sid}.${cls} or [ ]) boundedScopes;
+          # The collision validator den adds beside a parametric class module
+          # (wrap-classes.nix) is bookkeeping, made after the pipeline, so no
+          # delivery records it: its module is listed or not on its own.
+          inherit (den.lib.aspects.fx.wrapClasses) validatorSuffix;
+          isValidator =
+            m:
+            let
+              f = toString (m._file or "");
+              n = builtins.stringLength validatorSuffix;
+              l = builtins.stringLength f;
+            in
+            l >= n && builtins.substring (l - n) n f == validatorSuffix;
+          # A module's keys, its own and those of the attrset modules it
+          # imports: an anonymous wrapper around a keyed module (the
+          # home-manager host-module import) is the keyed module.
+          keysOf =
+            m:
+            if !builtins.isAttrs m then
+              [ ]
+            else
+              lib.optional (m ? key) (toString m.key) ++ lib.concatMap keysOf (m.imports or [ ]);
+          rootKeys = lib.genAttrs (lib.concatMap keysOf rootMods) (_: true);
+          rootIds = lib.genAttrs (builtins.filter (i: i != null) (map identityOf rootMods)) (_: true);
+          reachesRoot =
+            m:
+            let
+              id = identityOf m;
+            in
+            (
+              let
+                ks = keysOf m;
+              in
+              ks != [ ] && builtins.all (k: rootKeys ? ${k}) ks
+            )
+            || (id != null && rootIds ? ${id});
+          entityOf = sid: (scopeContexts.${sid} or { }).${scopeEntityKind.${sid} or ""} or null;
+          # A nested entity with its own class (a guest that is its own host)
+          # owns its host-class content: it is that entity's system config, not
+          # content lost from the root (#694 §6). Its users' content is its own
+          # too. What an edge delivers to the root is read above either way.
+          ownedBelow =
+            let
+              go =
+                seen: s:
+                if s == null || s == rootScopeId || seen ? ${s} then
+                  false
+                else if (entityOf s) ? class then
+                  true
+                else
+                  go (seen // { ${s} = true; }) (scopeParent.${s} or null);
+            in
+            go { };
+          # What reaches the root now through a transition default: a scope
+          # the default lifts (inside the effective boundary, outside the
+          # explicit one), and the locations a route only a default makes
+          # delivers.
+          effectiveSet = lib.genAttrs (subtreeScopes {
+            inherit scopeParent;
+            isolated = entityBoundary;
+            root = rootScopeId;
+            allScopeIds = builtins.attrNames acc.perScope;
+          }) (_: true);
+          defaultRoutes = builtins.filter (
+            p:
+            p.kind == "route"
+            && (p.spec.receiver or null) != null
+            && p.spec.fromClass == cls
+            && (p.spec.__transitionDefault or false)
+            && (p.spec.__fromProvenance or null) != null
+          ) orderedPairs;
+          # A provide stood down under a transition default (the
+          # os-user-class-fwd hook) is the end state's delivery of its aspect
+          # at its source scope.
+          standDownAspects = lib.genAttrs (map (spec: "${spec.sourceScopeId}\n${spec.__standDownAspect}") (
+            builtins.filter (spec: spec.class == cls && spec ? __standDownAspect) (
+              (pi.provenanceLocs or { }).__standDownProvides or [ ]
+            )
+          )) (_: true);
+          # Content the root has before any delivery (its own scopes' buckets,
+          # inside the explicit boundary) is on the host without the default, so
+          # it is not listed.
+          seedIds = lib.genAttrs (builtins.filter (i: i != null) (
+            map identityOf (lib.concatMap (sid: seed.perScope.${sid}.${cls} or [ ]) boundedScopes)
+          )) (_: true);
+          onRootUndelivered =
+            m:
+            let
+              id = identityOf m;
+            in
+            id != null && seedIds ? ${id};
+          # Content a policy emitted under a provider is listed by that
+          # provider, as the provider's static content is, not by den's
+          # synthetic name for the policy's include or wrapper. A named aspect
+          # inside the provider keeps its own name.
+          isSynthetic =
+            id:
+            let
+              starts = p: builtins.substring 0 (builtins.stringLength p) id == p;
+            in
+            starts provenanceMarker || starts "<policy:";
+          shownAs = id: token: if token != null && id != null && isSynthetic id then token else id;
+          defaultDelivered = lib.concatMap (
+            p:
+            map
+              (l: {
+                scope = p.spec.sourceScopeId;
+                entity = (entityOf p.spec.sourceScopeId).name or p.spec.sourceScopeId;
+                aspect = shownAs (identityOf { key = l; }) p.spec.__fromProvenance;
+              })
+              (
+                builtins.filter (l: !(onRootUndelivered { key = l; })) (
+                  ((pi.provenanceLocs or { }).${p.spec.sourceScopeId} or { }).${p.spec.__fromProvenance} or [ ]
+                )
+              )
+          ) defaultRoutes;
+        in
+        lib.concatMap
+          (
+            sid:
+            map
+              (m: {
+                scope = sid;
+                entity = (entityOf sid).name or sid;
+                aspect =
+                  let
+                    l = den.lib.aspects.fx.identity.stripCtxSuffix (toString (m.key or m._file or ""));
+                    byToken = (pi.provenanceLocs or { }).${sid} or { };
+                    under = lib.findFirst (t: builtins.elem l (byToken.${t} or [ ])) null (builtins.attrNames byToken);
+                  in
+                  shownAs (identityOf m) under;
+              })
+              (
+                builtins.filter (
+                  m:
+                  !(isValidator m)
+                  && !(reachesRoot m)
+                  && !(standDownAspects ? "${sid}\n${toString (identityOf m)}")
+                  && !(
+                    provenanceRead
+                    ? "${sid}\n${den.lib.aspects.fx.identity.stripCtxSuffix (toString (m.key or m._file or ""))}"
+                  )
+                ) (acc.perScope.${sid}.${cls} or [ ])
+              )
+          )
+          (builtins.filter (sid: effectiveSet ? ${sid} && !(readScopes ? ${sid}) && !(ownedBelow sid)) nested)
+        ++ defaultDelivered;
+      # The root's class content: its own bounded subtree after delivery. An
+      # "aware" walk takes the entity boundary; a "blind" one (spawn extraction)
+      # is unchanged.
+      assembled = assembleSubtree {
+        root = rootScopeId;
+        pi =
+          pi
+          // acc
+          // lib.optionalAttrs (pi.isolationMode == "aware" && !(pi.unboundedCollect or false)) {
+            scopeIsolated = entityBoundary;
+          };
+      };
+      # A shared source fanned out at a host for a user the host accepts: the
+      # lifted merge already carries that user's own copy, so this one goes
+      # (#694 §11a R6). Users are matched by host and user id_hash (D5).
+      acceptedUsers = lib.genAttrs (map (
+        sid: "${(scopeContexts.${sid} or { }).host.id_hash or ""}>${ownEntityOf.${sid}}"
+      ) (builtins.filter acceptedUserScope (builtins.attrNames ownEntityOf))) (_: true);
+      droppedLocs = lib.genAttrs (lib.concatMap
+        (
+          byToken:
+          lib.concatLists (
+            lib.mapAttrsToList (
+              token: locs:
+              lib.optionals (
+                lib.hasPrefix sharedFanOutPrefix token
+                && acceptedUsers ? ${lib.removePrefix sharedFanOutPrefix token}
+              ) locs
+            ) byToken
+          )
+        )
+        (
+          builtins.attrValues (
+            builtins.removeAttrs (pi.provenanceLocs or { }) [
+              "__standDown"
+              "__standDownProvides"
+            ]
+          )
+        )
+      ) (_: true);
+      bounded =
+        if droppedLocs == { } then
+          assembled
+        else
+          lib.mapAttrs (
+            _: mods:
+            if builtins.isList mods then
+              builtins.filter (m: !(droppedLocs ? ${toString (m.key or m._file or "")})) mods
+            else
+              mods
+          ) assembled;
+
       # The folded edge records, in fold (post-toposort) order — the exact trace
       # edges the dispatch above consumed. Captured for the literal-object trace.
       foldedEdges = map (p: p.edge) orderedPairs;
@@ -416,9 +720,8 @@ let
       }) orderedPairs
     else if doFinalMerge then
       let
-        merged = assembleSubtree {
-          root = rootScopeId;
-          pi = pi // acc;
+        merged = bounded // {
+          __lostAt = lostAt;
         };
       in
       if exposeAcc then
@@ -430,10 +733,23 @@ let
         }
       else
         merged
+    # The flat surface (den.lib.aspects.resolve, __resolveResult.imports) is the
+    # root's bounded subtree too, so it agrees with the per-host merge.
     else if exposeEdges then
-      acc // { edges = foldedEdges; }
+      acc
+      // {
+        classImports = bounded;
+        __lostAt = lostAt;
+      }
+      // {
+        edges = foldedEdges;
+      }
     else
-      acc;
+      acc
+      // {
+        classImports = bounded;
+        __lostAt = lostAt;
+      };
 in
 {
   inherit materializeUnified;

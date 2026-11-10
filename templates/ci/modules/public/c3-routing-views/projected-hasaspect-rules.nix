@@ -28,6 +28,9 @@ in
     test-R12-host-sees-provided-POSITIVE = denTest (
       { den, igloo, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # what this cell exercises.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.test.nixos = { };
         den.aspects.effect = effectFor den.aspects.test;
@@ -45,6 +48,9 @@ in
     test-R12-host-absent-when-unprovided-NEGATIVE = denTest (
       { den, igloo, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # what this cell exercises.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.aspects.test.nixos = { };
         den.aspects.other.nixos = { };
@@ -82,6 +88,9 @@ in
     test-R6-per-user-provide-discriminates = denTest (
       { den, igloo, ... }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # what this cell exercises.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users = {
           tux = { };
           pingu = { };
@@ -116,6 +125,9 @@ in
         ...
       }:
       {
+        # #694: these hosts accept their users' host-class output, which is
+        # what this cell exercises.
+        den.schema.host.includes = [ den.batteries.user-aspects ];
         den.hosts.x86_64-linux.igloo.users.tux = { };
         den.hosts.x86_64-linux.iceberg.users.tux = { };
         den.aspects.test.nixos = { };

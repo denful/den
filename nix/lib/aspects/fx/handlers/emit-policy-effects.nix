@@ -34,6 +34,8 @@ in
             se: (se.__sourcePolicyName or "") == (e.__sourcePolicyName or "")
           ) effects.schemaEffects
         ) effects.includeEffects;
+        # Without den's provenance fields: a resolve's includes go to the
+        # entities it resolves (§11a R3), not under the emitting provider.
         includeAspects = map (e: e.value) crossProviderIncludes;
       in
       {

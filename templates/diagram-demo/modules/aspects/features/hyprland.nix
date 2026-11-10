@@ -7,7 +7,8 @@
         "nvidia-settings"
       ])
     ];
-    nixos.programs.hyprland.enable = true;
+    # Included by a user: the system part goes to each of the user's hosts.
+    provides.to-hosts.nixos.programs.hyprland.enable = true;
     homeManager.wayland.windowManager.hyprland.enable = true;
   };
 }

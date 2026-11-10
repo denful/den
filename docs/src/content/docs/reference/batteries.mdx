@@ -115,11 +115,13 @@ den.aspects.alice.includes = [
 
 ### `den.batteries.mutual-provider`
 
+For how a user's content reaches its host, and when to use `mutual-provider` or `user-aspects`, see [Crossing Scopes](/explanation/crossing-scopes/#mutual-provider-and-user-aspects).
+
 Delivers what a user provides to its hosts into each host's own configuration. It covers the user-to-host half of [mutual providers](/guides/mutual/): `provides.to-hosts` and `provides.<host>`. The host-class part of that content (`nixos` on a NixOS host, `darwin` on a Darwin host) goes to the host. Its other classes, such as `homeManager`, stay with the user.
 
 Host-to-user providers (`provides.to-users`, `provides.<user>`) are not part of this battery. They are built in and always apply.
 
-**Included by default** in `den.schema.host.includes`, so `to-hosts` and `provides.<host>` work without any setup. To opt out, exclude it for every host or for one host:
+Include it on the hosts that should receive what their users provide: `den.schema.host.includes = [ den.batteries.mutual-provider ];`. Until 2027-01-01 it is also on by default, as a [transition default](/explanation/crossing-scopes/#the-transition-defaults). To opt out, exclude the battery for every host or for one host; the exclude covers the default:
 
 ```nix
 # every host
@@ -130,14 +132,6 @@ den.hosts.x86_64-linux.igloo.excludes = [ den.batteries.mutual-provider ];
 ```
 
 It has no effect on standalone homes, which have no host configuration to deliver into.
-
-<Aside type="caution">
-In this release a user's content still reaches its hosts by nesting, with or
-without this battery, so excluding it doesn't stop `provides.to-hosts` content
-from reaching a host yet. The next release keeps a user's content with the
-user ([#694](https://github.com/denful/den/issues/694)); from then on, this
-battery is how `provides.to-hosts` reaches a host.
-</Aside>
 
 <Aside title="Source" icon="github">
 [`modules/aspects/batteries/mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix)
@@ -159,7 +153,9 @@ den.aspects.tux.includes = [ den.batteries.host-aspects ];
 
 ### `den.batteries.user-aspects`
 
-Lets a host accept its users' whole host-class output: everything a user's aspect tree writes to `nixos`, `darwin` or `os`, not only what it sends through `provides`. It is the user-to-host counterpart of `host-aspects`.
+For how a user's content reaches its host, and when to use `mutual-provider` or `user-aspects`, see [Crossing Scopes](/explanation/crossing-scopes/#mutual-provider-and-user-aspects).
+
+Lets a host accept everything its users produce for it, as before #694: what a user's aspect tree writes to `nixos`, `darwin` or `os`, custom classes it routes or forwards into the host's class, and a host-rooted `den.lib.aspects.resolve`, not only what it sends through `provides`. It is the user-to-host counterpart of `host-aspects`.
 
 **Opt-in, host side only.** Include it on a host or on the host kind. Included on a user, it does nothing, because a user cannot grant itself access to a host.
 
@@ -178,12 +174,8 @@ den.schema.host.includes = [ den.batteries.user-aspects ];
 
 When several includes apply to one host, the host accepts every user any of them names. The bare form accepts all users.
 
-<Aside type="caution" title="User host-class content still reaches hosts">
-In this release a user's `nixos`, `darwin` and `os` content still reaches every
-host the user lives on, whether or not the host includes `user-aspects`
-([#694](https://github.com/denful/den/issues/694)). The next release keeps
-that content with the user unless the host accepts it. Include `user-aspects`
-on the hosts that rely on it, so they keep working after that change.
+<Aside type="caution" title="Without it, user host-class content stays in the user">
+A user's `nixos`, `darwin` and `os` content does not reach a host that does not include `user-aspects` ([#694](https://github.com/denful/den/issues/694)). Until 2027-01-01 the battery is on by default, as a [transition default](/explanation/crossing-scopes/#the-transition-defaults), and den warns for what arrives only through it.
 </Aside>
 
 <Aside title="Source" icon="github">
