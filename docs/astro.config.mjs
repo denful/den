@@ -84,6 +84,7 @@ export default defineConfig({
 						{ label: 'From Zero to Den', slug: 'guides/from-zero-to-den' },
 						{ label: 'From Flake to Den', slug: 'guides/from-flake-to-den' },
 						{ label: 'Migrate to Den', slug: 'guides/migrate' },
+						{ label: "What's Changed in Den", slug: 'whats-changed', badge: { text: 'new', variant: 'success' } },
 						{ label: 'Future: den on gen', slug: 'future', badge: { text: 'new', variant: 'success' } },
 					],
 				},
