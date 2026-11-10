@@ -1,4 +1,4 @@
-{ lib, ... }:
+{ den, lib, ... }:
 let
   description = ''
     A class generic aspect that enables unfree packages by name.
@@ -22,6 +22,7 @@ let
       {
         class,
         host ? null,
+        home ? null,
         ...
       }:
       let
@@ -38,16 +39,43 @@ let
         # nixpkgs.config.allowUnfreePredicate covers these packages:
         #   - homeManager + useGlobalPkgs = true → OS-level predicate needed
         #   - "user" class (no HM) → only the host's OS config exists
-        hostModule = lib.optionalAttrs (
-          (class == "homeManager" || !builtins.elem class validClasses)
-          && host ? class
-          && builtins.elem host.class validClasses
-        ) { ${host.class}.unfree.packages = allowed-names; };
+        # Delivered to the host, since this is resolved in a user scope.
+        hostDelivery =
+          lib.optionalAttrs
+            (
+              (class == "homeManager" || !builtins.elem class validClasses)
+              && host ? class
+              # A standalone home binds a host that is not its ancestor: no receiver.
+              && home == null
+              && builtins.elem host.class validClasses
+            )
+            {
+              includes = [
+                {
+                  __isPolicy = true;
+                  name = "unfree-host(${builtins.concatStringsSep "," allowed-names})";
+                  fn =
+                    { host, ... }:
+                    [
+                      (den.lib.policy.provide {
+                        class = host.class;
+                        # Keyed, so the same list from several users lands once.
+                        module = {
+                          key = "den/unfree-host/${builtins.concatStringsSep "," allowed-names}";
+                          unfree.packages = allowed-names;
+                        };
+                        receiver = host;
+                      })
+                    ];
+                }
+              ];
+            };
       in
-      classModule // hostModule;
+      classModule // hostDelivery;
     __args = {
       class = true;
       host = true;
+      home = true;
     };
   };
 in

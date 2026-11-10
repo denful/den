@@ -53,6 +53,7 @@ let
     applySimpleRouteEdge
     orderedKeptRoutes
     routeEdges
+    targetScopeOf
     ;
   inherit (providesMod)
     applyOneProvide
@@ -125,6 +126,53 @@ let
         scopeIsolated
         scopeEntityKind
         ;
+      inherit (pi) ownEntityOf;
+      rootCtx = scopeContexts.${rootScopeId} or { };
+      outerEntities = lib.listToAttrs (
+        map (r: lib.nameValuePair r.id_hash true) (
+          builtins.filter (
+            r: builtins.isAttrs r && r ? id_hash && r.id_hash != (ownEntityOf.${rootScopeId} or null)
+          ) (builtins.attrValues rootCtx)
+        )
+      );
+      ownRecordOf =
+        sid:
+        let
+          kind = scopeEntityKind.${sid} or null;
+          # A routing kind is recorded in scopeEntityKind too; only an entity
+          # kind has an own entity (§2).
+          isEntity = kind != null && (den.schema.${kind}.isEntity or false);
+          record = if isEntity then (scopeContexts.${sid} or { }).${kind} or null else null;
+        in
+        if builtins.isAttrs record then { inherit kind record; } else null;
+      targetOf = targetScopeOf {
+        inherit
+          scopeParent
+          ownEntityOf
+          outerEntities
+          ownRecordOf
+          ;
+      };
+      # A delivery to an entity this resolve does not build has no target here.
+      landsHere = spec: targetOf spec != null;
+      liveProvides = lib.mapAttrs (_: builtins.filter landsHere) scopedProvides;
+      liveRoutes = lib.mapAttrs (_: builtins.filter landsHere) scopedRoutes;
+      # A scope with no own entity belongs to its nearest entity ancestor (a
+      # microvm guest, a routing scope); a chain with none keys on the scope.
+      entityOf =
+        sid:
+        let
+          go =
+            s:
+            if ownEntityOf ? ${s} then
+              ownEntityOf.${s}
+            else
+              let
+                p = scopeParent.${s} or null;
+              in
+              if p == null || p == s then sid else go p;
+        in
+        go sid;
       # Stable scope name for the trace-edge construction (ordering only).
       name = den.lib.aspects.fx.edges.edge.scopeName {
         scopeEntityKind = pi.scopeEntityKind or { };
@@ -137,10 +185,10 @@ let
       # paired with its TRACE edge for the unified toposort (the trace edges carry
       # the cell-model identity topoSortEdges reads; the SPEC drives materialization).
 
-      dedupedProvides = dedupProvides (lib.concatLists (lib.attrValues scopedProvides));
+      dedupedProvides = dedupProvides entityOf targetOf (lib.concatLists (lib.attrValues liveProvides));
       providesTraceEdges = providesEdges {
-        inherit name;
-        inherit scopedProvides;
+        inherit name entityOf targetOf;
+        scopedProvides = liveProvides;
       };
       # providesEdges dedups internally with the SAME dedupProvides, so the trace
       # edge list aligns 1:1 with dedupedProvides (same order, same count).
@@ -149,11 +197,18 @@ let
         inherit spec edge;
       }) dedupedProvides providesTraceEdges;
 
-      orderedRoutes = orderedKeptRoutes rootScopeId (lib.concatLists (lib.attrValues scopedRoutes));
+      orderedRoutes = orderedKeptRoutes targetOf rootScopeId (
+        lib.concatLists (lib.attrValues liveRoutes)
+      );
       # Build the matching trace edges over the SAME kept+ordered route list, so
       # the spec↔edge pairing is 1:1 and in the same order applyRoutes folds.
       routeTraceEdges = routeEdges {
-        inherit name scopeParent rootScopeId;
+        inherit
+          name
+          scopeParent
+          rootScopeId
+          targetOf
+          ;
         rawRoutes = orderedRoutes;
       };
       routePairs = lib.zipListsWith (spec: edge: {
@@ -170,50 +225,80 @@ let
       # index (inert — the cell model reads target/source/mode/annotations only) and
       # index the pairs back out after the sort.
       #
-      # A collectSubtree simple route also reads what complex forwards append to
-      # its subtree (see the fold below), a read the trace edge cannot show, so
-      # it is pinned after those forwards by pair index.
-      readsForwards = r: !(r.__complexForward or false) && (r.collectSubtree or false);
-      forwardIdxs = builtins.filter (i: (builtins.elemAt pairs i).spec.__complexForward or false) (
-        lib.range 0 (builtins.length pairs - 1)
-      );
-      forwardDepsOf =
-        r:
+      # A simple route reads the frozen seed, unless a delivery writes into a
+      # bucket it reads: then it reads that bucket after the fold, pinned after
+      # every producer into it (keyed by the producer's target, so a `receiver`
+      # delivery counts where it lands). A collectSubtree route always reads
+      # the folded subtree: a delivered guest carries its users' deliveries
+      # (#742).
+      pairIdxs = lib.range 0 (builtins.length pairs - 1);
+      classOfPair = p: if p.kind == "provide" then p.spec.class else p.spec.intoClass;
+      producerIdxs = builtins.foldl' (
+        acc: i:
         let
-          sids = subtreeScopes {
+          p = builtins.elemAt pairs i;
+          key = "${classOfPair p}@${targetOf p.spec}";
+        in
+        if p.kind == "route" && isClassAlias p.spec then
+          acc
+        else
+          acc // { ${key} = (acc.${key} or [ ]) ++ [ i ]; }
+      ) { } pairIdxs;
+      # Keyed, not lib.unique: at the flake root the pairs span the fleet.
+      producerScopes = builtins.attrNames (
+        lib.genAttrs (map (i: targetOf (builtins.elemAt pairs i).spec) (
+          builtins.filter (
+            i:
+            let
+              p = builtins.elemAt pairs i;
+            in
+            !(p.kind == "route" && isClassAlias p.spec)
+          ) pairIdxs
+        )) (_: true)
+      );
+      readScopesOf =
+        r:
+        if (r.collectSubtree or false) || r.intoClass == "flake" then
+          subtreeScopes {
             inherit scopeParent;
             isolated = scopeIsolated;
             root = r.sourceScopeId;
-            allScopeIds = lib.unique (map (i: (builtins.elemAt pairs i).spec.sourceScopeId) forwardIdxs);
-          };
-        in
-        builtins.filter (
-          i:
-          let
-            f = (builtins.elemAt pairs i).spec;
-          in
-          f.intoClass == r.fromClass && builtins.elem f.sourceScopeId sids
-        ) forwardIdxs;
+            allScopeIds = producerScopes;
+          }
+        else
+          [ r.sourceScopeId ];
+      deliveryDepsOf =
+        i: r:
+        builtins.filter (j: j != i) (
+          lib.concatMap (sid: producerIdxs."${r.fromClass}@${sid}" or [ ]) (readScopesOf r)
+        );
+      isSimpleReader =
+        p: p.kind == "route" && !(p.spec.__complexForward or false) && !(isClassAlias p.spec);
+      readerDeps = lib.imap0 (i: p: if isSimpleReader p then deliveryDepsOf i p.spec else [ ]) pairs;
+      readsDelivered =
+        i: (builtins.elemAt readerDeps i) != [ ] || (builtins.elemAt pairs i).spec.collectSubtree or false;
       taggedEdges = lib.imap0 (
         i: p:
         p.edge
         // {
           __pairIdx = i;
         }
-        // lib.optionalAttrs (p.kind == "route" && readsForwards p.spec) {
-          __afterEdges = forwardDepsOf p.spec;
+        // lib.optionalAttrs (readerDeps' i != [ ]) {
+          __afterEdges = readerDeps' i;
         }
       ) pairs;
+      readerDeps' = i: builtins.elemAt readerDeps i;
       sortedTagged = topoSortEdges taggedEdges;
-      orderedPairs = map (e: builtins.elemAt pairs e.__pairIdx) sortedTagged;
+      orderedPairs = map (
+        e: (builtins.elemAt pairs e.__pairIdx) // { __idx = e.__pairIdx; }
+      ) sortedTagged;
 
       # ===== 3. The interleaved ordered-dispatch fold ======================
       # acc = { classImports; perScope }. Simple routes read the FROZEN phase-1
-      # perScope (seed.perScope), NOT the evolving acc — matching applyRoutes,
-      # whose route fold's `wrappedPerScope` is captured ONCE at fold start. Complex
-      # forwards read the EVOLVING acc (getCollectedSource reads acc.perScope).
-      # A collectSubtree route additionally sees what complex forwards appended
-      # (`forwarded`): a delivered guest must carry its home-manager users (#742).
+      # perScope (seed.perScope), NOT the evolving acc, unless they read a
+      # delivered bucket (above): those read the seed plus every delivery
+      # appended so far (`delivered`, keyed by target). Complex forwards read the
+      # EVOLVING acc (getCollectedSource reads acc.perScope).
       wrappedPerScope = seed.perScope;
 
       # A class alias is a simple route that only re-labels a class within its own
@@ -228,6 +313,7 @@ let
         && (r.path or [ ]) == [ ]
         && !(r.collectSubtree or false)
         && !(r.appendToParent or false)
+        && (r.receiver or null) == null
         && !(r.reinstantiate or false)
         && (r.instantiate or null) == null
         && (r.adapterKey or null) == null
@@ -243,62 +329,73 @@ let
         if aliased == [ ] then perScope else appendAt perScope r.sourceScopeId r.intoClass aliased
       ) wrappedPerScope (builtins.filter isClassAlias orderedRoutes);
 
-      withForwarded =
-        forwarded:
+      withDelivered =
+        delivered:
         builtins.foldl' (
           perScope: sid:
-          builtins.foldl' (ps: cls: appendAt ps sid cls forwarded.${sid}.${cls}) perScope (
-            builtins.attrNames forwarded.${sid}
+          builtins.foldl' (ps: cls: appendAt ps sid cls delivered.${sid}.${cls}) perScope (
+            builtins.attrNames delivered.${sid}
           )
-        ) aliasedPerScope (builtins.attrNames forwarded);
+        ) aliasedPerScope (builtins.attrNames delivered);
+
+      # Each step only appends to its target bucket, so what it delivered is the
+      # new suffix there.
+      recordDelivery =
+        prev: next: sid: cls:
+        let
+          before = prev.acc.perScope.${sid}.${cls} or [ ];
+          added = lib.drop (builtins.length before) (next.perScope.${sid}.${cls} or [ ]);
+        in
+        {
+          acc = next;
+          delivered = if added == [ ] then prev.delivered else appendAt prev.delivered sid cls added;
+        };
 
       folded =
         builtins.foldl'
           (
             prev: pair:
+            let
+              inherit (pair) spec;
+              target = targetOf spec;
+            in
             if pair.kind == "provide" then
-              prev // { acc = applyOneProvide ctx prev.acc pair.spec; }
-            else if pair.spec.__complexForward or false then
-              let
-                inherit (pair.spec) sourceScopeId intoClass;
-                next = applyComplexRouteEdge prev.acc {
-                  route = pair.spec;
-                  inherit
-                    rootScopeId
-                    scopeContexts
-                    scopeParent
-                    scopeEntityKind
-                    spawnNode
-                    buildForwardAspect
-                    ;
-                };
-                before = prev.acc.perScope.${sourceScopeId}.${intoClass} or [ ];
-                # applyComplexRouteEdge only appends, so its output is the new suffix.
-                added = lib.drop (builtins.length before) next.perScope.${sourceScopeId}.${intoClass};
-              in
-              {
-                acc = next;
-                forwarded = appendAt prev.forwarded sourceScopeId intoClass added;
-              }
+              recordDelivery prev (applyOneProvide targetOf ctx prev.acc spec) target spec.class
+            else if spec.__complexForward or false then
+              recordDelivery prev (applyComplexRouteEdge prev.acc {
+                route = spec;
+                inherit
+                  rootScopeId
+                  scopeContexts
+                  scopeParent
+                  scopeEntityKind
+                  spawnNode
+                  buildForwardAspect
+                  targetOf
+                  ;
+              }) target spec.intoClass
             else
-              prev
-              // {
-                acc = applySimpleRouteEdge prev.acc {
-                  route = pair.spec;
+              let
+                next = applySimpleRouteEdge prev.acc {
+                  route = spec;
                   wrappedPerScope =
-                    if isClassAlias pair.spec then
+                    if isClassAlias spec then
                       wrappedPerScope
-                    else if readsForwards pair.spec then
-                      withForwarded prev.forwarded
+                    else if readsDelivered pair.__idx then
+                      withDelivered prev.delivered
                     else
                       aliasedPerScope;
-                  inherit scopeParent scopeIsolated;
+                  inherit scopeParent scopeIsolated targetOf;
                 };
-              }
+              in
+              if isClassAlias spec then
+                prev // { acc = next; }
+              else
+                recordDelivery prev next target spec.intoClass
           )
           {
             acc = seed;
-            forwarded = { };
+            delivered = { };
           }
           orderedPairs;
       inherit (folded) acc;

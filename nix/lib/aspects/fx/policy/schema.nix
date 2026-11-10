@@ -22,6 +22,11 @@ let
     isPolicyExcluded
     ;
 
+  inherit (import ./entity-identity.nix { inherit lib; })
+    mixedIdHash
+    sameByValue
+    ;
+
   # Identity by id_hash when both records carry one, else by value, minus the
   # per-scope `hasAspect` decomposeSchemaEffect adds.
   sameEntity =
@@ -77,63 +82,6 @@ let
   # Policies that already fired in one of `offered` (under any entity kind).
   firedInScopes =
     byScope: offered: builtins.foldl' (acc: s: acc // (byScope.${s} or { })) { } offered;
-
-  describeRecord =
-    r: "${r.name or "<unnamed>"}${lib.optionalString (r ? id_hash) " (id_hash ${r.id_hash})"}";
-
-  # A binding is matched to an entity scope by id_hash, or by value when
-  # neither record has one. A record with an id_hash and one without are
-  # different entities, unless they share a name: then den cannot tell, and a
-  # quiet mismatch would silently fire none of the entity's rules.
-  mixedIdHash =
-    kind: a: others:
-    let
-      clash = lib.findFirst (b: (b.name or null) != null && b.name == (a.name or null)) null others;
-    in
-    if clash == null then
-      [ ]
-    else
-      throw "den: two `${kind}` records, ${describeRecord a} and ${describeRecord clash}, share a name but only one carries an id_hash, so den cannot tell whether they are one entity; give both an id_hash, or neither";
-
-  # "eq", "ne", or "fn" when the values differ only in function-valued
-  # attributes, which Nix compares unequal unless they are the same value.
-  valueDiff =
-    a: b:
-    if a == b then
-      "eq"
-    else if builtins.isFunction a && builtins.isFunction b then
-      "fn"
-    else if builtins.isAttrs a && builtins.isAttrs b then
-      let
-        names = builtins.attrNames a;
-        isLeaf = n: !(builtins.isAttrs a.${n}) && !(builtins.isFunction a.${n});
-      in
-      if names != builtins.attrNames b then
-        "ne"
-      else if builtins.any (n: isLeaf n && a.${n} != b.${n}) names then
-        "ne"
-      else
-        let
-          diffs = map (n: valueDiff a.${n} b.${n}) (builtins.filter (n: !isLeaf n) names);
-        in
-        if builtins.elem "ne" diffs then
-          "ne"
-        else if builtins.elem "fn" diffs then
-          "fn"
-        else
-          "eq"
-    else
-      "ne";
-
-  sameByValue =
-    kind: a: b:
-    let
-      d = valueDiff (builtins.removeAttrs a [ "hasAspect" ]) (builtins.removeAttrs b [ "hasAspect" ]);
-    in
-    if d == "fn" then
-      throw "den: two `${kind}` records named ${a.name or "<unnamed>"} differ only in function values, so den cannot tell whether they are one entity; give them an id_hash"
-    else
-      d == "eq";
 
   # Pending re-pass entries for `kind`, bucketed by id_hash ("" for records
   # without one): the entries waiting on `record`'s entity.
@@ -397,6 +345,11 @@ let
       # late dispatch re-fires them at entity scopes (host/home/user),
       # creating duplicate routes that leak packages across scope boundaries.
       entityKinds = den.lib.schemaUtil.schemaEntityKinds;
+      # Registered at the sibling itself (a late include's own policies): its
+      # own dispatch would fire them wherever their arguments are bound, so
+      # the entity-kind filter, which keeps an ancestor's policies from
+      # re-firing at deeper kinds, does not apply to them.
+      ownPolicies = scopedAspectPolicies.${sib.scopeId} or { };
       latePolicies = lib.filterAttrs (
         name: policy:
         let
@@ -413,7 +366,11 @@ let
         # scopes via the fan-out. This is what makes `{ self, ... }:` mean
         # "fire once here", as opposed to `{ <kind>, ... }:` which fans.
         && !(policyArgs ? self)
-        && (requiredEntityArgs == [ ] || builtins.elem sib.targetKind requiredEntityArgs)
+        && (
+          ownPolicies ? ${name}
+          || requiredEntityArgs == [ ]
+          || builtins.elem sib.targetKind requiredEntityArgs
+        )
       ) allAspectPolicies;
     in
     fx.bind fx.effects.state.get (

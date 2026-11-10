@@ -25,6 +25,7 @@
 # (now a general edge toposort with loud cycle throw).
 { lib, den }:
 let
+  inherit (import ../policy/entity-identity.nix { inherit lib; }) sameEntity;
   inherit (import ./edge.nix { inherit lib; })
     mkEdge
     collected
@@ -372,14 +373,72 @@ let
       guard = route.guard or null;
     };
 
-  # The target scope for a route's edge: appendToParent ⇒ the PARENT scope of
-  # sourceScopeId (the §B "to=parent" property, consumed at construction).
-  appendScopeIdOf =
-    scopeParent: route:
-    if route.appendToParent or false then
-      scopeParent.${route.sourceScopeId} or route.sourceScopeId
+  # The scope a delivery lands in. `receiver` names an entity record: the
+  # target is the first scope, walking up from the source (inclusive), whose own
+  # entity is that record (`ownEntityOf`: sid → id_hash). `appendToParent` is
+  # the parent scope. Otherwise the edge stays at its source. `sourceScopeId`
+  # keeps meaning the source; suppression keys on it.
+  # `outerEntities` (id_hash → true) are records bound at the root but not
+  # built by this resolve (a host above a user-rooted resolve); a delivery to
+  # one has no target here, and the target is null.
+  targetScopeOf =
+    {
+      scopeParent,
+      ownEntityOf,
+      outerEntities ? { },
+      # sid → { kind; record; } of each scope's own entity, for a receiver
+      # without an id_hash, matched by value (#694 §11a R1).
+      ownRecordOf ? (_: null),
+    }:
+    spec:
+    let
+      sid = spec.sourceScopeId;
+      receiver = spec.receiver or null;
+      receiverHash = receiver.id_hash or null;
+      isReceiver =
+        s:
+        if receiverHash != null then
+          (ownEntityOf.${s} or null) == receiverHash
+        else
+          let
+            own = ownRecordOf s;
+          in
+          # A scope whose own record carries an id_hash is never this receiver;
+          # one matching nothing still ends in the "not on the chain" error.
+          own != null && !(own.record ? id_hash) && sameEntity own.kind own.record receiver;
+      walk =
+        s:
+        if isReceiver s then
+          s
+        else
+          let
+            p = scopeParent.${s} or null;
+          in
+          if (p == null || p == s) && receiverHash != null && outerEntities ? ${receiverHash} then
+            null
+          else if p == null || p == s then
+            throw "den: delivery receiver '${receiver.name or "<unnamed>"}' is not an entity on the chain of scope '${sid}' — `receiver` must name the source entity or one of its ancestors"
+          else
+            walk p;
+    in
+    if receiver != null then
+      if !(builtins.isAttrs receiver) then
+        throw "den: delivery receiver at scope '${sid}' is not an entity record"
+      else
+        walk sid
+    else if spec.appendToParent or false then
+      scopeParent.${sid} or sid
     else
-      route.sourceScopeId;
+      sid;
+
+  # For callers with no entity map (the read-only oracle): `receiver` is not
+  # resolvable there, so it renders at the source.
+  legacyTargetOf =
+    scopeParent: spec:
+    targetScopeOf {
+      inherit scopeParent;
+      ownEntityOf = { };
+    } (builtins.removeAttrs spec [ "receiver" ]);
 
   # ===== dedup + toposort (§B Decision 5 + dedupRoutes suppressions) =====
 
@@ -448,10 +507,11 @@ let
   # before any consumer (fromClass@scope) that reads it. Today this is the
   # single-level partition topoSortRoutes did (a complex forward depending on a
   # producer of its fromClass), generalized to a real toposort with a LOUD cycle
-  # throw printing the edge chain. Simple routes read the original per-scope data
-  # (not the fold state), so they never participate as dependents.
+  # throw printing the edge chain. A simple route reads the original per-scope
+  # data (not the fold state) unless a delivery writes into a bucket it reads;
+  # then it depends on that delivery (edges/materialize-unified.nix readerDeps).
   topoSort =
-    routes:
+    targetOf: routes:
     let
       n = builtins.length routes;
       routeAt = i: builtins.elemAt routes i;
@@ -459,7 +519,7 @@ let
         acc: i:
         let
           r = routeAt i;
-          key = "${r.intoClass}@${r.sourceScopeId}";
+          key = "${r.intoClass}@${targetOf r}";
         in
         acc // { ${key} = (acc.${key} or [ ]) ++ [ i ]; }
       ) { } (lib.range 0 (n - 1));
@@ -510,7 +570,9 @@ let
   # The ordered, deduped route list both projections fold over. Suppressed routes
   # are DROPPED for materialization but RECORDED (with suppressed=true) for the
   # trace — so the two consumers pass the full raw list + verdicts and select.
-  orderedKeptRoutes = rootScopeId: rawRoutes: topoSort (keptRoutes rootScopeId rawRoutes);
+  orderedKeptRoutes =
+    targetOf: rootScopeId: rawRoutes:
+    topoSort targetOf (keptRoutes rootScopeId rawRoutes);
 
   # ===== synthesize source + materialization (§B Decision 2 — complex forward) =
   # A complex (__complexForward) route is a SINGLE synthesize edge:
@@ -648,6 +710,7 @@ let
       scopeEntityKind,
       spawnNode,
       buildForwardAspect,
+      targetOf,
     }:
     let
       spec = route;
@@ -660,12 +723,12 @@ let
       sourceModule = spec.mapModule { imports = sourceModules; };
       newMods = collectClassMods spec.intoClass (buildForwardAspect spec sourceModule);
     in
-    appendToClass acc spec.intoClass spec.sourceScopeId newMods;
+    appendToClass acc spec.intoClass (targetOf spec) newMods;
 
   # Materialize ONE simple-route edge: classify (§B cell), collect source, run the
   # nest/nest-verbatim/merge mode switch (materializeRouteEdge), append to the
   # target bucket. The cell decision (classifyRoute), source collection
-  # (sourceModulesOf), and target scope (appendScopeIdOf) come from THIS file; the
+  # (sourceModulesOf), and target scope (targetScopeOf) come from THIS file; the
   # placement (mode switch) from materializeRouteEdge below.
   applySimpleRouteEdge =
     acc:
@@ -674,6 +737,7 @@ let
       wrappedPerScope,
       scopeParent,
       scopeIsolated,
+      targetOf,
     }:
     let
       c = classifyRoute route;
@@ -722,7 +786,7 @@ let
         adapterRoute = route;
       };
     in
-    appendToClass acc route.intoClass (appendScopeIdOf scopeParent route) wrappedModules;
+    appendToClass acc route.intoClass (targetOf route) wrappedModules;
 
 in
 {
@@ -739,6 +803,7 @@ in
     keptRoutes
     suppressionVerdicts
     orderedKeptRoutes
+    targetScopeOf
     ;
 
   # ===== trace-facing route edge constructor (§8 identity, no content) ===
@@ -767,6 +832,7 @@ in
       scopeParent,
       rootScopeId,
       rawRoutes,
+      targetOf ? legacyTargetOf scopeParent,
     }:
     let
       verdicts = suppressionVerdicts rootScopeId rawRoutes;
@@ -782,7 +848,7 @@ in
           isComplex = spec.__complexForward or false;
           path = spec.path or spec.staticIntoPath or [ ];
           appendToParent = spec.appendToParent or false;
-          appendSid = if appendToParent then scopeParent.${sid} or sid else sid;
+          appendSid = targetOf spec;
           adapterKey = spec.adapterKey or null;
           reinstantiate = spec.reinstantiate or false;
           baseAnnotations =
@@ -792,6 +858,7 @@ in
             // lib.optionalAttrs ((spec.intoClass or null) == "flake") { isFlakeRoute = true; }
             // lib.optionalAttrs ((spec.instantiate or null) != null) { instantiate = true; }
             // lib.optionalAttrs appendToParent { appendToParent = true; }
+            // lib.optionalAttrs ((spec.receiver or null) != null) { receiver = true; }
             // lib.optionalAttrs (
               # §B cell 5: ensureEntry placeholder (empty target path materialized).
               # Content-blind approx (also requires empty module set) — converges

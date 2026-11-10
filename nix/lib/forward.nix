@@ -127,7 +127,8 @@ let
           extraArgsFor
           canDirectImport
           ;
-      };
+      }
+      // lib.optionalAttrs (fwd ? receiver) { inherit (fwd) receiver; };
     };
 
   forwardEach = fwd: {

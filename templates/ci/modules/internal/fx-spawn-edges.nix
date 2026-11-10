@@ -66,6 +66,8 @@ let
         ${spawnRoot} = { };
       };
       scopeEntityKind = { };
+      # No entity records in this hand-built state, so no receiver resolves.
+      ownEntityOf = { };
       mergedClassImports = { };
       mergedScopeParent = {
         ${spawnRoot} = "host=igloo";
