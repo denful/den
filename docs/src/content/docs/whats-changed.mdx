@@ -1,0 +1,161 @@
+---
+title: What's changed in Den
+description: The big-picture changes in each Den release since 0.1, and what each one means for your config. Find your version and read down.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+This page answers "what's changed since 0.X?". Find the release you're on, then read every section after it. Each section covers only the changes that alter how you write a config, and what replaced each old pattern. The [release notes](https://github.com/denful/den/releases) list every PR.
+
+<Aside type="tip">
+You don't have to upgrade one release at a time. Most old forms still work through compatibility shims that print a deprecation warning, so the warnings double as your to-do list. Move straight to the latest release, fix whatever fails to evaluate, then clear the warnings. [Upgrading in one jump](#upgrading-in-one-jump) has the steps.
+</Aside>
+
+## At a glance
+
+| Release | Date | The change that matters for configs |
+| --- | --- | --- |
+| [0.1](#01-2025-10) | 2025-10 | First release: `den.aspects`, hosts, users, homes, the first batteries. |
+| [0.2](#02-2025-11) | 2025-11 | Batteries move under `den._` (`den.provides`). |
+| [0.3](#03-2025-11) | 2025-11 | Parametric aspects. One `den.default`, and `includes` live at the top level. |
+| [0.4–0.6](#04--06-2025-11) | 2025-11 | Context-driven includes, namespaces, angle brackets. `parametric.context` becomes `parametric.fixedTo`. |
+| [0.7–0.8](#07--08-2025-12--2026-02) | 2025-12 – 2026-02 | `den.base` for entity options. Contexts for hosts with home-manager users. |
+| [0.9](#09-2026-02) | 2026-02 | Named contexts (`den.ctx`). The `{ OS, host }` and `{ HM, host, user }` markers are gone. |
+| [0.10–0.11](#010--011-2026-02--03) | 2026-02 – 03 | `user.classes`. The `user`, `hjem` and `maid` classes. Home environments follow the users. |
+| [0.12–0.13](#012--013-2026-03) | 2026-03 | Every aspect is parametric. `den.base` becomes `den.schema`. Bidirectionality gives way to explicit `provides`. |
+| [0.14–0.16](#014--016-2026-03--04) | 2026-03 – 04 | Zero dependencies. `entity.aspect` is a reference. `hasAspect`. |
+| [0.17–0.18](#017--018-2026-05--06) | 2026-05 – 06 | Effects core, **policies** (relations between entities become rules) and **entity identity**. Quirks. `den.ctx` splits into `den.schema` plus `den.policies`. `den.batteries`. Scoped context. |
+| [0.19](#019-2026-09) | 2026-09 | Stabilisation: silent drops fixed. |
+| [next](#next) | | A user's aspects stop leaking into hosts. Hosts choose what they receive. |
+
+## 0.1 (2025-10)
+
+Den's first release: aspects under `den.aspects`, `den.hosts`, users and standalone `den.homes`, `inputs'` and `self'`, and a few batteries.
+
+## 0.2 (2025-11)
+
+The batteries moved into one namespace: `den.import-tree` became `den._.import-tree`, and `den.home-manager` became `den._.home-manager`. `den._` is short for `den.provides`. New batteries: `define-user`, `primary-user`, `user-shell` and `unfree`.
+
+## 0.3 (2025-11)
+
+Parametric aspects arrived: an aspect, or an `includes` entry, can be a function of context such as `{ host }` or `{ host, user }`. Two structural changes came with them:
+- `den.default.host`, `den.default.user` and `den.default.home` merged into one `den.default`;
+- the nested `._.host`, `._.user` and `._.home` include paths went away, so `includes` always lives at the top of the aspect.
+
+```nix
+# before 0.3
+den.default.host.nixos.system.stateVersion = "25.05";
+den.aspects.igloo._.host.includes = [ my-aspect ];
+# from 0.3
+den.default.nixos.system.stateVersion = "25.05";
+den.aspects.igloo.includes = [ my-aspect ];
+```
+
+## 0.4 – 0.6 (2025-11)
+
+These releases settled how context flows into includes, and fixed the duplicate values that early parametric aspects produced.
+- **Context:** the directional `{ hostToUser }` and `{ userToHost }` contexts were tried and then removed. Includes are matched by the arguments they declare.
+- **Renames:** `parametric.context` became `parametric.fixedTo`, and `parametric true` became `parametric.atLeast`.
+- **Sharing:** [namespaces](/guides/namespaces/) and experimental [angle brackets](/guides/angle-brackets/) arrived for sharing aspects across flakes.
+- **Dependencies:** from 0.6, flake-file's `dendritic` module no longer adds `den` and `flake-aspects` for you, so declare both inputs.
+
+## 0.7 – 0.8 (2025-12 – 2026-02)
+
+- **0.7:** `den.base.<host|user|home>` let you add options to entities, and a context covered hosts with home-manager users.
+- **0.8:** mostly fixes and templates, plus the `tty-autologin` battery. A function marked its stage with a placeholder argument: `{ OS, host }` for the host's OS module, `{ HM, host, user }` for a user's home.
+
+## 0.9 (2026-02)
+
+Named contexts (`den.ctx`) made the host → user → home flow explicit, and the placeholder markers went away. A function now names the entities it needs, and that alone says where it applies:
+
+```nix
+# 0.8
+({ OS, host }: { ${host.class}.networking.hostName = host.name; })
+({ HM, host, user }: { homeManager.home.username = user.userName; })
+# from 0.9
+({ host }: { nixos.networking.hostName = host.name; })
+({ host, user }: { homeManager.home.username = user.userName; })
+```
+
+Forward classes (`den._.forward`) also arrived, which deliver one class's settings into a path of another.
+
+## 0.10 – 0.11 (2026-02 – 03)
+
+- **`user.classes`:** `user.class` became `user.classes`, a list. A user can use any mix of `homeManager`, `hjem` and `maid`, and the new `user` class sets the user's account (`users.users.<name>`) on NixOS and nix-darwin.
+- **Home environments follow the users:** the host turns on each home environment when any of its users has that class. Including `den._.home-manager` no longer enables anything. On 0.11 it raised an error pointing you to `user.classes`, and the battery has since been removed.
+- **Also new:** guarded forwards, the `os` and `wsl` classes, and `intoAttr` as a path.
+
+## 0.12 – 0.13 (2026-03)
+
+- **Every aspect is parametric by default** (0.12). You no longer wrap aspects to make their includes take context. `den.lib.parametric`, `.atLeast`, `.exactly` and `den.lib.take.exactly` still work, but each one is a passthrough that warns ([deprecated lib](/reference/lib-deprecated/)).
+- **`den.base` became `den.schema`** (0.12):
+  ```nix
+  # before 0.12
+  den.base.conf.options.capabilities.docker = lib.mkEnableOption "…";
+  # from 0.12
+  den.schema.conf.options.capabilities.docker = lib.mkEnableOption "…";
+  ```
+- **Explicit crossing between hosts and users** (0.13). Hosts and users used to be wired both ways, which caused duplicate values. That was replaced by explicit channels, all delivered by the `mutual-provider` battery:
+  - `provides.to-users.<class>` on a host, delivered to its users;
+  - `provides.to-hosts.<class>` on a user, delivered to the hosts it's on;
+  - `provides.<name>` for one specific peer.
+- **Context shortcuts:** `den.lib.perHost`, `perUser` and `perHome` were added. They're shims today, because the pipeline replaces them.
+
+## 0.14 – 0.16 (2026-03 – 04)
+
+- **Zero dependencies** (0.14). Den no longer depends on `flake-aspects`, so remove that input. Each release also gets its own versioned docs.
+- **Aspect metadata** (0.15). Aspects can contribute flake outputs (`packages`, `checks`, and so on) and carry free-form `meta`.
+- **Entity references** (0.16). `entity.aspect` is the aspect itself, not its name, so use `host.aspect` rather than `den.aspects.${host.aspect}`. Entities answer `host.hasAspect den.aspects.steam`. `den.lib.strict` disables freeform options, and the `insecure` battery arrived.
+
+## 0.17 – 0.18 (2026-05 – 06)
+
+0.17 rewrote Den's core around [effects](/explanation/effects/). That rewrite brought **policies**, the biggest new idea since parametric aspects, and **entity identity**.
+
+- **Policies** (0.17). A [policy](/explanation/policies/) states a relation between entities as a rule: given the entities it names, it returns effects that Den carries out.
+  - `resolve.to` reaches another entity, for example a host's users;
+  - `include` applies an aspect;
+  - `provide` and `route` deliver content to a class or another entity;
+  - `exclude`, `instantiate` and `spawn` cover the rest.
+
+  Policies live in the `den.policies` registry, and take effect once you include them, on an entity kind, an entity or an aspect. How a host reaches its users, how outputs reach `nixosConfigurations`, and your own fleet relations are all policies now:
+
+  ```nix
+  den.policies.host-to-users = { host, ... }:
+    map (user: den.lib.policy.resolve.to "user" { inherit host user; })
+      (lib.attrValues host.users);
+  ```
+- **`den.ctx` was split in two** (0.17):
+  - **`den.schema.<kind>`** says what an entity is, and which aspects apply to every entity of that kind (`den.schema.host.includes`);
+  - **`den.policies`** says how entities relate.
+
+  A shim still forwards `den.ctx`. See [Migrating from den.ctx](/guides/migrate-ctx/).
+- **Identity** (0.17). Every entity, whether host, user, home or one of your own kinds, carries a stable identity (`id_hash`). Den uses it to tell entities apart, so a policy can target one exactly with `policy.for`. Aspects are tracked by identity too, so the same aspect reached by two paths applies once rather than duplicating its settings. 0.18 builds on this: entities became schema-typed values that own their identity.
+- **Quirks and pipes** (0.17). [Quirks](/explanation/quirks-and-pipes/) are named data that aspects emit and other scopes collect, for example DNS records or firewall ports gathered across a fleet. Policies build pipes to move them between scopes.
+- **`den.batteries`** (0.17). The built-in aspects live at `den.batteries.*`. `den.provides` and `den._` remain aliases, so `den._.unfree [ … ]` still works ([batteries](/reference/batteries/)).
+- **`._` includes every child aspect** (0.17), so `den.aspects.dev._` includes them all.
+- **Schema-typed entities** (0.18). Entities are typed values that own the identity 0.17 introduced.
+- **Scoped context** (0.18). An aspect only sees the entities bound where it's applied, and content reaches another entity only through a policy or `provides`.
+
+## 0.19 (2026-09)
+
+A stabilisation release. Many cases where a definition was silently dropped were fixed: nested aspect keys defined across files, conflicting entity definitions, and homes of the same name on different hosts. If something you defined was mysteriously missing before, 0.19 is worth a try.
+
+## next
+
+**A user's aspects stop leaking into hosts.** Today, a user aspect's `nixos`, `darwin` or `os` settings reach every host that user is on. After this change they stay with the user, and cross only through a channel that names its target, or because the host accepts them. Until 2027-01-01 the old behaviour stays on by default, and den warns about each host that depends on it. The [announcement](https://github.com/denful/den/discussions/750) lists what to do with each warning.
+
+The same release lets a host choose what it receives (`admits`), lets a policy name where its content lands (`include.at`), and makes an exclude remove exactly the rule it names.
+
+## Upgrading in one jump
+
+1. **Update your flake inputs.** Point `den` at the latest release (`github:denful/den`), and drop `flake-aspects` if you still have it.
+2. **Fix what stops evaluation.** These forms no longer exist, and each fails with an error:
+   - `den.base` → `den.schema` (0.12);
+   - `den._.home-manager` → remove it, and give users `classes` (0.11);
+   - `den.default.host`, `.user` and `.home`, and nested `._.host`-style includes (0.3), if you're coming from before 0.3.
+3. **Update context arguments.** `{ OS, host }` becomes `{ host }`, and `{ HM, host, user }` becomes `{ host, user }` (0.9).
+4. **Declare home environments.** A user's `classes` now default to `[ "user" ]`. If your users rely on home-manager, set `classes = [ "homeManager" ]` on them, or once for everyone with `den.schema.user.classes = lib.mkDefault [ "homeManager" ];`. Otherwise their home-manager configuration isn't applied.
+5. **Clear the deprecation warnings.** `parametric`, `take`, `perHost`, `perUser`, `perHome` and `den.ctx` still work, and each warning names its replacement. `den.provides` and `den._` remain plain aliases of `den.batteries`.
+6. **Compare the result.** Build each host on the old and new den, and diff the derivations, for example with `nix-diff`. Wherever they differ, the section for that release explains why.
+
+For help, ask in [the Den Matrix channel](https://matrix.to/#/#denful:matrix.org).
