@@ -98,6 +98,29 @@ den.schema.host.includes = [ den.policies.host-to-peers ];
 See [Policy Activation](/explanation/policy-activation/) for how `includes`
 drives activation.
 
+### `admits` and `policyEnforcement`
+
+Two receiver controls, set on a kind's schema for every entity of that kind,
+and on an entity's own aspect for that entity. See
+[Receiving Content](/explanation/receiving-content/).
+
+A sketch of the fields, not a complete config:
+
+```nix
+den.schema.host.admits = {
+  default = "deny";        # null (allow) by default; "deny" refuses unlisted deliveries
+  allow = [ den.policies.trusted ];
+  deny = [ ];
+};
+den.schema.host.policyEnforcement = "strict";   # "strict" | "per-policy" | "lenient"
+```
+
+- **`admits`** layers by kind and aspect: `allow` and `deny` lists join, and
+  `default = "deny"` in any layer can't be loosened by another. Entries match
+  policy records and aspects by value. Den's own channels always land.
+- **`policyEnforcement`**: who may exclude the policies an entity of this kind
+  registers. The strictest value set in any layer wins.
+
 ### Entity Kinds
 
 Entity kinds (`host`, `user`, `home`) are derived from the keys of `den.schema`.

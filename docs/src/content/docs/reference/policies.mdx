@@ -66,6 +66,30 @@ stays in the user ([#694](https://github.com/denful/den/issues/694)). To reach
 the host, deliver it:
 `policy.provide { receiver = host; class = host.class; module = …; }`.
 
+### `policy.include.at entity aspect`
+
+Includes `aspect` and names the entity its content attaches to. At the
+policy's own firing entity it is a plain include; at any other entity it is a
+delivery to that entity, resolved for its class, and checked against the
+receiver's `admits`. The entity must be one of the policy instance's relata
+(bound in its context), or it is an error. See
+[Receiving Content](/explanation/receiving-content/#includeat-name-the-entity).
+
+```nix
+den.aspects.tux.policies.to-host =
+  { host, user, ... }:
+  [ (den.lib.policy.include.at host { nixos.environment.etc.at.text = user.name; }) ];
+```
+
+### `policy.include.atClass class entity aspect`
+
+The same, resolved for `class` instead of the entity's own class: for an
+entity with no class (an environment), or to deliver another class's part.
+
+```nix
+[ (den.lib.policy.include.atClass "nixos" environment { nixos.environment.etc.env.text = "x"; }) ]
+```
+
 ### `policy.exclude aspect`
 
 Remove an aspect via the constraint registry:
@@ -278,6 +302,21 @@ den.lib.policy.when ({ host, ... }: host.wsl.enable) den.policies.wsl-setup
 ```
 
 Accepts a single policy or a list. Identity is preserved.
+
+### `den.lib.policy.strict policy`
+
+Marks a policy so only its registrant may exclude it, under the registrant's
+`policyEnforcement = "per-policy"` (the default). A registrant with
+`"lenient"` overrides it; on a policy registered on both sides
+(`den.default`) it has no effect. An exclude of the record it wraps still
+reaches it while it is unmodified. See
+[Receiving Content](/explanation/receiving-content/#policyenforcement-who-may-exclude-a-policy).
+
+```nix
+den.policies.hp = den.lib.policy.strict (
+  { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.HP = "x"; }) ]
+);
+```
 
 ### Composition
 

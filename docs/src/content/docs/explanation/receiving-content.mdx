@@ -1,0 +1,244 @@
+---
+title: Receiving Content
+description: Where a policy's content attaches (include.at), what a receiver admits, who may exclude a policy, and what an exclude names.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A policy can put content on an entity other than the one it fires at. This
+page covers the four controls around that: naming the entity the content
+attaches to, deciding what a receiver accepts, deciding who may switch a
+policy off, and saying exactly which policy an exclude removes.
+
+Every example below is evaluated by a test cell; the
+[examples map](https://github.com/denful/den/tree/main/templates/ci/modules/docs-examples)
+lists which.
+
+## `include.at`: name the entity
+
+`den.lib.policy.include.at <entity> <aspect>` includes an aspect and names the
+entity its content attaches to. A user policy can place content on its host,
+and a host policy on a user:
+
+```nix
+den.aspects.tux.policies.to-host =
+  { host, user, ... }:
+  [ (den.lib.policy.include.at host { nixos.environment.etc.at.text = user.name; }) ];
+den.aspects.tux.includes = [ den.aspects.tux.policies.to-host ];
+# igloo gets /etc/at = "tux"
+
+den.policies.to-user =
+  { host, user, ... }:
+  [ (den.lib.policy.include.at user { homeManager.home.sessionVariables.AT = host.name; }) ];
+den.aspects.igloo.includes = [ den.policies.to-user ];
+# tux's home gets AT = "igloo"
+```
+
+At the entity the policy fires at, `include.at` is a plain include. Anywhere
+else it is a delivery to that entity, resolved for its class, so the
+receiver's [`admits`](#admits-what-a-receiver-accepts) applies to it.
+
+**The entity must be one of the instance's relata**: an entity the policy's
+context binds. Naming any other entity is an error:
+
+```nix
+den.hosts.x86_64-linux.iceberg = { };
+den.policies.cross =
+  { host, user, ... }:
+  [ (den.lib.policy.include.at den.hosts.x86_64-linux.iceberg { nixos.environment.etc.x.text = "x"; }) ];
+den.aspects.igloo.includes = [ den.policies.cross ];
+# error: den: include.at names iceberg, which is not one of this policy instance's relata (bound in its context)
+```
+
+### `include.atClass`: give the class
+
+`den.lib.policy.include.atClass <class> <entity> <aspect>` is the same, resolved
+for `<class>` instead of the entity's own class. Use it for an entity with no
+class of its own, such as an environment, or to deliver another class's part:
+
+```nix
+den.policies.to-environment =
+  { environment, host, ... }:
+  [ (den.lib.policy.include.atClass "nixos" environment { nixos.environment.etc.env.text = "x"; }) ];
+```
+
+With plain `include.at`, an entity with no class is an error that points at
+`atClass`:
+
+```
+den: include.at names prod, which has no class to deliver into; give one with include.atClass
+```
+
+<Aside>`atClass` is a working name and may be renamed before den v2.</Aside>
+
+## `admits`: what a receiver accepts
+
+A receiver decides which deliveries land on it. `admits` sits on an entity's
+aspect, and on its kind's schema for every entity of that kind:
+
+```nix
+den.aspects.igloo.admits = {
+  default = "deny";                          # or "allow" (the default)
+  allow = [ den.policies.trusted ];
+  deny = [ den.aspects.tux.policies.to-host ];
+};
+den.schema.host.admits.default = "deny";     # every host
+```
+
+- **`deny`** withholds deliveries from the listed policies or aspects. Their
+  other content still lands; den's channels still deliver.
+- **`default = "deny"`** refuses every delivery that isn't allowed, naming the
+  source, the policy and what to add:
+  ```
+  den: delivery of `to-igloo` from tux denied on igloo: `admits.default = "deny"`; to admit it, add the policy `to-igloo`, or an aspect it is included through to `admits.allow`
+  ```
+- **`allow`** lists what lands under `default = "deny"`. `deny` wins over
+  `allow`.
+- **Layers**: the kind's schema and the entity's own aspect both apply. A
+  layer can tighten a "deny" but not loosen it: a host whose schema says
+  `default = "deny"` stays deny even if its aspect says "allow".
+- **The receiver's own kind decides**: a user-kind `admits` governs
+  deliveries to users, a host-kind one deliveries to hosts.
+
+**Entries match by value, not by name.** An entry is a policy record or an
+aspect, and a delivery matches it only when it came from that record, or from
+an aspect on its origin chain. Two different policies named `deliver` are two
+entries:
+
+```nix
+deliver = file: den.lib.policy.mkPolicy "deliver" ({ host, user, ... }: [
+  (den.lib.policy.provide { class = "nixos"; receiver = host; module.environment.etc.${file}.text = "x"; })
+]);
+allowedOne = deliver "allowed";
+den.aspects.igloo.admits = { default = "deny"; allow = [ allowedOne ]; };
+# allowedOne lands; another `deliver "other"` is refused
+```
+
+**Den's channels always land**: the home environments (`home-manager`, `hjem`,
+`maid`), the `user` class, user shells and den's other built-in deliveries. A
+config can't add to that list. A home environment you build yourself with
+`den.lib.home-env.makeHomeEnv` is *not* one of den's channels: on a
+default-deny host it is refused unless allowed.
+
+**`user-aspects` is gated as a whole battery.** Under `default = "deny"` a host
+that includes `den.batteries.user-aspects` must allow it:
+
+```nix
+den.aspects.igloo.includes = [ den.batteries.user-aspects ];
+den.aspects.igloo.admits = { default = "deny"; allow = [ den.batteries.user-aspects ]; };
+```
+
+Without the `allow`, it is an error:
+
+```
+den: igloo includes den.batteries.user-aspects but admits.default = "deny" and it is not in admits.allow
+```
+
+During the transition, the battery's default form is gated too:
+
+```
+den: igloo receives users' content through the transition default (den.batteries.user-aspects) but admits.default = "deny"; add den.batteries.user-aspects to admits.allow, or set den.migrations.user-host-content.acknowledged = true
+```
+
+### What `admits` checks
+
+`admits` checks a `provide` or `route` that names a `receiver`, an
+`include.at`, and a forward (`den.batteries.forward`) that names a receiver
+anywhere in a policy include, nested in lists or `includes` at any depth.
+Each delivery is decided on its own: a withheld forward is dropped and its
+siblings stay.
+
+Two kinds of delivery aren't checked:
+
+- a forward written as aspect content (outside a policy's include), and
+- a forward built by a function at walk time (behind a `{ … }:` that den only
+  calls when it walks it).
+
+## `policyEnforcement`: who may exclude a policy
+
+By default any entity a policy applies to may exclude it. `policyEnforcement`
+on the registrant changes that:
+
+- **`"lenient"`**: any relatum may exclude the registrant's policies.
+- **`"per-policy"`**: each policy decides; a policy wrapped in
+  `den.lib.policy.strict` can only be excluded by its registrant.
+- **`"strict"`**: only the registrant may exclude its policies.
+
+```nix
+den.policies.hp = den.lib.policy.strict (
+  { host, user, ... }: [ (den.lib.policy.include { homeManager.home.sessionVariables.HP = "x"; }) ]
+);
+den.aspects.igloo.includes = [ den.policies.hp ];
+den.aspects.tux.excludes = [ den.policies.hp ];   # no effect: tux isn't the registrant
+```
+
+`policyEnforcement` sits on an aspect (`den.aspects.igloo.policyEnforcement`)
+or a kind's schema (`den.schema.host.policyEnforcement`). The strictest value
+any layer sets wins, so a host can't loosen a fleet's "strict". Setting
+`"lenient"` on the registrant overrides a policy's own `strict`.
+
+A policy registered on both sides, such as one in `den.default`, has every
+relatum as a registrant, so `strict` has no effect on it and it stays
+excludable from either side.
+
+## Excludes name exactly what they remove
+
+**An aspect exclude reaches the policies that come from it.** Excluding an
+aspect on a host removes the aspect and the policies it carries for that
+host's users. A sub-aspect counts as part of its aspect; the match stops at a
+path boundary (`tools` doesn't reach `toolsx`).
+
+**A policy exclude names its record.** `excludes = [ den.policies.p ]` and a
+policy's `policy.exclude den.policies.p` effect both remove exactly that
+record, not another policy or aspect that shares its name.
+
+**Den's wrappers stay reachable.** `policy.when`, `policy.for` and
+`policy.strict` return a record that wraps yours. An exclude of the wrapped
+record reaches the wrapper, even when the wrapper is registered under a name
+of its own:
+
+```nix
+den.policies.sw = den.lib.policy.strict den.policies.w;
+den.aspects.tux.includes = [ den.policies.sw ];
+den.aspects.tux.excludes = [ den.policies.w ];     # also removes sw
+```
+
+(`sw` is `strict`, so only its registrant, tux, may exclude it.)
+
+That holds only while the wrapper is exactly what den built. Any `//` you apply
+to it afterwards makes it a different rule, which an exclude of `w` no longer
+reaches.
+
+### A constructor builds a new record each time
+
+A function that builds a policy record (`mkThing = args: den.lib.policy.mkPolicy …`)
+returns a new value on every call, so an exclude written as another call
+names nothing that registered:
+
+```nix
+den.aspects.tux.includes = [ (mkThing "a") ];
+den.aspects.igloo.excludes = [ (mkThing "a") ];   # removes nothing
+```
+
+Bind the record once and use that value in both places, or register it under
+`den.policies`:
+
+```nix
+let a = mkThing "a"; in {
+  den.aspects.tux.includes = [ a ];
+  den.aspects.igloo.excludes = [ a ];             # removes it
+}
+```
+
+Den warns when an exclude names a policy that never registered, and adds a
+hint when one with the same name did:
+
+```
+den: exclude in aspect 'igloo' names policy 'pp(a)', which never registered in this resolution — the exclude suppresses nothing; a policy named `pp(a)` did register: if it is built by a constructor, bind it once and use that value in both places, or register it under `den.policies`
+```
+
+## See also
+
+- [Crossing Scopes](/explanation/crossing-scopes/): delivering content to a host
+- [Policies reference](/reference/policies/)
+- [Schema reference](/reference/schema/)
