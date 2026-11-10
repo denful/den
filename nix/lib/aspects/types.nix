@@ -521,7 +521,9 @@ let
           let
             p = (builtins.head policyDefs).value;
           in
-          p // { name = p.name or (lib.last loc); }
+          # Only a name it lacks: re-stamping one it has would move `name`'s
+          # position, which tells den's renames from an author's (#694).
+          if p ? name then p else p // { name = lib.last loc; }
         else
           let
             parametrics = builtins.filter (d: isParametricWrapper d.value) defs';
@@ -952,6 +954,42 @@ let
             description = "Aspects or policies to exclude from this subtree";
             type = lib.types.listOf (providerType (typeCfg // { chain = null; }));
             default = [ ];
+          };
+          admits = lib.mkOption {
+            description = "What this entity admits as a receiver: deliveries from the denied origins are withheld; under `default = \"deny\"` only den's channels and the allowed origins land (#694).";
+            type = lib.types.submodule {
+              options = {
+                default = lib.mkOption {
+                  type = lib.types.nullOr (
+                    lib.types.enum [
+                      "allow"
+                      "deny"
+                    ]
+                  );
+                  default = null;
+                };
+                allow = lib.mkOption {
+                  type = lib.types.listOf lib.types.raw;
+                  default = [ ];
+                };
+                deny = lib.mkOption {
+                  type = lib.types.listOf lib.types.raw;
+                  default = [ ];
+                };
+              };
+            };
+            default = { };
+          };
+          policyEnforcement = lib.mkOption {
+            description = "Who may exclude the policies this entity registers (#694): \"strict\" (only their registrants), \"per-policy\" (each policy's own setting), or \"lenient\" (any relatum).";
+            type = lib.types.nullOr (
+              lib.types.enum [
+                "strict"
+                "per-policy"
+                "lenient"
+              ]
+            );
+            default = null;
           };
           provides = lib.mkOption {
             description = "Providers of aspect for other aspects";

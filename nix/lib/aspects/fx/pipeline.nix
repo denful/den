@@ -184,6 +184,8 @@ let
     # option path) even though both still land in one scope's
     # scopedAspectPolicies, which is exactly where they'd collide.
     policyClaimsByName = _: { };
+    # Wrapped record name → claims of den combinators wrapping it (claim.nix).
+    policyClaimsByWrapped = _: { };
 
     # --- Scope-partitioned output state (handlers write here) ---
     scopedClassImports = _: { };

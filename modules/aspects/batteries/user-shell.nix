@@ -64,6 +64,13 @@ in
 {
   den.batteries.user-shell = shell: {
     inherit description;
+    # A stable origin per call (#694 §12): excluding `den.batteries.user-shell`
+    # matches every shell.
+    name = "user-shell(${shell})";
+    meta.aspect-chain = [
+      "den"
+      "batteries"
+    ];
 
     includes = [
       ({ host, user }: { name = "user-shell/${user.userName}@${host.name}"; } // userShell shell)

@@ -12,6 +12,7 @@ let
   inherit (den.lib.aspects.fx.contentUtil) applyProvide;
   inherit (den.lib.aspects) isParametricWrapper;
   inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
+  inherit (import ./claim.nix { inherit lib den; }) claimPolicyName;
 
   # The user → host half of a cross-entity provide, delivered by the
   # mutual-provider battery. The provided aspect is included at the user scope
@@ -108,13 +109,32 @@ let
             )
           );
     in
-    fx.send "register-aspect-policy" {
-      fn = policyFn;
-      ownerIdentity = nodeIdentity;
-      label = key;
-      # Its include effects carry their provider's token (providedInclude).
-      setsProvenance = true;
-    };
+    # Claimed like any policy name, by a value no author record equals, so
+    # a same-named author policy (`den.aspects.tux.policies.to-hosts`) is
+    # displaced instead of one silently replacing the other. Not the record
+    # with `fn`: its closures are rebuilt on every walk, so it would never
+    # equal its own earlier claim.
+    claimPolicyName token { __denProvides = token; } (
+      ownerIdentity:
+      fx.send "register-aspect-policy" {
+        fn = policyFn;
+        inherit ownerIdentity;
+        displayName = token;
+        # An exclude of the provided aspect names this policy by it.
+        providesToken = token;
+        # Its routes carry den's provenance fields.
+        denMade = true;
+        # Its include effects carry their provider's token (providedInclude).
+        setsProvenance = true;
+        # What reaches a host from here is mutual-provider's delivery, by the
+        # battery or its transition default, so `admits` matches it by the
+        # battery's record (#694 §11a R7). Only this registration, den's own,
+        # carries it.
+        originPolicies = lib.optionals (key != "to-users") [
+          den.batteries.mutual-provider
+        ];
+      }
+    );
 
   # Extract the inner function and args from a provider value.
   resolveProviderFn =

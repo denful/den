@@ -25,10 +25,11 @@ let
     );
 
   # The transition default, on every host until the removal date: its own
-  # policy, so an explicit include is told apart from it.
-  defaultForm = {
+  # policy, so an explicit include is told apart from it. Named below the
+  # battery's path, so excluding the battery excludes it by origin.
+  transitionDefault = {
     __isPolicy = true;
-    name = "mutual-provider-default";
+    name = "mutual-provider/transition-default";
     fn = acceptWith den.lib.acceptance.mutualProviderDefaultKey;
   };
 in
@@ -39,10 +40,7 @@ in
     name = "mutual-provider";
     inherit description;
     fn = acceptWith den.lib.acceptance.mutualProviderKey;
-    # Excluding the battery excludes its default form too. Temporary: PR 4's
-    # origin-matched excludes cover this generally, and the default goes on
-    # the removal date.
-    __defaultForm = defaultForm;
+    __transitionDefaultPolicy = transitionDefault;
     # Earlier configs called it with an argument (`den._.mutual-provider { }`).
     __functor = self: _: self;
   };
@@ -50,5 +48,5 @@ in
   # On every entity kind, so a nested kind with its own class (a guest that is
   # its own host) gets it too; it acts only where `host` is bound and `user`
   # is not.
-  den.default.includes = lib.optional den.lib.migrations.transitionActive defaultForm;
+  den.default.includes = lib.optional den.lib.migrations.transitionActive transitionDefault;
 }

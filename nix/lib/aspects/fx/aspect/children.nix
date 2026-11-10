@@ -14,6 +14,7 @@ let
   # registerConstraints's excludeList comment for why that's deferred there
   # rather than resolved here.
   inherit (import ../handlers/constraint.nix { inherit lib den; }) resolveClaim;
+  inherit (import ./claim.nix { inherit lib den; }) claimPolicyName;
 
   nameIndexed =
     state: base: idx: ctxId:
@@ -97,62 +98,68 @@ let
   # the SAME chain segments, so without the index the second and third (and
   # every later) distinct claimant would collide with EACH OTHER under one
   # identical qualified string.
+  # One of den's channels (#694 §12): its `fn` is defined in one of den's
+  # channel files (an author can't place a definition there), or it is one of
+  # den's home environments' policies or den's one `den.policies` channel,
+  # user-to-host, by value. A home environment built with makeHomeEnv shares
+  # den's file, so it is matched by record. A record extended with
+  # `//` keeps its `fn`'s position: `den.batteries.define-user // { … }` that
+  # keeps den's `fn` is still den's channel, by design; one that redefines
+  # `fn` is the author's.
+  denChannelFiles = map (f: "${toString ../../../../..}/${f}") [
+    "modules/aspects/batteries/define-user.nix"
+    "modules/aspects/batteries/primary-user.nix"
+    "modules/aspects/batteries/user-shell.nix"
+    "modules/aspects/batteries/unfree/unfree.nix"
+    "modules/aspects/batteries/insecure/insecure.nix"
+  ];
+  # Den's home environments' records, at their fixed keys only: a key a
+  # config declares is never read.
+  denEnvChannels =
+    let
+      ci = den.internal.channelPolicies or { };
+    in
+    lib.concatMap (k: ci.${k} or [ ]) [
+      "homeManager"
+      "hjem"
+      "maid"
+    ];
+  isDenChannel =
+    p:
+    let
+      pos = builtins.unsafeGetAttrPos "fn" p;
+    in
+    (pos != null && builtins.elem pos.file denChannelFiles)
+    || builtins.elem p denEnvChannels
+    || p == (den.policies.user-to-host or null);
+
+  # Den's own delivery fields (#694's mutual-provider and stand-down routes)
+  # are honoured only on effects of a policy defined in a den file that sets
+  # them; an author can't place a definition there.
+  denMadeFiles = map (f: "${toString ../../../../..}/${f}") [ "nix/lib/home-env.nix" ];
+  isDenMade =
+    p:
+    let
+      pos = builtins.unsafeGetAttrPos "fn" p;
+    in
+    pos != null && builtins.elem pos.file denMadeFiles;
+
   registerPolicy =
     p:
-    fx.bind fx.effects.state.get (
-      state:
-      let
-        scope = state.currentScope;
-        scopeParentMap = (state.scopeParent or (_: { })) null;
-        bucketKey = "name:${p.name}";
-        claimRegistry = (state.policyClaimsByName or (_: { })) null;
-        claimsByScope = claimRegistry.${bucketKey} or { };
-        claimResult = resolveClaim scopeParentMap scope claimsByScope p;
-        inherit (claimResult) sameScopeEntries matchingClaim;
-        parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
-        parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
-        # Taken before this claim is appended, so the first displaced claim
-        # gets 1, the second 2, etc. — unique per claim, not just per parent.
-        claimIndex = builtins.length sameScopeEntries;
-        ownerIdentity =
-          if matchingClaim != null then
-            matchingClaim.identity
-          else if sameScopeEntries == [ ] then
-            p.name
-          else
-            identity.pathKey (parentChainSegments ++ [ "${p.name}#${toString claimIndex}" ]);
-        registerEffect = fx.send "register-aspect-policy" {
-          inherit (p) fn;
-          inherit ownerIdentity;
-          # The record's own `fn` slot, shared by every copy of the record: two
-          # registrations of one record compare equal under `==`, two records
-          # sharing a name don't (policy/schema.nix samePolicy).
-          fnSlot = builtins.intersectAttrs { fn = null; } p;
-        };
-      in
-      if matchingClaim != null then
-        registerEffect
-      else
-        fx.bind (fx.effects.state.modify (
-          st:
-          st
-          // {
-            policyClaimsByName =
-              _:
-              claimRegistry
-              // {
-                ${bucketKey} = claimsByScope // {
-                  ${scope} = (claimsByScope.${scope} or [ ]) ++ [
-                    {
-                      value = p;
-                      identity = ownerIdentity;
-                      inherit scope;
-                    }
-                  ];
-                };
-              };
-          }
-        )) (_: registerEffect)
+    claimPolicyName p.name p (
+      ownerIdentity:
+      fx.send "register-aspect-policy" {
+        inherit (p) fn;
+        inherit ownerIdentity;
+        # The record's own `fn` slot, shared by every copy of the record: two
+        # registrations of one record compare equal under `==`, two records
+        # sharing a name don't (policy/schema.nix samePolicy).
+        fnSlot = builtins.intersectAttrs { fn = null; } p;
+        displayName = p.name;
+        ref = p;
+        denChannel = isDenChannel p;
+        denMade = isDenMade p;
+      }
     );
 
   isPolicy = v: builtins.isAttrs v && v.__isPolicy or false;
@@ -327,24 +334,17 @@ let
       # can resolve it later, once dispatch has run past this aspect's own
       # includes and the registry actually holds the claim.
       policyExclude = policyExcludeOf;
-      excludeList = lib.concatMap (
+      excludeList = map (
         ref:
-        [
-          (
-            {
-              type = "exclude";
-              scope = "subtree";
-              identity = excludeIdentity ref;
-            }
-            // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
-          )
-        ]
-        # A battery's transition default is excluded with it (#694, until
-        # den.lib.migrations.removalDate). Temporary: PR 4's origin-matched
-        # excludes cover this generally.
-        ++ lib.optional (builtins.isAttrs ref && ref ? __defaultForm) (
-          policyExclude ref.__defaultForm // { defaultFormOf = true; }
-        )
+        {
+          type = "exclude";
+          scope = "subtree";
+          identity = excludeIdentity ref;
+        }
+        // lib.optionalAttrs (builtins.isAttrs ref && ref.__isPolicy or false) { rawRef = ref; }
+        // lib.optionalAttrs (builtins.isAttrs ref && ref ? __transitionDefaultPolicy) {
+          defaultPolicy = ref.__transitionDefaultPolicy;
+        }
       ) rawExcludes;
       allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
@@ -408,26 +408,21 @@ let
           );
         in
         fx.seq (
-          lib.concatMap (
+          map (
             e:
-            [
-              (fx.send "register-constraint" {
+            fx.send "register-constraint" (
+              {
                 type = "exclude";
                 scope = "subtree";
                 identity = identity.key e.value;
                 owner = "policy";
-              })
-            ]
-            # A battery's transition default is excluded with it, as excludeList
-            # does (#694, until removalDate).
-            ++ lib.optional (builtins.isAttrs e.value && e.value ? __defaultForm) (
-              fx.send "register-constraint" (
-                policyExcludeOf e.value.__defaultForm
-                // {
-                  defaultFormOf = true;
-                  owner = "policy";
-                }
-              )
+              }
+              // lib.optionalAttrs (e.value.__isPolicy or false) { rawRef = e.value; }
+              # A battery's transition default is excluded with it, as excludeList
+              # pairs it (#694, until removalDate).
+              // lib.optionalAttrs (builtins.isAttrs e.value && e.value ? __transitionDefaultPolicy) {
+                defaultPolicy = e.value.__transitionDefaultPolicy;
+              }
             )
           ) excludes
         )

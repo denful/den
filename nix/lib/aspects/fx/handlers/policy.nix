@@ -26,6 +26,19 @@ let
           chain = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
           # Den's provides policies set their includes' provenance themselves.
           setsProvenance = param.setsProvenance or false;
+          # The aspects the policy was included through, outermost first: an
+          # exclude of any of them excludes the policy (#694 §12, origin).
+          origin = ((state.scopedIncludesChain or (_: { })) null).${state.currentScope} or [ ];
+          # The record it registered from, matched by value by `admits` (#694).
+          ref = param.ref or null;
+          denChannel = param.denChannel or false;
+          # Den's records it delivers for (a battery), matched by value too.
+          originPolicies = param.originPolicies or [ ];
+          # Defined by den where it sets den's own delivery fields.
+          denMade = param.denMade or false;
+          # The name it was written with, for messages.
+          displayName = param.displayName or param.ownerIdentity;
+          providesToken = param.providesToken or null;
         }
         // (if param ? fnSlot then { inherit (param) fnSlot; } else { });
         # The registry is the one scoped field that merges rather than appends,

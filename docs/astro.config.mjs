@@ -117,6 +117,7 @@ export default defineConfig({
 							items: [
 								{ label: 'Policies', slug: 'explanation/policies' },
 								{ label: 'Policy Activation', slug: 'explanation/policy-activation' },
+								{ label: 'Receiving Content', slug: 'explanation/receiving-content', badge: { text: 'new', variant: 'success' } },
 							],
 						},
 						{

@@ -24,6 +24,7 @@ let
     canTake = ./can-take.nix;
     __findFile = ./den-brackets.nix;
     forward = ./forward.nix;
+    enforcement = ./enforcement.nix;
     home-env = ./home-env.nix;
     migrations = ./migrations.nix;
     nh = ./nh.nix;

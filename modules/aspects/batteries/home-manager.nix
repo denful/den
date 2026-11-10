@@ -23,15 +23,29 @@ let
     schemaIncludes = config.den.schema.hm-host.includes or [ ];
   };
 
+  # This environment's policy records, den's channels by value (#694 §12).
+  # Read by isDenChannel at this one key; `apply` ignores any definition, so
+  # a config can't add a channel.
+  channelPolicies = result.battery.includes ++ result.userDetect.includes;
 in
 {
-  den.schema.host.imports = [ result.hostConf ];
-  den.schema.host.includes = [ result.battery ];
+  options.den.internal.channelPolicies.homeManager = lib.mkOption {
+    internal = true;
+    visible = false;
+    type = lib.types.listOf lib.types.raw;
+    default = channelPolicies;
+    apply = _: channelPolicies;
+  };
 
-  den.schema.user.includes = [ result.userDetect ];
+  config = {
+    den.schema.host.imports = [ result.hostConf ];
+    den.schema.host.includes = [ result.battery ];
 
-  den.classes.homeManager.description = "Home Manager user environment";
-  # home-manager nests under its host; a member reaches the host config via osConfig.
-  den.classes.homeManager.parentPath = userHostPath;
-  den.classes.homeManager.parentArg = "osConfig";
+    den.schema.user.includes = [ result.userDetect ];
+
+    den.classes.homeManager.description = "Home Manager user environment";
+    # home-manager nests under its host; a member reaches the host config via osConfig.
+    den.classes.homeManager.parentPath = userHostPath;
+    den.classes.homeManager.parentArg = "osConfig";
+  };
 }

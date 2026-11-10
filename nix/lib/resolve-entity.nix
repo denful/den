@@ -76,7 +76,7 @@ let
             && entity ? class
           )
           (
-            map (b: b.__defaultForm) [
+            map (b: b.__transitionDefaultPolicy) [
               den.batteries.user-aspects
               den.batteries.mutual-provider
             ]

@@ -45,6 +45,8 @@ in
       __standDown = builtins.concatLists (
         builtins.attrValues ((state.scopedStandDowns or (_: { })) null)
       );
+      # Anonymous aspects' definition positions, by scope and location (F2).
+      __anonDefs = (state.scopedAnonDefs or (_: { })) null;
       __standDownProvides = builtins.concatLists (
         builtins.attrValues ((state.scopedStandDownProvides or (_: { })) null)
       );

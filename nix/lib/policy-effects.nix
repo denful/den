@@ -130,6 +130,21 @@ let
     ];
   withArgs = args: fn: lib.setFunctionArgs fn args;
   policyArgsOf = inner: if lib.isFunction inner.fn then lib.functionArgs inner.fn else { };
+  # A den combinator's record: its own record, plus the record it wraps, which
+  # an exclude of that record reaches. `__denWrap` ties the two together:
+  # the record counts as den's combinator only while it is still `core`
+  # (handlers/constraint.nix), so neither half can be grafted onto another.
+  denWrapped =
+    core: inner:
+    core
+    // {
+      __wraps = inner;
+      __denWrap = {
+        inherit core;
+        wraps = inner;
+      };
+    };
+
 in
 {
   inherit deliver;
@@ -185,9 +200,26 @@ in
 
   # Inject an aspect into the current resolution context.
   # Accepts aspect references and inline attrsets (coerced to anonymous aspects).
-  include = aspect: {
-    __policyEffect = "include";
-    value = aspect;
+  # `include.at <entity> <aspect>` names the entity the content attaches to
+  # (#694 §12): at the firing scope's own entity it is a plain include,
+  # anywhere else a delivery to that entity, resolved for its class.
+  include = {
+    __functor = _: aspect: {
+      __policyEffect = "include";
+      value = aspect;
+    };
+    at = entity: aspect: {
+      __policyEffect = "include";
+      value = aspect;
+      __at = entity;
+    };
+    # The same, resolved for `class` rather than the target's own class.
+    atClass = class: entity: aspect: {
+      __policyEffect = "include";
+      value = aspect;
+      __at = entity;
+      __atClass = class;
+    };
   };
 
   # Remove/gate an aspect from the current resolution tree.
@@ -401,22 +433,25 @@ in
         let
           inner = toInnerPolicy p;
         in
-        {
-          __isPolicy = true;
-          inherit (inner) name;
-          fn = withArgs (mergeArgs (policyArgsOf inner) targetArgs) (
-            ctx:
-            let
-              # The dispatching scope's own entity, or a binding of the target's kind.
-              ownKind = ctx.__entityKind or null;
-              own = if ownKind == null then null else (ctx.${ownKind} or { }).id_hash or null;
-              matches =
-                builtins.elem own entityHashes
-                || builtins.any (k: builtins.elem ((ctx.${k} or { }).id_hash or null) entityHashes) targetKinds;
-            in
-            if matches then inner.fn ctx else [ ]
-          );
-        };
+        let
+          core = {
+            __isPolicy = true;
+            inherit (inner) name;
+            fn = withArgs (mergeArgs (policyArgsOf inner) targetArgs) (
+              ctx:
+              let
+                # The dispatching scope's own entity, or a binding of the target's kind.
+                ownKind = ctx.__entityKind or null;
+                own = if ownKind == null then null else (ctx.${ownKind} or { }).id_hash or null;
+                matches =
+                  builtins.elem own entityHashes
+                  || builtins.any (k: builtins.elem ((ctx.${k} or { }).id_hash or null) entityHashes) targetKinds;
+              in
+              if matches then inner.fn ctx else [ ]
+            );
+          };
+        in
+        denWrapped core inner;
     in
     if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
 
@@ -460,14 +495,17 @@ in
         let
           inner = toInnerPolicy p;
         in
-        {
-          __isPolicy = true;
-          inherit (inner) name;
-          fn = withArgs (mergeArgs (policyArgsOf inner) predicateArgs) (
-            ctx:
-            if builtins.all (k: ctx ? ${k}) predicateRequiredArgs && predicate ctx then inner.fn ctx else [ ]
-          );
-        };
+        let
+          core = {
+            __isPolicy = true;
+            inherit (inner) name;
+            fn = withArgs (mergeArgs (policyArgsOf inner) predicateArgs) (
+              ctx:
+              if builtins.all (k: ctx ? ${k}) predicateRequiredArgs && predicate ctx then inner.fn ctx else [ ]
+            );
+          };
+        in
+        denWrapped core inner;
       wrap =
         p: if p.__isPolicy or false || builtins.isFunction p then wrapAsPolicy p else wrapAsConditional p;
     in
@@ -479,4 +517,24 @@ in
     __isPolicy = true;
     inherit name fn;
   };
+
+  # A policy its relata can't exclude, unless its registrant's mode is
+  # "lenient" (#694 §11a O2). On a policy registered on both sides
+  # (den.default) every relatum is a registrant, so it has no effect.
+  strict =
+    p:
+    if builtins.isAttrs p && p.__isPolicy or false then
+      p
+      // {
+        __strict = true;
+        # The record it wraps, which an exclude of that record reaches.
+        __wraps = p;
+      }
+    else
+      {
+        __isPolicy = true;
+        name = "<strict>";
+        fn = p;
+        __strict = true;
+      };
 }

@@ -44,6 +44,21 @@ let
           else
             stackTokenOf state scope;
         allProvenance = (state.scopedProvenanceLocs or (_: { })) null;
+        allAnonDefs = (state.scopedAnonDefs or (_: { })) null;
+        defPos = param.defPos or null;
+        updatedAnonDefs =
+          if defPos == null then
+            allAnonDefs
+          else
+            allAnonDefs
+            // {
+              ${scope} = (allAnonDefs.${scope} or { }) // {
+                ${loc} = {
+                  pos = "${defPos.file}:${toString defPos.line}:${toString defPos.column}";
+                  inherit (param) module;
+                };
+              };
+            };
         # Recorded on a skipped emission too: content provided and also reached
         # another way still crosses, since the other path does not revoke the
         # provide's edge.
@@ -109,6 +124,7 @@ let
               scopedClassImports = builtins.seq (forceHead updatedImports) (_: updatedImports);
               scopedEmittedLocs = builtins.seq (forceHead updatedEmittedLocs) (_: updatedEmittedLocs);
               scopedProvenanceLocs = builtins.seq (forceHead updatedProvenance) (_: updatedProvenance);
+              scopedAnonDefs = builtins.seq (forceHead updatedAnonDefs) (_: updatedAnonDefs);
               # Each location's include chain at its first emission, read when a
               # repeat under a provide was deduplicated (handlers/provenance.nix).
               scopedLocChains = builtins.seq (forceHead updatedLocChains) (_: updatedLocChains);

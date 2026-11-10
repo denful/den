@@ -548,6 +548,21 @@ let
             )
             || (id != null && rootIds ? ${id});
           entityOf = sid: (scopeContexts.${sid} or { }).${scopeEntityKind.${sid} or ""} or null;
+          # An anonymous aspect is the same content at the root when the root
+          # has one from the same definition position with an equal value:
+          # walk positions differ between scopes, so its identity can't say
+          # (#694 F2). Different values from one position (a `map`, a helper
+          # returning a literal) stay distinct.
+          anonDefs = (pi.provenanceLocs or { }).__anonDefs or { };
+          rootAnon = builtins.groupBy (d: d.pos) (
+            lib.concatMap (sid: builtins.attrValues (anonDefs.${sid} or { })) boundedScopes
+          );
+          sameAnonAtRoot =
+            sid: m:
+            let
+              d = (anonDefs.${sid} or { }).${toString (m.key or m._file or "")} or null;
+            in
+            d != null && builtins.any (r: r.module == d.module) (rootAnon.${d.pos} or [ ]);
           # A nested entity with its own class (a guest that is its own host)
           # owns its host-class content: it is that entity's system config, not
           # content lost from the root (#694 §6). Its users' content is its own
@@ -648,6 +663,7 @@ let
                   m:
                   !(isValidator m)
                   && !(reachesRoot m)
+                  && !(sameAnonAtRoot sid m)
                   && !(standDownAspects ? "${sid}\n${toString (identityOf m)}")
                   && !(
                     provenanceRead
@@ -694,6 +710,7 @@ let
             builtins.removeAttrs (pi.provenanceLocs or { }) [
               "__standDown"
               "__standDownProvides"
+              "__anonDefs"
             ]
           )
         )
