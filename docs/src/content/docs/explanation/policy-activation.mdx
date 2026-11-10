@@ -222,6 +222,35 @@ other policies provide. The loop is capped at 10 iterations; if new keys
 are still appearing past that, the pipeline throws a `den: enrichment
 cycle` error rather than looping forever.
 
+### Where a policy reaches, and how often it fires
+
+A policy registered at a scope reaches every level below it, at any depth:
+one registered on an environment reaches that environment's hosts and their
+users, not only its direct children. A host with a single user gets the same
+policies as a host with several.
+
+It fires once per *instance*: an assignment of every argument it declares to
+the value the scope binds (`lib.functionArgs`, optional arguments included).
+A policy fires at the shallowest scope where its instance is bound, and not
+again below it for the same values:
+
+```nix
+# Declares `user`: an instance per user, fired at each user scope.
+den.policies.per-user =
+  { host, user, ... }:
+  [ (den.lib.policy.provide { class = "nixos"; receiver = host; module.boot.kernelModules = [ "u-${user.name}" ]; }) ];
+den.schema.host.includes = [ den.policies.per-user ];
+# igloo with users tux and pingu gets [ "u-pingu" "u-tux" ], each once
+```
+
+A scope that rebinds an argument makes a new instance. A guest that is its
+own host (`host = cuda` under igloo) is a new `{ host }` instance and gets
+its own firing, and a host's policies don't fire inside its guests. A guest
+that binds another environment gets that environment's policies, not its
+host's environment's. A policy written `ctx: …` or `{ system, ... }@ctx: …`
+that relied on firing again further down, where more context is bound, now
+fires once: declare the arguments it reads.
+
 ### Self-exclusion invariant
 
 A policy does not apply to its own outputs. The source policy name is
