@@ -269,6 +269,15 @@ let
       revChunks: fx.pure (builtins.concatLists (lib.reverseList revChunks))
     );
 
+  # A policy record's exclude: by its name, resolved by value (rawRef) once the
+  # claim registry holds it (handlers/constraint.nix isPolicyExcluded).
+  policyExcludeOf = ref: {
+    type = "exclude";
+    scope = "subtree";
+    identity = ref.name;
+    rawRef = ref;
+  };
+
   registerConstraints =
     aspect:
     let
@@ -317,12 +326,7 @@ let
       # initial dispatch and policy/schema.nix's late-sibling re-dispatch)
       # can resolve it later, once dispatch has run past this aspect's own
       # includes and the registry actually holds the claim.
-      policyExclude = ref: {
-        type = "exclude";
-        scope = "subtree";
-        identity = excludeIdentity ref;
-        rawRef = ref;
-      };
+      policyExclude = policyExcludeOf;
       excludeList = lib.concatMap (
         ref:
         [
@@ -404,14 +408,27 @@ let
           );
         in
         fx.seq (
-          map (
+          lib.concatMap (
             e:
-            fx.send "register-constraint" {
-              type = "exclude";
-              scope = "subtree";
-              identity = identity.key e.value;
-              owner = "policy";
-            }
+            [
+              (fx.send "register-constraint" {
+                type = "exclude";
+                scope = "subtree";
+                identity = identity.key e.value;
+                owner = "policy";
+              })
+            ]
+            # A battery's transition default is excluded with it, as excludeList
+            # does (#694, until removalDate).
+            ++ lib.optional (builtins.isAttrs e.value && e.value ? __defaultForm) (
+              fx.send "register-constraint" (
+                policyExcludeOf e.value.__defaultForm
+                // {
+                  defaultFormOf = true;
+                  owner = "policy";
+                }
+              )
+            )
           ) excludes
         )
       );
