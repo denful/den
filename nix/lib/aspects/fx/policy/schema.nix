@@ -16,10 +16,23 @@
   mkSupplementalResolution,
 }:
 let
+  inherit (den.lib.synthesizePolicies) resolveArgsSatisfied;
   inherit (import ../handlers/constraint.nix { inherit lib den; })
     scopedConstraintsForScope
     isPolicyExcluded
     ;
+
+  # Identity by id_hash when both records carry one, else by value, minus the
+  # per-scope `hasAspect` decomposeSchemaEffect adds.
+  sameEntity =
+    a: b:
+    if a ? id_hash && b ? id_hash then
+      a.id_hash == b.id_hash
+    else
+      builtins.removeAttrs a [ "hasAspect" ] == builtins.removeAttrs b [ "hasAspect" ];
+
+  # Two scopes bind a value the same way: entities by identity, others by value.
+  sameBinding = a: b: if builtins.isAttrs a && builtins.isAttrs b then sameEntity a b else a == b;
 
   # Determine target entity kind from a schema effect.
   resolveTargetKind =
@@ -158,7 +171,7 @@ let
 
   # Emit late policy effects into a single sibling scope.
   emitLateForSibling =
-    parentScope: parentFiredPolicies: scopedAspectPolicies: firedPerScope: seen: sib:
+    parentScope: ancestorScopes: parentFiredPolicies: scopedAspectPolicies: firedPerScope: seen: sib:
     let
       # Runtime-include policies are subtree-scoped: a policy registered via a
       # scope's own includes applies only to that scope's subtree, never to
@@ -168,7 +181,8 @@ let
       # (an opt-in battery's policy, a per-user `to-users` policy, …) never fire
       # at OTHER users.
       allAspectPolicies =
-        (scopedAspectPolicies.${parentScope} or { }) // (scopedAspectPolicies.${sib.scopeId} or { });
+        builtins.foldl' (acc: s: (scopedAspectPolicies.${s} or { }) // acc) { } ancestorScopes
+        // (scopedAspectPolicies.${sib.scopeId} or { });
       dispatchKey = "${sib.targetKind}@${sib.scopeId}";
       alreadyFired = firedPerScope.${dispatchKey} or { };
       # Filter policies to those not already fired AND whose entity-kind
@@ -187,7 +201,7 @@ let
       latePolicies = lib.filterAttrs (
         name: policy:
         let
-          policyArgs = builtins.functionArgs (policy.fn or policy);
+          policyArgs = lib.functionArgs (policy.fn or policy);
           requiredEntityArgs = builtins.filter (
             k: builtins.elem k entityKinds && !(policyArgs.${k} or false)
           ) (builtins.attrNames policyArgs);
@@ -215,7 +229,45 @@ let
         constraintRegistry = scopedConstraintsForScope state sib.scopeId;
         # Applied once, outside the lambda — see isPolicyExcluded's currying note.
         excluded = isPolicyExcluded state sib.scopeId constraintRegistry;
-        filteredPolicies = lib.filterAttrs (name: _: !excluded name) latePolicies;
+        # A policy an ancestor scope could already dispatch with the same bound
+        # arguments fired there (late firings are not recorded in the fired
+        # set), so it does not fire again here: offering a grandparent's
+        # registry must not re-fire its `{ system }` policies at every user.
+        scopeCtxs = (state.scopeContexts or (_: { })) null;
+        boundOf =
+          ctx: policy:
+          builtins.filter (k: ctx ? ${k}) (builtins.attrNames (lib.functionArgs (policy.fn or policy)));
+        # The same instance: the same declared arguments bound, to the same
+        # values. Names alone are not enough where a scope rebinds one (a guest
+        # binds `host` to itself).
+        sameInstanceAbove =
+          name: policy:
+          builtins.any (
+            a:
+            let
+              actx = scopeCtxs.${a} or { };
+              names = boundOf actx policy;
+            in
+            resolveArgsSatisfied (policy.fn or policy) actx
+            && names == boundOf sib.scopedCtx policy
+            && builtins.all (k: sameBinding actx.${k} sib.scopedCtx.${k}) names
+          ) (registeredFrom name);
+        # Only an ancestor at or below the farthest one that registers the
+        # policy could have run it: one registered at the sibling after its own
+        # dispatch (a late include) is new everywhere above.
+        registeredFrom =
+          name:
+          let
+            regIdx = builtins.filter (
+              i: (scopedAspectPolicies.${builtins.elemAt ancestorScopes i} or { }) ? ${name}
+            ) (lib.range 0 (builtins.length ancestorScopes - 1));
+          in
+          if regIdx == [ ] then [ ] else lib.take (lib.last regIdx + 1) ancestorScopes;
+        # The sibling's own dispatch already ran these, whatever they returned.
+        ranAtSib = ((state.installDispatched or (_: { })) null).${sib.scopeId} or { };
+        filteredPolicies = lib.filterAttrs (
+          name: policy: !excluded name && !(ranAtSib ? ${name}) && !(sameInstanceAbove name policy)
+        ) latePolicies;
         resolveCtx = sib.scopedCtx // {
           __entityKind = sib.targetKind;
         };
@@ -271,7 +323,10 @@ let
               if fresh == { } then
                 fx.pure null
               else
-                emitLateForSibling parentScope parentFiredPolicies scopedAspectPolicies' firedPerScope seen' sib
+                emitLateForSibling parentScope ancestorScopes parentFiredPolicies scopedAspectPolicies'
+                  firedPerScope
+                  seen'
+                  sib
             )
           )
     );
@@ -300,14 +355,59 @@ let
           # Collect all policies that already fired at the parent scope
           # (under any entity kind). These should not re-fire at children
           # via late dispatch — they already produced their effects.
+          # The parent and every scope above it, nearest first: a policy
+          # registered at any of them fires where its relata are bound, not only
+          # one registered at the parent (an `environment`'s `{ host, user }`
+          # policy reaches the users two levels down).
+          scopeParents = (state.scopeParent or (_: { })) null;
+          ancestorScopes =
+            let
+              go =
+                seen: s:
+                if s == null || seen ? ${s} then
+                  [ ]
+                else
+                  [ s ] ++ go (seen // { ${s} = true; }) (scopeParents.${s} or null);
+            in
+            go { } parentScope;
+          ancestorSet = lib.genAttrs ancestorScopes (_: true);
+          # A tree ancestor whose own entity the sibling binds to a different
+          # entity is not offered: a guest binds `host` to itself, so its host's
+          # policies stay with the host, as guests are their own hosts.
+          scopeKinds = (state.scopeEntityKind or (_: { })) null;
+          scopeCtxsL = (state.scopeContexts or (_: { })) null;
+          keptAncestorsFor =
+            sib:
+            builtins.filter (
+              a:
+              let
+                kind = scopeKinds.${a} or null;
+                own = if kind == null then null else (scopeCtxsL.${a} or { }).${kind} or null;
+              in
+              own == null || !(sib.scopedCtx ? ${kind}) || sameEntity sib.scopedCtx.${kind} own
+            ) ancestorScopes;
+          # Policies that already fired at the parent or above (under any entity
+          # kind) do not fire again below.
           parentFiredPolicies = builtins.foldl' (
-            acc: key: if lib.hasSuffix "@${parentScope}" key then acc // (firedPerScope.${key} or { }) else acc
+            acc: key:
+            let
+              parts = lib.splitString "@" key;
+              at = lib.concatStringsSep "@" (builtins.tail parts);
+            in
+            if builtins.length parts > 1 && ancestorSet ? ${at} then
+              acc // (firedPerScope.${key} or { })
+            else
+              acc
           ) { } (builtins.attrNames firedPerScope);
         in
         builtins.foldl' (
           acc: sib:
           fx.bind acc (
-            _: emitLateForSibling parentScope parentFiredPolicies scopedAspectPolicies firedPerScope { } sib
+            _:
+            emitLateForSibling parentScope (keptAncestorsFor sib) parentFiredPolicies scopedAspectPolicies
+              firedPerScope
+              { }
+              sib
           )
         ) (fx.pure null) siblingMetas
       )
@@ -330,7 +430,10 @@ let
         )
       ) (fx.pure [ ]) schemaEffects;
     in
-    if !isFanOut || isLatePass then
+    # A single child gets the late pass too: whether a policy registered above
+    # fires where its arguments are bound cannot depend on how many children
+    # the resolve has (a guest with one user got none).
+    if schemaEffects == [ ] || isLatePass then
       mainFold
     else
       fx.bind fx.effects.state.get (
@@ -352,7 +455,14 @@ let
                 }
               ) schemaEffects;
             in
-            fx.bind (lateDispatchPass siblingMetas) (_: fx.pure allResults)
+            # The pass sets inLateDispatch for the policies it emits; reset it
+            # after, so a later batch at this scope level gets its own pass.
+            fx.bind (lateDispatchPass siblingMetas) (
+              _:
+              fx.bind (fx.effects.state.modify (
+                st: st // { inLateDispatch = preState.inLateDispatch or false; }
+              )) (_: fx.pure allResults)
+            )
           )
       );
 in
