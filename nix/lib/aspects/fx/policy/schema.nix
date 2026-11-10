@@ -345,6 +345,11 @@ let
       # late dispatch re-fires them at entity scopes (host/home/user),
       # creating duplicate routes that leak packages across scope boundaries.
       entityKinds = den.lib.schemaUtil.schemaEntityKinds;
+      # Registered at the sibling itself (a late include's own policies): its
+      # own dispatch would fire them wherever their arguments are bound, so
+      # the entity-kind filter, which keeps an ancestor's policies from
+      # re-firing at deeper kinds, does not apply to them.
+      ownPolicies = scopedAspectPolicies.${sib.scopeId} or { };
       latePolicies = lib.filterAttrs (
         name: policy:
         let
@@ -361,7 +366,11 @@ let
         # scopes via the fan-out. This is what makes `{ self, ... }:` mean
         # "fire once here", as opposed to `{ <kind>, ... }:` which fans.
         && !(policyArgs ? self)
-        && (requiredEntityArgs == [ ] || builtins.elem sib.targetKind requiredEntityArgs)
+        && (
+          ownPolicies ? ${name}
+          || requiredEntityArgs == [ ]
+          || builtins.elem sib.targetKind requiredEntityArgs
+        )
       ) allAspectPolicies;
     in
     fx.bind fx.effects.state.get (
