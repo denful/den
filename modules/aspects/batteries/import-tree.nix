@@ -60,6 +60,13 @@
       you are also free to create your own auto-imports layout following the implementation of these.
   '';
 
+  # Named, so `excludes = [ den.batteries.import-tree ]` reaches every root.
+  den.batteries.import-tree.name = "import-tree";
+  den.batteries.import-tree.meta.aspect-chain = [
+    "den"
+    "batteries"
+  ];
+
   den.batteries.import-tree.__functor =
     _: root:
     let
@@ -75,10 +82,11 @@
       }) classEntries;
     in
     {
-      name = "import-tree(${baseNameOf rootStr})";
+      name = "import-tree(${den.lib.argsName.pathOf rootStr})";
       meta.aspect-chain = [
         "den"
         "batteries"
+        "import-tree"
       ];
     }
     // aspect;

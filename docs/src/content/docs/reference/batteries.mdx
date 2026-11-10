@@ -115,19 +115,32 @@ den.aspects.alice.includes = [
 
 ### `den.batteries.mutual-provider`
 
-<Aside title="Inert compatibility shim" type="caution">
-This battery no longer does anything. Cross-entity routing (a host
-contributing config to its users, and a user contributing config to its hosts)
-is now **built into the pipeline** -- you do not need to enable any battery for
-it. `den.batteries.mutual-provider` remains only as an inert compatibility shim
-so older configs that still include it keep evaluating; it produces no effects.
+Delivers what a user provides to its hosts into each host's own configuration. It covers the user-to-host half of [mutual providers](/guides/mutual/): `provides.to-hosts` and `provides.<host>`. The host-class part of that content (`nixos` on a NixOS host, `darwin` on a Darwin host) goes to the host. Its other classes, such as `homeManager`, stay with the user.
 
-For the current cross-entity pattern, see the
-[Mutual Providers](/guides/mutual/) guide.
+Host-to-user providers (`provides.to-users`, `provides.<user>`) are not part of this battery. They are built in and always apply.
+
+**Included by default** in `den.schema.host.includes`, so `to-hosts` and `provides.<host>` work without any setup. To opt out, exclude it for every host or for one host:
+
+```nix
+# every host
+den.schema.host.excludes = [ den.batteries.mutual-provider ];
+
+# one host
+den.hosts.x86_64-linux.igloo.excludes = [ den.batteries.mutual-provider ];
+```
+
+It has no effect on standalone homes, which have no host configuration to deliver into.
+
+<Aside type="caution">
+In this release a user's content still reaches its hosts by nesting, with or
+without this battery, so excluding it doesn't stop `provides.to-hosts` content
+from reaching a host yet. The next release keeps a user's content with the
+user ([#694](https://github.com/denful/den/issues/694)); from then on, this
+battery is how `provides.to-hosts` reaches a host.
 </Aside>
 
 <Aside title="Source" icon="github">
-[`modules/compat/mutual-provider-shim.nix`](https://github.com/denful/den/blob/main/modules/compat/mutual-provider-shim.nix)
+[`modules/aspects/batteries/mutual-provider.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/mutual-provider.nix)
 </Aside>
 
 ### `den.batteries.host-aspects`
@@ -142,6 +155,39 @@ den.aspects.tux.includes = [ den.batteries.host-aspects ];
 
 <Aside title="Source" icon="github">
 [`modules/aspects/batteries/host-aspects.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/host-aspects.nix)
+</Aside>
+
+### `den.batteries.user-aspects`
+
+Lets a host accept its users' whole host-class output: everything a user's aspect tree writes to `nixos`, `darwin` or `os`, not only what it sends through `provides`. It is the user-to-host counterpart of `host-aspects`.
+
+**Opt-in, host side only.** Include it on a host or on the host kind. Included on a user, it does nothing, because a user cannot grant itself access to a host.
+
+```nix
+# igloo accepts all of its users
+den.aspects.igloo.includes = [ den.batteries.user-aspects ];
+
+# igloo accepts tux only
+den.aspects.igloo.includes = [
+  (den.batteries.user-aspects { users = [ "tux" ]; })
+];
+
+# every host accepts all of its users
+den.schema.host.includes = [ den.batteries.user-aspects ];
+```
+
+When several includes apply to one host, the host accepts every user any of them names. The bare form accepts all users.
+
+<Aside type="caution" title="User host-class content still reaches hosts">
+In this release a user's `nixos`, `darwin` and `os` content still reaches every
+host the user lives on, whether or not the host includes `user-aspects`
+([#694](https://github.com/denful/den/issues/694)). The next release keeps
+that content with the user unless the host accepts it. Include `user-aspects`
+on the hosts that rely on it, so they keep working after that change.
+</Aside>
+
+<Aside title="Source" icon="github">
+[`modules/aspects/batteries/user-aspects.nix`](https://github.com/denful/den/blob/main/modules/aspects/batteries/user-aspects.nix)
 </Aside>
 
 ### `den.batteries.tty-autologin`
@@ -411,6 +457,44 @@ den.default.includes = [ den.batteries.self' ];
 </Aside>
 
 ---
+
+## Battery identity and excludes
+
+A battery that takes arguments (`unfree`, `insecure`, `user-aspects`,
+`tty-autologin`, `vm-autologin`, `import-tree`) gives each use an identity
+under the battery's own, `den/batteries/<name>`. That identity decides when
+two uses are one, and what an exclude reaches.
+
+**Exclude the battery, or one use of it.** Excluding the battery removes every
+use the exclude reaches; excluding one use removes that one only:
+
+```nix
+den.aspects.igloo.includes = [
+  (den.batteries.unfree [ "z1" ])
+  (den.batteries.unfree [ "z2" ])
+];
+den.aspects.igloo.excludes = [ den.batteries.unfree ];             # removes both
+den.aspects.igloo.excludes = [ (den.batteries.unfree [ "z1" ]) ];  # removes z1, keeps z2
+```
+
+An exclude follows the aspect it is written on (#613's tree position), as any
+aspect exclude does: a host's `excludes` doesn't reach what its users include.
+Exclude a user's battery on that user.
+
+**Argument sets are sets.** `unfree`, `insecure` and `user-aspects` name a
+use by its sorted, deduplicated argument list, so the order of names doesn't
+matter and the same set used twice applies once. Distinct sets stay distinct,
+whatever they contain: `user-aspects { users = [ "all" ]; }` is not the bare
+battery, and `[ "a,b" ]` is not `[ "a" "b" ]`.
+
+**An `import-tree` root is its whole path.** Two roots that share a last
+directory name (`./a/disko` and `./b/disko`) are two uses, and so are two
+`import-tree.provides.host` roots for one host. One root included twice is
+one use. A root is identified by its store path, so a path literal (`./dir`,
+copied as part of the flake) and an interpolated string (`"${./dir}"`, copied
+as its own store object) are two roots: written both ways, the same files
+are imported twice. Write each root one way. Messages show a root without its
+store hash, for example `source/hosts/igloo`.
 
 ## Usage Patterns
 

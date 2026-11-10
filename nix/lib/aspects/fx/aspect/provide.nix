@@ -13,18 +13,45 @@ let
   inherit (den.lib.aspects) isParametricWrapper;
   inherit (den.lib.schemaUtil) schemaEntityKinds schemaEntityKindsSet;
 
+  # The user → host half of a cross-entity provide, delivered by the
+  # mutual-provider battery: the provided aspect's host-class output, resolved
+  # at the user's ctx, crosses to the host when that host accepts it (its key
+  # is in ctx; the key carries the host's id_hash, so a guest nested under an
+  # accepting host does not inherit the acceptance). Its other classes stay
+  # local through the include.
+  hostDelivery =
+    ctx: host: user: result:
+    lib.optional
+      (host ? class && (ctx.home or null) == null && ctx ? ${den.lib.acceptance.mutualProviderKey host})
+      (
+        policy.provide {
+          class = host.class;
+          module = _: den.lib.aspects.resolve host.class (den.lib.acceptance.atCtx ctx result);
+          receiver = host;
+          __deliverAfterFlip = true;
+        }
+      );
+
   mkCrossPolicy =
     nodeIdentity: provides: key:
     let
       value = provides.${key};
       policyFn =
-        if key == "to-hosts" || key == "to-users" then
+        if key == "to-users" then
           (
             { host, user, ... }:
             let
               result = applyProvide value { inherit host user; };
             in
             [ (policy.include result) ]
+          )
+        else if key == "to-hosts" then
+          (
+            { host, user, ... }@ctx:
+            let
+              result = applyProvide value { inherit host user; };
+            in
+            [ (policy.include result) ] ++ hostDelivery ctx host user result
           )
         else
           (
@@ -40,15 +67,16 @@ let
               user ? null,
               home ? null,
               ...
-            }:
+            }@ctx:
             let
               result = applyProvide value { inherit host user; };
               atDeliverableScope = user != null || home != null;
               matches = (host != null && host.name == key) || (user != null && user.name == key);
+              toHost = host != null && user != null && host.name == key;
             in
-            lib.optionals (atDeliverableScope && matches) [
-              (policy.include result)
-            ]
+            lib.optionals (atDeliverableScope && matches) (
+              [ (policy.include result) ] ++ lib.optionals toHost (hostDelivery ctx host user result)
+            )
           );
     in
     fx.send "register-aspect-policy" {

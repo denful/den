@@ -13,10 +13,11 @@ let
   '';
 
   __functor = _self: allowed-names: {
-    name = "unfree(${builtins.concatStringsSep "," allowed-names})";
+    name = "unfree(${den.lib.argsName.setOf allowed-names})";
     meta.aspect-chain = [
       "den"
-      "provides"
+      "batteries"
+      "unfree"
     ];
     __fn =
       {
@@ -53,7 +54,7 @@ let
               includes = [
                 {
                   __isPolicy = true;
-                  name = "unfree-host(${builtins.concatStringsSep "," allowed-names})";
+                  name = "unfree-host(${den.lib.argsName.setOf allowed-names})";
                   fn =
                     { host, ... }:
                     [
@@ -61,7 +62,7 @@ let
                         class = host.class;
                         # Keyed, so the same list from several users lands once.
                         module = {
-                          key = "den/unfree-host/${builtins.concatStringsSep "," allowed-names}";
+                          key = "den/unfree-host/${den.lib.argsName.setOf allowed-names}";
                           unfree.packages = allowed-names;
                         };
                         receiver = host;
@@ -80,7 +81,13 @@ let
   };
 in
 {
+  # Named, so `excludes = [ den.batteries.unfree ]` reaches every instance.
   den.batteries.unfree = {
+    name = "unfree";
+    meta.aspect-chain = [
+      "den"
+      "batteries"
+    ];
     inherit description __functor;
   };
 }

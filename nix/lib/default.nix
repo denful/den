@@ -18,6 +18,8 @@ let
         ;
     };
   den-lib = builtins.mapAttrs (_: load) {
+    acceptance = ./acceptance.nix;
+    argsName = ./args-name.nix;
     aspects = ./aspects;
     canTake = ./can-take.nix;
     __findFile = ./den-brackets.nix;
