@@ -7,7 +7,7 @@
 }:
 let
   inherit (den.lib) fx;
-  inherit (den.lib.aspects.fx) identity;
+  inherit (den.lib.aspects.fx) identity argClass;
   inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList unwrapContentValuesAll;
   inherit (den.lib.schemaUtil) schemaEntityKindsSet;
 
@@ -55,6 +55,68 @@ let
     else
       "/{" + lib.concatStringsSep "," (map (a: "${a}=${ctx.${a}.name or "?"}") args) + "}";
 
+  schema = den.schema or { };
+
+  # The contexts a class module emits under at a scope. A module requiring an
+  # entity kind that is a strict DESCENDANT of the scope's kind, and absent from
+  # ctx (a host-scope `nixos = { user, ... }:`), emits once per instance of that
+  # kind, bound in ctx; with no instance it emits nothing. Only that module
+  # fans: the aspect's other content stays at the scope (#629). Kinds fan
+  # shallowest first, so a transitive descendant enumerates off its bound
+  # parent; one whose parent is not reachable stays missing, and the module
+  # stays unsatisfied, as before. `fan` lists the kinds bound for this context.
+  fanKinds =
+    { ctx, scopeKind }:
+    module:
+    let
+      args = if builtins.isFunction module then builtins.functionArgs module else { };
+    in
+    builtins.filter (
+      a:
+      !args.${a}
+      && schemaEntityKindsSet ? ${a}
+      && !(ctx ? ${a})
+      && argClass.isDescendantOf schema scopeKind a
+    ) (builtins.attrNames args);
+
+  fanContexts =
+    { ctx, scopeKind }:
+    module:
+    let
+      missing = fanKinds { inherit ctx scopeKind; } module;
+      expand =
+        acc: kinds:
+        let
+          fanable = builtins.filter (k: acc.ctx ? ${argClass.parentKindOf schema scopeKind k}) kinds;
+          k = builtins.head fanable;
+          parent = acc.ctx.${argClass.parentKindOf schema scopeKind k};
+        in
+        if fanable == [ ] then
+          [ acc ]
+        else
+          builtins.concatMap (
+            child:
+            expand {
+              ctx = acc.ctx // {
+                ${k} = child;
+              };
+              fan = acc.fan ++ [ { inherit k child; } ];
+            } (builtins.filter (x: x != k) kinds)
+          ) (argClass.childrenOf parent k);
+    in
+    if missing == [ ] then
+      [
+        {
+          inherit ctx;
+          fan = [ ];
+        }
+      ]
+    else
+      expand {
+        inherit ctx;
+        fan = [ ];
+      } missing;
+
   emitClassEntry =
     {
       class,
@@ -85,33 +147,74 @@ let
     );
 
   emitClassKey =
-    aspect: ctx: aspectPolicy: globalPolicy: contextDep: nodeIdentity: k:
+    aspect: ctx: fanCtx: aspectPolicy: globalPolicy: contextDep: nodeIdentity: k:
     let
-      modules = unwrapContentValuesList aspect.${k};
+      # Several definitions of a key are merged into one module, which would
+      # hide a definition naming a kind an ancestor scope fans: it could not
+      # fan here, and its per-instance copies would share one key. When one
+      # does, each emits on its own, at the fanning scope and at the kind's own
+      # scope alike, so a fanned copy and the descendant's own copy are keyed
+      # alike.
+      defs = unwrapContentValuesAll aspect.${k};
+      hasParentKind = kind: builtins.length (argClass.ancestorChain schema kind) > 1;
+      namesEntity =
+        m:
+        builtins.any hasParentKind (namedEntityArgs ctx m)
+        ||
+          fanKinds {
+            inherit ctx;
+            inherit (fanCtx) scopeKind;
+          } m != [ ];
+      modules =
+        if builtins.length defs > 1 && builtins.any namesEntity defs then
+          defs
+        else
+          unwrapContentValuesList aspect.${k};
       isMulti = builtins.length modules > 1;
       mkEntry =
         idx: module:
         let
-          entityArgs = namedEntityArgs ctx module;
-          baseId = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
+          mkFanEntry =
+            fc:
+            let
+              entityArgs = namedEntityArgs fc.ctx module;
+              baseIdFor = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
+              # A fanned copy of content a descendant kind also includes is
+              # marked as bind.nix marks a fanned aspect (#694 §11a R6).
+              shared = lib.findFirst (b: fanCtx.sharedWith b.k && b.child ? id_hash) null (
+                lib.reverseList fc.fan
+              );
+            in
+            emitClassEntry {
+              class = k;
+              identity = baseIdFor + entityIdSuffix fc.ctx entityArgs;
+              inherit
+                module
+                aspectPolicy
+                globalPolicy
+                ;
+              inherit (fc) ctx;
+              # Content naming an entity kind is per-instance ⇒ keep the {…} suffix
+              # through identity computation (wrap-classes.nix finalIdentity).
+              isContextDependent = contextDep || entityArgs != [ ];
+              sharedFanOutFor =
+                if shared != null then
+                  "${fanCtx.hostIdHash}>${shared.child.id_hash}"
+                else
+                  aspect.meta.__sharedFanOutFor or null;
+              # An anonymous aspect's definition position, a stable key the
+              # transition warning reads (#694 F2); its walk identity is not.
+              defPos = if aspect.__walkStamped or false then builtins.unsafeGetAttrPos k aspect else null;
+            };
         in
-        emitClassEntry {
-          class = k;
-          identity = baseId + entityIdSuffix ctx entityArgs;
-          inherit
-            module
-            ctx
-            aspectPolicy
-            globalPolicy
-            ;
-          # Content naming an entity kind is per-instance ⇒ keep the {…} suffix
-          # through identity computation (wrap-classes.nix finalIdentity).
-          isContextDependent = contextDep || entityArgs != [ ];
-          sharedFanOutFor = aspect.meta.__sharedFanOutFor or null;
-          # An anonymous aspect's definition position, a stable key the
-          # transition warning reads (#694 F2); its walk identity is not.
-          defPos = if aspect.__walkStamped or false then builtins.unsafeGetAttrPos k aspect else null;
-        };
+        fx.seq (
+          map mkFanEntry (
+            fanContexts {
+              inherit ctx;
+              inherit (fanCtx) scopeKind;
+            } module
+          )
+        );
     in
     fx.seq (lib.imap0 mkEntry modules);
 
@@ -170,10 +273,28 @@ in
         aspectPolicy = aspect.meta.collisionPolicy or null;
         globalPolicy = den.config.classModuleCollisionPolicy or "error";
         contextDep = isContextDep aspect ctx;
+        # What fanContexts needs from the scope: its entity kind, and whether
+        # this aspect's schema-include root is also included by a kind (as
+        # bind.nix's sharedWithDescendant reads it).
+        scopeChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
+        includeRoot = if builtins.length scopeChain >= 2 then builtins.elemAt scopeChain 1 else null;
+        fanCtx = {
+          # The scope's own host, as bind.nix reads it (availRecords.host).
+          hostIdHash = (scopeCtx.host or { }).id_hash or "";
+          scopeKind =
+            if currentScope == null then
+              null
+            else
+              ((state.scopeEntityKind or (_: { })) null).${currentScope} or null;
+          sharedWith =
+            kind:
+            includeRoot != null
+            && builtins.any (inc: identity.key inc == includeRoot) ((schema.${kind} or { }).includes or [ ]);
+        };
       in
       {
         resume = fx.seq (
-          (map (emitClassKey aspect ctx aspectPolicy globalPolicy contextDep nodeIdentity) classKeys)
+          (map (emitClassKey aspect ctx fanCtx aspectPolicy globalPolicy contextDep nodeIdentity) classKeys)
           ++ (map (emitPipeKey aspect ctx contextDep nodeIdentity) pipeKeys)
         );
         inherit state;

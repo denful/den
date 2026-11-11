@@ -627,7 +627,17 @@ let
     own ++ nested;
 
   # A `den.default`-tagged module — root content shared across the entity chain.
-  isDenDefaultModule = mod: lib.hasSuffix "@default" (mod.key or mod._file or "");
+  # One definition of a `den.default` key defined more than once carries an
+  # index (`@default[1]`, then any {ctx} suffix).
+  isDenDefaultModule =
+    mod:
+    let
+      k = mod.key or mod._file or "";
+      inherit (den.lib.aspects.fx.identity) stripCtxSuffix stripDefIndex;
+      base = stripCtxSuffix k;
+    in
+    lib.hasSuffix "@default" k
+    || (stripDefIndex base != base && lib.hasSuffix "@default" (stripDefIndex base));
 
   # A root-scope module that a descendant-arg fan-out bound to ONE entity
   # belongs to that entity alone. handlers/bind.nix emits every fan instance at
