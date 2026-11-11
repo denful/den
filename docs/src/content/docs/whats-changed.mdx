@@ -26,7 +26,7 @@ You don't have to upgrade one release at a time. Most old forms still work throu
 | [0.14–0.16](#014--016-2026-03--04) | 2026-03 – 04 | Zero dependencies. `entity.aspect` is a reference. `hasAspect`. |
 | [0.17–0.18](#017--018-2026-05--06) | 2026-05 – 06 | Effects core, **policies** (relations between entities become rules) and **entity identity**. Quirks. `den.ctx` splits into `den.schema` plus `den.policies`. `den.batteries`. Scoped context. |
 | [0.19](#019-2026-09) | 2026-09 | Stabilisation: silent drops fixed. |
-| [next](#next) | | A user's aspects stop leaking into hosts. Hosts choose what they receive. |
+| [0.20](#020-2026-11) | 2026-11 | A user's aspects stop leaking into hosts. Hosts choose what they receive. |
 
 ## 0.1 (2025-10)
 
@@ -140,11 +140,11 @@ Forward classes (`den._.forward`) also arrived, which deliver one class's settin
 
 A stabilisation release. Many cases where a definition was silently dropped were fixed: nested aspect keys defined across files, conflicting entity definitions, and homes of the same name on different hosts. If something you defined was mysteriously missing before, 0.19 is worth a try.
 
-## next
+## 0.20 (2026-11)
 
-**A user's aspects stop leaking into hosts.** Today, a user aspect's `nixos`, `darwin` or `os` settings reach every host that user is on. After this change they stay with the user, and cross only through a channel that names its target, or because the host accepts them. Until 2027-01-01 the old behaviour stays on by default, and den warns about each host that depends on it. The [announcement](https://github.com/denful/den/discussions/750) lists what to do with each warning.
+**A user's aspects stop leaking into hosts.** Before 0.20, a user aspect's `nixos`, `darwin` or `os` settings reached every host that user was on. From 2027-01-01 they stay with the user, and cross only through a channel that names its target, or because the host accepts them. Until then the old behaviour stays on by default, and den warns about each host that depends on it. The [announcement](https://github.com/denful/den/discussions/750) lists what to do with each warning, and [Crossing scopes](/explanation/crossing-scopes/) explains the channels.
 
-The same release lets a host choose what it receives (`admits`), lets a policy name where its content lands (`include.at`), and makes an exclude remove exactly the rule it names.
+The same release lets a host choose what it receives (`admits`), lets a policy name where its content lands (`include.at`), and makes an exclude remove exactly the rule it names. See [Receiving content](/explanation/receiving-content/).
 
 ## Upgrading in one jump
 
