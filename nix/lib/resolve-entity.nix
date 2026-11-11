@@ -81,17 +81,33 @@ let
               den.batteries.mutual-provider
             ]
           );
+      # A parametric definition of the host's aspect is walked as its own
+      # body, one level down (types.nix ownBody); it is still the host's own.
+      markOwnBodies =
+        a:
+        if builtins.isAttrs a && a ? includes && builtins.isList a.includes then
+          a
+          // {
+            includes = map (
+              i: if builtins.isAttrs i && i.__ownBody or false then i // { __excludesAtEntity = true; } else i
+            ) a.includes;
+          }
+        else
+          a;
       selfProvide =
         if name == "default" && den ? default then
           [ den.default ]
         else if aspectKindSet ? ${name} then
           [
             {
-              __fn = c: c.${name}.aspect or { };
+              __fn = c: (if name == "host" then markOwnBodies else lib.id) (c.${name}.aspect or { });
               __args = {
                 ${name} = false;
               };
               name = "<self:${name}>";
+              # The host's own aspect is the host: its excludes reach as far as
+              # the host's own (children.nix ownerChainOverride).
+              __excludesAtEntity = name == "host";
               meta = { };
               includes = [ ];
             }

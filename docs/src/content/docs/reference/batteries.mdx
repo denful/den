@@ -469,9 +469,11 @@ den.aspects.igloo.excludes = [ den.batteries.unfree ];             # removes bot
 den.aspects.igloo.excludes = [ (den.batteries.unfree [ "z1" ]) ];  # removes z1, keeps z2
 ```
 
-An exclude follows the aspect it is written on (#613's tree position), as any
-aspect exclude does: a host's `excludes` doesn't reach what its users include.
-Exclude a user's battery on that user.
+An exclude follows the aspect it is written on, as any aspect exclude does.
+The host's own aspect (`den.aspects.igloo`) is the host, so its `excludes` reach
+what its users include too, as `den.hosts.<system>.igloo.excludes` does. An
+aspect the host only includes keeps the reach of its own subtree. To exclude a
+battery from one user, exclude it on that user.
 
 **Argument sets are sets.** `unfree`, `insecure` and `user-aspects` name a
 use by its sorted, deduplicated argument list, so the order of names doesn't

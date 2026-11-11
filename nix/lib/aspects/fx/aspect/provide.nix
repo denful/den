@@ -59,6 +59,27 @@ let
         }
       );
 
+  # A host's provide to a user is delivered at the user's policy dispatch,
+  # after the user's includes are gated, so an exclude it carries could reach
+  # nothing (den v1 exclude timing). It is refused rather than ignored.
+  refuseExcludes =
+    where: ctx: result:
+    let
+      excludesIn =
+        r:
+        if !builtins.isAttrs r then
+          [ ]
+        else
+          (r.excludes or [ ])
+          ++ builtins.concatMap (
+            i: if builtins.isAttrs i && i.__ownBody or false then excludesIn (applyProvide i ctx) else [ ]
+          ) (lib.flatten (r.includes or [ ]));
+    in
+    if lib.flatten (excludesIn result) == [ ] then
+      result
+    else
+      throw "den: `${where}` sets `excludes`, which a host's provide to a user can't apply: it is delivered after the user's own includes are resolved. Exclude on the user (`den.aspects.<user>.excludes`), or on the host (`den.aspects.<host>.excludes`, which reaches the host's users too).";
+
   mkCrossPolicy =
     nodeIdentity: provides: key:
     let
@@ -70,7 +91,9 @@ let
           (
             { host, user, ... }:
             let
-              result = applyProvide value { inherit host user; };
+              result = refuseExcludes "${nodeIdentity}.provides.to-users" { inherit host user; } (
+                applyProvide value { inherit host user; }
+              );
             in
             [ (policy.include result) ]
           )
@@ -104,7 +127,14 @@ let
               toHost = host != null && user != null && host.name == key;
             in
             lib.optionals (atDeliverableScope && matches) (
-              [ (if toHost then providedInclude token result else policy.include result) ]
+              [
+                (
+                  if toHost then
+                    providedInclude token result
+                  else
+                    policy.include (refuseExcludes "${nodeIdentity}.provides.${key}" { inherit host user; } result)
+                )
+              ]
               ++ lib.optionals toHost (hostDelivery token ctx host user)
             )
           );
