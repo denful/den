@@ -115,7 +115,8 @@ let
   # Strips context suffix (/{ctxId}) but preserves full provider path.
   # "postgres" → "postgres", "provider/postgres" → "provider/postgres"
   # "postgres/{host=igloo}" → "postgres"
-  baseIdentityFromEntry = id: den.lib.aspects.fx.identity.stripCtxSuffix id;
+  baseIdentityFromEntry =
+    id: den.lib.aspects.fx.identity.stripDefIndex (den.lib.aspects.fx.identity.stripCtxSuffix id);
 
   # Apply per-aspect pipe overrides from __pipeTargeted.
   # Matches on full identity pathkey, not just leaf name.

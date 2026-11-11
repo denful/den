@@ -36,6 +36,15 @@ let
   # Strip the {ctxId} suffix from an identity, yielding the base identity.
   stripCtxSuffix = id: lib.head (lib.splitString "/{" id);
 
+  # Strip a definition index (`X[2]`, one module of a class key defined more
+  # than once) from a base identity, yielding the aspect's own.
+  stripDefIndex =
+    id:
+    let
+      m = builtins.match "(.*)\\[[0-9]+]" id;
+    in
+    if m == null then id else builtins.head m;
+
   # The entity bindings a ctx-qualified identity carries, as { kind = name; }.
   # handlers/bind.nix fans a descendant-arg aspect by appending `@<kind>=<name>`
   # per bound child and emits EVERY instance at the same scope, so the {ctxId}
@@ -152,6 +161,7 @@ in
     baseKey
     isAnonIdentity
     stripCtxSuffix
+    stripDefIndex
     ctxBindings
     tombstone
     flattenPathSetByScope
