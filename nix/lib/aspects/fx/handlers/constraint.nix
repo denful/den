@@ -476,7 +476,11 @@ let
             atScope = currentScope;
             # The excluded battery's transition default, paired by value.
             defaultPolicy = param.defaultPolicy or null;
+            inherit (param) identity;
             inherit scope ownerChain;
+          }
+          // lib.optionalAttrs (param ? refDefPos) {
+            inherit (param) refDefPos;
           };
         in
         {
@@ -511,7 +515,17 @@ let
         # include nesting.
         # An exclude naming a policy record names a policy, never an aspect
         # that shares its name.
-        allEntries = builtins.filter (e: (e.rawRef or null) == null) (
+        # An exclude naming an aspect value matches the node of that identity
+        # only when it is the same definition: an aspect written elsewhere
+        # under the same name (an inline `{ name = …; }`) has its own position.
+        # Nodes below it, matched by identity prefix, are its own subtree.
+        sameDefinition =
+          e:
+          !(e ? refDefPos)
+          || aspect == null
+          || e.identity != nodeIdentity
+          || (aspect.meta.__defPos or null) == e.refDefPos;
+        allEntries = builtins.filter (e: (e.rawRef or null) == null && sameDefinition e) (
           lookupEntries (scopedConstraintsFor state) nodeIdentity
         );
         scopedEntries = filterByScope currentChain allEntries;

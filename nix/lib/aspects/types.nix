@@ -951,7 +951,7 @@ let
             default = [ ];
           };
           excludes = lib.mkOption {
-            description = "Aspects or policies to exclude from this subtree";
+            description = "Aspects or policies to exclude from this subtree; on a host's own aspect, from all of the host's content";
             type = lib.types.listOf (providerType (typeCfg // { chain = null; }));
             default = [ ];
           };

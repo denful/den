@@ -345,28 +345,44 @@ let
         // lib.optionalAttrs (builtins.isAttrs ref && ref ? __transitionDefaultPolicy) {
           defaultPolicy = ref.__transitionDefaultPolicy;
         }
+        # An aspect value names the aspect written there, not every aspect
+        # sharing its name: an inline `{ name = "tools"; … }` elsewhere is
+        # another aspect (constraint.nix sameDefinition).
+        // lib.optionalAttrs (builtins.isAttrs ref && !(ref.__isPolicy or false) && ref ? meta) {
+          refDefPos = ref.meta.__defPos or null;
+        }
       ) rawExcludes;
-      allConstraints = handleWithList ++ excludeList;
       owner = aspect.name or "<anon>";
+      send =
+        ownerChain: c:
+        fx.send "register-constraint" (
+          c // { inherit owner; } // lib.optionalAttrs (ownerChain != null) { inherit ownerChain; }
+        );
     in
-    fx.bind (ownerChainOverride aspect) (
-      ownerChain:
-      fx.bind (fx.seq (
-        map (
-          c:
-          fx.send "register-constraint" (
-            c // { inherit owner; } // lib.optionalAttrs (ownerChain != null) { inherit ownerChain; }
-          )
-        ) allConstraints
-      )) (_: registerIncludedPolicyExcludes aspect)
+    fx.bind (ownerChainOverride { excludes = false; } aspect) (
+      filterChain:
+      fx.bind (ownerChainOverride { excludes = true; } aspect) (
+        excludeChain:
+        fx.bind (fx.seq (map (send filterChain) handleWithList ++ map (send excludeChain) excludeList)) (
+          _: registerIncludedPolicyExcludes excludeChain aspect
+        )
+      )
     );
 
   # A coerced parametric body (types.nix ownBody) is walked as a child of its
   # aspect, one chain segment deeper; its constraints are the aspect's own, so
   # they register at the aspect's chain. null keeps the handler's default.
   ownerChainOverride =
+    { excludes }:
     aspect:
-    if aspect.__ownBody or false then
+    # A host's own aspect (`den.aspects.<host>`, resolve-entity.nix's
+    # self-provide, and its own parametric body) registers its excludes at the
+    # host root, as the host instance's `excludes` do: they reach all of the
+    # host's content, its users' included. Its `handleWith` keeps the
+    # aspect's reach.
+    if excludes && aspect.__excludesAtEntity or false then
+      fx.pure [ ]
+    else if aspect.__ownBody or false then
       fx.bind fx.effects.state.get (
         state:
         let
@@ -385,7 +401,7 @@ let
   # reach. A policy whose arguments this scope does not supply yet is left to
   # its dispatch.
   registerIncludedPolicyExcludes =
-    aspect:
+    ownerChain: aspect:
     let
       policies = builtins.filter isPolicy (lib.flatten (aspect.includes or [ ]));
     in
@@ -417,7 +433,14 @@ let
                 identity = identity.key e.value;
                 owner = "policy";
               }
+              // lib.optionalAttrs (ownerChain != null) { inherit ownerChain; }
               // lib.optionalAttrs (e.value.__isPolicy or false) { rawRef = e.value; }
+              # Named by the aspect written there, as excludeList names it.
+              //
+                lib.optionalAttrs (builtins.isAttrs e.value && !(e.value.__isPolicy or false) && e.value ? meta)
+                  {
+                    refDefPos = e.value.meta.__defPos or null;
+                  }
               # A battery's transition default is excluded with it, as excludeList
               # pairs it (#694, until removalDate).
               // lib.optionalAttrs (builtins.isAttrs e.value && e.value ? __transitionDefaultPolicy) {

@@ -212,7 +212,11 @@ den.lib.aspects.fx.constraints.exclude.global den.aspects.sops-nix # global
 
 `excludes` (the structural key) is the same mechanism in shorthand: each
 excluded ref registers a `subtree`-scoped exclude — and it works on policies
-by name as well as aspects.
+by name as well as aspects. A host's own aspect (`den.aspects.<host>`) reaches
+further: it is the host, so its `excludes` reach all of the host's content, its
+users' included, as `den.hosts.<system>.<host>.excludes` do. A host's
+`provides.<user>` and `provides.to-users` can't set `excludes`: they are
+delivered after the user's own includes are resolved, so den refuses them.
 
 ## Lib-level building blocks
 
