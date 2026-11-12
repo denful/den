@@ -62,25 +62,34 @@ let
 
 in
 {
-  den.batteries.user-shell = shell: {
-    inherit description;
-    # A stable origin per call (#694 §12): excluding `den.batteries.user-shell`
-    # matches every shell.
-    name = "user-shell(${shell})";
-    meta.aspect-chain = [
-      "den"
-      "batteries"
-    ];
+  den.batteries.user-shell =
+    shell:
+    let
+      # Built once per call, so every scope the include below reaches gets the
+      # same policy record. From den.default it is registered at the host scope
+      # and again at the user scope; a second record that is not `==` to the
+      # first gets its own identity and delivers the shell again (claim.nix).
+      shared = userShell shell;
+    in
+    {
+      inherit description;
+      # A stable origin per call (#694 §12): excluding `den.batteries.user-shell`
+      # matches every shell.
+      name = "user-shell(${shell})";
+      meta.aspect-chain = [
+        "den"
+        "batteries"
+      ];
 
-    includes = [
-      ({ host, user }: { name = "user-shell/${user.userName}@${host.name}"; } // userShell shell)
-      (
-        { home }:
-        {
-          name = "user-shell/${home.name}";
-          homeManager.programs.${shell}.enable = true;
-        }
-      )
-    ];
-  };
+      includes = [
+        ({ host, user }: { name = "user-shell/${user.userName}@${host.name}"; } // shared)
+        (
+          { home }:
+          {
+            name = "user-shell/${home.name}";
+            homeManager.programs.${shell}.enable = true;
+          }
+        )
+      ];
+    };
 }
