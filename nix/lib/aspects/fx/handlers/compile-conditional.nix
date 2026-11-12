@@ -152,6 +152,7 @@ let
       emitIncludes {
         __parentScopeHandlers = condNode.__scopeHandlers or null;
         __parentCtxId = condNode.__ctxId or null;
+        __parentPolicySite = condNode.__policySite or null;
       } condNode.meta.aspects
     );
 

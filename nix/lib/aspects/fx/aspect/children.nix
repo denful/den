@@ -3,6 +3,7 @@
   lib,
   den,
 }:
+{ ctxFromHandlers }:
 let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
@@ -14,7 +15,7 @@ let
   # registerConstraints's excludeList comment for why that's deferred there
   # rather than resolved here.
   inherit (import ../handlers/constraint.nix { inherit lib den; }) resolveClaim;
-  inherit (import ./claim.nix { inherit lib den; }) claimPolicyName;
+  inherit (import ./claim.nix { inherit lib den; }) claimPolicyNameAt;
 
   nameIndexed =
     state: base: idx: ctxId:
@@ -46,14 +47,53 @@ let
       comp;
 
   propagateScope =
-    parentScopeHandlers: parentCtxId: child:
+    parentScopeHandlers: parentCtxId: childSite: child:
     child
     // lib.optionalAttrs (parentScopeHandlers != null && !(child ? __scopeHandlers)) {
       __scopeHandlers = parentScopeHandlers;
     }
     // lib.optionalAttrs (parentCtxId != null && !(child ? __ctxId)) {
       __ctxId = parentCtxId;
+    }
+    // lib.optionalAttrs (childSite != null && !(child ? __policySite)) {
+      __policySite = childSite;
     };
+
+  # The include site below a parametric include: the include as written, and
+  # the include positions under it. Every copy of one include is walked from
+  # the same value, so its sites are equal under `==`, which compares a
+  # function inside a container by pointer. Not the wrapped `__fn`: a functor's
+  # is rebuilt on every walk (normalize.nix wrapFunctorChild).
+  siteAt = site: idx: if site == null then null else site // { path = site.path ++ [ idx ]; };
+  siteOf =
+    parentSite: idx: rawChild: wrapped:
+    if parentSite != null then
+      siteAt parentSite idx
+    else if wrapped ? __fn then
+      {
+        fn = rawChild;
+        path = [ ];
+      }
+    else
+      null;
+
+  entityKinds = builtins.removeAttrs (den.schema or { }) [ "conf" ];
+
+  # A policy record's site, with the entities bound where it is registered
+  # that its `fn` doesn't take as arguments: those it can only have captured,
+  # so copies made for different bindings stay apart.
+  policySiteKey =
+    site: scopeHandlers: p:
+    if site == null then
+      null
+    else
+      let
+        taken = if lib.isFunction (p.fn or null) then lib.functionArgs p.fn else { };
+        free = builtins.removeAttrs (builtins.intersectAttrs entityKinds (
+          if scopeHandlers == null then { } else scopeHandlers
+        )) (builtins.attrNames taken);
+      in
+      site // { free = lib.mapAttrs (_: e: e.id_hash or e.name or null) (ctxFromHandlers free); };
 
   dedupAndDispatch =
     child:
@@ -145,8 +185,8 @@ let
     pos != null && builtins.elem pos.file denMadeFiles;
 
   registerPolicy =
-    p:
-    claimPolicyName p.name p (
+    site: p:
+    claimPolicyNameAt site p.name p (
       ownerIdentity:
       fx.send "register-aspect-policy" {
         inherit (p) fn;
@@ -184,19 +224,32 @@ let
     {
       parentScopeHandlers,
       parentCtxId,
+      parentSite,
       skipNameAnon,
     }:
     idx: rawChild:
+    let
+      registerAt = i: p: registerPolicy (policySiteKey (siteAt parentSite i) parentScopeHandlers p) p;
+    in
     # Route policy values to register-aspect-policy instead of aspect walk.
     if isPolicy rawChild then
-      registerPolicy rawChild
+      registerAt idx rawChild
     else if builtins.isList rawChild then
       let
-        policyItems = builtins.filter isPolicy rawChild;
+        policyRegistrations = lib.concatLists (
+          lib.imap0 (i: item: lib.optional (isPolicy item) (registerAt (idx * 100 + i) item)) rawChild
+        );
         nonPolicyItems = builtins.filter (item: !isPolicy item) rawChild;
-        recurse = processInclude { inherit parentScopeHandlers parentCtxId skipNameAnon; };
+        recurse = processInclude {
+          inherit
+            parentScopeHandlers
+            parentCtxId
+            parentSite
+            skipNameAnon
+            ;
+        };
       in
-      fx.bind (fx.seq (map registerPolicy policyItems)) (
+      fx.bind (fx.seq policyRegistrations) (
         _:
         if nonPolicyItems == [ ] then
           fx.pure [ ]
@@ -206,7 +259,10 @@ let
     else
       # Existing behavior: wrap and dispatch as aspect.
       let
-        withScope = propagateScope parentScopeHandlers parentCtxId (wrapChild rawChild);
+        wrapped = wrapChild rawChild;
+        withScope = propagateScope parentScopeHandlers parentCtxId (siteOf parentSite idx rawChild
+          wrapped
+        ) wrapped;
       in
       fx.bind fx.effects.state.get (
         state:
@@ -248,6 +304,7 @@ let
     {
       __parentScopeHandlers ? null,
       __parentCtxId ? null,
+      __parentPolicySite ? null,
       __skipNameAnon ? false,
     }:
     incs:
@@ -255,6 +312,7 @@ let
       processOne = processInclude {
         parentScopeHandlers = __parentScopeHandlers;
         parentCtxId = __parentCtxId;
+        parentSite = __parentPolicySite;
         skipNameAnon = __skipNameAnon;
       };
       len = builtins.length incs;
