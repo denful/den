@@ -27,6 +27,7 @@ let
       emitCtx = {
         __parentScopeHandlers = aspect.__scopeHandlers or null;
         __parentCtxId = aspect.__ctxId or null;
+        __parentPolicySite = aspect.__policySite or null;
       };
     in
     fx.bind (emitAspectPolicies aspect) (

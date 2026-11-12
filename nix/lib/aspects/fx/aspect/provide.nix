@@ -197,7 +197,8 @@ let
     aspect: scopeHandlers: attrs:
     attrs
     // lib.optionalAttrs (scopeHandlers != null) { __parentScopeHandlers = scopeHandlers; }
-    // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; };
+    // lib.optionalAttrs (aspect ? __ctxId) { __parentCtxId = aspect.__ctxId; }
+    // lib.optionalAttrs (aspect ? __policySite) { __parentPolicySite = aspect.__policySite; };
 
   mkSelfProvideInclude =
     aspect: aspectName:

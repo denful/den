@@ -52,6 +52,7 @@ let
     "__functionArgs"
     "__scopeHandlers"
     "__ctxId"
+    "__policySite"
     "__parametricResolvedArgs"
     "__aspectChain"
     "__providesForwarded"
@@ -129,6 +130,8 @@ let
     next
     // lib.optionalAttrs (mergedScopeHandlers != { }) { __scopeHandlers = mergedScopeHandlers; }
     // lib.optionalAttrs (aspect ? __ctxId) { inherit (aspect) __ctxId; }
+    # The include site its policy records are registered at (children.nix).
+    // lib.optionalAttrs (aspect ? __policySite) { inherit (aspect) __policySite; }
     // {
       __parametricResolvedArgs =
         (aspect.__parametricResolvedArgs or [ ]) ++ builtins.attrNames (aspect.__args or { });

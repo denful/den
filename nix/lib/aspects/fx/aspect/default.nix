@@ -5,7 +5,7 @@
 }:
 { ctxFromHandlers }:
 let
-  children = import ./children.nix { inherit lib den; };
+  children = import ./children.nix { inherit lib den; } { inherit ctxFromHandlers; };
   provide = import ./provide.nix { inherit lib den; } { inherit ctxFromHandlers; };
 in
 {

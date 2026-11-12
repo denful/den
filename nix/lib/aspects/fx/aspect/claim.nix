@@ -4,17 +4,22 @@
 # registration under a taken name is displaced to a chain-qualified identity
 # instead of silently overwriting the first (O4), and the same registration
 # seen again keeps its identity (O5). `value` is what tells them apart, by
-# whole-value `==`.
+# whole-value `==`, or the include site the record was written at (children.nix
+# policySiteKey): a record built inside a parametric include is a new value in
+# every copy of that include, and every copy is the same registration.
 { lib, den }:
 let
   inherit (den.lib) fx;
   inherit (den.lib.aspects.fx) identity;
   inherit (import ../handlers/constraint.nix { inherit lib den; }) resolveClaim;
 in
-{
+rec {
   # Claim `name` for `value`, then run `k ownerIdentity`.
-  claimPolicyName =
-    name: value: k:
+  claimPolicyName = claimPolicyNameAt null;
+
+  # The same, for a record written at include `site` (null: no site).
+  claimPolicyNameAt =
+    site: name: value: k:
     fx.bind fx.effects.state.get (
       state:
       let
@@ -24,7 +29,15 @@ in
         claimRegistry = (state.policyClaimsByName or (_: { })) null;
         claimsByScope = claimRegistry.${bucketKey} or { };
         claimResult = resolveClaim scopeParentMap scope claimsByScope value;
-        inherit (claimResult) sameScopeEntries matchingClaim;
+        inherit (claimResult) sameScopeEntries;
+        # A copy of a registration already made, from the same include for the
+        # same bindings (children.nix policySiteKey).
+        siteCopy =
+          if claimResult.matchingClaim != null || site == null then
+            null
+          else
+            lib.findFirst (e: (e.site or null) == site) null sameScopeEntries;
+        matchingClaim = if siteCopy != null then siteCopy else claimResult.matchingClaim;
         parentStack = ((state.scopedIncludesChainSegments or (_: { })) null).${scope} or [ ];
         parentChainSegments = if parentStack == [ ] then [ ] else lib.last parentStack;
         # Taken before this claim is appended, so the first displaced claim
@@ -72,7 +85,11 @@ in
           in
           if names == [ ] then { } else { policyClaimsByWrapped = _: builtins.foldl' add all names; };
       in
-      if matchingClaim != null then
+      # The registration it copies already fires for these bindings; a second
+      # one would fire again, under the copy's own delivery keys.
+      if siteCopy != null then
+        fx.pure null
+      else if matchingClaim != null then
         k ownerIdentity
       else
         fx.bind (fx.effects.state.modify (
@@ -87,7 +104,7 @@ in
                 ${bucketKey} = claimsByScope // {
                   ${scope} = (claimsByScope.${scope} or [ ]) ++ [
                     {
-                      inherit value;
+                      inherit value site;
                       identity = ownerIdentity;
                       inherit scope;
                     }

@@ -30,6 +30,7 @@ let
         resume = emitIncludes {
           __parentScopeHandlers = parentScopeHandlers;
           __parentCtxId = parentCtxId;
+          __parentPolicySite = param.__parentPolicySite or null;
           __skipNameAnon = true;
         } [ rawChild ];
         inherit state;
