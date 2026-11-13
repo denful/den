@@ -291,6 +291,69 @@
       }
     );
 
+    # A revisit reports only the keys not yet recorded for its scope key.
+    test-ctx-seen-reports-new-keys = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        handlers = den.lib.aspects.fx.handlers;
+        visit =
+          aspects:
+          fx.send "ctx-seen" {
+            key = "user";
+            inherit aspects;
+          };
+        comp = fx.bind (visit [ "a" ]) (
+          _:
+          fx.bind
+            (visit [
+              "a"
+              "policy"
+            ])
+            (
+              second:
+              fx.bind
+                (visit [
+                  "a"
+                  "b"
+                  "policy"
+                ])
+                (
+                  third:
+                  fx.bind
+                    (visit [
+                      "a"
+                      "b"
+                      "policy"
+                    ])
+                    (
+                      fourth:
+                      fx.pure [
+                        second.newAspectIds
+                        third.newAspectIds
+                        fourth.newAspectIds
+                      ]
+                    )
+                )
+            )
+        );
+        result = fx.handle {
+          handlers = handlers.ctxSeenHandler;
+          state = {
+            seen = _: { };
+          };
+        } comp;
+      in
+      {
+        expr = result.value;
+        expected = [
+          [ "policy" ]
+          [ "b" ]
+          [ ]
+        ];
+      }
+    );
+
     # --- emit-class / classCollectorHandler tests ---
 
     # classCollectorHandler collects matching class, skips others.
