@@ -291,6 +291,53 @@
       }
     );
 
+    # A revisit whose new keys have no value (a policy or schema include key)
+    # records them and supplements only the new values.
+    test-ctx-seen-new-key-without-value = denTest (
+      { den, ... }:
+      let
+        fx = den.lib.fx;
+        handlers = den.lib.aspects.fx.handlers;
+        visit =
+          aspects: aspectValues:
+          fx.send "ctx-seen" {
+            key = "user";
+            inherit aspects aspectValues;
+          };
+        comp = fx.bind (visit [ "a" ] [ "va" ]) (
+          _:
+          fx.bind (visit [ "a" "policy" ] [ "va" ]) (
+            second:
+            fx.bind (visit [ "a" "b" "policy" ] [ "va" "vb" ]) (
+              third:
+              fx.bind (visit [ "a" "b" "policy" ] [ "va" "vb" ]) (
+                fourth:
+                fx.pure [
+                  second.newAspectValues
+                  third.newAspectValues
+                  fourth.newAspectValues
+                ]
+              )
+            )
+          )
+        );
+        result = fx.handle {
+          handlers = handlers.ctxSeenHandler;
+          state = {
+            seen = _: { };
+          };
+        } comp;
+      in
+      {
+        expr = result.value;
+        expected = [
+          [ ]
+          [ "vb" ]
+          [ ]
+        ];
+      }
+    );
+
     # --- emit-class / classCollectorHandler tests ---
 
     # classCollectorHandler collects matching class, skips others.

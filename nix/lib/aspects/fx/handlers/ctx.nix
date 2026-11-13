@@ -40,7 +40,11 @@ let
           lib.genList lib.id (builtins.length aspects)
         );
         newAspectIds = map (i: builtins.elemAt aspects i) newIndices;
-        newAspectValues = map (i: builtins.elemAt aspectValues i) newIndices;
+        # `aspects` may run past `aspectValues`: policy and schema include keys
+        # are recorded as seen but carry no value to supplement.
+        newAspectValues = map (i: builtins.elemAt aspectValues i) (
+          lib.filter (i: i < builtins.length aspectValues) newIndices
+        );
       in
       {
         resume = { inherit isFirst newAspectValues; };
