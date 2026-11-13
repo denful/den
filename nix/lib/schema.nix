@@ -104,6 +104,8 @@ base
           + den.lib.schema.mkInstanceType { … } den.schema.${a.kind or "<kind>"}
       '' (opts: mkInstanceTypeFor opts a);
   mkSchemaOption = withLib base.mkSchemaOption;
+  mkInstanceRegistry =
+    opts: kindValue: withLib base.mkInstanceRegistry (withResolved opts kindValue) kindValue;
 
   # `den.schema.<kind>.imports = [ den.lib.strict ]` (deprecated) lands `isStrict` on every
   # instance, which a closed kind would refuse.
