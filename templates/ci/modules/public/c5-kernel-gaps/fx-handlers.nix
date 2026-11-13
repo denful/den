@@ -291,35 +291,51 @@
       }
     );
 
-    # A revisit whose new keys have no value (a policy or schema include key)
-    # records them and supplements only the new values.
-    test-ctx-seen-new-key-without-value = denTest (
+    # A revisit reports only the keys not yet recorded for its scope key.
+    test-ctx-seen-reports-new-keys = denTest (
       { den, ... }:
       let
         fx = den.lib.fx;
         handlers = den.lib.aspects.fx.handlers;
         visit =
-          aspects: aspectValues:
+          aspects:
           fx.send "ctx-seen" {
             key = "user";
-            inherit aspects aspectValues;
+            inherit aspects;
           };
-        comp = fx.bind (visit [ "a" ] [ "va" ]) (
+        comp = fx.bind (visit [ "a" ]) (
           _:
-          fx.bind (visit [ "a" "policy" ] [ "va" ]) (
-            second:
-            fx.bind (visit [ "a" "b" "policy" ] [ "va" "vb" ]) (
-              third:
-              fx.bind (visit [ "a" "b" "policy" ] [ "va" "vb" ]) (
-                fourth:
-                fx.pure [
-                  second.newAspectValues
-                  third.newAspectValues
-                  fourth.newAspectValues
-                ]
-              )
+          fx.bind
+            (visit [
+              "a"
+              "policy"
+            ])
+            (
+              second:
+              fx.bind
+                (visit [
+                  "a"
+                  "b"
+                  "policy"
+                ])
+                (
+                  third:
+                  fx.bind
+                    (visit [
+                      "a"
+                      "b"
+                      "policy"
+                    ])
+                    (
+                      fourth:
+                      fx.pure [
+                        second.newAspectIds
+                        third.newAspectIds
+                        fourth.newAspectIds
+                      ]
+                    )
+                )
             )
-          )
         );
         result = fx.handle {
           handlers = handlers.ctxSeenHandler;
@@ -331,8 +347,8 @@
       {
         expr = result.value;
         expected = [
-          [ ]
-          [ "vb" ]
+          [ "policy" ]
+          [ "b" ]
           [ ]
         ];
       }

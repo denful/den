@@ -292,10 +292,14 @@ let
       (fx.send "ctx-seen" {
         key = ctxKey;
         aspects = policyAspectPaths;
-        aspectValues = includeAspects;
       })
       (
-        { isFirst, newAspectValues }:
+        { isFirst, newAspectIds }:
+        let
+          newIdSet = lib.genAttrs newAspectIds (_: true);
+          # Policy and schema includes are recorded as seen but never supplemented.
+          newAspectValues = builtins.filter (a: newIdSet ? ${identity.key a}) includeAspects;
+        in
         if isFirst then
           fx.bind (fx.send "resolve-schema-entity" {
             inherit
