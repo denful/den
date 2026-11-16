@@ -127,6 +127,12 @@ let
       missingDenArgNames = builtins.filter (k: builtins.elem k schemaKinds && !(allArgs.${k} or false)) (
         builtins.filter (k: !(ctx ? ${k})) argNames
       );
+      # An optional context arg with no context here takes its default; it is
+      # den's to supply, so it is never advertised to the module system, which
+      # would look it up in `_module.args`.
+      absentOptionalDenArgNames = builtins.filter (
+        k: builtins.elem k schemaKinds && allArgs.${k} && !(ctx ? ${k})
+      ) argNames;
       warnedModule = builtins.foldl' (
         mod: k: lib.warn "den: class module requests '${k}' but no ${k} context is available" mod
       ) module missingDenArgNames;
@@ -146,7 +152,7 @@ let
     else
       let
         denArgs = lib.genAttrs denArgNames (k: ctx.${k});
-        remainingArgs = removeAttrs allArgs denArgNames;
+        remainingArgs = removeAttrs allArgs (denArgNames ++ absentOptionalDenArgNames);
 
         # Detect pipe args containing config thunk markers (__configThunk).
         # These are resolved inside the module wrapper using the evalModules
