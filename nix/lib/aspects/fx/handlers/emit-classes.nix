@@ -7,7 +7,7 @@
 }:
 let
   inherit (den.lib) fx;
-  inherit (den.lib.aspects.fx) identity argClass;
+  inherit (den.lib.aspects.fx) argClass;
   inherit (den.lib.aspects.fx.contentUtil) unwrapContentValuesList unwrapContentValuesAll;
   inherit (den.lib.schemaUtil) schemaEntityKindsSet;
 
@@ -179,11 +179,6 @@ let
             let
               entityArgs = namedEntityArgs fc.ctx module;
               baseIdFor = if isMulti then "${nodeIdentity}[${toString idx}]" else nodeIdentity;
-              # A fanned copy of content a descendant kind also includes is
-              # marked as bind.nix marks a fanned aspect (#694 §11a R6).
-              shared = lib.findFirst (b: fanCtx.sharedWith b.k && b.child ? id_hash) null (
-                lib.reverseList fc.fan
-              );
             in
             emitClassEntry {
               class = k;
@@ -197,11 +192,11 @@ let
               # Content naming an entity kind is per-instance ⇒ keep the {…} suffix
               # through identity computation (wrap-classes.nix finalIdentity).
               isContextDependent = contextDep || entityArgs != [ ];
-              sharedFanOutFor =
-                if shared != null then
-                  "${fanCtx.hostIdHash}>${shared.child.id_hash}"
-                else
-                  aspect.meta.__sharedFanOutFor or null;
+              # Not marked as a shared fan-out when it fans per user here: it
+              # carries the same key as the user's own copy, so the module system
+              # applies the two once, and the R6 drop (#694 §11a), which matches
+              # by key, would remove both.
+              sharedFanOutFor = aspect.meta.__sharedFanOutFor or null;
               # An anonymous aspect's definition position, a stable key the
               # transition warning reads (#694 F2); its walk identity is not.
               defPos = if aspect.__walkStamped or false then builtins.unsafeGetAttrPos k aspect else null;
@@ -273,23 +268,13 @@ in
         aspectPolicy = aspect.meta.collisionPolicy or null;
         globalPolicy = den.config.classModuleCollisionPolicy or "error";
         contextDep = isContextDep aspect ctx;
-        # What fanContexts needs from the scope: its entity kind, and whether
-        # this aspect's schema-include root is also included by a kind (as
-        # bind.nix's sharedWithDescendant reads it).
-        scopeChain = ((state.scopedIncludesChain or (_: { })) null).${currentScope} or [ ];
-        includeRoot = if builtins.length scopeChain >= 2 then builtins.elemAt scopeChain 1 else null;
+        # What fanContexts needs from the scope: its entity kind.
         fanCtx = {
-          # The scope's own host, as bind.nix reads it (availRecords.host).
-          hostIdHash = (scopeCtx.host or { }).id_hash or "";
           scopeKind =
             if currentScope == null then
               null
             else
               ((state.scopeEntityKind or (_: { })) null).${currentScope} or null;
-          sharedWith =
-            kind:
-            includeRoot != null
-            && builtins.any (inc: identity.key inc == includeRoot) ((schema.${kind} or { }).includes or [ ]);
         };
       in
       {
