@@ -113,8 +113,8 @@ The user aspect:
 ```nix
 { lib, den, ... }:
 {
-  den.default.nixos.system.stateVersion = "25.11";
-  den.default.homeManager.home.stateVersion = "25.11";
+  den.default.nixos.system.stateVersion = lib.mkDefault "25.11";
+  den.default.homeManager.home.stateVersion = lib.mkDefault "25.11";
 
   # enable hm by default
   den.schema.user.classes = lib.mkDefault [ "homeManager" ];
@@ -129,8 +129,10 @@ The user aspect:
 }
 ```
 
-`den.default` applies an aspect to **all** hosts, users, and homes — the right
-place for `stateVersion` and other global settings. `den.schema.user.classes`
+`den.default` applies an aspect to **all** hosts, users, and homes, the place
+for global settings. The template sets `stateVersion` there with `lib.mkDefault`
+so a host can still pin its own; see
+[`stateVersion`: fleet-wide or per host](/guides/configure-aspects#stateversion-fleet-wide-or-per-host). `den.schema.user.classes`
 sets the default output class for users (here, `homeManager`), so every user
 gets a Home-Manager environment without declaring it per-user. The
 `den.aspects.igloo.nixos` block is a placeholder so the example evaluates into a
