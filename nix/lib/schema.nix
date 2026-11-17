@@ -27,7 +27,7 @@ let
   lock = builtins.fromJSON (builtins.readFile ../../templates/ci/flake.lock);
   locked = lock.nodes.gen.locked;
   genSrc = builtins.fetchTarball {
-    url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.zip";
+    url = "https://github.com/${locked.owner}/${locked.repo}/archive/${locked.rev}.tar.gz";
     sha256 = locked.narHash;
   };
   # Two entry shapes for one roster: the flake publishes `lib.mkGenLibs` (a
