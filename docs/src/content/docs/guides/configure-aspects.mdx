@@ -302,6 +302,28 @@ den.aspects.old-server.nixos.system.stateVersion = "23.11";
 Without `lib.mkDefault`, the two plain definitions conflict and evaluation
 fails with `The option 'system.stateVersion' has conflicting definition values`.
 
+#### Requiring a value per host
+
+Leaving `stateVersion` out of `den.default` does not make it required: NixOS
+gives `system.stateVersion` a default, so a host that never sets it gets the
+current release and only a "system.stateVersion is not set" warning. To make a
+missing value an error, declare it on the host and route it into the class:
+
+```nix
+den.schema.host = { lib, ... }: {
+  options.stateVersion = lib.mkOption { type = lib.types.str; };
+};
+
+den.default.includes = [
+  ({ host, ... }: { nixos.system.stateVersion = host.stateVersion; })
+];
+
+den.hosts.x86_64-linux.igloo.stateVersion = "24.11";
+```
+
+A host declared without it fails to evaluate, naming the host:
+``the option `den.hosts.x86_64-linux.igloo.stateVersion' is used but not defined``.
+
 To use flake inputs inside class modules (`inputs` as a module argument, an
 input's NixOS module, home-manager `extraSpecialArgs`), see
 [Flake inputs and specialArgs](/explanation/class-modules/#flake-inputs-and-specialargs).
