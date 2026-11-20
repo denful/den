@@ -222,8 +222,8 @@ option, so `host.settings.disk.zfs.nixos` never exists and aspects without
 settings add nothing.
 
 An aspect below the root that is named like a class or quirk and declares
-settings (`services.foo.crds` with a `crds` quirk) can't be told apart from
-that quirk's data, so the generator fails with an error naming the aspect path
+settings (`services.foo.crds` with a `crds` quirk) is read by den as that
+quirk's data, so the generator fails with an error naming the aspect path
 and the quirk or class, instead of silently dropping its settings. Rename one
 of the two.
 
