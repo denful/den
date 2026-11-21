@@ -47,6 +47,14 @@ per entity.
 and per-scope path sets -- used by
 [`den.lib.capture`](/reference/diag/).
 
+### `den.lib.aspects.settingsType`
+
+The option type behind [aspect settings](/guides/aspect-settings/): a
+submodule mirroring the aspect tree, with the options each aspect declares
+under its `settings` key. Attach it to any entity schema
+(`options.settings = lib.mkOption { type = den.lib.aspects.settingsType; default = { }; }`).
+It requires `"settings"` in `den.reservedKeys`.
+
 ### Structural introspection helpers
 
 `den.lib.aspects` also exposes the building blocks behind

@@ -9,8 +9,8 @@ import { Aside, Steps } from '@astrojs/starlight/components';
 Everything on this page is built from existing Den primitives:
 [`den.reservedKeys`](/reference/aspects/#reserved-keys),
 [`den.schema`](/reference/schema/#denschema) and class modules that take
-`host`. The one helper, `settings-type.nix`, is user code: copy it into your
-flake.
+`host`. The one piece Den supplies is the option type,
+`den.lib.aspects.settingsType`; you choose which entity kinds carry it.
 </Aside>
 
 ## The problem
@@ -27,9 +27,9 @@ to use, how many worker processes a service runs. You have three bad options:
   read it, and every host that sets it has to know the NixOS option path.
 
 The settings pattern gives each aspect a typed slot. The aspect declares
-its options and reads the values. Hosts set them. One generator,
-written once, turns every aspect's declarations into a single typed option on
-the host entity:
+its options and reads the values. Hosts set them. One option type,
+`den.lib.aspects.settingsType`, turns every aspect's declarations into a single
+typed option on the host entity:
 
 ```mermaid
 flowchart LR
@@ -37,7 +37,7 @@ flowchart LR
     K["kernel.settings.variant = mkOption"]
     Z["disk.zfs.settings.device = mkOption"]
   end
-  GEN["_settings-type.nix walks the aspect tree"]
+  GEN["den.lib.aspects.settingsType walks the aspect tree"]
   T["host.settings option type"]
   V["den.hosts.x86_64-linux.igloo.settings.kernel.variant = lts"]
   R["readers: class modules, parametric aspects, policies"]
@@ -62,81 +62,9 @@ Adding a setting to an aspect never touches the host schema.
 
     Den treats a reserved key as structural. The pipeline doesn't dispatch it
     as class content or as a nested aspect, and the value you wrote is left
-    as-is so the generator can read it back.
+    as-is so the settings type can read it back.
 
-2. **Add the generator**
-
-    Save this as a file that your module tree does not auto-import (the
-    leading underscore keeps [import-tree](https://github.com/vic/import-tree)
-    away from it):
-
-    ```nix
-    # _settings-type.nix
-    { den, lib }:
-    let
-      inherit (lib) mkOption types;
-      inherit (den.lib.aspects.fx.keyClassification) isStructuralKey;
-
-      # Inside an aspect, keys named after a registered class or quirk are that
-      # class's or quirk's data, never child aspects. This doesn't apply at the
-      # root: the keys of den.aspects are always aspect names.
-      reserved = k: (den.classes or { }) ? ${k} || (den.quirks or { }) ? ${k};
-      skipKey = isRoot: k: isStructuralKey k || (!isRoot && reserved k);
-
-      # A reserved key whose `settings` holds real option declarations is an aspect
-      # named like a class or quirk: its settings would otherwise vanish, with only a
-      # "does not exist" error at the definition.
-      hasOptions = v:
-        builtins.isAttrs v
-        && (v._type or null == "option" || lib.any hasOptions (builtins.attrValues v));
-      collides = isRoot: k: v:
-        !isRoot && reserved k && builtins.isAttrs v && hasOptions (v.settings or { });
-
-      # `settings` is either a bare attrset of options, or a module with
-      # options / config / imports.
-      reshape = raw:
-        if raw ? options || raw ? config || raw ? imports
-        then raw
-        else { options = raw; };
-
-      hasSettingsDeep = isRoot: node:
-        builtins.isAttrs node
-        && (node ? settings
-            || lib.any (k:
-                 let v = node.${k} or null; in
-                 (!(skipKey isRoot k) && hasSettingsDeep false v) || collides isRoot k v)
-                 (builtins.attrNames node));
-
-      # One submodule per aspect-tree node. A node can carry its own settings
-      # and also be the parent of aspects that do.
-      nodeModule = path: node:
-        let
-          isRoot = path == [ ];
-          own = reshape (node.settings or { });
-          children = lib.filterAttrs (k: v:
-            (!(skipKey isRoot k) && builtins.isAttrs v && hasSettingsDeep false v)
-            || collides isRoot k v) node;
-        in
-        {
-          imports = own.imports or [ ];
-          config = own.config or { };
-          options = (own.options or { }) // lib.mapAttrs (name: child:
-            if collides isRoot name child then
-              throw "den settings: aspect `${lib.concatStringsSep "." (path ++ [ name ])}` declares settings, but `${name}` is a registered ${if (den.quirks or { }) ? ${name} then "quirk" else "class"}, so den reads it as that data and its settings would be dropped. Rename the aspect or the ${if (den.quirks or { }) ? ${name} then "quirk" else "class"}."
-            else
-              mkOption {
-                type = types.submodule (nodeModule (path ++ [ name ]) child);
-                default = { };
-                description = "Settings under ${name}";
-              }) children;
-        };
-    in
-    types.submodule (nodeModule [ ] (den.aspects or { }))
-    ```
-
-3. **Attach it to the host schema**
-
-    Any module that receives the `den` module argument can build the type:
+2. **Attach the type to the host schema**
 
     ```nix
     { den, lib, ... }:
@@ -144,7 +72,7 @@ Adding a setting to an aspect never touches the host schema.
       den.schema.host.imports = [
         {
           options.settings = lib.mkOption {
-            type = import ./_settings-type.nix { inherit den lib; };
+            type = den.lib.aspects.settingsType;
             default = { };
             description = "Per-aspect typed settings";
           };
@@ -153,7 +81,10 @@ Adding a setting to an aspect never touches the host schema.
     }
     ```
 
-4. **Declare settings on an aspect**
+    The type reads each aspect's `settings` key, so it refuses to build
+    until step 1 reserves it.
+
+3. **Declare settings on an aspect**
 
     `settings` sits next to `includes` and `nixos`, and holds `lib.mkOption`
     declarations:
@@ -175,7 +106,7 @@ Adding a setting to an aspect never touches the host schema.
     };
     ```
 
-5. **Set values on the host**
+4. **Set values on the host**
 
     ```nix
     den.hosts.x86_64-linux.igloo = {
@@ -213,7 +144,7 @@ den.hosts.x86_64-linux.igloo.settings = {
 };
 ```
 
-The generator skips structural keys everywhere. Inside an aspect it also skips
+The type skips structural keys everywhere. Inside an aspect it also skips
 keys named after a registered class or quirk, because there they hold that
 class's or quirk's data; that rule doesn't apply to the top-level keys of
 `den.aspects`, which are always aspect names, so `den.quirks.my` beside
@@ -223,12 +154,21 @@ settings add nothing.
 
 An aspect below the root that is named like a class or quirk and declares
 settings (`services.foo.crds` with a `crds` quirk) is read by den as that
-quirk's data, so the generator fails with an error naming the aspect path
-and the quirk or class, instead of silently dropping its settings. Rename one
-of the two.
+quirk's data, so evaluation fails with an error naming the aspect path and the
+quirk or class, instead of silently dropping its settings. Rename one of the
+two.
 
-This generator is the definition to copy until den ships a builtin settings
-type ([#776](https://github.com/denful/den/discussions/776)).
+The type is built one aspect-tree node at a time, and it looks no deeper into
+class content than its top level. Class modules and includes can read
+`host.settings` freely without the type recursing into them.
+
+<Aside title="Migrating from a copied `_settings-type.nix`">
+Earlier versions of this guide had you copy a generator into your flake.
+`den.lib.aspects.settingsType` is that generator, with the root-level and
+collision fixes from [#776](https://github.com/denful/den/discussions/776).
+Replace `import ./_settings-type.nix { inherit den lib; }` with
+`den.lib.aspects.settingsType` and delete the file; settings paths don't change.
+</Aside>
 
 ## Reading settings
 
@@ -334,14 +274,14 @@ files with `settings.imports`.
 
 ## Settings on other entity kinds
 
-The generator doesn't depend on hosts. Attach the same type to any entity
-kind to get a mirrored namespace there. For users:
+The type doesn't depend on hosts. Attach it to any entity kind, built in or
+your own, to get the same mirrored namespace there. For users:
 
 ```nix
 den.schema.user.imports = [
   {
     options.settings = lib.mkOption {
-      type = import ./_settings-type.nix { inherit den lib; };
+      type = den.lib.aspects.settingsType;
       default = { };
     };
   }
@@ -361,6 +301,26 @@ Every entity kind gets the full tree. `user.settings.kernel` exists too, even
 though it only means something on hosts. The type describes every settings
 block, not the ones relevant to that kind.
 
+### Sharing a function between entities
+
+A setting can be a function. Declared once on an owner aspect, it gives a host
+aspect and its counterpart on another entity kind one shared definition,
+where you'd otherwise keep a `_`-prefixed helper file both import:
+
+```nix
+den.aspects.dns.settings.resolverUrl = lib.mkOption {
+  type = lib.types.functionTo lib.types.str;
+  default = name: "https://dns.${name}.lan/dns-query";
+};
+
+den.aspects.dns.nixos = { host, ... }: {
+  networking.nameservers = [ (host.settings.dns.resolverUrl host.name) ];
+};
+```
+
+Any entity whose schema carries the type reads the same default as
+`<entity>.settings.dns.resolverUrl`, and each can still override it.
+
 ## Adding a setting
 
 1. Add a `lib.mkOption` to the aspect's `settings` block, or create the block.
@@ -373,13 +333,13 @@ block, not the ones relevant to that kind.
 4. Build or evaluate an affected host. Type errors and missing required
    values show up at evaluation time with the full option path.
 
-No schema edits are needed. The generator picks up the new option.
+No schema edits are needed. The type picks up the new option.
 
 ## Caveats
 
 - **Declare settings on the static aspect attrset.** When the whole aspect is
   a function (`den.aspects.foo = { host, ... }: { settings = ...; }`), the
-  generator can't see `settings` without calling the function, so the
+  type can't see `settings` without calling the function, so the
   setting isn't discovered. Keep `settings` at the top level and make only
   the class modules or includes parametric.
 - **`settings` holds declarations, not values.** A bare `foo = "bar";`

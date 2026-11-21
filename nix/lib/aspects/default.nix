@@ -142,6 +142,7 @@ in
     mkEntityHasAspect
     mkProjectedHasAspect
     ;
+  settingsType = import ./settings-type.nix { inherit den lib; };
   mkAspectsType = typeCfg: lib.mapAttrs (_: v: v typeCfg) rawTypes;
   # Predicates exported directly (not through types mapAttrs which applies { } to each value).
   inherit (rawTypes)
