@@ -201,6 +201,52 @@ On a plain home (`tux`, no `@`) there is no `host`. A `{ host, ... }` include
 **does not fire and doesn't raise an error**. If an aspect needs the machine's
 name, declare the home as `user@host`.
 
+## Your own fields on a home
+
+A home's `host` arg never carries the home's own fields. On a plain home there
+is no `host`, and the synthetic host of an undeclared `user@host` home is only
+`{ name; system; }`. The home itself is bound as `home`, and that's where its
+schema options and freeform fields live:
+
+```nix
+den.homes.x86_64-linux.tux.isGraphical = true;
+
+den.aspects.tux.includes = [
+  ({ home, ... }: lib.optionalAttrs home.isGraphical { includes = [ den.aspects.gui ]; })
+];
+```
+
+Don't declare a placeholder host to get a richer `host`. A declared host
+builds a real `nixosConfigurations.<name>`, which then needs a real system
+config to pass `nix flake check`.
+
+To set one field on host users and standalone homes alike, declare it on
+`den.schema.conf`. The host, user and home schemas all inherit it. Then read it
+from whichever entity is in scope:
+
+```nix
+den.schema.conf.options.isGraphical = lib.mkOption {
+  type = lib.types.bool;
+  default = false;
+};
+
+den.hosts.x86_64-linux.igloo = { isGraphical = true; users.tux = { }; };
+den.homes.x86_64-linux."tux@work".isGraphical = true;
+
+den.aspects.tux.includes = [
+  # host users
+  ({ host, user, ... }: lib.optionalAttrs (host.isGraphical or false) { includes = [ den.aspects.gui ]; })
+  # standalone homes
+  ({ home, ... }: lib.optionalAttrs home.isGraphical { includes = [ den.aspects.gui ]; })
+];
+```
+
+The `or false` covers the synthetic host of an undeclared `user@host` home,
+which has no `isGraphical`. On a `user@host` home whose host *is* declared, the
+host include fires too, with the real host. It is enough for either flag to be
+set, and `gui` is still included once. To keep the field off hosts, declare it
+on `den.schema.home` instead.
+
 ## Sharing one user between a host and standalone homes
 
 A standalone home and a host user named `tux` both read `den.aspects.tux`.
