@@ -11,8 +11,12 @@ This is a step-by-step tutorial for learn-by-doing people. _It requires time_.
 However it is a **very recommended** read for all people _new_ to Den,
 as this guide introduces Den concepts from ground up.
 
-If you are a bit impatient and want to skip all this, Den provides `noflake` template that is
-basically the result of this guide. As well as several other templates with [different feature sets](/tutorials/overview).
+If you are a bit impatient and want to skip all this, Den provides a `noflake` template that ends
+where this guide does, with a few extras: users managed by nix-maid and hjem instead of
+home-manager, and `nh` commands under `den.sh`. To expose `den.sh`, its `default.nix` returns the
+whole `.config` rather than `.config.flake`, so you build it with
+`-A flake.nixosConfigurations.igloo` instead of `-A nixosConfigurations.igloo`. There are also
+several other templates with [different feature sets](/tutorials/overview).
 </Aside>
 
 <Aside>
@@ -31,6 +35,57 @@ This guide assumes you have familiarity with:
 - [`nixos-rebuild`](https://nixos.wiki/wiki/Nixos-rebuild) tool to build your OS 
 - [`npins`](https://github.com/andir/npins) tool for fetching Den and dependencies.
 </Aside>
+
+### The smallest Den
+
+Before the recommended layout, here is the smallest setup that builds your existing system with
+Den. It uses no helpers: just Den, the `<nixpkgs>` channel you already have, and your
+`configuration.nix`.
+
+```nix
+# default.nix
+let
+  den = import (builtins.fetchTarball "https://github.com/denful/den/archive/<rev>.tar.gz" + "/nix");
+  lib = import <nixpkgs/lib>;
+in
+(lib.evalModules {
+  modules = [ ./modules/den.nix ];
+  specialArgs.inputs = { inherit den; };
+}).config.flake
+```
+
+```nix
+# modules/den.nix
+{ inputs, ... }:
+{
+  imports = [ inputs.den.flakeModule ];
+  den.hosts.x86_64-linux.igloo.instantiate = import <nixpkgs/nixos/lib/eval-config.nix>;
+  den.aspects.igloo.nixos.imports = [ ../configuration.nix ];
+}
+```
+
+Your `configuration.nix`, with its `hardware-configuration.nix` import, becomes the NixOS module
+of one Den host, `igloo`. Replace `<rev>` with a Den release tag or commit, then build:
+
+```console
+nixos-rebuild build --file . -A nixosConfigurations.igloo
+```
+
+Three things here are worth knowing before the rest of the guide:
+
+- `lib.evalModules` evaluates your Den modules, and `.config.flake` is where Den places
+  `nixosConfigurations`, the same output name a flake would use.
+- `specialArgs.inputs` is how modules reach their dependencies (`inputs.den` here).
+- `instantiate` says how to build the host. By default Den calls `inputs.nixpkgs.lib.nixosSystem`,
+  which needs nixpkgs as an input; here it uses nixpkgs' own `eval-config.nix` from the channel
+  instead.
+
+The steps below grow this into the recommended layout. Each tool replaces something above:
+
+- `npins` pins Den and nixpkgs, instead of `fetchTarball` and the channel;
+- `import-tree` loads every file under `./modules`, instead of listing them;
+- `with-inputs` provides flake-style `inputs` (nixpkgs included), so the default `instantiate`
+  works and your modules work unchanged if you later move to flakes.
 
 
 ### Step 1. A `Den`-dritic layout
