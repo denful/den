@@ -8,40 +8,20 @@ on:
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event.number }}
   cancel-in-progress: true
+permissions: {}
 jobs:
   main:
     name: Check pull request title
     runs-on: ubuntu-latest
     steps:
-      - uses: amannn/action-semantic-pull-request@v5.5.2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          # Type abbreviation comments:
-          # feat -> feature
-          types: |
-            fix
-            docs
-            feat
-            test
-            perf
-            style
-            revert
-            cleanup
-            improve
-            refactor
-            breaking
-          scopes: |
-            ci
-            bug
-            lib
-            ctx
-            docs
-            core
-            repo
-            class
-            homes
-            tests
-            template
-            batteries
-            namespaces
+      # Accepts `type: description`, `type(scope): description` and a breaking `!`,
+      # with any lowercase type and any scope, e.g. `docs(standalone-home): ...`.
+      - env:
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          if printf '%s' "$TITLE" | grep -Eq '^[a-z][a-z0-9-]*(\([^()]+\))?!?: [^ ].*$'; then
+            echo "ok: $TITLE"
+          else
+            echo "::error::Pull request title must look like 'type(scope): description' or 'type: description', for example 'docs(standalone-home): show how aspects read a home's own fields'. Got: $TITLE"
+            exit 1
+          fi
