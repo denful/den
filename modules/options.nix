@@ -175,6 +175,13 @@ in
           ) val;
         identity = false;
       };
+      # Option modules for a kind's facts: what the assignment stage reads,
+      # evaluated apart from the entity (`den.<kind>s.<name>.facts`).
+      facts = {
+        default = [ ];
+        merge = acc: val: acc ++ lib.toList val;
+        identity = false;
+      };
       isEntity = {
         default = false;
         merge = acc: val: acc || val;
@@ -203,6 +210,7 @@ in
               "admits"
               "policyEnforcement"
               "folds"
+              "facts"
               "isEntity"
               "isolated"
               "isStrict"

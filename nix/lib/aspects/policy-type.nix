@@ -12,7 +12,13 @@ let
         lastDef = lib.last defs;
         raw = lastDef.value;
       in
-      if builtins.isAttrs raw && raw.__isPolicy or false then
+      if builtins.isAttrs raw && raw ? __assignUsers then
+        raw
+        // {
+          inherit name;
+          fn = raw.__namedFn name;
+        }
+      else if builtins.isAttrs raw && raw.__isPolicy or false then
         raw // { inherit name; }
       else if lib.isFunction raw then
         {

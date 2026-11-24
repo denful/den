@@ -1,6 +1,6 @@
 # Typed policy effect constructors.
 # Policies return lists of these; the pipeline dispatches on __policyEffect.
-{ lib, ... }:
+{ lib, den, ... }:
 let
   # Coerce a value into an inner policy record for use in `for` / `when`.
   # Accepts: policies (__isPolicy), effect descriptors (__policyEffect),
@@ -510,6 +510,11 @@ in
         p: if p.__isPolicy or false || builtins.isFunction p then wrapAsPolicy p else wrapAsConditional p;
     in
     if builtins.isList policiesOrSingle then map wrap policies else wrap policiesOrSingle;
+
+  # A stage-0 assignment policy: `{ host, users }: [ <user name> … ]`, run once
+  # per host before resolution. Register it under `den.policies.<name>` and
+  # include it on `den.schema.host` or a host.
+  assign = (import ./entities/assignment.nix { inherit lib den; }).mkAssign;
 
   # Create a named policy record for use in includes.
   # Usage: den.default.includes = [ (den.lib.policy.mkPolicy "host-guards" myPolicyFn) ];

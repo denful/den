@@ -17,6 +17,7 @@ let
     preprocessHosts
     ;
   userLib = import ./user.nix { inherit config lib den; };
+  assignment = import ./assignment.nix { inherit lib den; };
 
   # Entity instances are gen-schema instances: mkInstanceType injects name,
   # strict/freeform, _module.args.<kind>, and schema-owned id_hash (identity).
@@ -32,7 +33,7 @@ let
     apply =
       raw:
       let
-        normalized = preprocessHosts raw;
+        normalized = assignment.assign (preprocessHosts raw);
       in
       innerType.merge
         [ "den" "hosts" ]
@@ -87,7 +88,66 @@ let
                   userLib.compose (builtins.all userLib.isPlainEntry defs) (lib.unique (
                     lib.concatMap userLib.ownKeys defs
                   )) den.users.${n} rel
+                  // {
+                    __assignedBy = config.__assignments.${n} or [ ];
+                  }
                 );
+              };
+              facts = lib.mkOption {
+                description = "Facts the assignment stage reads; declared under `den.schema.host.facts`.";
+                type = lib.types.lazyAttrsOf lib.types.raw;
+                default = { };
+                apply =
+                  raw:
+                  assignment.evalFacts "host" {
+                    inherit (config) name system class;
+                  } raw;
+              };
+              __assignments = lib.mkOption {
+                internal = true;
+                visible = false;
+                type = lib.types.raw;
+                default = { };
+              };
+              # `users` as declared, before assignment added any: what the user
+              # registry and the stub aspects read, so they never wait on it.
+              __declaredUsers = lib.mkOption {
+                internal = true;
+                visible = false;
+                type = lib.types.raw;
+                default = { };
+              };
+              # Each declared user's classes on this host, for stub aspects. A
+              # plain entry is read as data; a function entry is evaluated
+              # alone, through the same user type, outside `users`, so
+              # assignment is never involved. That costs one extra evaluation
+              # per function entry (about 2,900 thunks each, fleet-wide, since
+              # the stubs read every host); plain entries cost nothing.
+              # Unsupported: an entry whose `classes` reads this host's
+              # assigned users.
+              __declaredUserClasses = lib.mkOption {
+                internal = true;
+                visible = false;
+                readOnly = true;
+                type = lib.types.raw;
+                default = builtins.mapAttrs (
+                  n: entry:
+                  if userLib.isPlainEntry entry then
+                    userLib.rawListValues "classes" entry
+                  else
+                    ((userType config).merge (options.users.loc ++ [ n ]) [
+                      {
+                        file = userLib.relationFile;
+                        value = entry;
+                      }
+                    ]).classes
+                ) config.__declaredUsers;
+              };
+              __assignmentPolicies = lib.mkOption {
+                internal = true;
+                visible = false;
+                type = lib.types.raw;
+                default = [ ];
               };
               instantiate = lib.mkOption {
                 description = ''

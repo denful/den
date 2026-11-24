@@ -35,6 +35,8 @@ let
     "__ownFields"
     "__ownDeclared"
     "__ownPlain"
+    "__assignedBy"
+    "facts"
   ];
 
   # The field names a raw entry sets, seen through the module system's
@@ -56,6 +58,48 @@ let
       ownKeys v.content
     else
       builtins.attrNames v;
+
+  # Every list a raw definition of `field` could contribute, through the
+  # module system's property wrappers; for stubs, where a superset is harmless.
+  rawListValues =
+    field: v:
+    let
+      go =
+        x:
+        if builtins.isList x then
+          x
+        else if !builtins.isAttrs x then
+          [ ]
+        else if x._type or null == "merge" then
+          lib.concatMap go x.contents
+        else if
+          builtins.elem (x._type or null) [
+            "if"
+            "override"
+            "order"
+          ]
+        then
+          go x.content
+        else
+          [ ];
+      field' =
+        x:
+        if !builtins.isAttrs x then
+          [ ]
+        else if x._type or null == "merge" then
+          lib.concatMap field' x.contents
+        else if
+          builtins.elem (x._type or null) [
+            "if"
+            "override"
+            "order"
+          ]
+        then
+          field' x.content
+        else
+          go (x.${field} or [ ]);
+    in
+    field' v;
 
   # An entry readable as data. Like nixpkgs' submodule
   # (`shorthandOnlyDefinesConfig`), an attrset entry only defines config, its
@@ -165,6 +209,16 @@ let
             defaultText = "den.aspects.<name>";
             default = lookupAspect den config;
           };
+          options.facts = lib.mkOption {
+            description = "Facts the assignment stage reads; declared under `den.schema.user.facts`.";
+            type = lib.types.lazyAttrsOf lib.types.raw;
+            default = { };
+            apply =
+              raw:
+              (import ./assignment.nix { inherit lib den; }).evalFacts "user" {
+                inherit (config) name userName;
+              } raw;
+          };
         }
       )
     ]
@@ -174,11 +228,12 @@ let
   innerType = lib.types.attrsOf registryUserType;
 
   # Every name a host declares is a registry user, with defaults when
-  # `den.users` doesn't declare it.
+  # `den.users` doesn't declare it. Read from the names declared before
+  # assignment: the hosts' `users` come from assignment, which reads den.users.
   hostUserNames = lib.unique (
-    lib.concatMap (system: lib.concatMap (h: builtins.attrNames h.users) (builtins.attrValues system)) (
-      builtins.attrValues config.den.hosts
-    )
+    lib.concatMap (
+      system: lib.concatMap (h: builtins.attrNames h.__declaredUsers) (builtins.attrValues system)
+    ) (builtins.attrValues config.den.hosts)
   );
 
   usersOption = lib.mkOption {
@@ -281,7 +336,10 @@ let
           }).value.${f};
       fields = lib.subtractLists unfolded (lib.unique (regOwn ++ relOwn));
     in
-    rel // lib.genAttrs fields field;
+    if builtins.elem "facts" relOwn then
+      throw "den: user '${rel.name}' sets `facts` on host '${rel.host.name}'. A user's facts are read before assignment, so they live on `den.users.${rel.name}.facts`, not on a host."
+    else
+      rel // lib.genAttrs fields field // { inherit (reg) facts; };
 in
 {
   inherit
@@ -290,6 +348,7 @@ in
     userFieldsModule
     ownKeys
     isPlainEntry
+    rawListValues
     compose
     relationFile
     ;
