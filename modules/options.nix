@@ -104,6 +104,7 @@ in
 {
   options.den.hosts = types.hostsOption;
   options.den.homes = types.homesOption;
+  options.den.users = types.usersOption;
   options.den.schema = schemaLib.mkSchemaOption {
     collections = {
       # includes / excludes are policy over aspects, not the kind's shape: their
@@ -150,6 +151,30 @@ in
           ];
         identity = false;
       };
+      # How a declared user field combines the registry user with a host's
+      # `user@host` override when both set it in the same priority band:
+      # `den.lib.fold.replace` (the default) or `den.lib.fold.append`.
+      folds = {
+        default = { };
+        merge =
+          acc: val:
+          acc
+          // builtins.mapAttrs (
+            f: v:
+            if
+              !(builtins.elem v [
+                "replace"
+                "append"
+              ])
+            then
+              throw "den: den.schema.<kind>.folds.${f}: `${toString v}` isn't a fold; use den.lib.fold.replace or den.lib.fold.append."
+            else if acc ? ${f} && acc.${f} != v then
+              throw "den: den.schema.<kind>.folds.${f} is declared both `${acc.${f}}` and `${v}`; a field folds one way."
+            else
+              v
+          ) val;
+        identity = false;
+      };
       isEntity = {
         default = false;
         merge = acc: val: acc || val;
@@ -177,6 +202,7 @@ in
               "excludes"
               "admits"
               "policyEnforcement"
+              "folds"
               "isEntity"
               "isolated"
               "isStrict"
@@ -341,6 +367,11 @@ in
   config.den.schema.fleet = { };
   config.den.schema.host.inherits = [ den.schema.conf ];
   config.den.schema.user.inherits = [ den.schema.conf ];
+  # A per-host `includes` adds to the registry user's rather than dropping it.
+  config.den.schema.user.folds = {
+    includes = "append";
+    excludes = "append";
+  };
   # `home` keys its identity on the registry key plus the system. `name` IS the
   # registry key and gen-schema injects it as an identity key by construction,
   # so only `system` needs declaring — and it has to be declared HERE because
