@@ -265,6 +265,12 @@ let
         };
       };
       rootScopeId = mkScopeId ctx;
+      # Without the root's kind, policies registered on the root entity find no registrant.
+      rootKind = self.__entityKind or null;
+      rootIsEntity =
+        rootKind != null
+        && (den.schema.${rootKind}.isEntity or false)
+        && builtins.isAttrs (ctx.${rootKind} or null);
     in
     fx.handle {
       handlers = composeHandlers rootHandlers extraHandlers;
@@ -275,6 +281,7 @@ let
           inherit rootScopeId;
           currentScope = rootScopeId;
           scopeContexts = _: { ${rootScopeId} = ctx; };
+          scopeEntityKind = _: lib.optionalAttrs rootIsEntity { ${rootScopeId} = rootKind; };
         };
     } bootstrapAndResolve;
 

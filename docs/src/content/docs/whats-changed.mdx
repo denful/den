@@ -148,6 +148,7 @@ The same release lets a host choose what it receives (`admits`), lets a policy n
 
 ## Unreleased
 
+- **`mainModule` now matches what den builds.** A host's `mainModule` missed host content the host delivered through its users, from `provides.to-users`, `provides.<user>` and host policies that fire for each user. `nixosConfigurations` always had it. A host built from `host.mainModule` now gains that content; `nixosConfigurations` doesn't change.
 - **`den.aspects.<host>.<user>` reaches that user only.** A host aspect's child named after a user used to be included at host scope, so its `homeManager` and `user` content reached every user on the host, and a `{ user, ... }:` child ran once per user. It's now part of that user's own aspect on that host, next to `den.aspects."<user>@<host>"` and `den.aspects.<user>`, so it reaches that user, once. If a config relied on the old behaviour to give every user the same content, move that content to `den.aspects.<host>.provides.to-users` or `den.schema.user.includes`.
 
 ## Upgrading in one jump
