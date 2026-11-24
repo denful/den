@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Uses nix-eval-jobs with $(nproc) workers
+# Uses nix-eval-jobs with up to $(nproc) workers, bounded by a memory budget
+# (DEN_CI_WORKERS, DEN_CI_MEM_PER_WORKER and DEN_CI_MEM_BUDGET override it).
 # NOTE: expectedError cells only verify that expr throws SOMETHING (via
 # tryEval, in the --select expression below). They do not verify
 # expectedError.type/.msg — nix-eval-jobs runs each job out-of-process, so
@@ -57,9 +58,19 @@ evalLog=$(mktemp -t den-test-XXXXX.err)
 
 # Cap workers and per-worker memory to prevent OOM from infinite recursion.
 # nproc can be very high (32+); limit workers so worst-case memory is bounded.
+# The worker count is also bounded by a total memory budget, so a run under a
+# memory cap fits by default: workers x DEN_CI_MEM_PER_WORKER stays within
+# DEN_CI_MEM_BUDGET, leaving room for the parent. All three can be overridden.
 max_workers=8
-mem_per_worker=2048  # MiB
-workers=$(( $(nproc) < max_workers ? $(nproc) : max_workers ))
+mem_per_worker="${DEN_CI_MEM_PER_WORKER:-2048}" # MiB
+mem_budget="${DEN_CI_MEM_BUDGET:-8192}"         # MiB
+by_cpu=$(( $(nproc) < max_workers ? $(nproc) : max_workers ))
+by_mem=$(( mem_budget / mem_per_worker ))
+workers="${DEN_CI_WORKERS:-$(( by_cpu < by_mem ? by_cpu : by_mem ))}"
+if (( workers < 1 )); then
+  echo "ci.bash: no eval workers fit (DEN_CI_MEM_BUDGET=${mem_budget} MiB, DEN_CI_MEM_PER_WORKER=${mem_per_worker} MiB)" >&2
+  exit 2
+fi
 
 # set +e around the pipeline: under `set -e` a dying evaluator aborts the
 # script here, so the summary below never runs and the exit status arrives
