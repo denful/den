@@ -16,6 +16,7 @@ let
     pathSetByScopeOption
     preprocessHosts
     ;
+  userLib = import ./user.nix { inherit config lib den; };
 
   # Entity instances are gen-schema instances: mkInstanceType injects name,
   # strict/freeform, _module.args.<kind>, and schema-owned id_hash (identity).
@@ -56,7 +57,7 @@ let
       strict = den.schema.host.isStrict;
       extraModules = [
         (
-          { config, ... }:
+          { config, options, ... }:
           {
             options = {
               hostName = strOpt "Network hostname" config.name;
@@ -76,6 +77,17 @@ let
                 default = { };
                 defaultText = lib.literalExpression "{ }";
                 type = lib.types.attrsOf (userType config);
+                # Each user as this host sees it: the registry user plus this
+                # host's `user@host` relation, field by field.
+                apply = builtins.mapAttrs (
+                  n: rel:
+                  let
+                    defs = map (d: d.${n}) (builtins.filter (d: d ? ${n}) options.users.definitions);
+                  in
+                  userLib.compose (builtins.all userLib.isPlainEntry defs) (lib.unique (
+                    lib.concatMap userLib.ownKeys defs
+                  )) den.users.${n} rel
+                );
               };
               instantiate = lib.mkOption {
                 description = ''
@@ -205,6 +217,7 @@ let
             };
           }
         )
+        (userLib.layerModule userLib.relationFile)
       ]
       ++ schemaLib.strictCompatModules den.schema.user.isStrict;
     } den.schema.user;

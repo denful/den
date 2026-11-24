@@ -6,8 +6,10 @@ args:
 let
   host = import ./entities/host.nix args;
   home = import ./entities/home.nix args;
+  user = import ./entities/user.nix args;
 in
 {
+  inherit (user) usersOption;
   inherit (host) hostsOption;
   inherit (home) homesOption;
 }

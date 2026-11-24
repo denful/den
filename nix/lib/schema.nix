@@ -92,6 +92,45 @@ let
 in
 base
 // {
+  # The gen libraries beyond gen-schema that den builds on, from the same roster
+  # on the flake path and the fallback. A consumer's own `gen` input can be older
+  # than den's pin, so a missing member is named rather than left to fail inside
+  # whatever first reads it.
+  gen =
+    let
+      needed = [
+        [
+          "merge"
+          "priorityBand"
+        ]
+        [
+          "algebra"
+          "record"
+          "foldLayersTraced"
+        ]
+        [
+          "algebra"
+          "term"
+        ]
+        [
+          "identity"
+          "hashIdentity"
+        ]
+      ];
+      missing = builtins.filter (p: !lib.hasAttrByPath p roster) needed;
+    in
+    if missing != [ ] then
+      throw ''
+        den: the gen libraries den was given are too old: they lack ${
+          lib.concatMapStringsSep ", " (lib.concatStringsSep ".") missing
+        }.
+        den needs gen at 620ceaab6180cc6de3843db4473507f739580e75 or later. Update your `gen` input.
+      ''
+    else
+      {
+        inherit (roster) merge algebra identity;
+      };
+
   mkInstanceType =
     a:
     if isInstanceOptions a then

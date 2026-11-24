@@ -11,7 +11,7 @@ let
 
   deps = map (from: {
     ${from.name} = lib.genAttrs (from.classes or [ from.class ]) (_: { });
-  }) (allHosts ++ allHomes ++ allUsers);
+  }) (allHosts ++ allHomes ++ allUsers ++ builtins.attrValues den.users);
 in
 {
   den.aspects = lib.mkMerge deps;
