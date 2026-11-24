@@ -90,8 +90,65 @@ let
   mkInstanceTypeFor =
     opts: kindValue: withLib base.mkInstanceType (withResolved opts kindValue) kindValue;
 in
-base
+# gen's paired constructions stay off den's public surface: den reaches them
+# only through `__mkInstancePaired` below.
+builtins.removeAttrs base [ "mkInstancePaired" ]
 // {
+  # The gen libraries beyond gen-schema that den builds on, from the same roster
+  # on the flake path and the fallback. A consumer's own `gen` input can be older
+  # than den's pin, so a missing member is named rather than left to fail inside
+  # whatever first reads it.
+  gen =
+    let
+      needed = [
+        [
+          "merge"
+          "priorityBand"
+        ]
+        [
+          "algebra"
+          "record"
+          "foldLayersTraced"
+        ]
+        [
+          "algebra"
+          "term"
+        ]
+        [
+          "identity"
+          "hashIdentity"
+        ]
+      ];
+      missing = builtins.filter (p: !lib.hasAttrByPath p roster) needed;
+    in
+    if missing != [ ] then
+      throw ''
+        den: the gen libraries den was given are too old: they lack ${
+          lib.concatMapStringsSep ", " (lib.concatStringsSep ".") missing
+        }.
+        den needs gen at 620ceaab6180cc6de3843db4473507f739580e75 or later. Update your `gen` input.
+      ''
+    else
+      {
+        inherit (roster) algebra identity;
+        merge = builtins.removeAttrs roster.merge [ "refusingSubmodulePaired" ];
+      };
+
+  # PROVISIONAL. The one caller of gen-schema's paired construction, and
+  # through it of gen-merge's refusingSubmodulePaired: `{ type; evaluate; }`,
+  # where `evaluate loc defs` is one evaluation of `type`, `{ config;
+  # provenance; }`. It isn't yet in the gen den pins; it's reached here alone,
+  # so a change to it stays in one place.
+  __mkInstancePaired =
+    opts: kindValue:
+    if base ? mkInstancePaired then
+      withLib base.mkInstancePaired (withResolved opts kindValue) kindValue
+    else
+      throw ''
+        den: the gen libraries den was given are too old for the user registry: they lack gen-schema's paired instance construction (`mkInstancePaired`), which isn't yet in the gen den pins.
+        den needs gen-schema at 7f2a0dd1c42bcd99d88661316209596d65d4dc8e or later, with gen-merge at 65070d57db3a92279733c8ea7a59d4a8a509aa79 or later. Every config with a host user or a home reads the registry.
+      '';
+
   mkInstanceType =
     a:
     if isInstanceOptions a then
