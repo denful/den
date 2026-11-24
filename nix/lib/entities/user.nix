@@ -242,10 +242,14 @@ let
   # Every name a host declares is a registry user, with defaults when
   # `den.users` doesn't declare it. Read from the names declared before
   # assignment: the hosts' `users` come from assignment, which reads den.users.
+  # A standalone home's user is a registry user too.
   hostUserNames = lib.unique (
     lib.concatMap (
       system: lib.concatMap (h: builtins.attrNames h.__declaredUsers) (builtins.attrValues system)
     ) (builtins.attrValues config.den.hosts)
+    ++ lib.concatMap (system: map (home: home.userName) (builtins.attrValues system)) (
+      builtins.attrValues config.den.homes
+    )
   );
 
   usersOption = lib.mkOption {
