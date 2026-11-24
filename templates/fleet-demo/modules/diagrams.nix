@@ -51,8 +51,9 @@ in
 
           In this fleet, the tree is: flake → fleet → environment → host → user.
           Environment and host scopes are created by policies that walk the
-          `fleet.environments` and `den.hosts` registries. User scopes are
-          created by access policies that match registry users by group membership.
+          `fleet.environments` and `den.hosts` registries. User scopes come from
+          each host's users, which an assignment policy picks from `den.users` by
+          group membership before any host is resolved.
 
           ```mermaid
           ${source}
@@ -73,8 +74,8 @@ in
 
           The arrows show the resolution chain — how `to-fleet` creates the
           fleet scope, `fleet-to-envs` fans out environments, `env-to-hosts`
-          walks hosts, and `env-users`/`host-users` resolve registry users
-          onto their granted hosts.
+          walks hosts, and den's own `host-to-users` creates a scope for each user
+          the `user-access` assignment policy put on the host.
 
           ```mermaid
           ${source}
@@ -236,7 +237,7 @@ in
 
             A multi-host NixOS fleet managed by den,
             demonstrating environment-based topology, cross-host data sharing, and
-            policy-driven user access from a centralized registry.
+            policy-driven user access from den's user registry.
 
             ## What This Builds
 
@@ -273,16 +274,16 @@ in
             };
             ```
 
-            The host schema is extended with `environment` and `addr` options via
-            `den.schema.host.imports`, so every host declares which environment it
-            belongs to.
+            Each host's environment is a fact (`den.schema.host.facts`, set as
+            `facts.environment`), and the host schema adds `environment` and `addr`
+            options via `den.schema.host.imports`; the `environment` field follows the
+            fact. Facts are what user assignment reads, before any host is resolved.
 
-            ### Users as Entities
+            ### Users
 
-            `users.nix` promotes users to real entities (`den.schema.user.isEntity = true`)
-            and extends the user schema with `email`, `groups`, and `ssh-keys` options.
-            The registry type imports `den.schema.user` so each entry is a proper user
-            entity with `userName`, `classes`, `aspect` — not a plain attrset.
+            `users.nix` declares the users in `den.users`, den's user registry, and
+            extends the user schema with `email` and `ssh-keys` options. Group
+            membership is a user fact (`den.schema.user.facts`, set as `facts.groups`).
 
             ## Policy-Driven Scope Tree
 
@@ -301,8 +302,10 @@ in
             | `to-fleet` | flake | fleet | `resolve.to "fleet"` — creates a single fleet entity |
             | `fleet-to-envs` | fleet | environments | `resolve.to "environment"` — one per `fleet.environments` entry |
             | `env-to-hosts` | environment | hosts | `resolve.to "host"` — filters `den.hosts` by matching `host.environment` |
-            | `env-users` | host | users | `resolve.to "user"` — filters `den.users.registry` by environment group grant |
-            | `host-users` | host | users | `resolve.to "user"` — filters `den.users.registry` by host-specific group grant |
+
+            Which users each host gets isn't part of this chain. It's decided first,
+            by the `user-access` assignment policy (`den.lib.policy.assign`), and den's
+            own `host-to-users` then creates a scope for each of a host's users.
 
             Each `resolve.to` call creates a named child scope. The entity's context
             bindings (`host`, `user`, `environment`, etc.) are available to all aspects
@@ -318,26 +321,20 @@ in
               instantiation explicitly via `den.lib.policy.instantiate`, so the default
               per-system output walk is unnecessary.
 
-            - **`den.policies.host-to-users`** is excluded from `den.schema.host` — this
-              core policy walks `host.users` (inline user definitions) and resolves them
-              via `resolve.shared`. Since this demo resolves users from the external
-              registry via `resolve.to "user"`, the default policy would be a no-op but
-              is excluded for clarity.
+            ## Users and Group-Based Access
 
-            ## User Registry and Group-Based Access
-
-            Users are defined once in `den.users.registry` with identity metadata:
+            Users are defined once in `den.users` with identity metadata:
 
             ```nix
-            den.users.registry = {
+            den.users = {
               alice = {
                 email = "alice@example.com";
-                groups = [ "admin" ];
+                facts.groups = [ "admin" ];
                 ssh-keys = [ "ssh-ed25519 AAAAC3... alice@workstation" ];
               };
               bob = {
                 email = "bob@example.com";
-                groups = [ "deploy" ];
+                facts.groups = [ "deploy" ];
                 ssh-keys = [ "ssh-ed25519 AAAAC3... bob@laptop" ];
               };
             };
@@ -353,19 +350,18 @@ in
             };
             ```
 
-            The `env-users` policy fires at each host scope, looks up the access
-            grant for `host.environment`, and filters the registry for users whose
-            `groups` intersect the granted set. Each match becomes a `resolve.to "user"`
-            call, creating a user scope on that host.
+            The `user-access` assignment policy runs once per host, before any host is
+            resolved. It looks up the grant for the host's `environment` fact (and any
+            `fleet.user-access.by-host` grant for the host itself), and returns the
+            registry users whose `groups` fact intersects it. Those become the host's
+            users, so every reader of `host.users` sees them.
 
             | User | Groups | Prod (grants admin) | Staging (grants admin + deploy) |
             |------|--------|---------------------|-------------------------------|
             | alice | admin | yes | yes |
             | bob | deploy | no | yes |
 
-            The `host-users` policy provides the same mechanism scoped to individual
-            hosts via `fleet.user-access.by-host`, allowing per-host overrides on top
-            of environment-level grants.
+            Grants in `fleet.user-access.by-host` add to a host's environment grant.
 
             The `ssh-keys` aspect fires in every user scope and sets the user
             account's `openssh.authorizedKeys.keys` (the `user` class) from

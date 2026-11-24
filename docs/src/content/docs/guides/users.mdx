@@ -1,0 +1,194 @@
+---
+title: Users Across Hosts & Homes
+description: Declare each user once in den.users, assign users to hosts by name, condition or policy, override them per host, and share them with standalone homes.
+---
+
+import { Aside } from '@astrojs/starlight/components';
+
+A user is one entity. Being on a host is a relation between that user and the host. `den.users` is where users live, next to `den.hosts` and `den.homes`, and each host sees its own view of a user: the registry user plus whatever that host contributes for them.
+
+```nix
+den.users.tux = {
+  classes = [ "homeManager" ];
+  email = "tux@example.com";
+};
+
+den.hosts.x86_64-linux.igloo.users.tux = { };           # tux is on igloo
+den.hosts.x86_64-linux.iceberg.users.tux.shell = "fish"; # and on iceberg, with a per-host shell
+```
+
+## Declaring users
+
+`den.users.<name>` takes the same fields as a host user: `userName`, `classes`, anything `den.schema.user` declares, and free-form fields. A registry entry is on no host by itself; it creates no account anywhere until something assigns it.
+
+`den.hosts.<system>.<host>.users.<name>` keeps working exactly as before. It assigns `<name>` to that host, and its fields are the per-host override for `<name>@<host>`, the same spelling `den.aspects."<name>@<host>"` and `den.homes."<name>@<host>"` use. If `den.users.<name>` isn't declared, the entry registers it with defaults, so a config that only uses `host.users` needs no change.
+
+Schema modules that read `host` see `null` on a registry entry, because a registry user isn't on a host. The same module on a host user sees that host.
+
+## Putting users on hosts
+
+A user can reach a host from three places, and they combine: a user is on a host if any of them puts it there.
+
+### `host.users`
+
+As above: `den.hosts.<system>.<host>.users.<name> = { … }`.
+
+### `den.users.<name>.hosts`
+
+A list of where the user goes. Each entry is one of:
+
+- **a declared host name**, such as `"igloo"`. A name no host has is an error, and so is a name declared under more than one system: use a condition on `host.name` and `host.system` there instead.
+- **a condition** built with `den.lib.cond`: `eq`, `all`, `any`, `not` and `always`, over paths into the host's and the user's [facts](#facts) and identity (`name`, `system`, `class`; `name`, `userName`):
+
+  ```nix
+  den.users.alice.hosts = [
+    (den.lib.cond.all [
+      (den.lib.cond.eq [ "host" "environment" ] "prod")
+      (den.lib.cond.not (den.lib.cond.eq [ "host" "name" ] "iceberg"))
+    ])
+  ];
+  ```
+
+  A path to a fact nobody declared is an error, never a non-match, and so is a condition den can't decide.
+- **a named predicate**, `den.lib.cond.predicate "<name>"`, for `den.predicates.<name> = { host, user, ... }: <bool>`. `host` is `{ name; system; class; facts; }` and `user` is `{ name; userName; facts; }`.
+- **an inline function** of the same shape. It works, with a warning to use a condition or a named predicate instead; `den.migrations.anonymous-predicates.suppressWarnings = true` silences it.
+
+Every entry is checked, so a bad entry fails even when another one matches. `hosts = [ ]` says on purpose that the user is on no host. The builtin `den.policies.user-to-hosts` reads these lists; excluding it from `den.schema.host` turns them off.
+
+### Assignment policies
+
+For a rule over many users, write an assignment policy. It runs once per host and returns the names of the users to put there:
+
+```nix
+den.policies.admins-on-prod = den.lib.policy.assign (
+  { host, users }:
+  lib.optionals (host.facts.environment == "prod") (
+    builtins.attrNames (lib.filterAttrs (_: u: builtins.elem "admin" u.facts.groups) users)
+  )
+);
+den.schema.host.includes = [ den.policies.admins-on-prod ];
+```
+
+`users` maps every registry user's name to `{ name; userName; facts; }`. A name that isn't a registry user is an error.
+
+Include an assignment policy on `den.schema.host` or on a host's own `includes`, and exclude it the same ways. It must be registered under `den.policies.<name>`. It can't go in `den.default.includes`: assignment runs before any host is resolved and doesn't read `den.default`, so den stops with an error naming where it belongs.
+
+### Facts
+
+Assignment happens before any host is resolved, so it can't read the host: which users a host has would then depend on itself. It reads facts instead.
+
+```nix
+den.schema.host.facts = [
+  {
+    options.environment = lib.mkOption {
+      type = lib.types.str;
+      default = "dev";
+    };
+  }
+];
+den.schema.user.facts = [
+  {
+    options.groups = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+    };
+  }
+];
+
+den.hosts.x86_64-linux.igloo.facts.environment = "prod";
+den.users.alice.facts.groups = [ "admin" ];
+```
+
+Facts are evaluated on their own. A fact's default can read other facts (`config`) and the entity's identity, never the host, its users or the rest of the config; reading `host` there is an error. An ordinary host field can follow a fact, as in `environment = config.facts.environment`, never the other way round. A user's facts live on `den.users.<name>`; setting them on a host user is an error.
+
+That direction is the main cost of migrating. Every value an assignment reads has to be *set* as a fact: each host's `environment = "prod"` becomes `facts.environment = "prod"`, and each user's `groups` becomes `facts.groups`. Keep the old field as an option whose default follows the fact, and everything else that reads it keeps working.
+
+A host doesn't inherit facts from anything above it. If a nested or child host used to get its gate from its parent's resolution context (an environment scope, a parent host), that host now has to state it as its own fact.
+
+Named predicates and assignment policies are ordinary functions, so den can't stop them reading something other than facts. The contract is about *entity* data: anything about a host or a user comes from `host.facts` and `users.<name>.facts`, never from `den.hosts` or a host's other fields. Fleet-level configuration that doesn't depend on assignment is fine to read, such as a grants table under your own `config.acl.*` options, as the [ACL environments guide](/guides/acl-environments/) does.
+
+## What a host sees
+
+On a host, every field of the user combines the registry value with the host's override:
+
+1. Each side's own definitions merge first, as the module system always does.
+2. The stronger priority band wins: `lib.mkForce` (below 100) beats a plain value (100–999), which beats `lib.mkDefault` (1000–1499). `lib.mkOptionDefault` and higher contribute nothing, so the declared default applies.
+3. In the same band, the host's override wins, because it's the more specific of the two.
+
+So `shell = "zsh"` on `den.users.tux` and `shell = "fish"` on igloo give `"fish"` on igloo and `"zsh"` everywhere else. A global `lib.mkForce` still beats a per-host plain value, and a global `lib.mkDefault` never overrides anything set per host. Within one band, `lib.mkOverride 75` on the registry and `lib.mkForce` on the host are the same band, so the host wins.
+
+The winner replaces the value, lists included. To add a host's list to the registry's instead, declare a fold for the field:
+
+```nix
+den.schema.user.folds.groups = den.lib.fold.append;
+```
+
+`den.lib.fold.append` concatenates the registry's value and then the host's, and needs a list. `den.lib.fold.replace` is the default. `includes` and `excludes` already append, so a per-host `includes` adds to the user's. Two different fold declarations for one field are an error.
+
+For per-host *content* for a user, write `den.aspects."<user>@<host>"`, or the host-side `den.aspects.<host>.<user>`: both apply to that user on that host only, and the first also to a `<user>@<host>` standalone home.
+
+<Aside type="caution" title="An include of `den.aspects.<host>.<user>` of your own">
+`den.aspects.<host>.<user>` is already part of that user's aspect on that host. A config that excluded `host-to-users` and included the same key itself from user scope gets it twice once the exclude is dropped, and repeated definitions of a list or non-mergeable option then conflict. Drop your own include of it.
+</Aside>
+
+These rules apply to fields declared as options (through `den.schema.user.imports`); declare a field to give it priorities and a fold. A host's contribution never changes the user on another host, and never changes `den.users.<name>` itself. Aspects and class content (`den.aspects.tux`, `den.aspects."tux@igloo"`, `nixos`, `homeManager` and so on) keep the module system's ordinary merging.
+
+## Standalone homes
+
+A standalone home's `user` is the registry user `den.users.<userName>`, registered with defaults if it isn't declared, bound the same way a host user is:
+
+- `den.homes.<system>.tux` gets the registry user's own fields, never another host's override;
+- `den.homes.<system>."tux@igloo"`, where `igloo` is declared in the same system, gets igloo's view: the registry user plus igloo's override;
+- `"tux@<host>"` for a host that isn't declared in that system is only context: it adds no override and creates no account anywhere.
+
+In every case `user.classes` is the home's class, because that's what the home builds. Everything else about a home is unchanged: its output name, its aspect lookup (`den.aspects."tux@<host>"`, then `den.aspects.tux`), and its `host`. See [Standalone Home Manager](/guides/standalone-home-manager/).
+
+## Users with no host
+
+A registry user nothing assigns is still readable by anything that reads `den.users`, and a standalone home can still use it. Identity-only users, such as SSO accounts, are a real case.
+
+While `user-to-hosts` runs, den reports the users that end up on no host and no home with `hosts` unset, once, from the flake checks (`nix flake check`). Building a host never reads that report. Set `hosts = [ ]` to say a user is hostless on purpose. A user that only has a standalone home is never reported.
+
+## Cost
+
+A `host.users` entry written as a function, such as `tux = { config, ... }: { … };`, costs one extra evaluation of that entry: den reads its classes for the aspect stubs without touching the rest of the host. A plain attrset entry costs nothing extra.
+
+## Migrating
+
+### From a custom `den.users.registry`
+
+Configs copied from the `fleet-demo` template or the ACL environments guide declared their own `options.den.users.registry`. That now collides with `den.users`, and evaluation fails with a module-system error (`den.users` … `does not support nested options`) before den can warn. To migrate:
+
+1. Delete the custom option and its entry type. `den.users` entries are already proper users: `userName`, `classes`, `aspect` and everything in `den.schema.user`.
+2. Rename the definitions: `den.users.registry.<name>` becomes `den.users.<name>`.
+3. Rename every reader: `config.den.users.registry` becomes `config.den.users`.
+
+<Aside type="caution" title="The silent reader">
+A reader written as `config.den.users.registry or { }` doesn't fail after the rename. It reads a user named `registry`, finds none, and gets `{ }`, so everything downstream (ACL grants, for example) sees no users. Search for every `den.users.registry`, not only the definitions.
+
+The same happens to a field you move into facts: `u.groups or [ ]` still evaluates after `groups` becomes `facts.groups`, and quietly reads `[ ]`. Search for every reader of each field you move.
+</Aside>
+
+### Other changes to check
+
+- **A host option named `facts`.** den declares `facts` on every host now, so a config that declares its own host option called `facts` fails with a duplicate declaration. Rename yours.
+- **`host.hasAspect` read from a user's scope.** Read inside a user's scope (a `{ host, ... }:` module on the user), `host.hasAspect` sees that user's own aspects when the user is a den user entity. Users that reached hosts as records from a custom registry type, or as hand-built attrsets, didn't count, so after migrating to `den.users` such a check can flip from false to true. Read from host scope, it doesn't see users' aspects, before or after.
+- **Nested hosts don't inherit assignment context.** See [Facts](#facts): a host gets its gate from its own facts.
+- **Per-host user content.** If you drop an exclude of `host-to-users`, remove your own includes of `den.aspects.<host>.<user>` first; see the caution under [What a host sees](#what-a-host-sees).
+
+### From host policies that assign during resolution
+
+A host policy that emits `resolve.to "user"` for registry users keeps working. It warns once per policy that `den.users` with `den.lib.policy.assign` (or `den.users.<name>.hosts`) is now the source of truth for host assignment. `den.migrations.resolution-assignments.suppressWarnings = true` silences the warning without changing anything else.
+
+To move such a policy over:
+
+1. Make whatever it filters on a fact: the host's environment, the user's groups.
+2. Rewrite it as `den.lib.policy.assign ({ host, users }: [ … ])`, reading `host.facts` and `users.<name>.facts`.
+3. Drop any `den.schema.host.excludes = [ den.policies.host-to-users ]`: assignment-policy users and `host.users` now combine, so nothing overlaps.
+4. In the same step, set `hosts = [ ];` on every user who is meant to be on no host, such as identity-only SSO accounts. With `user-to-hosts` active, the flake checks report each registry user that ends up on no host and no home; `hosts = [ ]` says that's on purpose. Don't exclude `user-to-hosts` to quiet the report instead: that also turns off `den.users.<name>.hosts` for every user, and the report for users you add later.
+
+The [ACL environments guide](/guides/acl-environments/) and the `fleet-demo` template are both written this way now.
+
+### From inline functions in `hosts`
+
+An inline function entry keeps working, with a warning. Replace it with a condition, or name it under `den.predicates` and refer to it with `den.lib.cond.predicate`. `den.migrations.anonymous-predicates.suppressWarnings = true` silences the warning.

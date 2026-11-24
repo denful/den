@@ -150,6 +150,7 @@ export default defineConfig({
 							collapsed: false,
 							items: [
 								{ label: 'Declare Hosts & Users', slug: 'guides/declare-hosts' },
+								{ label: 'Users Across Hosts & Homes', slug: 'guides/users', badge: { text: 'new', variant: 'success' } },
 								{ label: 'Configure Aspects', slug: 'guides/configure-aspects' },
 								{ label: 'Homes Integration', slug: 'guides/home-manager' },
 								{ label: 'Standalone Home Manager', slug: 'guides/standalone-home-manager', badge: { text: 'new', variant: 'success' } },

@@ -220,8 +220,10 @@ Don't declare a placeholder host to get a richer `host`. A declared host
 builds a real `nixosConfigurations.<name>`, which then needs a real system
 config to pass `nix flake check`.
 
-To set one field on host users and standalone homes alike, declare it on
-`den.schema.conf`. The host, user and home schemas all inherit it. Then read it
+A field that belongs to the *user* rather than the machine goes on
+`den.users`, and every home and host user of that user reads it as `user`; see
+[The home's user](#the-homes-user) below. To set one field on hosts and
+standalone homes alike, declare it on `den.schema.conf`. The host, user and home schemas all inherit it. Then read it
 from whichever entity is in scope:
 
 ```nix
@@ -246,6 +248,38 @@ which has no `isGraphical`. On a `user@host` home whose host *is* declared, the
 host include fires too, with the real host. It is enough for either flag to be
 set, and `gui` is still included once. To keep the field off hosts, declare it
 on `den.schema.home` instead.
+
+## The home's user
+
+A standalone home's `user` is the registry user `den.users.<userName>`, the
+same user a host has (see [Users Across Hosts & Homes](/guides/users/)). It's
+registered with defaults if you don't declare it, so a home needs no
+`den.users` entry, but fields you put there reach every home and host user:
+
+```nix
+den.users.tux.email = "tux@example.com";
+
+den.homes.x86_64-linux.tux = { };
+den.hosts.x86_64-linux.igloo.users.tux = { };
+
+den.aspects.tux.homeManager =
+  { user, ... }:
+  {
+    programs.git.userEmail = user.email;  # in the home and on igloo
+  };
+```
+
+Which view of the user a home sees depends on its name:
+
+- `den.homes.<system>.tux` sees the registry user's own fields, never another
+  host's override.
+- `den.homes.<system>."tux@igloo"`, with `igloo` declared in the same system,
+  sees igloo's view: the registry user plus igloo's `users.tux` fields.
+- `"tux@<host>"` for a host not declared in that system adds nothing, and
+  creates no account anywhere.
+
+In every case `user.classes` is the home's class (`[ "homeManager" ]`), since
+that's what the home builds, even when the host user's own `classes` differ.
 
 ## Sharing one user between a host and standalone homes
 
@@ -318,7 +352,9 @@ den.aspects.tux.homeManager = { osConfig, ... }: {
 ```
 
 `classes = [ "user" ]` keeps Home Manager out of igloo's system config, so
-tux's home is managed only by the standalone home. `define-user` still creates
+tux's home is managed only by the standalone home. Inside that home, `user`
+is still igloo's view of tux, but its `classes` is the home's
+`[ "homeManager" ]`. `define-user` still creates
 the OS account on igloo. If you leave the user's classes at `homeManager`, the
 home is built twice, once inside the system and once standalone, and whichever
 you activate last wins.

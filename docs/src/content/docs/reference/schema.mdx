@@ -214,6 +214,70 @@ Type: `attrsOf userType`
 
 Freeform: additional attributes pass through to the user module.
 
+An entry assigns the user to the host, and its fields are the host's override
+for `<name>@<host>`. On the host, each field combines the entry with
+`den.users.<name>`; see [What a host sees](/guides/users/#what-a-host-sees).
+A host user can't set `facts` or `hosts`: both belong to `den.users.<name>`.
+
+## `den.users`
+
+Type: `attrsOf userType`
+
+The user registry: one entry per user, whichever hosts and homes the user is
+on. Every name under `den.hosts.<sys>.<host>.users` and every standalone
+home's `userName` is registered here with defaults. See
+[Users Across Hosts & Homes](/guides/users/).
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `name` | `str` | attr name | User configuration name |
+| `userName` | `str` | `name` | System account name |
+| `classes` | `listOf str` | `[ "user" ]` | Nix classes this user participates in |
+| `aspect` | `raw` | `den.aspects.<name>` | The user's own aspect |
+| `facts` | facts of `den.schema.user.facts` | `{ }` | What host assignment reads about this user |
+| `hosts` | `null \| listOf raw` | `null` | Where the user goes: host names, `den.lib.cond` conditions, `den.lib.cond.predicate` names, or (warned) functions. `[ ]` marks the user hostless on purpose |
+| `*` | `den.schema.user` options | | Options from base module |
+| `*` |  | | free-form attributes |
+
+A registry entry is on no host by itself, so schema modules reading `host`
+see `null` there.
+
+### `den.schema.<kind>.facts`
+
+Option modules for a kind's facts, set as `den.hosts.<sys>.<host>.facts` and
+`den.users.<name>.facts`. Facts are evaluated on their own, with the entity's
+identity (`name`, `system`, `class` for hosts; `name`, `userName` for users)
+and each other: a fact can't read the host, its users, or the rest of the
+config. See [Facts](/guides/users/#facts).
+
+### `den.schema.user.folds`
+
+Type: `attrsOf (enum [ "replace" "append" ])`
+
+How a declared user field combines `den.users.<name>` with a host's override
+when both set it in the same priority band: `den.lib.fold.replace` (the
+default, the host's value wins) or `den.lib.fold.append` (the registry's list,
+then the host's). `includes` and `excludes` append. Declaring two different
+folds for one field is an error.
+
+## `den.predicates`
+
+Type: `attrsOf raw`
+
+Named predicates for `den.users.<name>.hosts`, used as
+`den.lib.cond.predicate "<name>"`: `{ host, user, ... }: <bool>`, with `host`
+as `{ name; system; class; facts; }` and `user` as
+`{ name; userName; facts; }`. One definition per name.
+
+## `den.migrations`
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `anonymous-predicates.suppressWarnings` | `false` | Silence the warning for an inline function in `den.users.<name>.hosts` |
+| `resolution-assignments.suppressWarnings` | `false` | Silence the warning for a host policy that assigns users with `resolve.to "user"` during resolution |
+
+Neither silences an error.
+
 ## `den.homes`
 
 Type: `attrsOf homeSystemType`
