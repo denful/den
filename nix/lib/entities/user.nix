@@ -37,6 +37,7 @@ let
     "__ownPlain"
     "__assignedBy"
     "facts"
+    "hosts"
   ];
 
   # The field names a raw entry sets, seen through the module system's
@@ -209,6 +210,17 @@ let
             defaultText = "den.aspects.<name>";
             default = lookupAspect den config;
           };
+          options.hosts = lib.mkOption {
+            description = ''
+              Hosts this user is assigned to, read by `den.policies.user-to-hosts`:
+              declared host names, `den.lib.cond` conditions over facts, named
+              predicates (`den.lib.cond.predicate "<name>"`), or (warned) inline
+              functions. `null` assigns nothing from here; `[ ]` marks the user
+              hostless on purpose.
+            '';
+            type = lib.types.nullOr (lib.types.listOf lib.types.raw);
+            default = null;
+          };
           options.facts = lib.mkOption {
             description = "Facts the assignment stage reads; declared under `den.schema.user.facts`.";
             type = lib.types.lazyAttrsOf lib.types.raw;
@@ -338,8 +350,10 @@ let
     in
     if builtins.elem "facts" relOwn then
       throw "den: user '${rel.name}' sets `facts` on host '${rel.host.name}'. A user's facts are read before assignment, so they live on `den.users.${rel.name}.facts`, not on a host."
+    else if builtins.elem "hosts" relOwn then
+      throw "den: user '${rel.name}' sets `hosts` on host '${rel.host.name}'. Which hosts a user is on is the user's, so it lives on `den.users.${rel.name}.hosts`."
     else
-      rel // lib.genAttrs fields field // { inherit (reg) facts; };
+      rel // lib.genAttrs fields field // { inherit (reg) facts hosts; };
 in
 {
   inherit

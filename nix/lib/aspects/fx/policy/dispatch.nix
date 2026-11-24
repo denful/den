@@ -432,6 +432,7 @@ let
       in
       {
         policyName = entry.name;
+        denMade = entry.value.denMade or false;
         # R3's host-class part of a registrant's own bare include is its own
         # content, not a delivery (§11a R7), so only the author's effects are
         # checked against admits.
@@ -440,13 +441,59 @@ let
       }
     ) matching;
 
+  # A host policy assigning users during resolution (`resolve.to "user"`)
+  # keeps working, and is pointed at the registry once per policy: the
+  # per-name thunk is forced at most once per evaluation.
+  warnOrThrow = if den.internal.warningsAsErrors or false then msg: _: throw msg else lib.warn;
+  resolutionAssignmentWarning = builtins.mapAttrs (
+    name: _:
+    warnOrThrow ''
+      den: policy `${name}` assigns users to hosts during resolution (`resolve.to "user"`). That keeps working, but `den.users` with `den.lib.policy.assign` (or `den.users.<n>.hosts`) is now the source of truth for host assignment; see https://github.com/denful/den/issues/781. Set `den.migrations.resolution-assignments.suppressWarnings = true` to silence this.
+    '' true
+  ) (den.policies or { });
+  # den's own fan-out (`host-to-users`, the home batteries' per-user policies)
+  # re-emits `host.users`, the assignment stage's output, so it isn't one.
+  # `denMade` is decided by source file, so a den battery copied into a
+  # config is user code and warns like any other policy.
+  assignsUsersAtHost =
+    resolveCtx: raw: r:
+    resolveCtx ? host
+    && !(resolveCtx ? user)
+    && !raw.denMade
+    && r.policyName != "host-to-users"
+    && builtins.any (
+      se: (se.schema.__targetKind or null) == "user" || se.schema.value ? user
+    ) r.schemaEffects;
+  warnResolutionAssignments =
+    resolveCtx: allResults: classified: x:
+    if den.migrations.resolution-assignments.suppressWarnings or false then
+      x
+    else
+      builtins.foldl'
+        (
+          acc: r:
+          builtins.seq (resolutionAssignmentWarning.${r.policyName}
+            or (warnOrThrow "den: a policy assigns users to hosts during resolution (`resolve.to \"user\"`); see https://github.com/denful/den/issues/781." true)
+          ) acc
+        )
+        x
+        (
+          builtins.filter (r: r != null) (
+            lib.zipListsWith (
+              raw: r: if assignsUsersAtHost resolveCtx raw r then r else null
+            ) allResults classified
+          )
+        );
+
   # Combined dispatch returning classified + tagged results.
   mkDispatch =
     aspectPolicies: firedPolicies: resolveCtx:
     let
       allResults = dispatchAspect aspectPolicies firedPolicies resolveCtx;
       classified = map classifyPolicyResult allResults;
-      tagged = extractTaggedEffects classified;
+      tagged = warnResolutionAssignments resolveCtx allResults classified (
+        extractTaggedEffects classified
+      );
     in
     tagged
     // {

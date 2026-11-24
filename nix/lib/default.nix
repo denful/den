@@ -25,6 +25,7 @@ let
     __findFile = ./den-brackets.nix;
     forward = ./forward.nix;
     fold = ./fold.nix;
+    cond = ./cond.nix;
     enforcement = ./enforcement.nix;
     home-env = ./home-env.nix;
     migrations = ./migrations.nix;
