@@ -48,8 +48,12 @@
               hostName
               name
               host
-              user
               ;
+            # The registry user's identity; the record also carries the
+            # registry user's other fields (#781).
+            user = {
+              inherit (den.homes.x86_64-linux."tux@igloo".user) name userName classes;
+            };
           };
           configuredUserName = config.flake.homeConfigurations."tux@igloo".config.home.username;
           keyboard = config.flake.homeConfigurations."tux@igloo".config.home.keyboard;
