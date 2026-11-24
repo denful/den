@@ -7,8 +7,8 @@ they produce.
 
 The arrows show the resolution chain — how `to-fleet` creates the
 fleet scope, `fleet-to-envs` fans out environments, `env-to-hosts`
-walks hosts, and `env-users`/`host-users` resolve registry users
-onto their granted hosts.
+walks hosts, and den's own `host-to-users` creates a scope for each user
+the `user-access` assignment policy put on the host.
 
 ```mermaid
 graph TD
@@ -28,15 +28,15 @@ graph TD
 
   fleet_fleet -->|fleet-to-envs| environment_prod_fleet_fleet
   environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_lb_prod
-  environment_prod_fleet_fleet_host_lb_prod -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_prod_fleet_fleet_host_lb_prod_user_alice
+  environment_prod_fleet_fleet_host_lb_prod -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_prod_fleet_fleet_host_lb_prod_user_alice
   environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_web_prod_1
-  environment_prod_fleet_fleet_host_web_prod_1 -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_prod_fleet_fleet_host_web_prod_1_user_alice
+  environment_prod_fleet_fleet_host_web_prod_1 -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_prod_fleet_fleet_host_web_prod_1_user_alice
   environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_web_prod_2
-  environment_prod_fleet_fleet_host_web_prod_2 -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_prod_fleet_fleet_host_web_prod_2_user_alice
+  environment_prod_fleet_fleet_host_web_prod_2 -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_prod_fleet_fleet_host_web_prod_2_user_alice
   fleet_fleet -->|fleet-to-envs| environment_staging_fleet_fleet
   environment_staging_fleet_fleet -->|env-to-hosts| environment_staging_fleet_fleet_host_web_staging
-  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_staging_fleet_fleet_host_web_staging_user_alice
-  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_staging_fleet_fleet_host_web_staging_user_bob
+  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_staging_fleet_fleet_host_web_staging_user_alice
+  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_staging_fleet_fleet_host_web_staging_user_bob
 
   style environment_prod_fleet_fleet fill:#a475f9,stroke:#a475f9,color:#1f2328
   style environment_prod_fleet_fleet_host_lb_prod fill:#2da44e,stroke:#2da44e,color:#1f2328

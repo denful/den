@@ -151,7 +151,7 @@
       "host": "lb-prod",
       "label": null,
       "style": "normal",
-      "to": "lb_prod__den__batteries__ssh_keys"
+      "to": "lb_prod__ssh_keys"
     },
     {
       "crossHost": false,
@@ -167,15 +167,7 @@
       "host": "lb-prod",
       "label": null,
       "style": "normal",
-      "to": "lb_prod__den__batteries__define_user__alice_lb_prod"
-    },
-    {
-      "crossHost": false,
-      "from": "lb_prod__den__batteries__define_user",
-      "host": "lb-prod",
-      "label": null,
-      "style": "normal",
-      "to": "lb_prod__den__batteries__host__resolve_define_user__den__batteries"
+      "to": "lb_prod__define_user__alice_lb_prod"
     },
     {
       "crossHost": false,
@@ -183,23 +175,7 @@
       "host": "lb-prod",
       "label": null,
       "style": "normal",
-      "to": "lb_prod__den__batteries__hostname__os"
-    },
-    {
-      "crossHost": false,
-      "from": "lb_prod__den__batteries__ssh_keys",
-      "host": "lb-prod",
-      "label": null,
-      "style": "normal",
-      "to": "lb_prod__den__batteries__host__resolve_ssh_keys__den__batteries"
-    },
-    {
-      "crossHost": false,
-      "from": "lb_prod__den__batteries__ssh_keys",
-      "host": "lb-prod",
-      "label": null,
-      "style": "normal",
-      "to": "lb_prod__den__batteries__ssh_keys__alice_lb_prod"
+      "to": "lb_prod__hostname__os"
     },
     {
       "crossHost": false,
@@ -224,14 +200,6 @@
       "label": null,
       "style": "normal",
       "to": "lb_prod__lb_prod"
-    },
-    {
-      "crossHost": false,
-      "from": "lb_prod__insecure_predicate",
-      "host": "lb-prod",
-      "label": null,
-      "style": "normal",
-      "to": "lb_prod__host__resolve_insecure_predicate_"
     },
     {
       "crossHost": false,
@@ -267,11 +235,11 @@
     },
     {
       "crossHost": false,
-      "from": "lb_prod__unfree_predicate",
+      "from": "lb_prod__ssh_keys",
       "host": "lb-prod",
       "label": null,
       "style": "normal",
-      "to": "lb_prod__host__resolve_unfree_predicate_"
+      "to": "lb_prod__ssh_keys__alice_lb_prod"
     },
     {
       "crossHost": false,
@@ -295,7 +263,15 @@
       "host": "lb-prod",
       "label": null,
       "style": "normal",
-      "to": "lb_prod___self_user_"
+      "to": "lb_prod__user___policy_hm_user_detect_"
+    },
+    {
+      "crossHost": false,
+      "from": "lb_prod__user",
+      "host": "lb-prod",
+      "label": null,
+      "style": "normal",
+      "to": "lb_prod__alice"
     },
     {
       "crossHost": false,
@@ -304,6 +280,54 @@
       "label": null,
       "style": "normal",
       "to": "lb_prod__default_user_alice"
+    },
+    {
+      "crossHost": false,
+      "from": "lb_prod__user",
+      "host": "lb-prod",
+      "label": null,
+      "style": "normal",
+      "to": "lb_prod__user__resolve_user_"
+    },
+    {
+      "crossHost": false,
+      "from": "lb_prod__unfree_predicate",
+      "host": "lb-prod",
+      "label": "provides",
+      "style": "provide",
+      "to": "lb_prod__unfree_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "lb_prod__unfree_predicate",
+      "host": "lb-prod",
+      "label": "provides",
+      "style": "provide",
+      "to": "lb_prod__unfree_predicate__user"
+    },
+    {
+      "crossHost": false,
+      "from": "lb_prod__insecure_predicate",
+      "host": "lb-prod",
+      "label": "provides",
+      "style": "provide",
+      "to": "lb_prod__insecure_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "lb_prod__insecure_predicate",
+      "host": "lb-prod",
+      "label": "provides",
+      "style": "provide",
+      "to": "lb_prod__insecure_predicate__user"
+    },
+    {
+      "crossHost": false,
+      "from": "lb_prod__user",
+      "host": "lb-prod",
+      "label": "provides",
+      "style": "provide",
+      "to": "lb_prod__user___policy_hm_user_detect_"
     },
     {
       "crossHost": false,
@@ -335,7 +359,7 @@
       "host": "web-prod-1",
       "label": null,
       "style": "normal",
-      "to": "web_prod_1__den__batteries__ssh_keys"
+      "to": "web_prod_1__ssh_keys"
     },
     {
       "crossHost": false,
@@ -351,15 +375,7 @@
       "host": "web-prod-1",
       "label": null,
       "style": "normal",
-      "to": "web_prod_1__den__batteries__define_user__alice_web_prod_1"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_1__den__batteries__define_user",
-      "host": "web-prod-1",
-      "label": null,
-      "style": "normal",
-      "to": "web_prod_1__den__batteries__host__resolve_define_user__den__batteries"
+      "to": "web_prod_1__define_user__alice_web_prod_1"
     },
     {
       "crossHost": false,
@@ -367,23 +383,7 @@
       "host": "web-prod-1",
       "label": null,
       "style": "normal",
-      "to": "web_prod_1__den__batteries__hostname__os"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_1__den__batteries__ssh_keys",
-      "host": "web-prod-1",
-      "label": null,
-      "style": "normal",
-      "to": "web_prod_1__den__batteries__host__resolve_ssh_keys__den__batteries"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_1__den__batteries__ssh_keys",
-      "host": "web-prod-1",
-      "label": null,
-      "style": "normal",
-      "to": "web_prod_1__den__batteries__ssh_keys__alice_web_prod_1"
+      "to": "web_prod_1__hostname__os"
     },
     {
       "crossHost": false,
@@ -415,14 +415,6 @@
       "host": "web-prod-1",
       "label": null,
       "style": "normal",
-      "to": "web_prod_1__host__resolve_insecure_predicate_"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_1__insecure_predicate",
-      "host": "web-prod-1",
-      "label": null,
-      "style": "normal",
       "to": "web_prod_1__insecure_predicate__os"
     },
     {
@@ -435,11 +427,11 @@
     },
     {
       "crossHost": false,
-      "from": "web_prod_1__unfree_predicate",
+      "from": "web_prod_1__ssh_keys",
       "host": "web-prod-1",
       "label": null,
       "style": "normal",
-      "to": "web_prod_1__host__resolve_unfree_predicate_"
+      "to": "web_prod_1__ssh_keys__alice_web_prod_1"
     },
     {
       "crossHost": false,
@@ -463,7 +455,15 @@
       "host": "web-prod-1",
       "label": null,
       "style": "normal",
-      "to": "web_prod_1___self_user_"
+      "to": "web_prod_1__user___policy_hm_user_detect_"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_1__user",
+      "host": "web-prod-1",
+      "label": null,
+      "style": "normal",
+      "to": "web_prod_1__alice"
     },
     {
       "crossHost": false,
@@ -472,6 +472,14 @@
       "label": null,
       "style": "normal",
       "to": "web_prod_1__default_user_alice"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_1__user",
+      "host": "web-prod-1",
+      "label": null,
+      "style": "normal",
+      "to": "web_prod_1__user__resolve_user_"
     },
     {
       "crossHost": false,
@@ -488,6 +496,46 @@
       "label": null,
       "style": "normal",
       "to": "web_prod_1__nginx"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_1__user",
+      "host": "web-prod-1",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_1__user___policy_hm_user_detect_"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_1__unfree_predicate",
+      "host": "web-prod-1",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_1__unfree_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_1__unfree_predicate",
+      "host": "web-prod-1",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_1__unfree_predicate__user"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_1__insecure_predicate",
+      "host": "web-prod-1",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_1__insecure_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_1__insecure_predicate",
+      "host": "web-prod-1",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_1__insecure_predicate__user"
     },
     {
       "crossHost": false,
@@ -519,7 +567,7 @@
       "host": "web-prod-2",
       "label": null,
       "style": "normal",
-      "to": "web_prod_2__den__batteries__ssh_keys"
+      "to": "web_prod_2__ssh_keys"
     },
     {
       "crossHost": false,
@@ -535,15 +583,7 @@
       "host": "web-prod-2",
       "label": null,
       "style": "normal",
-      "to": "web_prod_2__den__batteries__define_user__alice_web_prod_2"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_2__den__batteries__define_user",
-      "host": "web-prod-2",
-      "label": null,
-      "style": "normal",
-      "to": "web_prod_2__den__batteries__host__resolve_define_user__den__batteries"
+      "to": "web_prod_2__define_user__alice_web_prod_2"
     },
     {
       "crossHost": false,
@@ -551,23 +591,7 @@
       "host": "web-prod-2",
       "label": null,
       "style": "normal",
-      "to": "web_prod_2__den__batteries__hostname__os"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_2__den__batteries__ssh_keys",
-      "host": "web-prod-2",
-      "label": null,
-      "style": "normal",
-      "to": "web_prod_2__den__batteries__host__resolve_ssh_keys__den__batteries"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_2__den__batteries__ssh_keys",
-      "host": "web-prod-2",
-      "label": null,
-      "style": "normal",
-      "to": "web_prod_2__den__batteries__ssh_keys__alice_web_prod_2"
+      "to": "web_prod_2__hostname__os"
     },
     {
       "crossHost": false,
@@ -599,14 +623,6 @@
       "host": "web-prod-2",
       "label": null,
       "style": "normal",
-      "to": "web_prod_2__host__resolve_insecure_predicate_"
-    },
-    {
-      "crossHost": false,
-      "from": "web_prod_2__insecure_predicate",
-      "host": "web-prod-2",
-      "label": null,
-      "style": "normal",
       "to": "web_prod_2__insecure_predicate__os"
     },
     {
@@ -619,11 +635,11 @@
     },
     {
       "crossHost": false,
-      "from": "web_prod_2__unfree_predicate",
+      "from": "web_prod_2__ssh_keys",
       "host": "web-prod-2",
       "label": null,
       "style": "normal",
-      "to": "web_prod_2__host__resolve_unfree_predicate_"
+      "to": "web_prod_2__ssh_keys__alice_web_prod_2"
     },
     {
       "crossHost": false,
@@ -647,7 +663,15 @@
       "host": "web-prod-2",
       "label": null,
       "style": "normal",
-      "to": "web_prod_2___self_user_"
+      "to": "web_prod_2__user___policy_hm_user_detect_"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_2__user",
+      "host": "web-prod-2",
+      "label": null,
+      "style": "normal",
+      "to": "web_prod_2__alice"
     },
     {
       "crossHost": false,
@@ -656,6 +680,14 @@
       "label": null,
       "style": "normal",
       "to": "web_prod_2__default_user_alice"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_2__user",
+      "host": "web-prod-2",
+      "label": null,
+      "style": "normal",
+      "to": "web_prod_2__user__resolve_user_"
     },
     {
       "crossHost": false,
@@ -672,6 +704,46 @@
       "label": null,
       "style": "normal",
       "to": "web_prod_2__nginx"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_2__user",
+      "host": "web-prod-2",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_2__user___policy_hm_user_detect_"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_2__unfree_predicate",
+      "host": "web-prod-2",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_2__unfree_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_2__unfree_predicate",
+      "host": "web-prod-2",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_2__unfree_predicate__user"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_2__insecure_predicate",
+      "host": "web-prod-2",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_2__insecure_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "web_prod_2__insecure_predicate",
+      "host": "web-prod-2",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_prod_2__insecure_predicate__user"
     },
     {
       "crossHost": false,
@@ -703,7 +775,7 @@
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging__den__batteries__ssh_keys"
+      "to": "web_staging__ssh_keys"
     },
     {
       "crossHost": false,
@@ -719,7 +791,7 @@
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging__den__batteries__define_user__alice_web_staging"
+      "to": "web_staging__define_user__alice_web_staging"
     },
     {
       "crossHost": false,
@@ -727,15 +799,7 @@
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging__den__batteries__define_user__bob_web_staging"
-    },
-    {
-      "crossHost": false,
-      "from": "web_staging__den__batteries__define_user",
-      "host": "web-staging",
-      "label": null,
-      "style": "normal",
-      "to": "web_staging__den__batteries__host__resolve_define_user__den__batteries"
+      "to": "web_staging__define_user__bob_web_staging"
     },
     {
       "crossHost": false,
@@ -743,31 +807,7 @@
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging__den__batteries__hostname__os"
-    },
-    {
-      "crossHost": false,
-      "from": "web_staging__den__batteries__ssh_keys",
-      "host": "web-staging",
-      "label": null,
-      "style": "normal",
-      "to": "web_staging__den__batteries__host__resolve_ssh_keys__den__batteries"
-    },
-    {
-      "crossHost": false,
-      "from": "web_staging__den__batteries__ssh_keys",
-      "host": "web-staging",
-      "label": null,
-      "style": "normal",
-      "to": "web_staging__den__batteries__ssh_keys__alice_web_staging"
-    },
-    {
-      "crossHost": false,
-      "from": "web_staging__den__batteries__ssh_keys",
-      "host": "web-staging",
-      "label": null,
-      "style": "normal",
-      "to": "web_staging__den__batteries__ssh_keys__bob_web_staging"
+      "to": "web_staging__hostname__os"
     },
     {
       "crossHost": false,
@@ -799,14 +839,6 @@
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging__host__resolve_insecure_predicate_"
-    },
-    {
-      "crossHost": false,
-      "from": "web_staging__insecure_predicate",
-      "host": "web-staging",
-      "label": null,
-      "style": "normal",
       "to": "web_staging__insecure_predicate__os"
     },
     {
@@ -819,11 +851,19 @@
     },
     {
       "crossHost": false,
-      "from": "web_staging__unfree_predicate",
+      "from": "web_staging__ssh_keys",
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging__host__resolve_unfree_predicate_"
+      "to": "web_staging__ssh_keys__alice_web_staging"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__ssh_keys",
+      "host": "web-staging",
+      "label": null,
+      "style": "normal",
+      "to": "web_staging__ssh_keys__bob_web_staging"
     },
     {
       "crossHost": false,
@@ -847,7 +887,7 @@
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging___self_user__user_alice"
+      "to": "web_staging__user___policy_hm_user_detect__user_alice"
     },
     {
       "crossHost": false,
@@ -855,7 +895,23 @@
       "host": "web-staging",
       "label": null,
       "style": "normal",
-      "to": "web_staging___self_user__user_bob"
+      "to": "web_staging__user___policy_hm_user_detect__user_bob"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__user_user_alice",
+      "host": "web-staging",
+      "label": null,
+      "style": "normal",
+      "to": "web_staging__alice"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__user_user_bob",
+      "host": "web-staging",
+      "label": null,
+      "style": "normal",
+      "to": "web_staging__bob"
     },
     {
       "crossHost": false,
@@ -875,6 +931,22 @@
     },
     {
       "crossHost": false,
+      "from": "web_staging__user_user_alice",
+      "host": "web-staging",
+      "label": null,
+      "style": "normal",
+      "to": "web_staging__user__resolve_user__user_alice"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__user_user_bob",
+      "host": "web-staging",
+      "label": null,
+      "style": "normal",
+      "to": "web_staging__user__resolve_user__user_bob"
+    },
+    {
+      "crossHost": false,
       "from": "web_staging__web_staging",
       "host": "web-staging",
       "label": null,
@@ -888,6 +960,54 @@
       "label": null,
       "style": "normal",
       "to": "web_staging__nginx"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__user_user_alice",
+      "host": "web-staging",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_staging__user___policy_hm_user_detect__user_alice"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__unfree_predicate",
+      "host": "web-staging",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_staging__unfree_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__unfree_predicate",
+      "host": "web-staging",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_staging__unfree_predicate__user"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__insecure_predicate",
+      "host": "web-staging",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_staging__insecure_predicate__os"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__insecure_predicate",
+      "host": "web-staging",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_staging__insecure_predicate__user"
+    },
+    {
+      "crossHost": false,
+      "from": "web_staging__user_user_bob",
+      "host": "web-staging",
+      "label": "provides",
+      "style": "provide",
+      "to": "web_staging__user___policy_hm_user_detect__user_bob"
     },
     {
       "crossHost": true,
@@ -1451,34 +1571,59 @@
       "classes": [],
       "entityInstance": "user:alice",
       "entityKind": "user",
-      "fnArgNames": [
-        "user"
-      ],
+      "fnArgNames": [],
       "from": null,
-      "fullLabel": "<self:user>",
+      "fullLabel": "user/<policy:hm-user-detect>",
       "hasClass": false,
       "host": "lb-prod",
-      "id": "lb_prod___self_user_",
-      "isParametric": true,
+      "id": "lb_prod__user___policy_hm_user_detect_",
+      "isParametric": false,
       "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "<self:user>",
-      "originalId": "_self_user_",
-      "pathKey": "<self:user>",
+      "isProvider": true,
+      "label": "user/<policy:hm-user-detect>",
+      "originalId": "user___policy_hm_user_detect_",
+      "pathKey": "user/<policy:hm-user-detect>",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
           "replacedBy": null
-        },
-        "user": {
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "user"
+      ],
+      "scope": "user:alice",
+      "shape": "trapezoid",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "alice",
+      "hasClass": false,
+      "host": "lb-prod",
+      "id": "lb_prod__alice",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "alice",
+      "originalId": "alice",
+      "pathKey": "alice",
+      "perClass": {
+        "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -1492,7 +1637,7 @@
       "providerPath": [],
       "scope": "user:alice",
       "shape": "hexagon",
-      "style": "default",
+      "style": "adapter",
       "to": null
     },
     {
@@ -1552,10 +1697,9 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
+      "class": "nixos",
       "classes": [
-        "nixos",
-        "homeManager"
+        "nixos"
       ],
       "entityInstance": "host:lb-prod",
       "entityKind": "host",
@@ -1572,22 +1716,10 @@
       "originalId": "default_host_lb_prod",
       "pathKey": "default",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -1602,10 +1734,9 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
+      "class": "nixos",
       "classes": [
-        "nixos",
-        "homeManager"
+        "nixos"
       ],
       "entityInstance": "user:alice",
       "entityKind": "user",
@@ -1622,22 +1753,10 @@
       "originalId": "default_user_alice",
       "pathKey": "default",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -1669,19 +1788,7 @@
       "originalId": "den__batteries__define_user",
       "pathKey": "den/batteries/define-user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -1702,11 +1809,36 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
-      ],
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "define-user-account",
+      "hasClass": false,
+      "host": "lb-prod",
+      "id": "lb_prod__define_user_account",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "define-user-account",
+      "originalId": "define_user_account",
+      "pathKey": "define-user-account",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "define-user-account",
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
       "entityInstance": "host:lb-prod",
       "entityKind": "host",
       "fnArgNames": [
@@ -1714,30 +1846,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/define-user/alice@lb-prod",
-      "hasClass": true,
+      "fullLabel": "define-user/alice@lb-prod",
+      "hasClass": false,
       "host": "lb-prod",
-      "id": "lb_prod__den__batteries__define_user__alice_lb_prod",
+      "id": "lb_prod__define_user__alice_lb_prod",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/define-user/alice@lb-prod",
-      "originalId": "den__batteries__define_user__alice_lb_prod",
-      "pathKey": "den/batteries/define-user/alice@lb-prod",
+      "isProvider": false,
+      "label": "define-user/alice@lb-prod",
+      "originalId": "define_user__alice_lb_prod",
+      "pathKey": "define-user/alice@lb-prod",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -1748,41 +1868,10 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:lb-prod",
       "shape": "hexagon",
       "style": "default",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:lb-prod",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": "host",
-      "fullLabel": "env-users",
-      "hasClass": false,
-      "host": "lb-prod",
-      "id": "lb_prod__env_users",
-      "isParametric": false,
-      "isPolicyDispatch": true,
-      "isProvider": false,
-      "label": "env-users",
-      "originalId": "env_users",
-      "pathKey": "env-users",
-      "perClass": {},
-      "pipes": {
-        "produces": []
-      },
-      "policyName": "env-users",
-      "providerPath": [],
-      "scope": "host:lb-prod",
-      "shape": "rect",
-      "style": "policy",
       "to": null
     },
     {
@@ -1805,22 +1894,10 @@
       "originalId": "haproxy",
       "pathKey": "haproxy",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -1832,6 +1909,34 @@
       "scope": "host:lb-prod",
       "shape": "rect",
       "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "hm-user-detect",
+      "hasClass": false,
+      "host": "lb-prod",
+      "id": "lb_prod__hm_user_detect",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "hm-user-detect",
+      "originalId": "hm_user_detect",
+      "pathKey": "hm-user-detect",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "hm-user-detect",
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -1852,19 +1957,7 @@
       "originalId": "host",
       "pathKey": "host",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -1887,48 +1980,54 @@
       "entityInstance": "host:lb-prod",
       "entityKind": "host",
       "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(define-user):den/batteries",
+      "from": "host",
+      "fullLabel": "host-to-hm-users",
       "hasClass": false,
       "host": "lb-prod",
-      "id": "lb_prod__den__batteries__host__resolve_define_user__den__batteries",
+      "id": "lb_prod__host_to_hm_users",
       "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(define-user):den/batteries",
-      "originalId": "den__batteries__host__resolve_define_user__den__batteries",
-      "pathKey": "den/batteries/host/resolve(define-user):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-hm-users",
+      "originalId": "host_to_hm_users",
+      "pathKey": "host-to-hm-users",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "policyName": "host-to-hm-users",
+      "providerPath": [],
       "scope": "host:lb-prod",
-      "shape": "trapezoid",
-      "style": "terminal",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:lb-prod",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "host-to-users",
+      "hasClass": false,
+      "host": "lb-prod",
+      "id": "lb_prod__host_to_users",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-users",
+      "originalId": "host_to_users",
+      "pathKey": "host-to-users",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "host-to-users",
+      "providerPath": [],
+      "scope": "host:lb-prod",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -1949,163 +2048,7 @@
       "originalId": "host__resolve_host_",
       "pathKey": "host/resolve(host)",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:lb-prod",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:lb-prod",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(insecure-predicate)",
-      "hasClass": false,
-      "host": "lb-prod",
-      "id": "lb_prod__host__resolve_insecure_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(insecure-predicate)",
-      "originalId": "host__resolve_insecure_predicate_",
-      "pathKey": "host/resolve(insecure-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:lb-prod",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:lb-prod",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "hasClass": false,
-      "host": "lb-prod",
-      "id": "lb_prod__den__batteries__host__resolve_ssh_keys__den__batteries",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(ssh-keys):den/batteries",
-      "originalId": "den__batteries__host__resolve_ssh_keys__den__batteries",
-      "pathKey": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
-      "scope": "host:lb-prod",
-      "shape": "trapezoid",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:lb-prod",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(unfree-predicate)",
-      "hasClass": false,
-      "host": "lb-prod",
-      "id": "lb_prod__host__resolve_unfree_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(unfree-predicate)",
-      "originalId": "host__resolve_unfree_predicate_",
-      "pathKey": "host/resolve(unfree-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2142,22 +2085,10 @@
       "originalId": "hostfile",
       "pathKey": "hostfile",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -2191,19 +2122,7 @@
       "originalId": "den__batteries__hostname",
       "pathKey": "den/batteries/hostname",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2234,33 +2153,21 @@
         "host"
       ],
       "from": null,
-      "fullLabel": "den/batteries/hostname/os",
+      "fullLabel": "hostname/os",
       "hasClass": true,
       "host": "lb-prod",
-      "id": "lb_prod__den__batteries__hostname__os",
+      "id": "lb_prod__hostname__os",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/hostname/os",
-      "originalId": "den__batteries__hostname__os",
-      "pathKey": "den/batteries/hostname/os",
+      "isProvider": false,
+      "label": "hostname/os",
+      "originalId": "hostname__os",
+      "pathKey": "hostname/os",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -2268,10 +2175,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:lb-prod",
       "shape": "hexagon",
       "style": "default",
@@ -2295,19 +2199,7 @@
       "originalId": "insecure_predicate",
       "pathKey": "insecure-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2335,33 +2227,21 @@
         "host"
       ],
       "from": null,
-      "fullLabel": "insecure-predicate/os",
+      "fullLabel": "lb-prod",
       "hasClass": true,
       "host": "lb-prod",
-      "id": "lb_prod__insecure_predicate__os",
+      "id": "lb_prod__lb_prod",
       "isParametric": true,
       "isPolicyDispatch": false,
       "isProvider": false,
-      "label": "insecure-predicate/os",
-      "originalId": "insecure_predicate__os",
-      "pathKey": "insecure-predicate/os",
+      "label": "lb-prod",
+      "originalId": "lb_prod",
+      "pathKey": "lb-prod",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -2372,48 +2252,63 @@
       "providerPath": [],
       "scope": "host:lb-prod",
       "shape": "hexagon",
-      "style": "default",
+      "style": "adapter",
       "to": null
     },
     {
-      "class": "homeManager",
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:lb-prod",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "mutual-provider/transition-default",
+      "hasClass": false,
+      "host": "lb-prod",
+      "id": "lb_prod__mutual_provider__transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "mutual-provider/transition-default",
+      "originalId": "mutual_provider__transition_default",
+      "pathKey": "mutual-provider/transition-default",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "mutual-provider/transition-default",
+      "providerPath": [],
+      "scope": "host:lb-prod",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "nixos",
       "classes": [
-        "homeManager"
+        "nixos"
       ],
       "entityInstance": "host:lb-prod",
       "entityKind": "host",
       "fnArgNames": [
-        "host",
-        "user"
+        "host"
       ],
       "from": null,
-      "fullLabel": "insecure-predicate/user",
-      "hasClass": false,
+      "fullLabel": "unfree-predicate/os",
+      "hasClass": true,
       "host": "lb-prod",
-      "id": "lb_prod__insecure_predicate__user",
+      "id": "lb_prod__unfree_predicate__os",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "insecure-predicate/user",
-      "originalId": "insecure_predicate__user",
-      "pathKey": "insecure-predicate/user",
+      "isProvider": true,
+      "label": "unfree-predicate/os",
+      "originalId": "unfree_predicate__os",
+      "pathKey": "unfree-predicate/os",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
+          "hasClass": true,
           "replacedBy": null
         }
       },
@@ -2421,7 +2316,9 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [],
+      "providerPath": [
+        "unfree-predicate"
+      ],
       "scope": "host:lb-prod",
       "shape": "hexagon",
       "style": "default",
@@ -2438,33 +2335,21 @@
         "host"
       ],
       "from": null,
-      "fullLabel": "lb-prod",
+      "fullLabel": "insecure-predicate/os",
       "hasClass": true,
       "host": "lb-prod",
-      "id": "lb_prod__lb_prod",
+      "id": "lb_prod__insecure_predicate__os",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "lb-prod",
-      "originalId": "lb_prod",
-      "pathKey": "lb-prod",
+      "isProvider": true,
+      "label": "insecure-predicate/os",
+      "originalId": "insecure_predicate__os",
+      "pathKey": "insecure-predicate/os",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -2472,10 +2357,12 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [],
+      "providerPath": [
+        "insecure-predicate"
+      ],
       "scope": "host:lb-prod",
       "shape": "hexagon",
-      "style": "adapter",
+      "style": "default",
       "to": null
     },
     {
@@ -2541,30 +2428,18 @@
       "entityKind": "host",
       "fnArgNames": [],
       "from": null,
-      "fullLabel": "den/batteries/ssh-keys",
+      "fullLabel": "ssh-keys",
       "hasClass": false,
       "host": "lb-prod",
-      "id": "lb_prod__den__batteries__ssh_keys",
+      "id": "lb_prod__ssh_keys",
       "isParametric": false,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys",
-      "originalId": "den__batteries__ssh_keys",
-      "pathKey": "den/batteries/ssh-keys",
+      "isProvider": false,
+      "label": "ssh-keys",
+      "originalId": "ssh_keys",
+      "pathKey": "ssh-keys",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2575,20 +2450,15 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:lb-prod",
-      "shape": "trapezoid",
+      "shape": "rect",
       "style": "adapter",
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:lb-prod",
       "entityKind": "host",
       "fnArgNames": [
@@ -2596,30 +2466,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/ssh-keys/alice@lb-prod",
-      "hasClass": true,
+      "fullLabel": "ssh-keys/alice@lb-prod",
+      "hasClass": false,
       "host": "lb-prod",
-      "id": "lb_prod__den__batteries__ssh_keys__alice_lb_prod",
+      "id": "lb_prod__ssh_keys__alice_lb_prod",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys/alice@lb-prod",
-      "originalId": "den__batteries__ssh_keys__alice_lb_prod",
-      "pathKey": "den/batteries/ssh-keys/alice@lb-prod",
+      "isProvider": false,
+      "label": "ssh-keys/alice@lb-prod",
+      "originalId": "ssh_keys__alice_lb_prod",
+      "pathKey": "ssh-keys/alice@lb-prod",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2630,10 +2488,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:lb-prod",
       "shape": "hexagon",
       "style": "default",
@@ -2657,19 +2512,7 @@
       "originalId": "unfree_predicate",
       "pathKey": "unfree-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2687,61 +2530,8 @@
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
-      "entityInstance": "host:lb-prod",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host"
-      ],
-      "from": null,
-      "fullLabel": "unfree-predicate/os",
-      "hasClass": true,
-      "host": "lb-prod",
-      "id": "lb_prod__unfree_predicate__os",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "unfree-predicate/os",
-      "originalId": "unfree_predicate__os",
-      "pathKey": "unfree-predicate/os",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:lb-prod",
-      "shape": "hexagon",
-      "style": "default",
-      "to": null
-    },
-    {
-      "class": "homeManager",
-      "classes": [
-        "homeManager"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:lb-prod",
       "entityKind": "host",
       "fnArgNames": [
@@ -2755,24 +2545,12 @@
       "id": "lb_prod__unfree_predicate__user",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": false,
+      "isProvider": true,
       "label": "unfree-predicate/user",
       "originalId": "unfree_predicate__user",
       "pathKey": "unfree-predicate/user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2783,7 +2561,49 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [],
+      "providerPath": [
+        "unfree-predicate"
+      ],
+      "scope": "host:lb-prod",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:lb-prod",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "insecure-predicate/user",
+      "hasClass": false,
+      "host": "lb-prod",
+      "id": "lb_prod__insecure_predicate__user",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "insecure-predicate/user",
+      "originalId": "insecure_predicate__user",
+      "pathKey": "insecure-predicate/user",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "insecure-predicate"
+      ],
       "scope": "host:lb-prod",
       "shape": "hexagon",
       "style": "default",
@@ -2807,19 +2627,7 @@
       "originalId": "user",
       "pathKey": "user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2834,6 +2642,34 @@
       "scope": "user:alice",
       "shape": "rect",
       "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:lb-prod",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "user-aspects(all)/transition-default",
+      "hasClass": false,
+      "host": "lb-prod",
+      "id": "lb_prod__user_aspects_all___transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "user-aspects(all)/transition-default",
+      "originalId": "user_aspects_all___transition_default",
+      "pathKey": "user-aspects(all)/transition-default",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "user-aspects(all)/transition-default",
+      "providerPath": [],
+      "scope": "host:lb-prod",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -2869,34 +2705,94 @@
       "classes": [],
       "entityInstance": "user:alice",
       "entityKind": "user",
-      "fnArgNames": [
-        "user"
-      ],
+      "fnArgNames": [],
       "from": null,
-      "fullLabel": "<self:user>",
+      "fullLabel": "user/resolve(user)",
       "hasClass": false,
-      "host": "web-prod-1",
-      "id": "web_prod_1___self_user_",
-      "isParametric": true,
+      "host": "lb-prod",
+      "id": "lb_prod__user__resolve_user_",
+      "isParametric": false,
       "isPolicyDispatch": false,
       "isProvider": false,
-      "label": "<self:user>",
-      "originalId": "_self_user_",
-      "pathKey": "<self:user>",
+      "label": "user/resolve(user)",
+      "originalId": "user__resolve_user_",
+      "pathKey": "user/resolve(user)",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
           "replacedBy": null
-        },
-        "user": {
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "terminal",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "user/<policy:hm-user-detect>",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__user___policy_hm_user_detect_",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "user/<policy:hm-user-detect>",
+      "originalId": "user___policy_hm_user_detect_",
+      "pathKey": "user/<policy:hm-user-detect>",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "user"
+      ],
+      "scope": "user:alice",
+      "shape": "trapezoid",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "alice",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__alice",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "alice",
+      "originalId": "alice",
+      "pathKey": "alice",
+      "perClass": {
+        "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -2910,7 +2806,7 @@
       "providerPath": [],
       "scope": "user:alice",
       "shape": "hexagon",
-      "style": "default",
+      "style": "adapter",
       "to": null
     },
     {
@@ -2970,60 +2866,9 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
+      "class": "nixos",
       "classes": [
-        "nixos",
-        "homeManager"
-      ],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "default",
-      "hasClass": true,
-      "host": "web-prod-1",
-      "id": "web_prod_1__default_host_web_prod_1",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "default",
-      "originalId": "default_host_web_prod_1",
-      "pathKey": "default",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-1",
-      "shape": "rect",
-      "style": "adapter",
-      "to": null
-    },
-    {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
+        "nixos"
       ],
       "entityInstance": "user:alice",
       "entityKind": "user",
@@ -3040,22 +2885,10 @@
       "originalId": "default_user_alice",
       "pathKey": "default",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -3065,6 +2898,43 @@
       "policyName": null,
       "providerPath": [],
       "scope": "user:alice",
+      "shape": "rect",
+      "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
+      "entityInstance": "host:web-prod-1",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "default",
+      "hasClass": true,
+      "host": "web-prod-1",
+      "id": "web_prod_1__default_host_web_prod_1",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "default",
+      "originalId": "default_host_web_prod_1",
+      "pathKey": "default",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "host:web-prod-1",
       "shape": "rect",
       "style": "adapter",
       "to": null
@@ -3087,19 +2957,7 @@
       "originalId": "den__batteries__define_user",
       "pathKey": "den/batteries/define-user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3120,11 +2978,36 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
-      ],
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "define-user-account",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__define_user_account",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "define-user-account",
+      "originalId": "define_user_account",
+      "pathKey": "define-user-account",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "define-user-account",
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-prod-1",
       "entityKind": "host",
       "fnArgNames": [
@@ -3132,30 +3015,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/define-user/alice@web-prod-1",
-      "hasClass": true,
+      "fullLabel": "define-user/alice@web-prod-1",
+      "hasClass": false,
       "host": "web-prod-1",
-      "id": "web_prod_1__den__batteries__define_user__alice_web_prod_1",
+      "id": "web_prod_1__define_user__alice_web_prod_1",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/define-user/alice@web-prod-1",
-      "originalId": "den__batteries__define_user__alice_web_prod_1",
-      "pathKey": "den/batteries/define-user/alice@web-prod-1",
+      "isProvider": false,
+      "label": "define-user/alice@web-prod-1",
+      "originalId": "define_user__alice_web_prod_1",
+      "pathKey": "define-user/alice@web-prod-1",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3166,10 +3037,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-1",
       "shape": "hexagon",
       "style": "default",
@@ -3178,27 +3046,27 @@
     {
       "class": "",
       "classes": [],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
+      "entityInstance": "user:alice",
+      "entityKind": "user",
       "fnArgNames": [],
-      "from": "host",
-      "fullLabel": "env-users",
+      "from": "user",
+      "fullLabel": "hm-user-detect",
       "hasClass": false,
       "host": "web-prod-1",
-      "id": "web_prod_1__env_users",
+      "id": "web_prod_1__hm_user_detect",
       "isParametric": false,
       "isPolicyDispatch": true,
       "isProvider": false,
-      "label": "env-users",
-      "originalId": "env_users",
-      "pathKey": "env-users",
+      "label": "hm-user-detect",
+      "originalId": "hm_user_detect",
+      "pathKey": "hm-user-detect",
       "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": "env-users",
+      "policyName": "hm-user-detect",
       "providerPath": [],
-      "scope": "host:web-prod-1",
+      "scope": "user:alice",
       "shape": "rect",
       "style": "policy",
       "to": null
@@ -3221,19 +3089,7 @@
       "originalId": "host",
       "pathKey": "host",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3256,48 +3112,54 @@
       "entityInstance": "host:web-prod-1",
       "entityKind": "host",
       "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(define-user):den/batteries",
+      "from": "host",
+      "fullLabel": "host-to-hm-users",
       "hasClass": false,
       "host": "web-prod-1",
-      "id": "web_prod_1__den__batteries__host__resolve_define_user__den__batteries",
+      "id": "web_prod_1__host_to_hm_users",
       "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(define-user):den/batteries",
-      "originalId": "den__batteries__host__resolve_define_user__den__batteries",
-      "pathKey": "den/batteries/host/resolve(define-user):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-hm-users",
+      "originalId": "host_to_hm_users",
+      "pathKey": "host-to-hm-users",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "policyName": "host-to-hm-users",
+      "providerPath": [],
       "scope": "host:web-prod-1",
-      "shape": "trapezoid",
-      "style": "terminal",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-1",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "host-to-users",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__host_to_users",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-users",
+      "originalId": "host_to_users",
+      "pathKey": "host-to-users",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "host-to-users",
+      "providerPath": [],
+      "scope": "host:web-prod-1",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -3318,163 +3180,7 @@
       "originalId": "host__resolve_host_",
       "pathKey": "host/resolve(host)",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-1",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(insecure-predicate)",
-      "hasClass": false,
-      "host": "web-prod-1",
-      "id": "web_prod_1__host__resolve_insecure_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(insecure-predicate)",
-      "originalId": "host__resolve_insecure_predicate_",
-      "pathKey": "host/resolve(insecure-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-1",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "hasClass": false,
-      "host": "web-prod-1",
-      "id": "web_prod_1__den__batteries__host__resolve_ssh_keys__den__batteries",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(ssh-keys):den/batteries",
-      "originalId": "den__batteries__host__resolve_ssh_keys__den__batteries",
-      "pathKey": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
-      "scope": "host:web-prod-1",
-      "shape": "trapezoid",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(unfree-predicate)",
-      "hasClass": false,
-      "host": "web-prod-1",
-      "id": "web_prod_1__host__resolve_unfree_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(unfree-predicate)",
-      "originalId": "host__resolve_unfree_predicate_",
-      "pathKey": "host/resolve(unfree-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3511,22 +3217,10 @@
       "originalId": "hostfile",
       "pathKey": "hostfile",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -3560,19 +3254,7 @@
       "originalId": "den__batteries__hostname",
       "pathKey": "den/batteries/hostname",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3603,33 +3285,21 @@
         "host"
       ],
       "from": null,
-      "fullLabel": "den/batteries/hostname/os",
+      "fullLabel": "hostname/os",
       "hasClass": true,
       "host": "web-prod-1",
-      "id": "web_prod_1__den__batteries__hostname__os",
+      "id": "web_prod_1__hostname__os",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/hostname/os",
-      "originalId": "den__batteries__hostname__os",
-      "pathKey": "den/batteries/hostname/os",
+      "isProvider": false,
+      "label": "hostname/os",
+      "originalId": "hostname__os",
+      "pathKey": "hostname/os",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -3637,10 +3307,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-1",
       "shape": "hexagon",
       "style": "default",
@@ -3664,19 +3331,7 @@
       "originalId": "insecure_predicate",
       "pathKey": "insecure-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3694,106 +3349,31 @@
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-prod-1",
       "entityKind": "host",
-      "fnArgNames": [
-        "host"
-      ],
-      "from": null,
-      "fullLabel": "insecure-predicate/os",
-      "hasClass": true,
-      "host": "web-prod-1",
-      "id": "web_prod_1__insecure_predicate__os",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "insecure-predicate/os",
-      "originalId": "insecure_predicate__os",
-      "pathKey": "insecure-predicate/os",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-1",
-      "shape": "hexagon",
-      "style": "default",
-      "to": null
-    },
-    {
-      "class": "homeManager",
-      "classes": [
-        "homeManager"
-      ],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host",
-        "user"
-      ],
-      "from": null,
-      "fullLabel": "insecure-predicate/user",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "mutual-provider/transition-default",
       "hasClass": false,
       "host": "web-prod-1",
-      "id": "web_prod_1__insecure_predicate__user",
-      "isParametric": true,
-      "isPolicyDispatch": false,
+      "id": "web_prod_1__mutual_provider__transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
       "isProvider": false,
-      "label": "insecure-predicate/user",
-      "originalId": "insecure_predicate__user",
-      "pathKey": "insecure-predicate/user",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "label": "mutual-provider/transition-default",
+      "originalId": "mutual_provider__transition_default",
+      "pathKey": "mutual-provider/transition-default",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
+      "policyName": "mutual-provider/transition-default",
       "providerPath": [],
       "scope": "host:web-prod-1",
-      "shape": "hexagon",
-      "style": "default",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -3816,22 +3396,10 @@
       "originalId": "nginx",
       "pathKey": "nginx",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -3848,31 +3416,85 @@
       "to": null
     },
     {
-      "class": "",
-      "classes": [],
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
       "entityInstance": "host:web-prod-1",
       "entityKind": "host",
-      "fnArgNames": [],
-      "from": "host",
-      "fullLabel": "os-to-host",
-      "hasClass": false,
+      "fnArgNames": [
+        "host"
+      ],
+      "from": null,
+      "fullLabel": "unfree-predicate/os",
+      "hasClass": true,
       "host": "web-prod-1",
-      "id": "web_prod_1__os_to_host_host_web_prod_1",
-      "isParametric": false,
-      "isPolicyDispatch": true,
-      "isProvider": false,
-      "label": "os-to-host",
-      "originalId": "os_to_host_host_web_prod_1",
-      "pathKey": "os-to-host",
-      "perClass": {},
+      "id": "web_prod_1__unfree_predicate__os",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "unfree-predicate/os",
+      "originalId": "unfree_predicate__os",
+      "pathKey": "unfree-predicate/os",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
       "pipes": {
         "produces": []
       },
-      "policyName": "os-to-host",
-      "providerPath": [],
+      "policyName": null,
+      "providerPath": [
+        "unfree-predicate"
+      ],
       "scope": "host:web-prod-1",
-      "shape": "rect",
-      "style": "policy",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
+      "entityInstance": "host:web-prod-1",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host"
+      ],
+      "from": null,
+      "fullLabel": "insecure-predicate/os",
+      "hasClass": true,
+      "host": "web-prod-1",
+      "id": "web_prod_1__insecure_predicate__os",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "insecure-predicate/os",
+      "originalId": "insecure_predicate__os",
+      "pathKey": "insecure-predicate/os",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "insecure-predicate"
+      ],
+      "scope": "host:web-prod-1",
+      "shape": "hexagon",
+      "style": "default",
       "to": null
     },
     {
@@ -3909,31 +3531,47 @@
       "entityInstance": "host:web-prod-1",
       "entityKind": "host",
       "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/ssh-keys",
+      "from": "host",
+      "fullLabel": "os-to-host",
       "hasClass": false,
       "host": "web-prod-1",
-      "id": "web_prod_1__den__batteries__ssh_keys",
+      "id": "web_prod_1__os_to_host_host_web_prod_1",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "os-to-host",
+      "originalId": "os_to_host_host_web_prod_1",
+      "pathKey": "os-to-host",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "os-to-host",
+      "providerPath": [],
+      "scope": "host:web-prod-1",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-1",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "ssh-keys",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__ssh_keys",
       "isParametric": false,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys",
-      "originalId": "den__batteries__ssh_keys",
-      "pathKey": "den/batteries/ssh-keys",
+      "isProvider": false,
+      "label": "ssh-keys",
+      "originalId": "ssh_keys",
+      "pathKey": "ssh-keys",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3944,20 +3582,15 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-1",
-      "shape": "trapezoid",
+      "shape": "rect",
       "style": "adapter",
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-prod-1",
       "entityKind": "host",
       "fnArgNames": [
@@ -3965,30 +3598,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/ssh-keys/alice@web-prod-1",
-      "hasClass": true,
+      "fullLabel": "ssh-keys/alice@web-prod-1",
+      "hasClass": false,
       "host": "web-prod-1",
-      "id": "web_prod_1__den__batteries__ssh_keys__alice_web_prod_1",
+      "id": "web_prod_1__ssh_keys__alice_web_prod_1",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys/alice@web-prod-1",
-      "originalId": "den__batteries__ssh_keys__alice_web_prod_1",
-      "pathKey": "den/batteries/ssh-keys/alice@web-prod-1",
+      "isProvider": false,
+      "label": "ssh-keys/alice@web-prod-1",
+      "originalId": "ssh_keys__alice_web_prod_1",
+      "pathKey": "ssh-keys/alice@web-prod-1",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -3999,10 +3620,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-1",
       "shape": "hexagon",
       "style": "default",
@@ -4026,19 +3644,7 @@
       "originalId": "unfree_predicate",
       "pathKey": "unfree-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -4053,109 +3659,6 @@
       "scope": "host:web-prod-1",
       "shape": "rect",
       "style": "adapter",
-      "to": null
-    },
-    {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host"
-      ],
-      "from": null,
-      "fullLabel": "unfree-predicate/os",
-      "hasClass": true,
-      "host": "web-prod-1",
-      "id": "web_prod_1__unfree_predicate__os",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "unfree-predicate/os",
-      "originalId": "unfree_predicate__os",
-      "pathKey": "unfree-predicate/os",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-1",
-      "shape": "hexagon",
-      "style": "default",
-      "to": null
-    },
-    {
-      "class": "homeManager",
-      "classes": [
-        "homeManager"
-      ],
-      "entityInstance": "host:web-prod-1",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host",
-        "user"
-      ],
-      "from": null,
-      "fullLabel": "unfree-predicate/user",
-      "hasClass": false,
-      "host": "web-prod-1",
-      "id": "web_prod_1__unfree_predicate__user",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "unfree-predicate/user",
-      "originalId": "unfree_predicate__user",
-      "pathKey": "unfree-predicate/user",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-1",
-      "shape": "hexagon",
-      "style": "default",
       "to": null
     },
     {
@@ -4176,19 +3679,7 @@
       "originalId": "user",
       "pathKey": "user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -4203,6 +3694,114 @@
       "scope": "user:alice",
       "shape": "rect",
       "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-1",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "unfree-predicate/user",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__unfree_predicate__user",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "unfree-predicate/user",
+      "originalId": "unfree_predicate__user",
+      "pathKey": "unfree-predicate/user",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "unfree-predicate"
+      ],
+      "scope": "host:web-prod-1",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-1",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "insecure-predicate/user",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__insecure_predicate__user",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "insecure-predicate/user",
+      "originalId": "insecure_predicate__user",
+      "pathKey": "insecure-predicate/user",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "insecure-predicate"
+      ],
+      "scope": "host:web-prod-1",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-1",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "user-aspects(all)/transition-default",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__user_aspects_all___transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "user-aspects(all)/transition-default",
+      "originalId": "user_aspects_all___transition_default",
+      "pathKey": "user-aspects(all)/transition-default",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "user-aspects(all)/transition-default",
+      "providerPath": [],
+      "scope": "host:web-prod-1",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -4234,6 +3833,41 @@
       "to": null
     },
     {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "user/resolve(user)",
+      "hasClass": false,
+      "host": "web-prod-1",
+      "id": "web_prod_1__user__resolve_user_",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "user/resolve(user)",
+      "originalId": "user__resolve_user_",
+      "pathKey": "user/resolve(user)",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "terminal",
+      "to": null
+    },
+    {
       "class": "nixos",
       "classes": [
         "nixos"
@@ -4255,22 +3889,10 @@
       "originalId": "web_prod_1",
       "pathKey": "web-prod-1",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -4289,34 +3911,59 @@
       "classes": [],
       "entityInstance": "user:alice",
       "entityKind": "user",
-      "fnArgNames": [
-        "user"
-      ],
+      "fnArgNames": [],
       "from": null,
-      "fullLabel": "<self:user>",
+      "fullLabel": "user/<policy:hm-user-detect>",
       "hasClass": false,
       "host": "web-prod-2",
-      "id": "web_prod_2___self_user_",
-      "isParametric": true,
+      "id": "web_prod_2__user___policy_hm_user_detect_",
+      "isParametric": false,
       "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "<self:user>",
-      "originalId": "_self_user_",
-      "pathKey": "<self:user>",
+      "isProvider": true,
+      "label": "user/<policy:hm-user-detect>",
+      "originalId": "user___policy_hm_user_detect_",
+      "pathKey": "user/<policy:hm-user-detect>",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
           "replacedBy": null
-        },
-        "user": {
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "user"
+      ],
+      "scope": "user:alice",
+      "shape": "trapezoid",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "alice",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__alice",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "alice",
+      "originalId": "alice",
+      "pathKey": "alice",
+      "perClass": {
+        "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -4330,7 +3977,7 @@
       "providerPath": [],
       "scope": "user:alice",
       "shape": "hexagon",
-      "style": "default",
+      "style": "adapter",
       "to": null
     },
     {
@@ -4390,60 +4037,9 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
+      "class": "nixos",
       "classes": [
-        "nixos",
-        "homeManager"
-      ],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "default",
-      "hasClass": true,
-      "host": "web-prod-2",
-      "id": "web_prod_2__default_host_web_prod_2",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "default",
-      "originalId": "default_host_web_prod_2",
-      "pathKey": "default",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-2",
-      "shape": "rect",
-      "style": "adapter",
-      "to": null
-    },
-    {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
+        "nixos"
       ],
       "entityInstance": "user:alice",
       "entityKind": "user",
@@ -4460,22 +4056,10 @@
       "originalId": "default_user_alice",
       "pathKey": "default",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -4485,6 +4069,43 @@
       "policyName": null,
       "providerPath": [],
       "scope": "user:alice",
+      "shape": "rect",
+      "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
+      "entityInstance": "host:web-prod-2",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "default",
+      "hasClass": true,
+      "host": "web-prod-2",
+      "id": "web_prod_2__default_host_web_prod_2",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "default",
+      "originalId": "default_host_web_prod_2",
+      "pathKey": "default",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "host:web-prod-2",
       "shape": "rect",
       "style": "adapter",
       "to": null
@@ -4507,19 +4128,7 @@
       "originalId": "den__batteries__define_user",
       "pathKey": "den/batteries/define-user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -4540,11 +4149,36 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
-      ],
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "define-user-account",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__define_user_account",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "define-user-account",
+      "originalId": "define_user_account",
+      "pathKey": "define-user-account",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "define-user-account",
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-prod-2",
       "entityKind": "host",
       "fnArgNames": [
@@ -4552,30 +4186,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/define-user/alice@web-prod-2",
-      "hasClass": true,
+      "fullLabel": "define-user/alice@web-prod-2",
+      "hasClass": false,
       "host": "web-prod-2",
-      "id": "web_prod_2__den__batteries__define_user__alice_web_prod_2",
+      "id": "web_prod_2__define_user__alice_web_prod_2",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/define-user/alice@web-prod-2",
-      "originalId": "den__batteries__define_user__alice_web_prod_2",
-      "pathKey": "den/batteries/define-user/alice@web-prod-2",
+      "isProvider": false,
+      "label": "define-user/alice@web-prod-2",
+      "originalId": "define_user__alice_web_prod_2",
+      "pathKey": "define-user/alice@web-prod-2",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -4586,10 +4208,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-2",
       "shape": "hexagon",
       "style": "default",
@@ -4598,27 +4217,27 @@
     {
       "class": "",
       "classes": [],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
+      "entityInstance": "user:alice",
+      "entityKind": "user",
       "fnArgNames": [],
-      "from": "host",
-      "fullLabel": "env-users",
+      "from": "user",
+      "fullLabel": "hm-user-detect",
       "hasClass": false,
       "host": "web-prod-2",
-      "id": "web_prod_2__env_users",
+      "id": "web_prod_2__hm_user_detect",
       "isParametric": false,
       "isPolicyDispatch": true,
       "isProvider": false,
-      "label": "env-users",
-      "originalId": "env_users",
-      "pathKey": "env-users",
+      "label": "hm-user-detect",
+      "originalId": "hm_user_detect",
+      "pathKey": "hm-user-detect",
       "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": "env-users",
+      "policyName": "hm-user-detect",
       "providerPath": [],
-      "scope": "host:web-prod-2",
+      "scope": "user:alice",
       "shape": "rect",
       "style": "policy",
       "to": null
@@ -4641,19 +4260,7 @@
       "originalId": "host",
       "pathKey": "host",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -4676,48 +4283,54 @@
       "entityInstance": "host:web-prod-2",
       "entityKind": "host",
       "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(define-user):den/batteries",
+      "from": "host",
+      "fullLabel": "host-to-hm-users",
       "hasClass": false,
       "host": "web-prod-2",
-      "id": "web_prod_2__den__batteries__host__resolve_define_user__den__batteries",
+      "id": "web_prod_2__host_to_hm_users",
       "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(define-user):den/batteries",
-      "originalId": "den__batteries__host__resolve_define_user__den__batteries",
-      "pathKey": "den/batteries/host/resolve(define-user):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-hm-users",
+      "originalId": "host_to_hm_users",
+      "pathKey": "host-to-hm-users",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "policyName": "host-to-hm-users",
+      "providerPath": [],
       "scope": "host:web-prod-2",
-      "shape": "trapezoid",
-      "style": "terminal",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-2",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "host-to-users",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__host_to_users",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-users",
+      "originalId": "host_to_users",
+      "pathKey": "host-to-users",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "host-to-users",
+      "providerPath": [],
+      "scope": "host:web-prod-2",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -4738,163 +4351,7 @@
       "originalId": "host__resolve_host_",
       "pathKey": "host/resolve(host)",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-2",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(insecure-predicate)",
-      "hasClass": false,
-      "host": "web-prod-2",
-      "id": "web_prod_2__host__resolve_insecure_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(insecure-predicate)",
-      "originalId": "host__resolve_insecure_predicate_",
-      "pathKey": "host/resolve(insecure-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-2",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "hasClass": false,
-      "host": "web-prod-2",
-      "id": "web_prod_2__den__batteries__host__resolve_ssh_keys__den__batteries",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(ssh-keys):den/batteries",
-      "originalId": "den__batteries__host__resolve_ssh_keys__den__batteries",
-      "pathKey": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
-      "scope": "host:web-prod-2",
-      "shape": "trapezoid",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(unfree-predicate)",
-      "hasClass": false,
-      "host": "web-prod-2",
-      "id": "web_prod_2__host__resolve_unfree_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(unfree-predicate)",
-      "originalId": "host__resolve_unfree_predicate_",
-      "pathKey": "host/resolve(unfree-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -4931,22 +4388,10 @@
       "originalId": "hostfile",
       "pathKey": "hostfile",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -4980,19 +4425,7 @@
       "originalId": "den__batteries__hostname",
       "pathKey": "den/batteries/hostname",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5023,33 +4456,21 @@
         "host"
       ],
       "from": null,
-      "fullLabel": "den/batteries/hostname/os",
+      "fullLabel": "hostname/os",
       "hasClass": true,
       "host": "web-prod-2",
-      "id": "web_prod_2__den__batteries__hostname__os",
+      "id": "web_prod_2__hostname__os",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/hostname/os",
-      "originalId": "den__batteries__hostname__os",
-      "pathKey": "den/batteries/hostname/os",
+      "isProvider": false,
+      "label": "hostname/os",
+      "originalId": "hostname__os",
+      "pathKey": "hostname/os",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -5057,10 +4478,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-2",
       "shape": "hexagon",
       "style": "default",
@@ -5084,19 +4502,7 @@
       "originalId": "insecure_predicate",
       "pathKey": "insecure-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5114,106 +4520,31 @@
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-prod-2",
       "entityKind": "host",
-      "fnArgNames": [
-        "host"
-      ],
-      "from": null,
-      "fullLabel": "insecure-predicate/os",
-      "hasClass": true,
-      "host": "web-prod-2",
-      "id": "web_prod_2__insecure_predicate__os",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "insecure-predicate/os",
-      "originalId": "insecure_predicate__os",
-      "pathKey": "insecure-predicate/os",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-2",
-      "shape": "hexagon",
-      "style": "default",
-      "to": null
-    },
-    {
-      "class": "homeManager",
-      "classes": [
-        "homeManager"
-      ],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host",
-        "user"
-      ],
-      "from": null,
-      "fullLabel": "insecure-predicate/user",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "mutual-provider/transition-default",
       "hasClass": false,
       "host": "web-prod-2",
-      "id": "web_prod_2__insecure_predicate__user",
-      "isParametric": true,
-      "isPolicyDispatch": false,
+      "id": "web_prod_2__mutual_provider__transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
       "isProvider": false,
-      "label": "insecure-predicate/user",
-      "originalId": "insecure_predicate__user",
-      "pathKey": "insecure-predicate/user",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "label": "mutual-provider/transition-default",
+      "originalId": "mutual_provider__transition_default",
+      "pathKey": "mutual-provider/transition-default",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
+      "policyName": "mutual-provider/transition-default",
       "providerPath": [],
       "scope": "host:web-prod-2",
-      "shape": "hexagon",
-      "style": "default",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -5236,22 +4567,10 @@
       "originalId": "nginx",
       "pathKey": "nginx",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -5268,31 +4587,85 @@
       "to": null
     },
     {
-      "class": "",
-      "classes": [],
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
       "entityInstance": "host:web-prod-2",
       "entityKind": "host",
-      "fnArgNames": [],
-      "from": "host",
-      "fullLabel": "os-to-host",
-      "hasClass": false,
+      "fnArgNames": [
+        "host"
+      ],
+      "from": null,
+      "fullLabel": "unfree-predicate/os",
+      "hasClass": true,
       "host": "web-prod-2",
-      "id": "web_prod_2__os_to_host_host_web_prod_2",
-      "isParametric": false,
-      "isPolicyDispatch": true,
-      "isProvider": false,
-      "label": "os-to-host",
-      "originalId": "os_to_host_host_web_prod_2",
-      "pathKey": "os-to-host",
-      "perClass": {},
+      "id": "web_prod_2__unfree_predicate__os",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "unfree-predicate/os",
+      "originalId": "unfree_predicate__os",
+      "pathKey": "unfree-predicate/os",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
       "pipes": {
         "produces": []
       },
-      "policyName": "os-to-host",
-      "providerPath": [],
+      "policyName": null,
+      "providerPath": [
+        "unfree-predicate"
+      ],
       "scope": "host:web-prod-2",
-      "shape": "rect",
-      "style": "policy",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
+      "entityInstance": "host:web-prod-2",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host"
+      ],
+      "from": null,
+      "fullLabel": "insecure-predicate/os",
+      "hasClass": true,
+      "host": "web-prod-2",
+      "id": "web_prod_2__insecure_predicate__os",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "insecure-predicate/os",
+      "originalId": "insecure_predicate__os",
+      "pathKey": "insecure-predicate/os",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "insecure-predicate"
+      ],
+      "scope": "host:web-prod-2",
+      "shape": "hexagon",
+      "style": "default",
       "to": null
     },
     {
@@ -5329,31 +4702,47 @@
       "entityInstance": "host:web-prod-2",
       "entityKind": "host",
       "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/ssh-keys",
+      "from": "host",
+      "fullLabel": "os-to-host",
       "hasClass": false,
       "host": "web-prod-2",
-      "id": "web_prod_2__den__batteries__ssh_keys",
+      "id": "web_prod_2__os_to_host_host_web_prod_2",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "os-to-host",
+      "originalId": "os_to_host_host_web_prod_2",
+      "pathKey": "os-to-host",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "os-to-host",
+      "providerPath": [],
+      "scope": "host:web-prod-2",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-2",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "ssh-keys",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__ssh_keys",
       "isParametric": false,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys",
-      "originalId": "den__batteries__ssh_keys",
-      "pathKey": "den/batteries/ssh-keys",
+      "isProvider": false,
+      "label": "ssh-keys",
+      "originalId": "ssh_keys",
+      "pathKey": "ssh-keys",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5364,20 +4753,15 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-2",
-      "shape": "trapezoid",
+      "shape": "rect",
       "style": "adapter",
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-prod-2",
       "entityKind": "host",
       "fnArgNames": [
@@ -5385,30 +4769,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/ssh-keys/alice@web-prod-2",
-      "hasClass": true,
+      "fullLabel": "ssh-keys/alice@web-prod-2",
+      "hasClass": false,
       "host": "web-prod-2",
-      "id": "web_prod_2__den__batteries__ssh_keys__alice_web_prod_2",
+      "id": "web_prod_2__ssh_keys__alice_web_prod_2",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys/alice@web-prod-2",
-      "originalId": "den__batteries__ssh_keys__alice_web_prod_2",
-      "pathKey": "den/batteries/ssh-keys/alice@web-prod-2",
+      "isProvider": false,
+      "label": "ssh-keys/alice@web-prod-2",
+      "originalId": "ssh_keys__alice_web_prod_2",
+      "pathKey": "ssh-keys/alice@web-prod-2",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5419,10 +4791,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-prod-2",
       "shape": "hexagon",
       "style": "default",
@@ -5446,19 +4815,7 @@
       "originalId": "unfree_predicate",
       "pathKey": "unfree-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5473,109 +4830,6 @@
       "scope": "host:web-prod-2",
       "shape": "rect",
       "style": "adapter",
-      "to": null
-    },
-    {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host"
-      ],
-      "from": null,
-      "fullLabel": "unfree-predicate/os",
-      "hasClass": true,
-      "host": "web-prod-2",
-      "id": "web_prod_2__unfree_predicate__os",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "unfree-predicate/os",
-      "originalId": "unfree_predicate__os",
-      "pathKey": "unfree-predicate/os",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-2",
-      "shape": "hexagon",
-      "style": "default",
-      "to": null
-    },
-    {
-      "class": "homeManager",
-      "classes": [
-        "homeManager"
-      ],
-      "entityInstance": "host:web-prod-2",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host",
-        "user"
-      ],
-      "from": null,
-      "fullLabel": "unfree-predicate/user",
-      "hasClass": false,
-      "host": "web-prod-2",
-      "id": "web_prod_2__unfree_predicate__user",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "unfree-predicate/user",
-      "originalId": "unfree_predicate__user",
-      "pathKey": "unfree-predicate/user",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-prod-2",
-      "shape": "hexagon",
-      "style": "default",
       "to": null
     },
     {
@@ -5596,19 +4850,7 @@
       "originalId": "user",
       "pathKey": "user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5623,6 +4865,114 @@
       "scope": "user:alice",
       "shape": "rect",
       "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-2",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "unfree-predicate/user",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__unfree_predicate__user",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "unfree-predicate/user",
+      "originalId": "unfree_predicate__user",
+      "pathKey": "unfree-predicate/user",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "unfree-predicate"
+      ],
+      "scope": "host:web-prod-2",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-2",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "insecure-predicate/user",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__insecure_predicate__user",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "insecure-predicate/user",
+      "originalId": "insecure_predicate__user",
+      "pathKey": "insecure-predicate/user",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "insecure-predicate"
+      ],
+      "scope": "host:web-prod-2",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-prod-2",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "user-aspects(all)/transition-default",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__user_aspects_all___transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "user-aspects(all)/transition-default",
+      "originalId": "user_aspects_all___transition_default",
+      "pathKey": "user-aspects(all)/transition-default",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "user-aspects(all)/transition-default",
+      "providerPath": [],
+      "scope": "host:web-prod-2",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -5654,6 +5004,41 @@
       "to": null
     },
     {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "user/resolve(user)",
+      "hasClass": false,
+      "host": "web-prod-2",
+      "id": "web_prod_2__user__resolve_user_",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "user/resolve(user)",
+      "originalId": "user__resolve_user_",
+      "pathKey": "user/resolve(user)",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "terminal",
+      "to": null
+    },
+    {
       "class": "nixos",
       "classes": [
         "nixos"
@@ -5675,22 +5060,10 @@
       "originalId": "web_prod_2",
       "pathKey": "web-prod-2",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -5709,34 +5082,96 @@
       "classes": [],
       "entityInstance": "user:alice",
       "entityKind": "user",
-      "fnArgNames": [
-        "user"
-      ],
+      "fnArgNames": [],
       "from": null,
-      "fullLabel": "<self:user>",
+      "fullLabel": "user/<policy:hm-user-detect>",
       "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging___self_user__user_alice",
-      "isParametric": true,
+      "id": "web_staging__user___policy_hm_user_detect__user_alice",
+      "isParametric": false,
       "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "<self:user>",
-      "originalId": "_self_user__user_alice",
-      "pathKey": "<self:user>",
+      "isProvider": true,
+      "label": "user/<policy:hm-user-detect>",
+      "originalId": "user___policy_hm_user_detect__user_alice",
+      "pathKey": "user/<policy:hm-user-detect>",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
           "replacedBy": null
-        },
-        "user": {
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "user"
+      ],
+      "scope": "user:alice",
+      "shape": "trapezoid",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:bob",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "user/<policy:hm-user-detect>",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__user___policy_hm_user_detect__user_bob",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "user/<policy:hm-user-detect>",
+      "originalId": "user___policy_hm_user_detect__user_bob",
+      "pathKey": "user/<policy:hm-user-detect>",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "user"
+      ],
+      "scope": "user:bob",
+      "shape": "trapezoid",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "alice",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__alice",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "alice",
+      "originalId": "alice",
+      "pathKey": "alice",
+      "perClass": {
+        "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5750,7 +5185,7 @@
       "providerPath": [],
       "scope": "user:alice",
       "shape": "hexagon",
-      "style": "default",
+      "style": "adapter",
       "to": null
     },
     {
@@ -5762,30 +5197,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "<self:user>",
+      "fullLabel": "bob",
       "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging___self_user__user_bob",
+      "id": "web_staging__bob",
       "isParametric": true,
       "isPolicyDispatch": false,
       "isProvider": false,
-      "label": "<self:user>",
-      "originalId": "_self_user__user_bob",
-      "pathKey": "<self:user>",
+      "label": "bob",
+      "originalId": "bob",
+      "pathKey": "bob",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -5799,7 +5222,7 @@
       "providerPath": [],
       "scope": "user:bob",
       "shape": "hexagon",
-      "style": "default",
+      "style": "adapter",
       "to": null
     },
     {
@@ -5859,60 +5282,9 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
+      "class": "nixos",
       "classes": [
-        "nixos",
-        "homeManager"
-      ],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "default",
-      "hasClass": true,
-      "host": "web-staging",
-      "id": "web_staging__default_host_web_staging",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "default",
-      "originalId": "default_host_web_staging",
-      "pathKey": "default",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-staging",
-      "shape": "rect",
-      "style": "adapter",
-      "to": null
-    },
-    {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
+        "nixos"
       ],
       "entityInstance": "user:alice",
       "entityKind": "user",
@@ -5929,22 +5301,10 @@
       "originalId": "default_user_alice",
       "pathKey": "default",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -5959,10 +5319,46 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
+      "class": "nixos",
       "classes": [
-        "nixos",
-        "homeManager"
+        "nixos"
+      ],
+      "entityInstance": "host:web-staging",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "default",
+      "hasClass": true,
+      "host": "web-staging",
+      "id": "web_staging__default_host_web_staging",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "default",
+      "originalId": "default_host_web_staging",
+      "pathKey": "default",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "host:web-staging",
+      "shape": "rect",
+      "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "nixos",
+      "classes": [
+        "nixos"
       ],
       "entityInstance": "user:bob",
       "entityKind": "user",
@@ -5979,22 +5375,10 @@
       "originalId": "default_user_bob",
       "pathKey": "default",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -6026,19 +5410,7 @@
       "originalId": "den__batteries__define_user",
       "pathKey": "den/batteries/define-user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -6059,67 +5431,64 @@
       "to": null
     },
     {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
-      ],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host",
-        "user"
-      ],
-      "from": null,
-      "fullLabel": "den/batteries/define-user/alice@web-staging",
-      "hasClass": true,
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "define-user-account",
+      "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__den__batteries__define_user__alice_web_staging",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/define-user/alice@web-staging",
-      "originalId": "den__batteries__define_user__alice_web_staging",
-      "pathKey": "den/batteries/define-user/alice@web-staging",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "id": "web_staging__define_user_account_user_alice",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "define-user-account",
+      "originalId": "define_user_account_user_alice",
+      "pathKey": "define-user-account",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
-      "scope": "host:web-staging",
-      "shape": "hexagon",
-      "style": "default",
+      "policyName": "define-user-account",
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
-      "class": "homeManager+nixos",
-      "classes": [
-        "nixos",
-        "homeManager"
-      ],
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:bob",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "define-user-account",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__define_user_account_user_bob",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "define-user-account",
+      "originalId": "define_user_account_user_bob",
+      "pathKey": "define-user-account",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "define-user-account",
+      "providerPath": [],
+      "scope": "user:bob",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-staging",
       "entityKind": "host",
       "fnArgNames": [
@@ -6127,30 +5496,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/define-user/bob@web-staging",
-      "hasClass": true,
+      "fullLabel": "define-user/alice@web-staging",
+      "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__den__batteries__define_user__bob_web_staging",
+      "id": "web_staging__define_user__alice_web_staging",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/define-user/bob@web-staging",
-      "originalId": "den__batteries__define_user__bob_web_staging",
-      "pathKey": "den/batteries/define-user/bob@web-staging",
+      "isProvider": false,
+      "label": "define-user/alice@web-staging",
+      "originalId": "define_user__alice_web_staging",
+      "pathKey": "define-user/alice@web-staging",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -6161,10 +5518,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-staging",
       "shape": "hexagon",
       "style": "default",
@@ -6175,25 +5529,91 @@
       "classes": [],
       "entityInstance": "host:web-staging",
       "entityKind": "host",
-      "fnArgNames": [],
-      "from": "host",
-      "fullLabel": "env-users",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "define-user/bob@web-staging",
       "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__env_users",
+      "id": "web_staging__define_user__bob_web_staging",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "define-user/bob@web-staging",
+      "originalId": "define_user__bob_web_staging",
+      "pathKey": "define-user/bob@web-staging",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "host:web-staging",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "hm-user-detect",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__hm_user_detect_user_alice",
       "isParametric": false,
       "isPolicyDispatch": true,
       "isProvider": false,
-      "label": "env-users",
-      "originalId": "env_users",
-      "pathKey": "env-users",
+      "label": "hm-user-detect",
+      "originalId": "hm_user_detect_user_alice",
+      "pathKey": "hm-user-detect",
       "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": "env-users",
+      "policyName": "hm-user-detect",
       "providerPath": [],
-      "scope": "host:web-staging",
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:bob",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": "user",
+      "fullLabel": "hm-user-detect",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__hm_user_detect_user_bob",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "hm-user-detect",
+      "originalId": "hm_user_detect_user_bob",
+      "pathKey": "hm-user-detect",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "hm-user-detect",
+      "providerPath": [],
+      "scope": "user:bob",
       "shape": "rect",
       "style": "policy",
       "to": null
@@ -6216,19 +5636,7 @@
       "originalId": "host",
       "pathKey": "host",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -6251,48 +5659,54 @@
       "entityInstance": "host:web-staging",
       "entityKind": "host",
       "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(define-user):den/batteries",
+      "from": "host",
+      "fullLabel": "host-to-hm-users",
       "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__den__batteries__host__resolve_define_user__den__batteries",
+      "id": "web_staging__host_to_hm_users",
       "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(define-user):den/batteries",
-      "originalId": "den__batteries__host__resolve_define_user__den__batteries",
-      "pathKey": "den/batteries/host/resolve(define-user):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-hm-users",
+      "originalId": "host_to_hm_users",
+      "pathKey": "host-to-hm-users",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "policyName": "host-to-hm-users",
+      "providerPath": [],
       "scope": "host:web-staging",
-      "shape": "trapezoid",
-      "style": "terminal",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-staging",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "host-to-users",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__host_to_users",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "host-to-users",
+      "originalId": "host_to_users",
+      "pathKey": "host-to-users",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "host-to-users",
+      "providerPath": [],
+      "scope": "host:web-staging",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -6313,163 +5727,7 @@
       "originalId": "host__resolve_host_",
       "pathKey": "host/resolve(host)",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-staging",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(insecure-predicate)",
-      "hasClass": false,
-      "host": "web-staging",
-      "id": "web_staging__host__resolve_insecure_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(insecure-predicate)",
-      "originalId": "host__resolve_insecure_predicate_",
-      "pathKey": "host/resolve(insecure-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-staging",
-      "shape": "rect",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "hasClass": false,
-      "host": "web-staging",
-      "id": "web_staging__den__batteries__host__resolve_ssh_keys__den__batteries",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/host/resolve(ssh-keys):den/batteries",
-      "originalId": "den__batteries__host__resolve_ssh_keys__den__batteries",
-      "pathKey": "den/batteries/host/resolve(ssh-keys):den/batteries",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
-      "scope": "host:web-staging",
-      "shape": "trapezoid",
-      "style": "terminal",
-      "to": null
-    },
-    {
-      "class": "",
-      "classes": [],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [],
-      "from": null,
-      "fullLabel": "host/resolve(unfree-predicate)",
-      "hasClass": false,
-      "host": "web-staging",
-      "id": "web_staging__host__resolve_unfree_predicate_",
-      "isParametric": false,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "host/resolve(unfree-predicate)",
-      "originalId": "host__resolve_unfree_predicate_",
-      "pathKey": "host/resolve(unfree-predicate)",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -6506,22 +5764,10 @@
       "originalId": "hostfile",
       "pathKey": "hostfile",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -6555,19 +5801,7 @@
       "originalId": "den__batteries__hostname",
       "pathKey": "den/batteries/hostname",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -6598,33 +5832,21 @@
         "host"
       ],
       "from": null,
-      "fullLabel": "den/batteries/hostname/os",
+      "fullLabel": "hostname/os",
       "hasClass": true,
       "host": "web-staging",
-      "id": "web_staging__den__batteries__hostname__os",
+      "id": "web_staging__hostname__os",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/hostname/os",
-      "originalId": "den__batteries__hostname__os",
-      "pathKey": "den/batteries/hostname/os",
+      "isProvider": false,
+      "label": "hostname/os",
+      "originalId": "hostname__os",
+      "pathKey": "hostname/os",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -6632,10 +5854,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-staging",
       "shape": "hexagon",
       "style": "default",
@@ -6659,19 +5878,7 @@
       "originalId": "insecure_predicate",
       "pathKey": "insecure-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -6689,106 +5896,31 @@
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-staging",
       "entityKind": "host",
-      "fnArgNames": [
-        "host"
-      ],
-      "from": null,
-      "fullLabel": "insecure-predicate/os",
-      "hasClass": true,
-      "host": "web-staging",
-      "id": "web_staging__insecure_predicate__os",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "insecure-predicate/os",
-      "originalId": "insecure_predicate__os",
-      "pathKey": "insecure-predicate/os",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-staging",
-      "shape": "hexagon",
-      "style": "default",
-      "to": null
-    },
-    {
-      "class": "homeManager",
-      "classes": [
-        "homeManager"
-      ],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host",
-        "user"
-      ],
-      "from": null,
-      "fullLabel": "insecure-predicate/user",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "mutual-provider/transition-default",
       "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__insecure_predicate__user",
-      "isParametric": true,
-      "isPolicyDispatch": false,
+      "id": "web_staging__mutual_provider__transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
       "isProvider": false,
-      "label": "insecure-predicate/user",
-      "originalId": "insecure_predicate__user",
-      "pathKey": "insecure-predicate/user",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
+      "label": "mutual-provider/transition-default",
+      "originalId": "mutual_provider__transition_default",
+      "pathKey": "mutual-provider/transition-default",
+      "perClass": {},
       "pipes": {
         "produces": []
       },
-      "policyName": null,
+      "policyName": "mutual-provider/transition-default",
       "providerPath": [],
       "scope": "host:web-staging",
-      "shape": "hexagon",
-      "style": "default",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -6811,22 +5943,10 @@
       "originalId": "nginx",
       "pathKey": "nginx",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -6843,31 +5963,85 @@
       "to": null
     },
     {
-      "class": "",
-      "classes": [],
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
       "entityInstance": "host:web-staging",
       "entityKind": "host",
-      "fnArgNames": [],
-      "from": "host",
-      "fullLabel": "os-to-host",
-      "hasClass": false,
+      "fnArgNames": [
+        "host"
+      ],
+      "from": null,
+      "fullLabel": "unfree-predicate/os",
+      "hasClass": true,
       "host": "web-staging",
-      "id": "web_staging__os_to_host_host_web_staging",
-      "isParametric": false,
-      "isPolicyDispatch": true,
-      "isProvider": false,
-      "label": "os-to-host",
-      "originalId": "os_to_host_host_web_staging",
-      "pathKey": "os-to-host",
-      "perClass": {},
+      "id": "web_staging__unfree_predicate__os",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "unfree-predicate/os",
+      "originalId": "unfree_predicate__os",
+      "pathKey": "unfree-predicate/os",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
       "pipes": {
         "produces": []
       },
-      "policyName": "os-to-host",
-      "providerPath": [],
+      "policyName": null,
+      "providerPath": [
+        "unfree-predicate"
+      ],
       "scope": "host:web-staging",
-      "shape": "rect",
-      "style": "policy",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "nixos",
+      "classes": [
+        "nixos"
+      ],
+      "entityInstance": "host:web-staging",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host"
+      ],
+      "from": null,
+      "fullLabel": "insecure-predicate/os",
+      "hasClass": true,
+      "host": "web-staging",
+      "id": "web_staging__insecure_predicate__os",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "insecure-predicate/os",
+      "originalId": "insecure_predicate__os",
+      "pathKey": "insecure-predicate/os",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": true,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "insecure-predicate"
+      ],
+      "scope": "host:web-staging",
+      "shape": "hexagon",
+      "style": "default",
       "to": null
     },
     {
@@ -6894,6 +6068,34 @@
       "policyName": "os-to-host",
       "providerPath": [],
       "scope": "user:alice",
+      "shape": "rect",
+      "style": "policy",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-staging",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "os-to-host",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__os_to_host_host_web_staging",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "os-to-host",
+      "originalId": "os_to_host_host_web_staging",
+      "pathKey": "os-to-host",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "os-to-host",
+      "providerPath": [],
+      "scope": "host:web-staging",
       "shape": "rect",
       "style": "policy",
       "to": null
@@ -6933,30 +6135,18 @@
       "entityKind": "host",
       "fnArgNames": [],
       "from": null,
-      "fullLabel": "den/batteries/ssh-keys",
+      "fullLabel": "ssh-keys",
       "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__den__batteries__ssh_keys",
+      "id": "web_staging__ssh_keys",
       "isParametric": false,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys",
-      "originalId": "den__batteries__ssh_keys",
-      "pathKey": "den/batteries/ssh-keys",
+      "isProvider": false,
+      "label": "ssh-keys",
+      "originalId": "ssh_keys",
+      "pathKey": "ssh-keys",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -6967,20 +6157,15 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-staging",
-      "shape": "trapezoid",
+      "shape": "rect",
       "style": "adapter",
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-staging",
       "entityKind": "host",
       "fnArgNames": [
@@ -6988,30 +6173,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/ssh-keys/alice@web-staging",
-      "hasClass": true,
+      "fullLabel": "ssh-keys/alice@web-staging",
+      "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__den__batteries__ssh_keys__alice_web_staging",
+      "id": "web_staging__ssh_keys__alice_web_staging",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys/alice@web-staging",
-      "originalId": "den__batteries__ssh_keys__alice_web_staging",
-      "pathKey": "den/batteries/ssh-keys/alice@web-staging",
+      "isProvider": false,
+      "label": "ssh-keys/alice@web-staging",
+      "originalId": "ssh_keys__alice_web_staging",
+      "pathKey": "ssh-keys/alice@web-staging",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -7022,20 +6195,15 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-staging",
       "shape": "hexagon",
       "style": "default",
       "to": null
     },
     {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
+      "class": "",
+      "classes": [],
       "entityInstance": "host:web-staging",
       "entityKind": "host",
       "fnArgNames": [
@@ -7043,30 +6211,18 @@
         "user"
       ],
       "from": null,
-      "fullLabel": "den/batteries/ssh-keys/bob@web-staging",
-      "hasClass": true,
+      "fullLabel": "ssh-keys/bob@web-staging",
+      "hasClass": false,
       "host": "web-staging",
-      "id": "web_staging__den__batteries__ssh_keys__bob_web_staging",
+      "id": "web_staging__ssh_keys__bob_web_staging",
       "isParametric": true,
       "isPolicyDispatch": false,
-      "isProvider": true,
-      "label": "batteries/ssh-keys/bob@web-staging",
-      "originalId": "den__batteries__ssh_keys__bob_web_staging",
-      "pathKey": "den/batteries/ssh-keys/bob@web-staging",
+      "isProvider": false,
+      "label": "ssh-keys/bob@web-staging",
+      "originalId": "ssh_keys__bob_web_staging",
+      "pathKey": "ssh-keys/bob@web-staging",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -7077,10 +6233,7 @@
         "produces": []
       },
       "policyName": null,
-      "providerPath": [
-        "den",
-        "batteries"
-      ],
+      "providerPath": [],
       "scope": "host:web-staging",
       "shape": "hexagon",
       "style": "default",
@@ -7104,19 +6257,7 @@
       "originalId": "unfree_predicate",
       "pathKey": "unfree-predicate",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -7131,109 +6272,6 @@
       "scope": "host:web-staging",
       "shape": "rect",
       "style": "adapter",
-      "to": null
-    },
-    {
-      "class": "nixos",
-      "classes": [
-        "nixos"
-      ],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host"
-      ],
-      "from": null,
-      "fullLabel": "unfree-predicate/os",
-      "hasClass": true,
-      "host": "web-staging",
-      "id": "web_staging__unfree_predicate__os",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "unfree-predicate/os",
-      "originalId": "unfree_predicate__os",
-      "pathKey": "unfree-predicate/os",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-staging",
-      "shape": "hexagon",
-      "style": "default",
-      "to": null
-    },
-    {
-      "class": "homeManager",
-      "classes": [
-        "homeManager"
-      ],
-      "entityInstance": "host:web-staging",
-      "entityKind": "host",
-      "fnArgNames": [
-        "host",
-        "user"
-      ],
-      "from": null,
-      "fullLabel": "unfree-predicate/user",
-      "hasClass": false,
-      "host": "web-staging",
-      "id": "web_staging__unfree_predicate__user",
-      "isParametric": true,
-      "isPolicyDispatch": false,
-      "isProvider": false,
-      "label": "unfree-predicate/user",
-      "originalId": "unfree_predicate__user",
-      "pathKey": "unfree-predicate/user",
-      "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": true,
-          "replacedBy": null
-        },
-        "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        }
-      },
-      "pipes": {
-        "produces": []
-      },
-      "policyName": null,
-      "providerPath": [],
-      "scope": "host:web-staging",
-      "shape": "hexagon",
-      "style": "default",
       "to": null
     },
     {
@@ -7254,19 +6292,7 @@
       "originalId": "user_user_alice",
       "pathKey": "user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -7281,6 +6307,86 @@
       "scope": "user:alice",
       "shape": "rect",
       "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-staging",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "unfree-predicate/user",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__unfree_predicate__user",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "unfree-predicate/user",
+      "originalId": "unfree_predicate__user",
+      "pathKey": "unfree-predicate/user",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "unfree-predicate"
+      ],
+      "scope": "host:web-staging",
+      "shape": "hexagon",
+      "style": "default",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-staging",
+      "entityKind": "host",
+      "fnArgNames": [
+        "host",
+        "user"
+      ],
+      "from": null,
+      "fullLabel": "insecure-predicate/user",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__insecure_predicate__user",
+      "isParametric": true,
+      "isPolicyDispatch": false,
+      "isProvider": true,
+      "label": "insecure-predicate/user",
+      "originalId": "insecure_predicate__user",
+      "pathKey": "insecure-predicate/user",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [
+        "insecure-predicate"
+      ],
+      "scope": "host:web-staging",
+      "shape": "hexagon",
+      "style": "default",
       "to": null
     },
     {
@@ -7301,19 +6407,7 @@
       "originalId": "user_user_bob",
       "pathKey": "user",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
-        "user": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": false,
@@ -7328,6 +6422,34 @@
       "scope": "user:bob",
       "shape": "rect",
       "style": "adapter",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "host:web-staging",
+      "entityKind": "host",
+      "fnArgNames": [],
+      "from": "host",
+      "fullLabel": "user-aspects(all)/transition-default",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__user_aspects_all___transition_default",
+      "isParametric": false,
+      "isPolicyDispatch": true,
+      "isProvider": false,
+      "label": "user-aspects(all)/transition-default",
+      "originalId": "user_aspects_all___transition_default",
+      "pathKey": "user-aspects(all)/transition-default",
+      "perClass": {},
+      "pipes": {
+        "produces": []
+      },
+      "policyName": "user-aspects(all)/transition-default",
+      "providerPath": [],
+      "scope": "host:web-staging",
+      "shape": "rect",
+      "style": "policy",
       "to": null
     },
     {
@@ -7387,6 +6509,76 @@
       "to": null
     },
     {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:alice",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "user/resolve(user)",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__user__resolve_user__user_alice",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "user/resolve(user)",
+      "originalId": "user__resolve_user__user_alice",
+      "pathKey": "user/resolve(user)",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "user:alice",
+      "shape": "rect",
+      "style": "terminal",
+      "to": null
+    },
+    {
+      "class": "",
+      "classes": [],
+      "entityInstance": "user:bob",
+      "entityKind": "user",
+      "fnArgNames": [],
+      "from": null,
+      "fullLabel": "user/resolve(user)",
+      "hasClass": false,
+      "host": "web-staging",
+      "id": "web_staging__user__resolve_user__user_bob",
+      "isParametric": false,
+      "isPolicyDispatch": false,
+      "isProvider": false,
+      "label": "user/resolve(user)",
+      "originalId": "user__resolve_user__user_bob",
+      "pathKey": "user/resolve(user)",
+      "perClass": {
+        "nixos": {
+          "excluded": false,
+          "excludedFrom": null,
+          "hasClass": false,
+          "replacedBy": null
+        }
+      },
+      "pipes": {
+        "produces": []
+      },
+      "policyName": null,
+      "providerPath": [],
+      "scope": "user:bob",
+      "shape": "rect",
+      "style": "terminal",
+      "to": null
+    },
+    {
       "class": "nixos",
       "classes": [
         "nixos"
@@ -7408,22 +6600,10 @@
       "originalId": "web_staging",
       "pathKey": "web-staging",
       "perClass": {
-        "homeManager": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
-          "replacedBy": null
-        },
         "nixos": {
           "excluded": false,
           "excludedFrom": null,
           "hasClass": true,
-          "replacedBy": null
-        },
-        "user": {
-          "excluded": false,
-          "excludedFrom": null,
-          "hasClass": false,
           "replacedBy": null
         }
       },
@@ -7618,6 +6798,8 @@
         "environment=prod,fleet=fleet,host=lb-prod,user=alice"
       ],
       "ctxKeys": [
+        "den-mutual-provider/default/host:3b8f3c38b6838e5455e71ba340e005014cb9463691afb56fb74f41129bbc5171",
+        "den-user-aspects/default/host:3b8f3c38b6838e5455e71ba340e005014cb9463691afb56fb74f41129bbc5171",
         "environment",
         "fleet",
         "host"
@@ -7631,6 +6813,8 @@
     {
       "children": [],
       "ctxKeys": [
+        "den-mutual-provider/default/host:3b8f3c38b6838e5455e71ba340e005014cb9463691afb56fb74f41129bbc5171",
+        "den-user-aspects/default/host:3b8f3c38b6838e5455e71ba340e005014cb9463691afb56fb74f41129bbc5171",
         "environment",
         "fleet",
         "host",
@@ -7647,6 +6831,8 @@
         "environment=prod,fleet=fleet,host=web-prod-1,user=alice"
       ],
       "ctxKeys": [
+        "den-mutual-provider/default/host:c1141233d70098d611fd8335c51003b687ada7f7f29b14fcbf97e55b20c6f496",
+        "den-user-aspects/default/host:c1141233d70098d611fd8335c51003b687ada7f7f29b14fcbf97e55b20c6f496",
         "environment",
         "fleet",
         "host"
@@ -7660,6 +6846,8 @@
     {
       "children": [],
       "ctxKeys": [
+        "den-mutual-provider/default/host:c1141233d70098d611fd8335c51003b687ada7f7f29b14fcbf97e55b20c6f496",
+        "den-user-aspects/default/host:c1141233d70098d611fd8335c51003b687ada7f7f29b14fcbf97e55b20c6f496",
         "environment",
         "fleet",
         "host",
@@ -7676,6 +6864,8 @@
         "environment=prod,fleet=fleet,host=web-prod-2,user=alice"
       ],
       "ctxKeys": [
+        "den-mutual-provider/default/host:ff8d48d120937a0587b8456c26ebfd31c2a3c6edd5acc69ae889ee34883a51f4",
+        "den-user-aspects/default/host:ff8d48d120937a0587b8456c26ebfd31c2a3c6edd5acc69ae889ee34883a51f4",
         "environment",
         "fleet",
         "host"
@@ -7689,6 +6879,8 @@
     {
       "children": [],
       "ctxKeys": [
+        "den-mutual-provider/default/host:ff8d48d120937a0587b8456c26ebfd31c2a3c6edd5acc69ae889ee34883a51f4",
+        "den-user-aspects/default/host:ff8d48d120937a0587b8456c26ebfd31c2a3c6edd5acc69ae889ee34883a51f4",
         "environment",
         "fleet",
         "host",
@@ -7720,6 +6912,8 @@
         "environment=staging,fleet=fleet,host=web-staging,user=bob"
       ],
       "ctxKeys": [
+        "den-mutual-provider/default/host:129f7e749ef0a3e06baecf63e15b166fb7e6200e52269932cdb43ca2592a18d2",
+        "den-user-aspects/default/host:129f7e749ef0a3e06baecf63e15b166fb7e6200e52269932cdb43ca2592a18d2",
         "environment",
         "fleet",
         "host"
@@ -7733,6 +6927,8 @@
     {
       "children": [],
       "ctxKeys": [
+        "den-mutual-provider/default/host:129f7e749ef0a3e06baecf63e15b166fb7e6200e52269932cdb43ca2592a18d2",
+        "den-user-aspects/default/host:129f7e749ef0a3e06baecf63e15b166fb7e6200e52269932cdb43ca2592a18d2",
         "environment",
         "fleet",
         "host",
@@ -7747,6 +6943,8 @@
     {
       "children": [],
       "ctxKeys": [
+        "den-mutual-provider/default/host:129f7e749ef0a3e06baecf63e15b166fb7e6200e52269932cdb43ca2592a18d2",
+        "den-user-aspects/default/host:129f7e749ef0a3e06baecf63e15b166fb7e6200e52269932cdb43ca2592a18d2",
         "environment",
         "fleet",
         "host",

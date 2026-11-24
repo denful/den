@@ -45,8 +45,8 @@ Everything else — the set of users on a host, their Unix groups — is derived
 |---|---|---|
 | Environment | `acl.environments.<env>` | A named slice of the fleet (`prod`, `dev`) carrying shared settings (`domain`, `timezone`) and a baseline list of **login gates**. |
 | Group | `acl.groups.<name>` | A name with `labels` (what consumes it) and `members` (other groups whose members inherit this one). |
-| User | `acl.users.<name>` | An identity plus the groups it is **directly** in. No host list. |
-| Host gate | `den.hosts.<sys>.<host>.system-access-groups` | Extra login gates for one host, added to its environment's. |
+| User | `den.users.<name>`, with `facts.groups` | An identity plus the groups it is **directly** in. No host list. |
+| Host gate | `den.hosts.<sys>.<host>.facts.system-access-groups` | Extra login gates for one host, added to its environment's. |
 
 Resolution for a user `U` on host `H` in environment `E`:
 
@@ -70,9 +70,9 @@ module can consume `oauth-grant` from the same graph (see
 | Piece | den primitive |
 |---|---|
 | `environment` as a scope between flake and host | `den.schema.environment.isEntity` + a `resolve.to "environment"` policy ([Policies](/explanation/policies/)) |
-| Host-to-environment membership | `den.schema.host.imports` adding an `environment` option ([Schema](/reference/schema/)) |
-| Users admitted by ACL instead of `host.users` | a host policy emitting `resolve.to "user"`, with `den.policies.host-to-users` excluded |
-| Per-user Unix groups | a parametric `{ host, user }` aspect in `den.schema.user.includes` ([Parametric aspects](/explanation/parametric/)) |
+| Host-to-environment membership | a host fact, `environment`, with a host field that follows it ([Facts](/guides/users/#facts)) |
+| Users admitted by ACL | an assignment policy over facts, `den.lib.policy.assign` ([Users Across Hosts & Homes](/guides/users/#assignment-policies)) |
+| Per-user Unix groups | a parametric `{ host }` aspect in `den.schema.host.includes`, reading `host.users` ([Parametric aspects](/explanation/parametric/)) |
 | Environment settings in class modules | the `environment` context argument, inherited by every host scope under it |
 | Host-side view of admitted users | a quirk exposed from user scope with `pipe.expose` ([Cross-Scope Pipes](/guides/quirks-cross-scope/)) |
 
@@ -80,16 +80,19 @@ module can consume `oauth-grant` from the same graph (see
 flowchart TB
   F["flake"] -- "to-environments" --> E["environment: dev"]
   E -- "environment-to-hosts (resolve.to host + instantiate)" --> H["host: iceberg"]
-  H -- "acl-users: closure(user.groups) meets env gates ++ host gates?" --> U1["user: alice"]
-  H -- "acl-users" --> U2["user: bob"]
-  U1 -- "posixGroups: closure filtered to posix" --> G["users.users.alice.extraGroups"]
+  H -- "host.users (assigned by acl-users before resolution)" --> U1["user: alice"]
+  H -- "host.users" --> U2["user: bob"]
+  H -- "posixGroups: each user's closure filtered to posix" --> G["users.users.alice.extraGroups"]
 ```
 
-Each arrow is one policy. Only the `acl-users` step consults the group graph.
+Each labelled arrow is one policy or aspect. Only the `acl-users` assignment
+policy consults the group graph, and it runs before any host is resolved, so
+`host.users` already holds every admitted user.
 
-The groups, users and environments registries are plain `lib.types`
-options under a user-chosen `acl.*` namespace. They are **not** den API; den
-only sees the entities the policies resolve.
+Users live in den's registry, `den.users`. The groups and environments
+registries are plain `lib.types` options under a user-chosen `acl.*`
+namespace. They are **not** den API; den only sees the entities the policies
+resolve.
 
 ## Worked example
 
@@ -114,13 +117,15 @@ let
     strict = den.schema.environment.isStrict;
     extraModules = [
       (
-        { name, config, ... }:
+        { config, ... }:
         {
           config._module.args.environment = config;
           options = {
-            name = mkOption { type = types.str; default = name; };
             domain = mkOption { type = types.str; };
-            timezone = mkOption { type = types.str; default = "UTC"; };
+            timezone = mkOption {
+              type = types.str;
+              default = "UTC";
+            };
             system-access-groups = groupNames;
           };
         }
@@ -130,74 +135,81 @@ let
 
   groupType = types.submodule {
     options = {
-      description = mkOption { type = types.str; default = ""; };
+      description = mkOption {
+        type = types.str;
+        default = "";
+      };
       labels = groupNames;
       members = groupNames;
     };
   };
-
-  # Mirrors den's own user entity shape so batteries such as define-user
-  # find userName, classes and aspect.
-  userType = den.lib.schema.mkInstanceType {
-    strict = den.schema.user.isStrict;
-    extraModules = [
-      (
-        { name, config, ... }:
-        {
-          config._module.args.user = config;
-          options = {
-            name = mkOption { type = types.str; default = name; };
-            userName = mkOption { type = types.str; default = name; };
-            classes = mkOption {
-              type = types.listOf types.str;
-              default = [ "homeManager" ];
-            };
-            aspect = mkOption {
-              type = types.raw;
-              default = den.aspects.${name} or { };
-            };
-            groups = groupNames;
-          };
-        }
-      )
-    ];
-  } den.schema.user;
 in
 {
   options.acl = {
-    environments = mkOption { type = types.attrsOf environmentType; default = { }; };
-    groups = mkOption { type = types.attrsOf groupType; default = { }; };
-    users = mkOption { type = types.attrsOf userType; default = { }; };
+    environments = mkOption {
+      type = types.attrsOf environmentType;
+      default = { };
+    };
+    groups = mkOption {
+      type = types.attrsOf groupType;
+      default = { };
+    };
   };
 
   config = {
     den.schema.environment.isEntity = true;
-    den.schema.user.isEntity = true;
-    den.schema.host.imports = [
+    den.schema.user.classes = lib.mkDefault [ "homeManager" ];
+
+    # What user assignment reads, before any host is resolved.
+    den.schema.host.facts = [
       {
         options.environment = mkOption { type = types.str; };
         options.system-access-groups = groupNames;
       }
     ];
+    den.schema.user.facts = [ { options.groups = groupNames; } ];
+
+    # The host's environment as an ordinary field too, for the walk below.
+    den.schema.host.imports = [
+      (
+        { config, ... }:
+        {
+          options.environment = mkOption {
+            type = types.str;
+            default = config.facts.environment;
+          };
+        }
+      )
+    ];
   };
 }
 ```
 
-`den.lib.schema.mkInstanceType { … } den.schema.<kind>` builds the registry
-entry type from the kind itself, so any `den.schema.environment.imports` /
-`den.schema.user.imports` you add later apply to registry entries too, and
-passing `strict = den.schema.<kind>.isStrict` closes the entries whenever
+`den.lib.schema.mkInstanceType { … } den.schema.environment` builds the
+environment registry's entry type from the kind itself, so any
+`den.schema.environment.imports` you add later apply to its entries too, and
+passing `strict = den.schema.environment.isStrict` closes the entries whenever
 the kind is [strict](/explanation/entities/#strict-mode). A plain
-`types.submodule` that imports the kind stays open.
+`types.submodule` that imports the kind stays open. Users need no type of their
+own: `den.users` entries are den users already.
+
+The facts are what the `acl-users` assignment policy below reads. It runs
+before any host is resolved, so it can't read the host itself; the host's
+`environment` field follows its fact for everything that runs later.
 
 ### 2. Resolution
 
 ```nix
 # modules/acl-policies.nix
-{ lib, den, config, ... }:
+{
+  lib,
+  den,
+  config,
+  ...
+}:
 let
   inherit (den.lib.policy) resolve instantiate;
-  inherit (config.acl) environments groups users;
+  inherit (config.acl) environments groups;
 
   # A member of group G is also a member of every group listing G in `members`.
   closure =
@@ -213,20 +225,37 @@ let
       }
     );
 
-  gatesFor = environment: host: environment.system-access-groups ++ host.system-access-groups;
+  gatesFor =
+    host:
+    environments.${host.facts.environment}.system-access-groups ++ host.facts.system-access-groups;
 
-  canLogin =
-    environment: host: user:
-    lib.any (g: lib.elem g (gatesFor environment host)) (closure user.groups);
+  canLogin = host: user: lib.any (g: lib.elem g (gatesFor host)) (closure user.facts.groups);
 
-  posixGroups = user: lib.filter (g: lib.elem "posix" groups.${g}.labels) (closure user.groups);
+  posixGroups = user: lib.filter (g: lib.elem "posix" groups.${g}.labels) (closure user.facts.groups);
 
   allHosts = lib.concatMap lib.attrValues (lib.attrValues den.hosts);
+
+  # Every user is on `host.users` before resolution, so the host sets each
+  # one's POSIX groups itself; nothing crosses from user scope.
+  posixGroupsOnHost =
+    { host }:
+    let
+      posix = lib.mapAttrs' (_: u: lib.nameValuePair u.userName (posixGroups u)) host.users;
+    in
+    {
+      name = "acl-posix-groups/${host.name}";
+      nixos = {
+        users.users = builtins.mapAttrs (_: extraGroups: { inherit extraGroups; }) posix;
+        users.groups = lib.genAttrs (lib.unique (lib.concatLists (builtins.attrValues posix))) (_: { });
+      };
+    };
+
 in
 {
   # flake -> environment
   den.policies.to-environments =
-    _: lib.mapAttrsToList (_: environment: resolve.to "environment" { inherit environment; }) environments;
+    _:
+    lib.mapAttrsToList (_: environment: resolve.to "environment" { inherit environment; }) environments;
 
   # environment -> host
   den.policies.environment-to-hosts =
@@ -239,48 +268,38 @@ in
       ]
     ) allHosts;
 
-  # host -> user, for every user the gates admit
-  den.policies.acl-users =
-    { host, environment, ... }:
-    map (user: resolve.to "user" { inherit user; }) (
-      lib.filter (canLogin environment host) (lib.attrValues users)
-    );
+  # Which users each host gets, decided before any host is resolved: every
+  # registry user the host's gates admit.
+  den.policies.acl-users = den.lib.policy.assign (
+    { host, users }: builtins.attrNames (lib.filterAttrs (_: canLogin host) users)
+  );
 
   den.schema.flake.includes = [ den.policies.to-environments ];
   den.schema.environment.includes = [ den.policies.environment-to-hosts ];
-  den.schema.host.includes = [ den.policies.acl-users ];
+  den.schema.host.includes = [
+    den.policies.acl-users
+    posixGroupsOnHost
+  ];
 
-  # The environment walk replaces den's default host and user walks.
-  den.schema.host.excludes = [ den.policies.host-to-users ];
+  # The environment walk replaces den's default host walk.
   den.schema.flake-system.excludes = [
     den.policies.system-to-os-outputs
-    den.policies.system-to-hm-outputs
   ];
 
-  # Fires once per admitted user; the name keeps one entry per user and host.
-  den.schema.user.includes = [
-    (
-      { host, user }:
-      {
-        name = "acl-posix-groups/${user.userName}@${host.name}";
-        nixos = {
-          users.users.${user.userName}.extraGroups = posixGroups user;
-          users.groups = lib.genAttrs (posixGroups user) (_: { });
-        };
-      }
-    )
-  ];
 }
 ```
 
-`acl-users` destructures `environment` although it runs at host scope: a
-host resolved under an environment scope inherits that binding, so the policy
-sees the host's own environment without looking it up.
+`acl-users` runs before any host is resolved, so it reads the host's
+environment and extra gates from its facts, and each user's groups from theirs.
+Its result is the host's `users`, so everything that reads `host.users` sees
+the admitted users: den's own user scopes, home-manager detection, and the
+`posixGroupsOnHost` aspect above.
 
 <Aside>
-Excluding `host-to-users` means `den.hosts.<sys>.<host>.users` is ignored.
-Every user now comes from `acl.users`. To keep a few hand-declared users,
-leave `host-to-users` in place and make sure the two sets do not overlap.
+Hand-declared `den.hosts.<sys>.<host>.users.<name>` entries still work beside
+the ACL: a user is on a host if either puts it there, and a hand-declared
+entry's fields are that host's override for the user. See
+[Users Across Hosts & Homes](/guides/users/).
 </Aside>
 
 ### 3. Data
@@ -305,7 +324,7 @@ leave `host-to-users` in place and make sure the two sets do not overlap.
     admins.description = "Log in anywhere";
     developers = {
       labels = [ "posix" ];
-      members = [ "admins" ];      # every admin is a developer
+      members = [ "admins" ]; # every admin is a developer
     };
     wheel = {
       labels = [ "posix" ];
@@ -318,17 +337,17 @@ leave `host-to-users` in place and make sure the two sets do not overlap.
     grafana-viewers.members = [ "developers" ];
   };
 
-  acl.users = {
-    tux.groups = [ "admins" ];
-    alice.groups = [ "developers" ];
-    bob.groups = [ "grafana-viewers" ];
+  den.users = {
+    tux.facts.groups = [ "admins" ];
+    alice.facts.groups = [ "developers" ];
+    bob.facts.groups = [ "grafana-viewers" ];
   };
 
   den.hosts.x86_64-linux = {
-    igloo.environment = "prod";
-    iceberg = {
+    igloo.facts.environment = "prod";
+    iceberg.facts = {
       environment = "dev";
-      system-access-groups = [ "grafana-viewers" ];  # host-only gate
+      system-access-groups = [ "grafana-viewers" ]; # host-only gate
     };
   };
 
@@ -415,39 +434,23 @@ reaches across environments. See [Quirks & Pipes](/guides/quirks/).
 
 ### Tell host aspects who is admitted
 
-Some host-level modules need the list of users resolved onto the host
+Some host-level modules need the list of users admitted to the host
 (`hardware.openrazer.users`, a group's member list, `authorized_keys` for a
-shared account). Emit one record per user and expose it upward:
+shared account). They're already on `host.users`, so a host aspect reads them
+directly:
 
 ```nix
-{ lib, den, ... }:
-let
-  inherit (den.lib.policy) pipe;
-in
+{ lib, ... }:
 {
-  den.quirks.login-users.description = "Users admitted to a host by the ACL";
-
-  den.policies.expose-login-users =
-    { user, ... }: [ (pipe.from "login-users" [ pipe.expose ]) ];
-
-  den.schema.user.includes = [
-    den.policies.expose-login-users
-    (
-      { host, user }:
-      {
-        name = "login-users/${user.userName}@${host.name}";
-        login-users = { inherit (user) name groups; };
-      }
-    )
-  ];
-
-  den.aspects.wireshark.nixos =
-    { login-users, lib, ... }:
+  den.aspects.wireshark =
+    { host }:
     {
-      programs.wireshark.enable = true;
-      users.users = lib.genAttrs (map (u: u.name) login-users) (_: {
-        extraGroups = [ "wireshark" ];
-      });
+      nixos = {
+        programs.wireshark.enable = true;
+        users.users = lib.mapAttrs' (
+          _: user: lib.nameValuePair user.userName { extraGroups = [ "wireshark" ]; }
+        ) host.users;
+      };
     };
 }
 ```
@@ -466,17 +469,17 @@ every user (admitted anywhere or not) and every group labelled
 ```nix
 oauthGroups = lib.filterAttrs (_: g: lib.elem "oauth-grant" g.labels) config.acl.groups;
 membersOf = group:
-  lib.attrNames (lib.filterAttrs (_: u: lib.elem group (closure u.groups)) config.acl.users);
+  lib.attrNames (lib.filterAttrs (_: u: lib.elem group (closure u.facts.groups)) config.den.users);
 ```
 
-Identity-only users are registry entries whose closure reaches no gate. They
-exist for the identity provider and never resolve onto a host.
+Identity-only users are `den.users` entries whose closure reaches no gate. They
+exist for the identity provider and never land on a host.
 
 ### More gates and grants
 
-- **Role defaults.** Give `system-access-groups` a default computed from
-  another host option (`if role == "server" then [ "server-access" ] else …`)
-  instead of setting it on every host.
+- **Role defaults.** Give the `system-access-groups` fact a default computed
+  from another fact (`if config.role == "server" then [ "server-access" ] else …`)
+  instead of setting it on every host. A fact's default reads other facts only.
 - **Grants separate from gates.** If "who is allowed into prod" and "what a
   host accepts" are owned by different people, add a second list (for example
   `acl.grants.<env>`) and admit users whose closure hits `grants ∩ gates`.

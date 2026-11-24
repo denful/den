@@ -448,7 +448,7 @@ let
   resolutionAssignmentWarning = builtins.mapAttrs (
     name: _:
     warnOrThrow ''
-      den: policy `${name}` assigns users to hosts during resolution (`resolve.to "user"`). That keeps working, but `den.users` with `den.lib.policy.assign` (or `den.users.<n>.hosts`) is now the source of truth for host assignment; see https://github.com/denful/den/issues/781. Set `den.migrations.resolution-assignments.suppressWarnings = true` to silence this.
+      den: policy `${name}` assigns users to hosts during resolution (`resolve.to "user"`). That keeps working, but `den.users` with `den.lib.policy.assign` (or `den.users.<n>.hosts`) is now the source of truth for host assignment; see https://den.denful.dev/guides/users/#from-host-policies-that-assign-during-resolution. Set `den.migrations.resolution-assignments.suppressWarnings = true` to silence this.
     '' true
   ) (den.policies or { });
   # den's own fan-out (`host-to-users`, the home batteries' per-user policies)
@@ -473,7 +473,7 @@ let
         (
           acc: r:
           builtins.seq (resolutionAssignmentWarning.${r.policyName}
-            or (warnOrThrow "den: a policy assigns users to hosts during resolution (`resolve.to \"user\"`); see https://github.com/denful/den/issues/781." true)
+            or (warnOrThrow "den: a policy assigns users to hosts during resolution (`resolve.to \"user\"`); see https://den.denful.dev/guides/users/#from-host-policies-that-assign-during-resolution." true)
           ) acc
         )
         x

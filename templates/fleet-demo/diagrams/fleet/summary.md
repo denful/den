@@ -11,8 +11,8 @@ for quick reference or machine consumption.
 ## Topology
 
 - **2** environments, **4** hosts, **5** users
-- Scope chain: flake → flake-system → fleet → user → host → environment
-- Trace entries: 245
+- Scope chain: flake → fleet → user → host → environment → flake-system
+- Trace entries: 249
 
 ## Environments
 
@@ -25,10 +25,10 @@ for quick reference or machine consumption.
 
 | Host | Aspect Count | Aspects |
 | ------ | -------------- | --------- |
-| lb-prod | 5 | haproxy, hostfile, insecure-predicate/os, lb-prod, unfree-predicate/os |
-| web-prod-1 | 5 | hostfile, insecure-predicate/os, nginx, unfree-predicate/os, web-prod-1 |
-| web-prod-2 | 5 | hostfile, insecure-predicate/os, nginx, unfree-predicate/os, web-prod-2 |
-| web-staging | 5 | hostfile, insecure-predicate/os, nginx, unfree-predicate/os, web-staging |
+| lb-prod | 4 | haproxy, hostfile, hostname/os, lb-prod |
+| web-prod-1 | 4 | hostfile, hostname/os, nginx, web-prod-1 |
+| web-prod-2 | 4 | hostfile, hostname/os, nginx, web-prod-2 |
+| web-staging | 4 | hostfile, hostname/os, nginx, web-staging |
 
 ## Pipes
 
@@ -43,17 +43,22 @@ for quick reference or machine consumption.
 
 | Policy | Fires at |
 | -------- | ---------- |
+| flake-to-systems | flake |
 | to-fleet | flake |
-| to-systems | flake |
+| apps-to-flake | flake-system |
+| checks-to-flake | flake-system |
+| devShells-to-flake | flake-system |
+| legacyPackages-to-flake | flake-system |
+| packages-to-flake | flake-system |
 | fleet-to-envs | fleet |
 | env-to-hosts | environment |
 | collect-backends | host |
 | collect-host-addrs | host |
-| env-users | host |
+| host-to-hm-users | host |
+| host-to-users | host |
+| mutual-provider/transition-default | host |
 | os-to-host | host |
+| user-aspects(all)/transition-default | host |
+| define-user-account | user |
+| hm-user-detect | user |
 | user-to-host | user |
-| to-apps | flake-system |
-| to-checks | flake-system |
-| to-devShells | flake-system |
-| to-legacyPackages | flake-system |
-| to-packages | flake-system |

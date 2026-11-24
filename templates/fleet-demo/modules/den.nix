@@ -1,4 +1,5 @@
 # Fleet topology: two environments, four hosts, policy-driven user access.
+# Each host's environment is a fact the user-access assignment policy reads.
 #
 # Scope tree:
 #   flake
@@ -27,19 +28,19 @@
 
   den.hosts.x86_64-linux = {
     lb-prod = {
-      environment = "prod";
+      facts.environment = "prod";
       addr = "10.0.1.1";
     };
     web-prod-1 = {
-      environment = "prod";
+      facts.environment = "prod";
       addr = "10.0.1.10";
     };
     web-prod-2 = {
-      environment = "prod";
+      facts.environment = "prod";
       addr = "10.0.1.11";
     };
     web-staging = {
-      environment = "staging";
+      facts.environment = "staging";
       addr = "10.0.2.10";
     };
   };

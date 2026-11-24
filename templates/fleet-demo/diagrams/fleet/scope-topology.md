@@ -6,8 +6,9 @@ evaluated. Child scopes inherit their parent's context bindings.
 
 In this fleet, the tree is: flake → fleet → environment → host → user.
 Environment and host scopes are created by policies that walk the
-`fleet.environments` and `den.hosts` registries. User scopes are
-created by access policies that match registry users by group membership.
+`fleet.environments` and `den.hosts` registries. User scopes come from
+each host's users, which an assignment policy picks from `den.users` by
+group membership before any host is resolved.
 
 ```mermaid
 graph TD
