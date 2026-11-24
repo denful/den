@@ -11,6 +11,7 @@
     "*.txt"
     "*.svg"
     "ci.bash"
+    ".github/test-scope.sh"
     "templates/fleet-demo/diagrams/*"
     "templates/fleet-demo/README.md"
     "templates/diagram-demo/diagrams/*"
