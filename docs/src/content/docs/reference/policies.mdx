@@ -335,7 +335,7 @@ den.lib.policy.when (ctx: ctx.flag or false)
 
 | Policy | From | To | Behavior |
 |---|---|---|---|
-| `host-to-users` | `host` | `user` | One shared `{ host, user }` scope per `host.users` entry. The host aspect's child keyed by a user's name (`den.aspects.igloo.tux`) is included as well; today it reaches **every** user on the host, so prefer `provides.tux` for one user -- see [Where Does My Config Land?](/explanation/where-config-lands/) |
+| `host-to-users` | `host` | `user` | One shared `{ host, user }` scope per `host.users` entry. The host aspect's child keyed by a user's name (`den.aspects.igloo.tux`) is part of that user's own aspect, so it reaches that user only -- see [Where Does My Config Land?](/explanation/where-config-lands/) |
 
 ### Battery-driven class routing
 
