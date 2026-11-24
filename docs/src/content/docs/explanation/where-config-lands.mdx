@@ -75,20 +75,19 @@ from a broken probe.
 | `igloo.provides.to-users` | `nixos` | igloo's OS config, once |
 | `to-users` on an aspect in `igloo.includes` | `homeManager` / `user` | every user on igloo |
 | `igloo.provides.tux` | `homeManager` / `user` | tux only |
-| `den.aspects.igloo.tux` (child named after a user) | `homeManager` / `user` | **every** user on igloo (see caution below) |
+| `den.aspects.igloo.tux` (child named after a user) | `homeManager` / `user` | tux only, on igloo |
 | `den.aspects.igloo.stuff` (any other child) | `homeManager` | **nowhere** (children are not walked unless included) |
 | `igloo.homeManager` + `tux.includes = [ den.batteries.host-aspects ]` | `homeManager` | tux's home; pingu's only if pingu opts in too |
 | `den.schema.user.includes = [ den.batteries.host-aspects ]` | `homeManager` | every user's home |
 | `tux.provides.igloo` | `homeManager` | tux's home, only on igloo |
 | `tux.provides.igloo` / `tux.provides.to-hosts` | `nixos` | igloo's OS config |
 
-<Aside type="caution" title="den.aspects.igloo.tux">
-The `host-to-users` policy includes a host child named after a user when it
-resolves that user. At `main`, a static `den.aspects.igloo.tux` reaches
-**every** user on igloo, and a `{ user, ... }:` child named `tux` runs once for
-each user. That looks like a defect, not a design choice, so don't rely on it.
-To target one user, use `den.aspects.igloo.provides.tux`, which reaches tux
-only.
+<Aside title="den.aspects.igloo.tux">
+A host child named after a user is part of that user's own aspect on that
+host, so `den.aspects.igloo.tux` reaches tux on igloo and nobody else, and a
+`{ user, ... }:` child named `tux` sees tux. `den.aspects."tux@igloo"` says
+the same thing from the user's side. Before this was fixed, the child was
+included at host scope and reached every user on igloo.
 </Aside>
 
 ## The picture

@@ -146,6 +146,10 @@ A stabilisation release. Many cases where a definition was silently dropped were
 
 The same release lets a host choose what it receives (`admits`), lets a policy name where its content lands (`include.at`), and makes an exclude remove exactly the rule it names. See [Receiving content](/explanation/receiving-content/).
 
+## Unreleased
+
+- **`den.aspects.<host>.<user>` reaches that user only.** A host aspect's child named after a user used to be included at host scope, so its `homeManager` and `user` content reached every user on the host, and a `{ user, ... }:` child ran once per user. It's now part of that user's own aspect on that host, next to `den.aspects."<user>@<host>"` and `den.aspects.<user>`, so it reaches that user, once. If a config relied on the old behaviour to give every user the same content, move that content to `den.aspects.<host>.provides.to-users` or `den.schema.user.includes`.
+
 ## Upgrading in one jump
 
 1. **Update your flake inputs.** Point `den` at the latest release (`github:denful/den`), and drop `flake-aspects` if you still have it.

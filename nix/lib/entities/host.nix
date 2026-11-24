@@ -167,10 +167,36 @@ let
                 # without the bare aspect having to branch on `host.name`. Same
                 # two candidates a standalone home asks for, so a user's aspect
                 # resolves identically whether they are a host user or a home.
-                default = lookupAspectBy den [
-                  "${config.name}@${host.name}"
-                  config.name
-                ];
+                default =
+                  let
+                    base = lookupAspectBy den [
+                      "${config.name}@${host.name}"
+                      config.name
+                    ];
+                    # A host aspect's key named after this user
+                    # (`den.aspects.<host>.<user>`) is the user's content on
+                    # this host, so it's part of the user's own aspect, read
+                    # in the user's scope wherever the user resolves. Keys
+                    # forwarded from `provides` are cross-entity deliveries,
+                    # handled by those.
+                    hostAspect = host.aspect;
+                    forwarded = lib.genAttrs (hostAspect.__providesForwarded or [ ]) (_: true);
+                    nested =
+                      if builtins.isAttrs hostAspect && hostAspect ? ${config.name} && !(forwarded ? ${config.name}) then
+                        hostAspect.${config.name}
+                      else
+                        null;
+                  in
+                  if nested == null then
+                    base
+                  else
+                    {
+                      name = "<aspects:${config.name}+${host.name}.${config.name}>";
+                      includes = [
+                        base
+                        nested
+                      ];
+                    };
               };
               host = lib.mkOption {
                 default = host;

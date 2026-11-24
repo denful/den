@@ -7,28 +7,18 @@
 # schema include for host/user/home entity kinds (defaults.nix).
 { lib, den, ... }:
 let
-  inherit (den.lib.policy) resolve include;
+  inherit (den.lib.policy) resolve;
 in
 {
-  # Host → users: fan-out to each declared user.
-  # If the host aspect has a freeform key matching the user name
-  # (not from provides — those are handled by mkCrossPolicy),
-  # include it in the user scope as an entity-named sub-aspect.
+  # Host → users: fan-out to each declared user. A host aspect's key named
+  # after a user (`den.aspects.<host>.<user>`) is part of that user's own
+  # aspect (entities/host.nix), so it reaches only that user.
   den.policies.host-to-users =
     {
       host,
       ...
     }:
-    let
-      aspect = host.aspect;
-      forwarded = lib.genAttrs (aspect.__providesForwarded or [ ]) (_: true);
-      hasChild = name: builtins.isAttrs aspect && aspect ? ${name} && !(forwarded ? ${name});
-    in
-    lib.concatMap (
-      user:
-      [ (resolve.shared { inherit user; }) ]
-      ++ lib.optional (hasChild user.name) (include aspect.${user.name})
-    ) (lib.attrValues host.users);
+    map (user: resolve.shared { inherit user; }) (lib.attrValues host.users);
 
   den.schema.host.includes = [ den.policies.host-to-users ];
 }
