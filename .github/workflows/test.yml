@@ -2,10 +2,8 @@ name: test
 on:
   push:
     branches: [main]
-    paths: ["**/*.nix"]
   pull_request:
     types: [labeled, opened, synchronize, reopened, ready_for_review]
-    paths: ["**/*.nix"]
   pull_request_review:
     types: [submitted]
   workflow_dispatch:
@@ -23,26 +21,27 @@ jobs:
     runs-on: ubuntu-latest
     # review events: only approvals re-trigger CI; comment reviews would
     # otherwise produce skipped check runs that overwrite real test results
-    if: ${{github.ref == 'refs/heads/main' || (github.event.pull_request.draft == false && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved'))}}
+    if: ${{github.ref == 'refs/heads/main' || github.event_name == 'workflow_dispatch' || (github.event.pull_request.draft == false && (github.event_name != 'pull_request_review' || github.event.review.state == 'approved'))}}
     outputs:
       nix-changed: ${{ steps.diff.outputs.nix-changed }}
     steps:
       - uses: actions/checkout@v6
+      # Whether the change needs the tests is decided here alone, by
+      # .github/test-scope.sh; the triggers above have no `paths:` filter, so
+      # there is no second list to drift. Downstream jobs skip on
+      # nix-changed=false (skipped required checks count as passing, which is
+      # what lets docs-only PRs merge), so the decision fails closed: if the
+      # rule's self-test fails, or the list of changed files can't be read,
+      # the tests run.
       - id: diff
-        # pull_request_review has no paths filter, so docs-only PRs reach here;
-        # downstream jobs skip on nix-changed=false (skipped required checks
-        # count as passing, which is what lets docs-only PRs merge)
-        run: |
-          if [[ "${{github.ref}}" == "refs/heads/main" ]]; then
-            echo "nix-changed=true" >> "$GITHUB_OUTPUT"
-          else
-            git fetch --depth 1 origin refs/heads/main
-            if git diff --name-only origin/main..${{github.sha}} -- | grep -q '\.nix$'; then
-              echo "nix-changed=true" >> "$GITHUB_OUTPUT"
-            else
-              echo "nix-changed=false" >> "$GITHUB_OUTPUT"
-            fi
-          fi
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          EVENT: ${{ github.event_name }}
+          PR: ${{ github.event.pull_request.number }}
+          BEFORE: ${{ github.event.before }}
+          SHA: ${{ github.sha }}
+          REPO: ${{ github.repository }}
+        run: .github/test-scope.sh --decide
   allow-ci:
     needs: [non-draft]
     name: allow-ci
