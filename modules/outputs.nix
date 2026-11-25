@@ -6,7 +6,9 @@
 }@args:
 let
   has-flake-parts = args ? flake-parts-lib;
-  flakeModule = den.lib.aspects.resolve "flake" (den.lib.resolveEntity "flake" { });
+  flakeModule = {
+    inherit (den.__fleet) imports;
+  };
   flake =
     (lib.evalModules {
       modules = [

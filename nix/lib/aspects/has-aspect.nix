@@ -64,6 +64,53 @@ let
       forAnyClass = check;
     };
 
+  # The aspects behind landed class locations (`<class>@<aspect>`) in `classes`,
+  # each with every aspect on the include chain it was emitted under, so a role
+  # counts through what it includes. `chains`: scope → location → chain.
+  landedIds =
+    {
+      locs,
+      classes,
+      chains,
+    }:
+    let
+      inherit (identity) stripCtxSuffix stripDefIndex;
+      classOf = loc: lib.head (lib.splitString "@" loc);
+      own = builtins.filter (loc: lib.hasInfix "@" loc && builtins.elem (classOf loc) classes) locs;
+      idOf =
+        loc: stripDefIndex (stripCtxSuffix (lib.concatStringsSep "@" (lib.tail (lib.splitString "@" loc))));
+      chainsOf = loc: lib.concatMap (byLoc: byLoc.${loc} or [ ]) (builtins.attrValues chains);
+    in
+    lib.genAttrs (lib.unique (map idOf own ++ lib.concatMap chainsOf own)) (_: true);
+
+  # The finalized (late) hasAspect over the fleet landing index: is ref's
+  # content, or that of an aspect it includes, in the entity's own evaluation
+  # in that class. `landing` is the entity's index entry: a root entity's
+  # (`forClass`), or one below a root (`locs` in its `classes`).
+  __mkLateHasAspect =
+    {
+      landing,
+      chains,
+      classes,
+    }:
+    let
+      locsFor = c: if landing ? forClass then landing.forClass c else landing.locs;
+      idsFor = lib.genAttrs classes (
+        c:
+        landedIds {
+          locs = locsFor c;
+          classes = [ c ];
+          inherit chains;
+        }
+      );
+      check = c: ref: builtins.elem c classes && idsFor.${c} ? ${refKey ref};
+    in
+    {
+      __functor = _: check (lib.head classes);
+      forClass = check;
+      forAnyClass = ref: lib.any (c: check c ref) classes;
+    };
+
   # Augment a resolved node with its identity accessors for .aspects callers.
   # Shallow: every node already appears as its own flat entry, so children
   # reached via `.includes` are also present (augmented) at top level.
@@ -135,5 +182,6 @@ in
     collectPathSet
     mkEntityHasAspect
     mkProjectedHasAspect
+    __mkLateHasAspect
     ;
 }

@@ -3,6 +3,43 @@
   den,
 }:
 let
+  # A class module's entity bindings answer `hasAspect` from the fleet landing
+  # index (what lands in each entity's own evaluation), as den.lib.__hasLandedAspect
+  # does. Class module bodies run after the walk; the walk's own scope contexts
+  # (policies, parametric includes, guards) keep their current answer, since
+  # only this wrap sees the late view. An entity the fleet doesn't instantiate,
+  # or reach below one it does, keeps its current answer too.
+  schemaKindSet = lib.genAttrs (den.schema._kindNames or [ ]) (_: true);
+  lateCtx =
+    sctx:
+    let
+      kinds = builtins.filter (k: schemaKindSet ? ${k}) (builtins.attrNames sctx);
+      lateFor =
+        k: v:
+        let
+          landing = den.lib.__landingOf sctx v;
+        in
+        if landing == null then
+          v
+        else
+          v
+          // {
+            hasAspect = den.lib.aspects.__mkLateHasAspect {
+              inherit landing;
+              inherit (den.__fleet.fleet) chains;
+              classes = v.classes or (lib.optional (v ? class) v.class);
+            };
+          };
+    in
+    sctx
+    // lib.genAttrs kinds (
+      k:
+      let
+        v = sctx.${k};
+      in
+      if builtins.isAttrs v && v ? hasAspect && v ? id_hash then lateFor k v else v
+    );
+
   # Merge enrichment-only keys into the entry's emit-time ctx.
   # Only keys NOT already in entry.ctx are added — this avoids
   # overwriting entity bindings (host, user) from a different
@@ -14,7 +51,7 @@ let
     in
     {
       inherit enrichmentKeys;
-      ctx = entryCtx // enrichmentKeys;
+      ctx = lateCtx (entryCtx // enrichmentKeys);
     };
 
   # Strip enrichment-only args from the module's advertised functionArgs.
