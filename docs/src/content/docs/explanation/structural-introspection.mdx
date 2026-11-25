@@ -28,7 +28,7 @@ makes them safe.
 ## Reading structure: `entity.hasAspect`
 
 Every entity (host, user, home — and any custom schema kind) carries a
-readOnly `hasAspect` functor computed from its resolved aspect tree:
+readOnly `hasAspect` functor:
 
 ```nix
 host.hasAspect den.aspects.zfs-root        # bool — asks at the primary class
@@ -39,15 +39,11 @@ host.hasAspect.forAnyClass den.aspects.zfs-root   # union over the entity's clas
 The reference is any aspect you can point at: `den.aspects.foo`,
 `den.aspects.foo.provides.bar`, a namespace aspect, …
 
-**All three agree for any class the entity declares.** Membership is
-*structural*, and the resolved tree is the same whichever class it is
-resolved at — a class decides what an aspect *emits*, never whether it is
-*in* the tree. The variants differ only in the class they ask at:
 `hasAspect` uses the primary class (the head of the entity's `classes` —
 `nixos` for a Linux host, `darwin` for a darwin one), `forClass` uses the
 class you name and answers `false` for one the entity does not declare, and
-`forAnyClass` unions over the declared classes. Prefer the bare functor; reach for the other two only when
-the class is the point of the question.
+`forAnyClass` unions over the declared classes. Prefer the bare functor;
+reach for the other two only when the class is the point of the question.
 
 ### Where you may call it
 
@@ -56,24 +52,24 @@ bodies run during `evalModules`, long after the aspect tree has been resolved
 and frozen:
 
 ```nix
-den.aspects.impermanence =
-  { host, ... }:
-  {
-    nixos =
-      { lib, ... }:
-      lib.mkMerge [
-        (lib.mkIf (host.hasAspect den.aspects.zfs-root) {
-          # zfs-flavored impermanence wiring
-        })
-        (lib.mkIf (host.hasAspect den.aspects.btrfs-root) {
-          # btrfs-flavored impermanence wiring
-        })
-      ];
-  };
+den.aspects.impermanence = {
+  nixos =
+    { host, lib, ... }:
+    lib.mkMerge [
+      (lib.mkIf (host.hasAspect den.aspects.zfs-root) {
+        # zfs-flavored impermanence wiring
+      })
+      (lib.mkIf (host.hasAspect den.aspects.btrfs-root) {
+        # btrfs-flavored impermanence wiring
+      })
+    ];
+};
 ```
 
-This is cycle-safe: the body reads a frozen tree; nothing in the tree reads
-the body.
+This is cycle-safe: the body reads what lands, which nothing in the body
+decides. Take the entity as the class module's own argument, as `host` is
+above: a `host` the aspect function binds (`{ host, ... }: { nixos = …; }`)
+is the walk's, and answers as the walk does.
 
 **Safe — in policy guards.** `den.lib.policy.when` over an *inline aspect*
 compiles a [conditional aspect](/reference/aspects/#metaguard--metaaspects--conditional-aspects) whose
@@ -111,24 +107,127 @@ operate *on* the tree rather than reading *from inside* it.
 
 ### What "present" means
 
-*Present* is exactly what the boolean above reports: `hasAspect ref` is
-`true` when `ref` is in the entity's resolved tree, and `false` — *absent* —
-when it is not. Two rules decide which:
+Taken as a class module's own argument (`nixos = { host, ... }: …`),
+`<entity>.hasAspect ref` is `true` when
+content of `ref`, or of an aspect `ref` includes, lands in that entity's own
+evaluation in that entity's class, and `false` otherwise. The answer is the
+same from whichever scope or class asks:
 
-- **Scoped to the entity** — membership covers the entity's own resolved
-  tree: its scope and all descendants (for a host, the host scope plus its
-  user scopes). A sibling host that included the aspect does *not* leak in,
-  regardless of evaluation order. (The guard-level `hasAspect` in
-  [conditional aspects](/reference/aspects/#metaguard--metaaspects--conditional-aspects)
-  is scoped to the current pipeline scope plus its ancestors.)
-- **Exclude-aware** — an aspect excluded from the entity's scope (via
-  `excludes` or a constraint) reads as *absent*.
+- **`host.hasAspect ref`** — `ref`'s host-class content (`nixos`, `darwin`)
+  is in the host's config. A user's homeManager module asking
+  `host.hasAspect steam` gets `true` when the host's own config has Steam,
+  and `false` when Steam came only from that user's includes.
+- **`user.hasAspect ref`** — `ref`'s user-class content (`homeManager`,
+  `user`, …) is in that user's config.
+- **Roles count through their includes.** A content-free role that
+  aggregates features is present wherever one of its features lands.
+- **A provide is its own aspect.** `A.provides.to-users` landing in an
+  entity doesn't make `hasAspect A` true there; what the provide includes
+  counts where it lands.
+- **Forwards count.** A forward into the host's class lands there at any
+  path, except a per-user nest (`home-manager.users.<n>`, `users.users.<n>`),
+  which is that user's.
+- **Exclude-aware** — an aspect excluded from the entity reads as *absent*.
+
+The answer comes from the delivery the flake builds each configuration from,
+so content an entity kind above the host delivers (an `environment` whose
+`provides.to-users`, or a host include that takes `{ environment, host, ... }`)
+counts where it lands. Reading it doesn't evaluate any configuration.
+
+In den v2 this is a graph query over finalized delivery edges. den v1 answers
+it from where content is collected and routed while each configuration is
+assembled, and has these limits:
+
+- an entity binding captured outside the class module's arguments, from the
+  aspect function or an include (`{ host, ... }: { nixos = …; }`), is the
+  walk's and keeps the walk's answer;
+- an entity with no entry in the landing index keeps the walk's answer, with
+  no warning: one the flake doesn't instantiate and that isn't below one it
+  does, such as a custom entity kind resolved under the flake root. Hosts and
+  standalone homes the flake instantiates, and the users below them, have
+  entries;
+- in a `mainModule` build, `host.hasAspect` answers about what lands in the
+  configuration the flake builds (`nixosConfigurations`), not about that
+  `mainModule` build, and the two can differ for content an entity kind above
+  the host delivers ([#795](https://github.com/denful/den/issues/795)). A
+  `mainModule` class module that reads `host` also forces the flake's resolve;
+- a target query forces every instantiated host's walk, including its
+  includes, but no module bodies or option values: the first entity binding
+  a class module reads forces the head of every host's delivery (its scopes),
+  since the index is keyed across the fleet. The walk already evaluates every
+  host's includes to build any one host, so a host whose include throws fails
+  every host's build, with or without a query;
+- policies, computed `includes` and guards (`den.lib.policy.when`,
+  `includeIf`) still see the walk as it runs, scoped to the current scope plus
+  its ancestors: they decide what lands, so reading what lands would read
+  their own outcome. Only a class module's own arguments see the finalized
+  answer.
+
+### The registry lookup
+
+`den.hosts.<s>.<h>.hasAspect` (and `den.homes.…`) is the registry lookup. It
+isn't the finalized query: it answers whether `ref` is in the entity's
+resolved tree, its own scope and its users' scopes, whether or not the content
+lands. It keeps that answer for every caller, early or late, and while den
+moves to the finalized query the two aren't promised to agree. Content a user
+includes is in the host's tree, for example, so the lookup answers `true` for
+it while `host.hasAspect` taken as a class module's argument answers `false`
+unless it lands on the host.
+
+A policy that reads its own host's registry entry, or two hosts' policies that
+read each other's, recurse, because the lookup resolves the host that runs the
+policy.
+
+### The finalized query
+
+A late caller outside a class module (a flake output, a check) will get the
+class-module answer from a finalized query. It exists as a private prototype;
+its public name and shape are pending review.
+
+### Choosing inside a policy
+
+A policy or a computed include that needs a fleet-wide fact shouldn't ask
+what lands, since that's still being decided. Give the fact to it as an
+input instead, a registered role or capability on the entity, and use a
+current-walk guard when the choice is local to one scope.
+
+A cluster policy that picks its members by asking each host's registry
+entry:
+
+```nix
+# before: reads the registry during the walk
+den.policies.cluster-members =
+  { cluster, ... }:
+  lib.concatMap (
+    host: lib.optional (host.hasAspect den.aspects.k3s-server) (resolve.to "host" { inherit host; })
+  ) (builtins.attrValues den.hosts.x86_64-linux);
+```
+
+reads an input the host declares instead:
+
+```nix
+# after: the role is an input, declared with the host
+den.schema.host.options.roles = lib.mkOption {
+  type = lib.types.listOf lib.types.str;
+  default = [ ];
+};
+den.hosts.x86_64-linux.node1.roles = [ "k3s-server" ];
+
+den.policies.cluster-members =
+  { cluster, ... }:
+  lib.concatMap (
+    host: lib.optional (builtins.elem "k3s-server" host.roles) (resolve.to "host" { inherit host; })
+  ) (builtins.attrValues den.hosts.x86_64-linux);
+```
+
+and the host includes `den.aspects.k3s-server` from that role, so the input
+and the content can't disagree.
 
 ## Reading the tree: `entity.aspects`
 
 Alongside the boolean functor, every entity exposes `aspects` — a flat list
 of **all resolved aspect nodes** (every depth), taken at its primary class —
-the same class-invariant tree `hasAspect` reads, so no class carries a
+the same class-invariant tree the registry lookup reads, so no class carries a
 different list. The entity root itself and excluded/tombstoned aspects are
 not listed; anonymous aspects are. Each node keeps its `.name`, `.meta`, and `.includes` (its
 resolved subtree), and adds identity accessors:
