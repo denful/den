@@ -1,13 +1,12 @@
-# Behavior matrix for projected (in-context) `hasAspect` on the ANCESTOR-BINDING
-# axis — i.e. `host.hasAspect X` answering membership at the ACTIVE (consuming)
-# descendant scope. The consuming-entity axis (`user.hasAspect`) is covered by
-# deadbugs/projected-hasaspect.nix; the host-own-scope axis by
-# public/c2-policies-outputs/hasaspect-ancestor-scope.nix. This suite pins the host-binding
-# axis with matched positives and negatives.
+# Behavior matrix for in-context `hasAspect` on the ANCESTOR-BINDING axis:
+# `host.hasAspect X` read from inside a user's home. The consuming-entity axis
+# (`user.hasAspect`) is covered by deadbugs/projected-hasaspect.nix; the
+# host-own-scope axis by public/c2-policies-outputs/hasaspect-ancestor-scope.nix.
 #
-# Formal rule (specs/2026-06-09-projected-hasaspect-v1.md): every in-context
-# entity-kind binding answers "is X delivered INTO this active scope", keyed by
-# the active (consuming) scope — NOT the binding's own scope.
+# Rule: `<entity>.hasAspect X`, taken as a class module's argument, is true
+# when content of X, or of an aspect X includes, lands in that entity's own
+# class, and the answer is the same from whichever scope asks. The full matrix
+# is in deadbugs/hasaspect-lands-in-class.nix.
 { denTest, lib, ... }:
 let
   # An effect homeManager aspect that reports, via home.username, whether the
@@ -64,10 +63,9 @@ in
       }
     );
 
-    # R4 -: the host's OWN aspect resolves under the HOST scope, so it is NOT
-    # visible via host.hasAspect from a USER's home (active scope = user). Matches
-    # the spec's scope-specificity rule (and main).
-    test-R4-host-own-aspect-not-visible-from-user-NEGATIVE = denTest (
+    # R4: the host's own aspect is in the host's nixos, so host.hasAspect is
+    # true from a user's home too.
+    test-R4-host-own-aspect-visible-from-user = denTest (
       { den, igloo, ... }:
       {
         den.hosts.x86_64-linux.igloo.users.tux = { };
@@ -78,14 +76,14 @@ in
           provides.to-users.includes = [ den.aspects.effect ];
         };
         expr = igloo.home-manager.users.tux.home.username;
-        expected = "wrong";
+        expected = "right";
       }
     );
 
-    # R6 -: per-user delivery. `test` is provided ONLY to tux; the host-binding
-    # query is keyed by the ACTIVE scope, so tux sees it and sibling pingu does
-    # not. (positive + negative in one path.)
-    test-R6-per-user-provide-discriminates = denTest (
+    # R6: `test` is provided only to tux, and its nixos reaches the host
+    # through tux, so the host has it, and host.hasAspect answers true from
+    # pingu's home as well.
+    test-R6-per-user-provide-reaches-host-for-every-user = denTest (
       { den, igloo, ... }:
       {
         # #694: these hosts accept their users' host-class output, which is
@@ -110,7 +108,7 @@ in
         };
         expected = {
           tux = "right";
-          pingu = "wrong";
+          pingu = "right";
         };
       }
     );

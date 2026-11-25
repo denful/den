@@ -172,7 +172,10 @@ rec {
   #   pi    — the Π(root) projection (shape above).
   # Returns { class → [ modules ] }; a class with no content is absent (callers
   # treat absence as null, matching extractSubtreeModules' `== [] then null`).
-  assembleSubtree =
+  # The scopes `assembleSubtree` collects for `root`: its bounded subtree.
+  # Shared with the in-context hasAspect landing read (resolve.nix), so what
+  # it reports collected is exactly what the merge walks.
+  subtreeOf =
     { root, pi }:
     let
       # The subtree-membership universe. Default = perScope attrnames (the entity-
@@ -180,17 +183,26 @@ rec {
       # explicitly (mergedScopeParent ∪ scopedRoutes keys) because a route-only
       # scope can sit on the subtree parent-chain without a perScope bucket.
       allScopeIds = pi.allScopeIds or (builtins.attrNames pi.perScope);
-      # The merge collection dial (§A spawn invariant): default dedup; "raw" =
-      # dedup-free concat (spawn final extraction).
-      dedupMode = pi.dedupMode or "dedup";
       # The isolation set the subtree boundary uses, governed by pi.isolationMode.
       # Computed ONCE here so the merge-collection walk and the edge constructor's
       # own internal subtree walk agree on the boundary.
       isolated = isolatedSetOf pi;
+    in
+    {
+      inherit allScopeIds isolated;
       subtreeScopeIds = subtreeScopes {
         inherit (pi) scopeParent;
         inherit isolated root allScopeIds;
       };
+    };
+
+  assembleSubtree =
+    { root, pi }:
+    let
+      inherit (subtreeOf { inherit root pi; }) allScopeIds isolated subtreeScopeIds;
+      # The merge collection dial (§A spawn invariant): default dedup; "raw" =
+      # dedup-free concat (spawn final extraction).
+      dedupMode = pi.dedupMode or "dedup";
       # Default-fold edges for THIS root, built by the SHARED constructor
       # (edges/default.nix defaultFoldEdges) — the same function the read-only
       # oracle (edge-trace.nix) consumes, so production and oracle agree on the

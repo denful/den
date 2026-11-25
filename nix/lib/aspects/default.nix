@@ -141,6 +141,7 @@ in
     collectPathSet
     mkEntityHasAspect
     mkProjectedHasAspect
+    __mkLateHasAspect
     ;
   mkAspectsType = typeCfg: lib.mapAttrs (_: v: v typeCfg) rawTypes;
   # Predicates exported directly (not through types mapAttrs which applies { } to each value).

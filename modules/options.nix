@@ -220,6 +220,66 @@ in
     default = false;
   };
 
+  # Internal: the flake's resolve, shared by the flake outputs built from it and
+  # the fleet landing index that class-module hasAspect reads.
+  options.den.__fleet = lib.mkOption {
+    internal = true;
+    visible = false;
+    readOnly = true;
+    type = lib.types.raw;
+    default = den.lib.aspects.resolveWithPaths "flake" (den.lib.resolveEntity "flake" { });
+  };
+
+  # Private prototype, its public name pending: the finalized landing query.
+  # `den.lib.__hasLandedAspect
+  # { entity; within ? { }; } ref` is true when ref's content, or that of an
+  # aspect it includes, lands in the entity's own evaluation in its primary
+  # class (`.forClass c ref` for another class). `within` names the bindings
+  # above a non-root entity (`{ inherit host; }` for a user). Reads what the
+  # fleet builds, so call it from class modules or after the walk, never from
+  # a policy or an includes list.
+  config.den.lib.__landingOf =
+    sctx: e:
+    let
+      landing = den.__fleet.fleet.landing;
+      direct = landing.${e.id_hash or ""} or null;
+      owners =
+        builtins.filter
+          (
+            o:
+            builtins.isAttrs o
+            && o ? id_hash
+            && ((landing.${o.id_hash} or { }).below or { }) ? ${e.id_hash or ""}
+          )
+          (
+            map (k: sctx.${k}) (
+              builtins.filter (k: builtins.elem k (den.schema._kindNames or [ ])) (builtins.attrNames sctx)
+            )
+          );
+    in
+    if direct != null then
+      direct
+    else if owners != [ ] then
+      landing.${(lib.head owners).id_hash}.below.${e.id_hash}
+    else
+      null;
+  config.den.lib.__hasLandedAspect =
+    {
+      entity,
+      within ? { },
+    }:
+    let
+      landing = den.lib.__landingOf within entity;
+    in
+    if landing == null then
+      throw "den: __hasLandedAspect: `${entity.name or "?"}` is not an entity the flake instantiates, nor one below such an entity named in `within`"
+    else
+      den.lib.aspects.__mkLateHasAspect {
+        inherit landing;
+        inherit (den.__fleet.fleet) chains;
+        classes = entity.classes or (lib.optional (entity ? class) entity.class);
+      };
+
   # Internal: den's own test suite runs without the transition defaults, so it
   # tests the end state; one dedicated file re-enables them.
   options.den.internal.transitionDefaults = lib.mkOption {
