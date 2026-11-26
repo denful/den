@@ -364,72 +364,84 @@ let
         seed = subtreePhase1;
       };
 
-  # Build instantiateArgs for a spec without calling spec.instantiate.
-  # Factored out so both applyInstantiates and hostConfigs can reuse it.
-  mkInstantiateArgs =
+  # The per-host delivery: the host subtree's projection folded through
+  # materializeUnified, as nixosConfigurations is built from it. null when the
+  # spec has no resolvable host scope. Shared by the module assembly and the
+  # fleet landing index, which read one thunk per host.
+  perHostMaterialized =
     argBundle@{
-      augmentedScopeContexts,
-      scopedClassImportsRaw,
-      scopedProvides,
-      scopedRoutes,
-      scopeParent,
-      scopeByEntity ? { },
-      scopeEntityClass ? (_: { }),
       scopeEntityKind ? { },
-      scopeIsolated ? { },
       ownEntityOf,
       provenanceLocs,
       spawnNodeFn,
       ctx,
+      scopeParent,
+      scopeIsolated ? { },
+      ...
     }:
     spec:
     let
-      # perHostProjection takes only the projection inputs; scopeEntityKind and
-      # ownEntityOf are mkInstantiateArgs-LOCAL concerns (the Π materializeUnified
-      # reads), so they are stripped from the bundle passed through.
       projBundle = builtins.removeAttrs argBundle [
         "scopeEntityKind"
         "ownEntityOf"
         "provenanceLocs"
+        "materializedFor"
       ];
       proj = perHostProjection projBundle spec;
+    in
+    if proj == null then
+      null
+    else
+      let
+        inherit (proj)
+          hostScopeId
+          subtreeProvides
+          subtreeRoutes
+          relevantContexts
+          seed
+          ;
+        # The Π's scopeContexts MUST be relevantContexts (NOT subtreeContexts):
+        # materializeUnified's complex-forward path reads pi.scopeContexts for
+        # source resolution.
+        pi =
+          (mkStaticPi {
+            rootScopeId = hostScopeId;
+            scopeContexts = relevantContexts;
+            inherit scopeParent scopeIsolated;
+            isolationMode = "aware";
+          })
+          // {
+            inherit scopeEntityKind ownEntityOf provenanceLocs;
+          }
+          // lib.optionalAttrs proj.unbounded { unboundedCollect = true; };
+      in
+      {
+        inherit proj;
+        materialized = materializeUnified {
+          inherit pi ctx;
+          seed = seed;
+          scopedProvides = subtreeProvides;
+          scopedRoutes = subtreeRoutes;
+          spawnNode = spawnNodeFn;
+          inherit (handlers) buildForwardAspect;
+        } { doFinalMerge = true; };
+      };
+
+  # Build instantiateArgs for a spec without calling spec.instantiate.
+  # Factored out so both applyInstantiates and hostConfigs can reuse it.
+  mkInstantiateArgs =
+    argBundle@{
+      materializedFor ? null,
+      ...
+    }:
+    spec:
+    let
+      pm = if materializedFor != null then materializedFor spec else perHostMaterialized argBundle spec;
       preWalkedModules =
-        if proj != null then
+        if pm != null then
           let
-            inherit (proj)
-              hostScopeId
-              hostClass
-              subtreeProvides
-              subtreeRoutes
-              relevantContexts
-              seed
-              ;
-            # Production delivery (Task 17/18): the per-host final extraction folds
-            # materializeUnified (doFinalMerge = true → it runs assembleSubtree at
-            # hostScopeId), replacing the phase2 (provides) ∘ phase3 (routes) ∘
-            # assembleSubtree sequence. The Π's scopeContexts MUST be relevantContexts
-            # (NOT subtreeContexts): materializeUnified's complex-forward path reads
-            # pi.scopeContexts for source resolution, whereas the old assembleSubtree
-            # merge ignored it.
-            pi =
-              (mkStaticPi {
-                rootScopeId = hostScopeId;
-                scopeContexts = relevantContexts;
-                inherit scopeParent scopeIsolated;
-                isolationMode = "aware";
-              })
-              // {
-                inherit scopeEntityKind ownEntityOf provenanceLocs;
-              }
-              // lib.optionalAttrs proj.unbounded { unboundedCollect = true; };
-            materialized = materializeUnified {
-              inherit pi ctx;
-              seed = seed;
-              scopedProvides = subtreeProvides;
-              scopedRoutes = subtreeRoutes;
-              spawnNode = spawnNodeFn;
-              inherit (handlers) buildForwardAspect;
-            } { doFinalMerge = true; };
+            inherit (pm) proj materialized;
+            inherit (proj) hostScopeId hostClass;
             hostModules =
               if proj.unbounded then
                 materialized.${hostClass} or [ ]
@@ -488,11 +500,13 @@ let
       provenanceLocs,
       spawnNodeFn,
       ctx,
+      materializedFor ? null,
     }:
     classImports:
     let
       mkArgs = mkInstantiateArgs {
         inherit
+          materializedFor
           augmentedScopeContexts
           scopedClassImportsRaw
           scopedProvides
@@ -1024,8 +1038,7 @@ let
             # unchanged.
             exposeEdges = true;
           };
-      phase4 = applyInstantiates {
-        scopedInstantiates = result.state.scopedInstantiates null;
+      instantiateBundle = {
         scopeEntityClass = result.state.scopeEntityClass or (_: { });
         inherit
           scopeIsolated
@@ -1045,7 +1058,120 @@ let
         # included in per-host subtree assembly.
         scopedClassImportsRaw = drainedClassImportsRaw;
         spawnNodeFn = spawnNode;
-      } materialized.classImports;
+      };
+      # One per-host delivery thunk per instantiated entity scope and class, read
+      # by both its module assembly and the fleet landing index.
+      hostKeyOf =
+        spec:
+        let
+          sid = entityScopeFor scopeByEntity spec;
+        in
+        if sid == null then null else "${sid}\n${spec.class or "nixos"}";
+      perHostByKey = builtins.listToAttrs (
+        lib.concatMap (
+          spec:
+          let
+            k = hostKeyOf spec;
+          in
+          lib.optional (k != null) {
+            name = k;
+            value = perHostMaterialized instantiateBundle spec;
+          }
+        ) allInstantiateSpecs
+      );
+      materializedFor =
+        spec:
+        let
+          k = hostKeyOf spec;
+        in
+        if k != null && perHostByKey ? ${k} then
+          perHostByKey.${k}
+        else
+          perHostMaterialized instantiateBundle spec;
+      phase4 = applyInstantiates (
+        instantiateBundle
+        // {
+          scopedInstantiates = result.state.scopedInstantiates null;
+          inherit materializedFor;
+        }
+      ) materialized.classImports;
+
+      # The landing of one root scope: the drained content of each scope its merge
+      # walked, less the fan-out copies it dropped, plus the routes into its
+      # class (a nest into another entity's place belongs to that entity), per
+      # class; and each entity scope below it, in that entity's own classes.
+      landingOf =
+        {
+          rootScopeId,
+          materialized,
+          subtree,
+        }:
+        {
+          forClass =
+            class:
+            lib.unique (
+              builtins.filter (l: !(materialized.__landedFrom.dropped ? ${l})) (
+                lib.concatMap (
+                  sid: locsOf (drainedClassImportsRaw.${sid}.${class} or [ ])
+                ) materialized.__landedFrom.scopes
+              )
+              ++ lib.concatMap (
+                r:
+                let
+                  kind = scopeEntityKind.${r.source} or null;
+                  anotherEntity = r.source != rootScopeId && kind != null;
+                in
+                lib.optionals (r.cls == class && (r.path == [ ] || !anotherEntity)) (
+                  map (l: "${class}@${lib.concatStringsSep "@" (lib.tail (lib.splitString "@" l))}") r.locs
+                )
+              ) materialized.__landed
+            );
+          below = lib.foldl' (
+            acc: sid:
+            let
+              kind = scopeEntityKind.${sid} or null;
+              e = if kind == null then null else (scopeContexts.${sid} or { }).${kind} or null;
+              classes = if e == null then [ ] else e.classes or (lib.optional (e ? class) e.class);
+            in
+            if sid == rootScopeId || e == null || !(e ? id_hash) then
+              acc
+            else
+              acc
+              // {
+                ${e.id_hash} = {
+                  locs =
+                    ((acc.${e.id_hash} or { }).locs or [ ])
+                    ++ lib.concatMap (c: locsOf (drainedClassImportsRaw.${sid}.${c} or [ ])) classes;
+                  inherit classes;
+                };
+              }
+          ) { } subtree;
+        };
+
+      # What lands in each instantiated entity, from the delivery that builds its
+      # configuration: keyed by the entity's id_hash, per class, with what lands
+      # in each entity below it (its users) keyed by their id_hash. Built from
+      # the collected locations and routes, never from a module body.
+      fleetLanding = lib.foldl' (
+        acc: k:
+        let
+          pm = perHostByKey.${k};
+          sid = pm.proj.hostScopeId;
+          kind = scopeEntityKind.${sid} or null;
+          entity = if kind == null then null else (scopeContexts.${sid} or { }).${kind} or null;
+        in
+        if pm == null || entity == null || !(entity ? id_hash) || acc ? ${entity.id_hash} then
+          acc
+        else
+          acc
+          // {
+            ${entity.id_hash} = landingOf {
+              rootScopeId = sid;
+              inherit (pm) materialized;
+              subtree = pm.proj.subtreeScopeIds;
+            };
+          }
+      ) { } (builtins.attrNames perHostByKey);
 
       # TODO(#694): remove with the `isolated` alias. Every entity scope now
       # bounds its ancestors' merge, so the flag only matters for a scope of an
@@ -1235,9 +1361,20 @@ let
       # set from scope-string to entity identity (id_hash) for projected
       # hasAspect (see entities/_types.nix:pathSetByScopeOption).
       inherit scopeContexts scopeEntityKind;
+      # In-context hasAspect's landing for every entity this resolve
+      # instantiates, with the include chains its locations map through.
+      fleet = {
+        landing = fleetLanding;
+        chains = (result.state.scopedLocChains or (_: { })) null;
+      };
       # The production edge object (see productionEdgeTrace above).
       edgeTrace = productionEdgeTrace;
     };
+
+  # The location each collected class module was emitted under
+  # (handlers/class-collector.nix).
+  locsOf =
+    mods: builtins.filter (l: l != "") (map (m: toString (m.__loc or m.key or m._file or "")) mods);
 
   # Back-compatible projection: imports only. Protects deferredModule consumers
   # that assert resolve's output is exactly { imports = …; }.

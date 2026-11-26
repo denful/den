@@ -724,16 +724,19 @@ let
       }).imports;
 
   # Append synthesized modules to a class bucket at a scope (flat + perScope).
-  appendToClass = acc: cls: sid: newMods: {
-    classImports = acc.classImports // {
-      ${cls} = (acc.classImports.${cls} or [ ]) ++ newMods;
-    };
-    perScope = acc.perScope // {
-      ${sid} = (acc.perScope.${sid} or { }) // {
-        ${cls} = ((acc.perScope.${sid} or { }).${cls} or [ ]) ++ newMods;
+  appendToClass =
+    acc: cls: sid: newMods:
+    acc
+    // {
+      classImports = acc.classImports // {
+        ${cls} = (acc.classImports.${cls} or [ ]) ++ newMods;
+      };
+      perScope = acc.perScope // {
+        ${sid} = (acc.perScope.${sid} or { }) // {
+          ${cls} = ((acc.perScope.${sid} or { }).${cls} or [ ]) ++ newMods;
+        };
       };
     };
-  };
 
   # Materialize ONE synthesize edge: build the source module (collected-else-
   # rewalk), run it through the forward constructor (buildForwardAspect), collect
@@ -831,7 +834,26 @@ let
         adapterRoute = route;
       };
     in
-    appendToClass acc route.intoClass (targetOf route) wrappedModules;
+    appendToClass (recordLanded acc route
+      sourceModules
+    ) route.intoClass (targetOf route) wrappedModules;
+
+  # Every location a route moves into a class, read before wrapping hides it,
+  # with where it came from and the path it lands at: resolve.nix decides what
+  # counts as landing in the root's own class for in-context hasAspect.
+  recordLanded =
+    acc: route: mods:
+    acc
+    // {
+      landed = (acc.landed or [ ]) ++ [
+        {
+          cls = route.intoClass;
+          path = route.path or [ ];
+          source = route.sourceScopeId or null;
+          locs = builtins.filter (l: l != "") (map (m: toString (m.key or m._file or m.__loc or "")) mods);
+        }
+      ];
+    };
 
 in
 {

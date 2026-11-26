@@ -35,7 +35,7 @@
 let
   routeEdgesMod = import ./route.nix { inherit lib den; };
   providesMod = import ./provides.nix { inherit lib den; };
-  inherit (import ./materialize.nix { inherit lib den; }) assembleSubtree;
+  inherit (import ./materialize.nix { inherit lib den; }) assembleSubtree subtreeOf;
   inherit (import ./toposort.nix { inherit lib; }) topoSortEdges;
   inherit (import ../scope-walk.nix { inherit lib; }) subtreeScopes;
   inherit (import ../handlers/provenance.nix { inherit lib; }) sharedFanOutPrefix;
@@ -677,14 +677,25 @@ let
       # The root's class content: its own bounded subtree after delivery. An
       # "aware" walk takes the entity boundary; a "blind" one (spawn extraction)
       # is unchanged.
+      assembledPi =
+        pi
+        // acc
+        // lib.optionalAttrs (pi.isolationMode == "aware" && !(pi.unboundedCollect or false)) {
+          scopeIsolated = entityBoundary;
+        };
       assembled = assembleSubtree {
         root = rootScopeId;
-        pi =
-          pi
-          // acc
-          // lib.optionalAttrs (pi.isolationMode == "aware" && !(pi.unboundedCollect or false)) {
-            scopeIsolated = entityBoundary;
-          };
+        pi = assembledPi;
+      };
+      # Read-only, for in-context hasAspect: the scopes that merge walked for
+      # this root, and the shared-fan-out locations it dropped.
+      landedFrom = {
+        scopes =
+          (subtreeOf {
+            root = rootScopeId;
+            pi = assembledPi;
+          }).subtreeScopeIds;
+        dropped = droppedLocs;
       };
       # A shared source fanned out at a host for a user the host accepts: the
       # lifted merge already carries that user's own copy, so this one goes
@@ -739,6 +750,9 @@ let
       let
         merged = bounded // {
           __lostAt = lostAt;
+          # For the fleet landing index (resolve.nix fleetLanding).
+          __landedFrom = landedFrom;
+          __landed = acc.landed or [ ];
         };
       in
       if exposeAcc then
