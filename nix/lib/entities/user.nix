@@ -34,6 +34,7 @@ let
     "isStrict"
     "__assignedBy"
     "facts"
+    "hosts"
   ];
 
   # The field names a raw entry sets, seen through the module system's
@@ -141,12 +142,14 @@ let
     r
     // {
       inherit shared;
-      # `facts` is no composed field, but a position defining it is refused.
-      setsFacts =
+      # `facts` and `hosts` are no composed fields, but a host position
+      # defining one is refused.
+      sets =
+        f:
         if plain then
-          builtins.any (d: builtins.elem "facts" (ownKeys d.value)) defs
+          builtins.any (d: builtins.elem f (ownKeys d.value)) defs
         else
-          defCount (r.provenance.facts or null) > defCount (shared.provenance.facts or null);
+          defCount (r.provenance.${f} or null) > defCount (shared.provenance.${f} or null);
       # A plain entry's keys that its own evaluation kept: a key under a false
       # `mkIf` names no field.
       own =
@@ -215,6 +218,17 @@ let
             type = lib.types.raw; # no merging
             defaultText = "den.aspects.<name>";
             default = lookupAspect den config;
+          };
+          options.hosts = lib.mkOption {
+            description = ''
+              Hosts this user is assigned to, read by `den.policies.user-to-hosts`:
+              declared host names, `den.lib.cond` conditions over facts, named
+              predicates (`den.lib.cond.predicate "<name>"`), or (warned) inline
+              functions. `null` assigns nothing from here; `[ ]` marks the user
+              hostless on purpose.
+            '';
+            type = lib.types.nullOr (lib.types.listOf lib.types.raw);
+            default = null;
           };
           options.facts = lib.mkOption {
             description = "Facts the assignment stage reads; declared under `den.schema.user.facts`.";
@@ -373,10 +387,12 @@ let
           }).value.${f};
       fields = lib.subtractLists unfolded (lib.unique (regLayer.own ++ relLayer.own));
     in
-    if relLayer.setsFacts then
+    if relLayer.sets "facts" then
       throw "den: user '${rel.name}' sets `facts` on host '${rel.host.name}'. A user's facts are read before assignment, so they live on `den.users.${rel.name}.facts`, not on a host."
+    else if relLayer.sets "hosts" then
+      throw "den: user '${rel.name}' sets `hosts` on host '${rel.host.name}'. Which hosts a user is on is the user's, so it lives on `den.users.${rel.name}.hosts`."
     else
-      rel // lib.genAttrs fields field // { inherit (regLayer.config) facts; };
+      rel // lib.genAttrs fields field // { inherit (regLayer.config) facts hosts; };
 in
 {
   inherit
