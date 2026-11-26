@@ -97,12 +97,16 @@ let
           manySubmodule lib [ (den.schema.flake or { }) ];
     };
 
+  # Each output module is keyed, so importing it from more than one place (a
+  # flake and its test modules, or two of a config's own files) declares the
+  # option once: an unkeyed module is a new one per importing file.
   flakeBased = builtins.listToAttrs (
     map (name: {
       inherit name;
       value =
         { lib, ... }:
         {
+          key = "den#flakeOutputs.${name}";
           options.flake.${name} = flakeOut lib;
         };
     }) flakeNames
@@ -114,6 +118,7 @@ let
       value =
         { lib, ... }:
         {
+          key = "den#flakeOutputs.${name}";
           options.flake.${name} = systemOut lib;
         };
     }) systemNames
@@ -124,6 +129,7 @@ let
   flake =
     { lib, config, ... }:
     {
+      key = "den#flakeOutputs.flake";
       options.flake = flakeTop {
         inherit lib;
         den = config.den or { };
