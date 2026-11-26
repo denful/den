@@ -25,7 +25,9 @@ graph LR
 
 ### Host instantiation
 
-For each host in `den.hosts`, Den calls:
+For each host in `den.hosts`, Den builds the configuration from that host's
+part of the fleet-wide resolve, and falls back to `host.mainModule` when that
+part is empty. Building a host from its `mainModule` yourself looks like this:
 
 ```nix
 host.instantiate {
@@ -38,7 +40,12 @@ host.instantiate {
 
 `host.mainModule` is internally computed by resolving the host's aspect
 with its context, collecting all class-specific config
-and dispatched includes.
+and dispatched includes. For a host resolved from its own context (no entity
+kind above the host, such as `den.schema.host.parent`), building it on its own
+gives the same host-class content as the configuration den puts in
+`flake.<intoAttr>`, including what the host delivers to its users and receives
+back through them (`provides.to-users`, `provides.<user>`). Content that needs
+an ancestor kind's context isn't in `mainModule`.
 
 The result is placed at `flake.<intoAttr>` -- by default
 `flake.nixosConfigurations.<name>` or `flake.darwinConfigurations.<name>`.
