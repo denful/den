@@ -16,6 +16,7 @@ let
     pathSetByScopeOption
     preprocessHosts
     ;
+  userLib = import ./user.nix { inherit config lib den; };
 
   # Entity instances are gen-schema instances: mkInstanceType injects name,
   # strict/freeform, _module.args.<kind>, and schema-owned id_hash (identity).
@@ -56,7 +57,11 @@ let
       strict = den.schema.host.isStrict;
       extraModules = [
         (
-          { config, ... }:
+          { config, options, ... }:
+          let
+            # One user construction per host, beside its evaluator.
+            relPair = userPair config;
+          in
           {
             options = {
               hostName = strOpt "Network hostname" config.name;
@@ -75,7 +80,23 @@ let
                 description = "user accounts";
                 default = { };
                 defaultText = lib.literalExpression "{ }";
-                type = lib.types.attrsOf (userType config);
+                type = lib.types.attrsOf relPair.type;
+                # Each user as this host sees it: the registry user plus this
+                # host's `user@host` relation, field by field.
+                apply = builtins.mapAttrs (
+                  n: _:
+                  userLib.compose den.users.${n}.__layer (
+                    userLib.mkLayer relPair (options.users.loc ++ [ n ]) (
+                      lib.concatMap (
+                        d:
+                        lib.optional (d.value ? ${n}) {
+                          inherit (d) file;
+                          value = d.value.${n};
+                        }
+                      ) options.users.definitionsWithLocations
+                    )
+                  )
+                );
               };
               instantiate = lib.mkOption {
                 description = ''
@@ -142,9 +163,9 @@ let
       ++ schemaLib.strictCompatModules den.schema.host.isStrict;
     } den.schema.host;
 
-  userType =
+  userPair =
     host:
-    schemaLib.mkInstanceType {
+    schemaLib.__mkInstancePaired {
       strict = den.schema.user.isStrict;
       extraModules = [
         (
