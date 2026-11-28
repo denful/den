@@ -427,6 +427,25 @@ let
         } { doFinalMerge = true; };
       };
 
+  # Shared by the instantiation and the fleet delivery index so the two can't drift.
+  deliveredModulesOf =
+    spec: pm:
+    if pm == null then
+      null
+    else
+      let
+        inherit (pm) proj materialized;
+        inherit (proj) hostScopeId hostClass;
+        hostModules =
+          if proj.unbounded then
+            materialized.${hostClass} or [ ]
+          else
+            checkLost (spec.name or hostScopeId) hostClass (materialized.__lostAt hostClass) (
+              materialized.${hostClass} or [ ]
+            );
+      in
+      if hostModules == [ ] then null else hostModules;
+
   # Build instantiateArgs for a spec without calling spec.instantiate.
   # Factored out so both applyInstantiates and hostConfigs can reuse it.
   mkInstantiateArgs =
@@ -437,25 +456,13 @@ let
     spec:
     let
       pm = if materializedFor != null then materializedFor spec else perHostMaterialized argBundle spec;
-      preWalkedModules =
-        if pm != null then
-          let
-            inherit (pm) proj materialized;
-            inherit (proj) hostScopeId hostClass;
-            hostModules =
-              if proj.unbounded then
-                materialized.${hostClass} or [ ]
-              else
-                checkLost (spec.name or hostScopeId) hostClass (materialized.__lostAt hostClass) (
-                  materialized.${hostClass} or [ ]
-                );
-          in
-          if hostModules == [ ] then null else hostModules
-        else
-          null;
+      preWalkedModules = deliveredModulesOf spec pm;
+      # Not the public mainModule: under an ancestor kind it reads this delivery.
       modules =
         if preWalkedModules != null then
           preWalkedModules
+        else if spec ? __rootedModule then
+          [ spec.__rootedModule ]
         else
           lib.optional (spec ? mainModule) spec.mainModule;
     in
@@ -1160,37 +1167,50 @@ let
           ) { } subtree;
         };
 
-      # Each instantiated root entity's landing, by den.lib.aspects.__landingKey of its spec; a key two scopes deliver throws only when read.
-      fleetLanding =
-        builtins.mapAttrs
-          (
-            _: ds:
-            let
-              d = builtins.head ds;
-            in
-            if builtins.length ds > 1 then
-              throw "den: two scopes deliver ${d.spec.name or "?"} (${d.spec.system or "?"}, ${d.spec.class or "?"}) to the fleet landing index: ${
-                lib.concatMapStringsSep " and " (x: x.pm.proj.hostScopeId) ds
-              }"
-            else
-              landingOf {
-                rootScopeId = d.pm.proj.hostScopeId;
-                inherit (d.pm) materialized;
-                subtree = d.pm.proj.subtreeScopeIds;
-              }
-          )
-          (
-            builtins.groupBy (d: den.lib.aspects.__landingKey d.spec) (
-              lib.concatMap (
-                k:
-                let
-                  pm = perHostByKey.${k};
-                  spec = specByKey.${k};
-                in
-                lib.optional (pm != null && spec ? id_hash) { inherit pm spec; }
-              ) (builtins.attrNames perHostByKey)
-            )
-          );
+      # Each instantiated root entity's deliveries, grouped by den.lib.aspects.__landingKey of its spec.
+      deliveriesByKey = builtins.groupBy (d: den.lib.aspects.__landingKey d.spec) (
+        lib.concatMap (
+          k:
+          let
+            pm = perHostByKey.${k};
+            spec = specByKey.${k};
+          in
+          lib.optional (pm != null && spec ? id_hash) { inherit pm spec; }
+        ) (builtins.attrNames perHostByKey)
+      );
+      # A key two scopes deliver throws, naming both, only when it is read.
+      onlyDelivery =
+        ds:
+        let
+          d = builtins.head ds;
+        in
+        if builtins.length ds > 1 then
+          throw "den: two scopes deliver ${d.spec.name or "?"} (${d.spec.system or "?"}, ${d.spec.class or "?"}) to the fleet landing index: ${
+            lib.concatMapStringsSep " and " (x: x.pm.proj.hostScopeId) ds
+          }"
+        else
+          d;
+      fleetLanding = builtins.mapAttrs (
+        _: ds:
+        let
+          d = onlyDelivery ds;
+        in
+        landingOf {
+          rootScopeId = d.pm.proj.hostScopeId;
+          inherit (d.pm) materialized;
+          subtree = d.pm.proj.subtreeScopeIds;
+        }
+      ) deliveriesByKey;
+      # null where the instantiation fell back to the host-rooted resolve.
+      fleetDelivery = builtins.mapAttrs (
+        _: ds:
+        let
+          d = onlyDelivery ds;
+        in
+        {
+          modules = deliveredModulesOf d.spec d.pm;
+        }
+      ) deliveriesByKey;
 
       # TODO(#694): remove with the `isolated` alias. Every entity scope now
       # bounds its ancestors' merge, so the flag only matters for a scope of an
@@ -1384,6 +1404,7 @@ let
       # instantiates, with the include chains its locations map through.
       fleet = {
         landing = fleetLanding;
+        delivery = fleetDelivery;
         chains = (result.state.scopedLocChains or (_: { })) null;
       };
       # The production edge object (see productionEdgeTrace above).

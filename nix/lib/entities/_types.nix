@@ -155,6 +155,38 @@ let
       default = den.lib.aspects.resolveWithPaths config.class config.resolved;
     };
 
+  # Private, so den's instantiation fallback never reads the fleet through mainModule.
+  rootedModuleOption =
+    _den: config:
+    lib.mkOption {
+      internal = true;
+      visible = false;
+      readOnly = true;
+      type = lib.types.raw;
+      defaultText = "{ inherit (config.__resolveResult) imports; }";
+      default = { inherit (config.__resolveResult) imports; };
+    };
+
+  # Under an ancestor kind only the fleet walk sees what that kind delivers.
+  hostMainModuleOption =
+    den: config:
+    lib.mkOption {
+      internal = true;
+      visible = false;
+      readOnly = true;
+      type = lib.types.deferredModule;
+      defaultText = "the fleet's delivery for this host, or { inherit (config.__resolveResult) imports; }";
+      # The choice sits inside `imports` so binding or `? imports` forces nothing.
+      default = {
+        imports = den.lib.aspects.__mainModuleImports {
+          gated = (den.schema.host.parent or null) != null;
+          delivered =
+            (den.__fleet.fleet.delivery.${den.lib.aspects.__landingKey config} or { }).modules or null;
+          rooted = config.__resolveResult.imports;
+        };
+      };
+    };
+
   # mainModule now derives imports from the shared result (no second run).
   mainModuleOption =
     _den: config:
@@ -299,6 +331,8 @@ in
     lookupAspectBy
     deepMergeAttrs
     mainModuleOption
+    hostMainModuleOption
+    rootedModuleOption
     resolveResultOption
     pathSetByScopeOption
     resolvedCtxModule

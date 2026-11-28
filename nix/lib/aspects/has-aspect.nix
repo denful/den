@@ -86,6 +86,15 @@ let
   # id_hash is kind + name only, so same-named hosts on two systems need system and class too.
   __landingKey = e: "${e.id_hash or ""}\n${e.system or ""}\n${e.class or ""}";
 
+  # Factored out so the empty-delivery fallback is testable without a fixture.
+  __mainModuleImports =
+    {
+      gated,
+      delivered,
+      rooted,
+    }:
+    if gated && delivered != null then delivered else rooted;
+
   # The finalized (late) hasAspect over the fleet landing index: is ref's
   # content, or that of an aspect it includes, in the entity's own evaluation
   # in that class. `landing` is the entity's index entry: a root entity's
@@ -187,5 +196,6 @@ in
     mkProjectedHasAspect
     __mkLateHasAspect
     __landingKey
+    __mainModuleImports
     ;
 }

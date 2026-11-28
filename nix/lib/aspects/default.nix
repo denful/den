@@ -143,6 +143,7 @@ in
     mkProjectedHasAspect
     __mkLateHasAspect
     __landingKey
+    __mainModuleImports
     ;
   mkAspectsType = typeCfg: lib.mapAttrs (_: v: v typeCfg) rawTypes;
   # Predicates exported directly (not through types mapAttrs which applies { } to each value).
