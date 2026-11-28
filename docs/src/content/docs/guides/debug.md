@@ -125,6 +125,10 @@ nix-repl> cfg = (lib.nixosSystem { modules = [ module ]; }).config
 nix-repl> cfg.networking.hostName
 ```
 
+With an entity kind above hosts (`den.schema.host.parent`), the first read of
+a host's `mainModule` resolves the whole fleet, as `nixosConfigurations` does.
+See [Host instantiation](/reference/output/#host-instantiation).
+
 ## Common Issues
 
 **Duplicate values in lists**: Den deduplicates owned and static configs

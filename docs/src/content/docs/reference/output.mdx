@@ -38,14 +38,28 @@ host.instantiate {
 }
 ```
 
-`host.mainModule` is internally computed by resolving the host's aspect
-with its context, collecting all class-specific config
-and dispatched includes. For a host resolved from its own context (no entity
-kind above the host, such as `den.schema.host.parent`), building it on its own
-gives the same host-class content as the configuration den puts in
-`flake.<intoAttr>`, including what the host delivers to its users and receives
-back through them (`provides.to-users`, `provides.<user>`). Content that needs
-an ancestor kind's context isn't in `mainModule`.
+What a `mainModule` build carries depends on whether an entity kind sits above
+hosts:
+
+- **No entity kind above hosts** (the default): `mainModule` is the host's own
+  resolve, computed from the host alone. It has the host-class content of the
+  configuration den puts in `flake.<intoAttr>`, including what the host
+  delivers to its users and receives back through them (`provides.to-users`,
+  `provides.<user>`), but not values its pipes collect from other hosts.
+- **An entity kind above hosts** (`den.schema.host.parent`, such as an
+  `environment`): `mainModule` is the host's part of the fleet-wide resolve,
+  the same modules its configuration is built from, so it carries what that
+  kind delivers too. Reading its modules pays for the whole fleet walk the
+  first time, as building any host's configuration already does, and an error
+  in another host's include reaches it, as it reaches every configuration den
+  builds. A host delivered from two scopes is refused by name, where its
+  configuration warns and keeps the last. A host the flake doesn't
+  instantiate keeps its own resolve.
+
+Under an entity kind above hosts, a host's `mainModule` is a late value: an
+include or policy can bind it, or ask `mainModule ? imports`, but reading the
+modules inside it while den is still resolving the fleet is a cycle. Read them
+from a class module, a flake output or the repl, after the walk.
 
 The result is placed at `flake.<intoAttr>` -- by default
 `flake.nixosConfigurations.<name>` or `flake.darwinConfigurations.<name>`.
