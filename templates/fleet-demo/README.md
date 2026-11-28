@@ -2,7 +2,7 @@
 
 A multi-host NixOS fleet managed by den,
 demonstrating environment-based topology, cross-host data sharing, and
-policy-driven user access from a centralized registry.
+policy-driven user access from den's user registry.
 
 ## What This Builds
 
@@ -39,16 +39,16 @@ fleet.environments = {
 };
 ```
 
-The host schema is extended with `environment` and `addr` options via
-`den.schema.host.imports`, so every host declares which environment it
-belongs to.
+Each host's environment is a fact (`den.schema.host.facts`, set as
+`facts.environment`), and the host schema adds `environment` and `addr`
+options via `den.schema.host.imports`; the `environment` field follows the
+fact. Facts are what user assignment reads, before any host is resolved.
 
-### Users as Entities
+### Users
 
-`users.nix` promotes users to real entities (`den.schema.user.isEntity = true`)
-and extends the user schema with `email`, `groups`, and `ssh-keys` options.
-The registry type imports `den.schema.user` so each entry is a proper user
-entity with `userName`, `classes`, and `aspect` — not a plain attrset.
+`users.nix` declares the users in `den.users`, den's user registry, and
+extends the user schema with `email` and `ssh-keys` options. Group
+membership is a user fact (`den.schema.user.facts`, set as `facts.groups`).
 
 ## Policy-Driven Scope Tree
 
@@ -67,8 +67,10 @@ at a specific scope level and resolving child entities:
 | `to-fleet` | flake | fleet | `resolve.to "fleet"` — creates a single fleet entity |
 | `fleet-to-envs` | fleet | environments | `resolve.to "environment"` — one per `fleet.environments` entry |
 | `env-to-hosts` | environment | hosts | `resolve.to "host"` — filters `den.hosts` by matching `host.environment` |
-| `env-users` | host | users | `resolve.to "user"` — filters `den.users.registry` by environment group grant |
-| `host-users` | host | users | `resolve.to "user"` — filters `den.users.registry` by host-specific group grant |
+
+Which users each host gets isn't part of this chain. It's decided first,
+by the `user-access` assignment policy (`den.lib.policy.assign`), and den's
+own `host-to-users` then creates a scope for each of a host's users.
 
 Each `resolve.to` call creates a named child scope. The entity's context
 bindings (`host`, `user`, `environment`, etc.) are available to all aspects
@@ -79,31 +81,25 @@ and policies that fire within that scope.
 Den's core provides built-in policies for common patterns. This demo
 disables two of them to take full control of the scope tree:
 
-- **`den.policies.to-os-outputs`** and **`den.policies.to-hm-outputs`** are
+- **`den.policies.system-to-os-outputs`** and **`den.policies.system-to-hm-outputs`** are
   excluded from `den.schema.flake-system` — the fleet policies handle host
   instantiation explicitly via `den.lib.policy.instantiate`, so the default
   per-system output walk is unnecessary.
 
-- **`den.policies.host-to-users`** is excluded from `den.schema.host` — this
-  core policy walks `host.users` (inline user definitions) and resolves them
-  via `resolve.shared`. Since this demo resolves users from the external
-  registry via `resolve.to "user"`, the default policy would be a no-op but
-  is excluded for clarity.
+## Users and Group-Based Access
 
-## User Registry and Group-Based Access
-
-Users are defined once in `den.users.registry` with identity metadata:
+Users are defined once in `den.users` with identity metadata:
 
 ```nix
-den.users.registry = {
+den.users = {
   alice = {
     email = "alice@example.com";
-    groups = [ "admin" ];
+    facts.groups = [ "admin" ];
     ssh-keys = [ "ssh-ed25519 AAAAC3... alice@workstation" ];
   };
   bob = {
     email = "bob@example.com";
-    groups = [ "deploy" ];
+    facts.groups = [ "deploy" ];
     ssh-keys = [ "ssh-ed25519 AAAAC3... bob@laptop" ];
   };
 };
@@ -119,22 +115,21 @@ fleet.user-access.by-environment = {
 };
 ```
 
-The `env-users` policy fires at each host scope, looks up the access
-grant for `host.environment`, and filters the registry for users whose
-`groups` intersect the granted set. Each match becomes a `resolve.to "user"`
-call, creating a user scope on that host.
+The `user-access` assignment policy runs once per host, before any host is
+resolved. It looks up the grant for the host's `environment` fact (and any
+`fleet.user-access.by-host` grant for the host itself), and returns the
+registry users whose `groups` fact intersects it. Those become the host's
+users, so every reader of `host.users` sees them.
 
 | User | Groups | Prod (grants admin) | Staging (grants admin + deploy) |
 |------|--------|---------------------|-------------------------------|
 | alice | admin | yes | yes |
 | bob | deploy | no | yes |
 
-The `host-users` policy provides the same mechanism scoped to individual
-hosts via `fleet.user-access.by-host`, allowing per-host overrides on top
-of environment-level grants.
+Grants in `fleet.user-access.by-host` add to a host's environment grant.
 
-The `ssh-keys` battery fires in every user scope and sets
-`users.users.${user.userName}.openssh.authorizedKeys.keys` from
+The `ssh-keys` aspect fires in every user scope and sets the user
+account's `openssh.authorizedKeys.keys` (the `user` class) from
 `user.ssh-keys`. Because user scopes only exist on hosts where access
 was granted, keys are provisioned exactly where they should be — nowhere
 else.
@@ -220,7 +215,7 @@ modules/
       web-prod-{1,2}.nix      — includes nginx + hostfile
       web-staging.nix         — includes nginx + hostfile
     users/
-      ssh-keys.nix            — SSH key provisioning battery
+      ssh-keys.nix            — SSH key provisioning aspect
 ```
 
 ## Usage
@@ -265,8 +260,9 @@ evaluated. Child scopes inherit their parent's context bindings.
 
 In this fleet, the tree is: flake → fleet → environment → host → user.
 Environment and host scopes are created by policies that walk the
-`fleet.environments` and `den.hosts` registries. User scopes are
-created by access policies that match registry users by group membership.
+`fleet.environments` and `den.hosts` registries. User scopes come from
+each host's users, which an assignment policy picks from `den.users` by
+group membership before any host is resolved.
 
 ```mermaid
 graph TD
@@ -320,8 +316,8 @@ they produce.
 
 The arrows show the resolution chain — how `to-fleet` creates the
 fleet scope, `fleet-to-envs` fans out environments, `env-to-hosts`
-walks hosts, and `env-users`/`host-users` resolve registry users
-onto their granted hosts.
+walks hosts, and den's own `host-to-users` creates a scope for each user
+the `user-access` assignment policy put on the host.
 
 ```mermaid
 graph TD
@@ -341,15 +337,15 @@ graph TD
 
   fleet_fleet -->|fleet-to-envs| environment_prod_fleet_fleet
   environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_lb_prod
-  environment_prod_fleet_fleet_host_lb_prod -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_prod_fleet_fleet_host_lb_prod_user_alice
+  environment_prod_fleet_fleet_host_lb_prod -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_prod_fleet_fleet_host_lb_prod_user_alice
   environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_web_prod_1
-  environment_prod_fleet_fleet_host_web_prod_1 -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_prod_fleet_fleet_host_web_prod_1_user_alice
+  environment_prod_fleet_fleet_host_web_prod_1 -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_prod_fleet_fleet_host_web_prod_1_user_alice
   environment_prod_fleet_fleet -->|env-to-hosts| environment_prod_fleet_fleet_host_web_prod_2
-  environment_prod_fleet_fleet_host_web_prod_2 -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_prod_fleet_fleet_host_web_prod_2_user_alice
+  environment_prod_fleet_fleet_host_web_prod_2 -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_prod_fleet_fleet_host_web_prod_2_user_alice
   fleet_fleet -->|fleet-to-envs| environment_staging_fleet_fleet
   environment_staging_fleet_fleet -->|env-to-hosts| environment_staging_fleet_fleet_host_web_staging
-  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_staging_fleet_fleet_host_web_staging_user_alice
-  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, env-users, os-to-host| environment_staging_fleet_fleet_host_web_staging_user_bob
+  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_staging_fleet_fleet_host_web_staging_user_alice
+  environment_staging_fleet_fleet_host_web_staging -->|collect-backends, collect-host-addrs, host-to-hm-users, host-to-users, mutual-provider/transition-default, os-to-host, user-aspects(all)/transition-default| environment_staging_fleet_fleet_host_web_staging_user_bob
 
   style environment_prod_fleet_fleet fill:#a475f9,stroke:#a475f9,color:#1f2328
   style environment_prod_fleet_fleet_host_lb_prod fill:#2da44e,stroke:#2da44e,color:#1f2328
@@ -467,15 +463,21 @@ be included by hosts or users. Edges show the `includes` relationship:
 ```mermaid
 graph TD
   aspects([aspects]):::root
-  haproxy["haproxy · shared"]:::haproxy_c
-  hostfile["hostfile · shared"]:::hostfile_c
-  lb_prod["lb-prod · host"]:::lb_prod_c
-  nginx["nginx · shared"]:::nginx_c
-  web_prod_1["web-prod-1 · host"]:::web_prod_1_c
-  web_prod_2["web-prod-2 · host"]:::web_prod_2_c
-  web_staging["web-staging · host"]:::web_staging_c
+  alice[/"alice · shared"\]:::alice_c
+  bob[/"bob · shared"\]:::bob_c
+  haproxy[/"haproxy · shared"\]:::haproxy_c
+  hostfile[/"hostfile · shared"\]:::hostfile_c
+  lb_prod[/"lb-prod · host"\]:::lb_prod_c
+  nginx[/"nginx · shared"\]:::nginx_c
+  ssh_keys[/"ssh-keys · host"\]:::ssh_keys_c
+  web_prod_1[/"web-prod-1 · host"\]:::web_prod_1_c
+  web_prod_2[/"web-prod-2 · host"\]:::web_prod_2_c
+  web_staging[/"web-staging · host"\]:::web_staging_c
 
+  aspects --> alice
+  aspects --> bob
   aspects --> lb_prod
+  aspects --> ssh_keys
   aspects --> web_prod_1
   aspects --> web_prod_2
   aspects --> web_staging
@@ -489,10 +491,13 @@ graph TD
   web_staging --> hostfile
 
   classDef root fill:#218bff,stroke:#218bff,color:#1f2328,font-weight:bold
+  classDef alice_c fill:#e16f24,stroke:#e16f24,color:#1f2328,stroke-width:2px
+  classDef bob_c fill:#e16f24,stroke:#e16f24,color:#1f2328,stroke-width:2px
   classDef haproxy_c fill:#e16f24,stroke:#e16f24,color:#1f2328,stroke-width:2px
   classDef hostfile_c fill:#e16f24,stroke:#e16f24,color:#1f2328,stroke-width:2px
   classDef lb_prod_c fill:#218bff,stroke:#218bff,color:#1f2328,stroke-width:2px
   classDef nginx_c fill:#e16f24,stroke:#e16f24,color:#1f2328,stroke-width:2px
+  classDef ssh_keys_c fill:#218bff,stroke:#218bff,color:#1f2328,stroke-width:2px
   classDef web_prod_1_c fill:#218bff,stroke:#218bff,color:#1f2328,stroke-width:2px
   classDef web_prod_2_c fill:#218bff,stroke:#218bff,color:#1f2328,stroke-width:2px
   classDef web_staging_c fill:#218bff,stroke:#218bff,color:#1f2328,stroke-width:2px
@@ -511,8 +516,8 @@ for quick reference or machine consumption.
 ## Topology
 
 - **2** environments, **4** hosts, **5** users
-- Scope chain: flake → flake-system → fleet → user → host → environment
-- Trace entries: 245
+- Scope chain: flake → fleet → user → host → environment → flake-system
+- Trace entries: 249
 
 ## Environments
 
@@ -525,10 +530,10 @@ for quick reference or machine consumption.
 
 | Host | Aspect Count | Aspects |
 | ------ | -------------- | --------- |
-| lb-prod | 5 | haproxy, hostfile, insecure-predicate/os, lb-prod, unfree-predicate/os |
-| web-prod-1 | 5 | hostfile, insecure-predicate/os, nginx, unfree-predicate/os, web-prod-1 |
-| web-prod-2 | 5 | hostfile, insecure-predicate/os, nginx, unfree-predicate/os, web-prod-2 |
-| web-staging | 5 | hostfile, insecure-predicate/os, nginx, unfree-predicate/os, web-staging |
+| lb-prod | 4 | haproxy, hostfile, hostname/os, lb-prod |
+| web-prod-1 | 4 | hostfile, hostname/os, nginx, web-prod-1 |
+| web-prod-2 | 4 | hostfile, hostname/os, nginx, web-prod-2 |
+| web-staging | 4 | hostfile, hostname/os, nginx, web-staging |
 
 ## Pipes
 
@@ -543,17 +548,22 @@ for quick reference or machine consumption.
 
 | Policy | Fires at |
 | -------- | ---------- |
+| flake-to-systems | flake |
 | to-fleet | flake |
-| to-systems | flake |
+| apps-to-flake | flake-system |
+| checks-to-flake | flake-system |
+| devShells-to-flake | flake-system |
+| legacyPackages-to-flake | flake-system |
+| packages-to-flake | flake-system |
 | fleet-to-envs | fleet |
 | env-to-hosts | environment |
 | collect-backends | host |
 | collect-host-addrs | host |
-| env-users | host |
+| host-to-hm-users | host |
+| host-to-users | host |
+| mutual-provider/transition-default | host |
 | os-to-host | host |
+| user-aspects(all)/transition-default | host |
+| define-user-account | user |
+| hm-user-detect | user |
 | user-to-host | user |
-| to-apps | flake-system |
-| to-checks | flake-system |
-| to-devShells | flake-system |
-| to-legacyPackages | flake-system |
-| to-packages | flake-system |

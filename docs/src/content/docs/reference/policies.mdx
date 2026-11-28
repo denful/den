@@ -262,6 +262,41 @@ den.default.includes = [
 Returns `{ __isPolicy = true; name; fn; }` — the pipeline recognizes this
 as a policy and routes it to the dispatch system.
 
+## Assignment policies
+
+### `den.lib.policy.assign fn`
+
+```nix
+den.policies.admins-on-prod = den.lib.policy.assign (
+  { host, users }:
+  lib.optionals (host.facts.environment == "prod") [ "alice" ]
+);
+den.schema.host.includes = [ den.policies.admins-on-prod ];
+```
+
+An assignment policy decides which registry users a host gets, before any host
+is resolved. `fn` runs once per host with `host = { name; system; class; facts; }`
+and `users`, a map from each `den.users` name to `{ name; userName; facts; }`,
+and returns a list of user names. Each becomes one of the host's `users`.
+
+It must be registered under `den.policies.<name>`, and is selected from
+`den.schema.host.includes`/`excludes` and a host's own `includes`/`excludes`.
+Unknown user names, an unnamed assignment policy, and excluding one that's
+never included are errors, and so is one placed where assignment doesn't
+read, such as `den.default.includes`. See
+[Assignment policies](/guides/users/#assignment-policies).
+
+### `den.policies.user-to-hosts`
+
+The builtin assignment policy that reads `den.users.<name>.hosts`. It's on
+`den.schema.host.includes`; exclude it to turn `hosts` lists off.
+
+### Policies that assign during resolution
+
+A host policy that emits `resolve.to "user"` still works, and warns once per
+policy that `den.users` is the source of truth for host assignment. See
+[Migrating](/guides/users/#from-host-policies-that-assign-during-resolution).
+
 ## Deactivation
 
 Use `excludes` to prevent a policy from firing in a subtree:

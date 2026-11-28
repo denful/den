@@ -17,11 +17,6 @@ let
         {
           config._module.args.environment = config;
           options = {
-            name = lib.mkOption {
-              type = lib.types.str;
-              default = name;
-              description = "Environment name";
-            };
             domain-name = lib.mkOption {
               type = lib.types.str;
               default = "local";
@@ -39,14 +34,24 @@ let
     ];
   } den.schema.environment;
 
+  # The environment is a fact, so user assignment can read it before any host
+  # is resolved; the host field follows it.
+  hostFacts = {
+    options.environment = lib.mkOption {
+      type = lib.types.str;
+      default = "default";
+      description = "Environment this host belongs to";
+    };
+  };
+
   # Extend host schema with environment + networking fields.
   extendHostSchema =
-    { ... }:
+    { config, ... }:
     {
       options.environment = lib.mkOption {
         type = lib.types.str;
-        default = "default";
-        description = "Environment this host belongs to";
+        default = config.facts.environment;
+        description = "Environment this host belongs to (from `facts.environment`)";
       };
       options.addr = lib.mkOption {
         type = lib.types.str;
@@ -68,6 +73,7 @@ in
   };
 
   config.den.schema.host.imports = [ extendHostSchema ];
+  config.den.schema.host.facts = [ hostFacts ];
 
   config.fleet.environments = {
     prod = {

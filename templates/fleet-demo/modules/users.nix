@@ -1,7 +1,8 @@
-# User registry and policy-driven access mappings.
+# Users and policy-driven access mappings.
 #
-# Demonstrates a standalone user registry with extended schema,
-# resolved onto hosts via fleet.user-access group policies.
+# Users live in den's registry (`den.users`), with extra schema fields and a
+# `groups` fact; the user-access assignment policy (policies/fleet.nix) puts
+# them on hosts from fleet.user-access grants.
 {
   lib,
   config,
@@ -18,6 +19,15 @@ let
     };
   };
 
+  # Group memberships are a fact: assignment reads them before resolution.
+  userFacts = {
+    options.groups = lib.mkOption {
+      type = lib.types.listOf lib.types.str;
+      default = [ ];
+      description = "Group memberships for access policy selection";
+    };
+  };
+
   # Extend user schema with registry fields.
   extendUserSchema =
     { ... }:
@@ -27,11 +37,6 @@ let
         default = "";
         description = "User email address";
       };
-      options.groups = lib.mkOption {
-        type = lib.types.listOf lib.types.str;
-        default = [ ];
-        description = "Group memberships for access policy selection";
-      };
       options.ssh-keys = lib.mkOption {
         type = lib.types.listOf lib.types.str;
         default = [ ];
@@ -39,52 +44,8 @@ let
       };
     };
 
-  # Registry entry type — mirrors the standard user entity shape from
-  # nix/lib/entities/host.nix so that pipeline self-provide, define-user,
-  # and other batteries find the expected attributes (userName, aspect, classes).
-  registryUserType = den.lib.schema.mkInstanceType {
-    strict = false;
-    extraModules = [
-      (
-        { name, config, ... }:
-        {
-          config._module.args.user = config;
-          options = {
-            name = lib.mkOption {
-              type = lib.types.str;
-              default = name;
-              description = "User name (from attrset key)";
-            };
-            userName = lib.mkOption {
-              type = lib.types.str;
-              default = name;
-              description = "User account name";
-            };
-            classes = lib.mkOption {
-              type = lib.types.listOf lib.types.str;
-              default = [ "user" ];
-              description = "Home management nix classes";
-            };
-            aspect = lib.mkOption {
-              type = lib.types.raw;
-              default = if den.aspects ? ${name} then den.aspects.${name} else { };
-              defaultText = "den.aspects.<name>";
-              description = "Aspect that configures this user";
-            };
-          };
-        }
-      )
-    ];
-  } den.schema.user;
 in
 {
-  # Registry: standalone, not under fleet.
-  options.den.users.registry = lib.mkOption {
-    type = lib.types.attrsOf registryUserType;
-    default = { };
-    description = "External user registry with extended schema";
-  };
-
   # Access mappings: under fleet.
   options.fleet.user-access = {
     by-environment = lib.mkOption {
@@ -100,22 +61,20 @@ in
   };
 
   config = {
-    # Promote users to real entities.
-    den.schema.user.isEntity = true;
-
     # Extend user schema with registry fields.
     den.schema.user.imports = [ extendUserSchema ];
+    den.schema.user.facts = [ userFacts ];
 
     # Demo users.
-    den.users.registry = {
+    den.users = {
       alice = {
         email = "alice@example.com";
-        groups = [ "admin" ];
+        facts.groups = [ "admin" ];
         ssh-keys = [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyAlice alice@workstation" ];
       };
       bob = {
         email = "bob@example.com";
-        groups = [ "deploy" ];
+        facts.groups = [ "deploy" ];
         ssh-keys = [ "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIExampleKeyBob bob@laptop" ];
       };
     };

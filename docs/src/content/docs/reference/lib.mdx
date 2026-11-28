@@ -121,6 +121,11 @@ Pipe builder API for quirk data routing. See
 Create a named policy record for use in `includes` lists.
 See [Policies reference](/reference/policies/#denlibpolicymkpolicy-name-fn).
 
+### `den.lib.policy.assign fn`
+
+An assignment policy: `{ host, users }: [ <user name> … ]`, run once per host
+before resolution. See [Policies reference](/reference/policies/#denlibpolicyassign-fn).
+
 ### `den.lib.policy.for entity policyOrList`
 
 Conditional policy wrapper — fires only for a specific entity.
@@ -130,6 +135,23 @@ See [Policies](/explanation/policies/#conditional-policies).
 
 Conditional policy wrapper — fires only when predicate returns true.
 See [Policies](/explanation/policies/#conditional-policies).
+
+## `den.lib.cond`
+
+Conditions for `den.users.<name>.hosts` entries, over the host's and the
+user's facts and identity. `eq path value`, `all [ … ]`, `any [ … ]`,
+`not cond` and `always`, where a path starts with `"host"` or `"user"`:
+`den.lib.cond.eq [ "host" "environment" ] "prod"`. A path to an undeclared
+fact, and a condition den can't decide, are errors.
+
+`den.lib.cond.predicate "<name>"` is a whole entry naming
+`den.predicates.<name>`.
+
+## `den.lib.fold`
+
+`den.lib.fold.replace` and `den.lib.fold.append`, the values of
+`den.schema.user.folds.<field>`. See
+[`den.schema.user.folds`](/reference/schema/#denschemauserfolds).
 
 ## `den.lib.policyInspect`
 

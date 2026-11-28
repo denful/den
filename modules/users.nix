@@ -23,7 +23,7 @@ let
   lambdaWarned = builtins.mapAttrs (
     n: _:
     warnOrThrow ''
-      den: den.users.${n}.hosts has an inline function. Use a condition (`den.lib.cond.eq [ "host" "<fact>" ] <value>`) or a named predicate (`den.lib.cond.predicate "<name>"` with `den.predicates.<name>`) instead; set `den.migrations.anonymous-predicates.suppressWarnings = true` to silence this.
+      den: den.users.${n}.hosts has an inline function. Use a condition (`den.lib.cond.eq [ "host" "<fact>" ] <value>`) or a named predicate (`den.lib.cond.predicate "<name>"` with `den.predicates.<name>`) instead (https://den.denful.dev/guides/users/#from-inline-functions-in-hosts); set `den.migrations.anonymous-predicates.suppressWarnings = true` to silence this.
     '' true
   ) den.users;
 
