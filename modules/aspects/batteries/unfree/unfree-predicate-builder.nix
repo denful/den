@@ -12,7 +12,10 @@ let
   unfreeModule =
     { config, ... }@args:
     let
-      globalPkgs = args.osConfig.home-manager.useGlobalPkgs or false;
+      # The host's nixpkgs serves only a home nested in it: a standalone home
+      # builds its own even when its host sets useGlobalPkgs.
+      globalPkgs =
+        (config.submoduleSupport.enable or false) && (args.osConfig.home-manager.useGlobalPkgs or false);
       hasUnfree = config.unfree.packages != [ ];
     in
     {
