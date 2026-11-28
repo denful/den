@@ -16,20 +16,22 @@ let
       kinds = builtins.filter (k: schemaKindSet ? ${k}) (builtins.attrNames sctx);
       lateFor =
         k: v:
-        let
-          landing = den.lib.__landingOf sctx v;
-        in
-        if landing == null then
-          v
-        else
-          v
-          // {
-            hasAspect = den.lib.aspects.__mkLateHasAspect {
-              inherit landing;
-              inherit (den.__fleet.fleet) chains;
-              classes = v.classes or (lib.optional (v ? class) v.class);
-            };
-          };
+        v
+        // {
+          # Looked up only when read, so binding an entity forces nothing.
+          hasAspect =
+            let
+              landing = den.lib.__landingOf sctx v;
+            in
+            if landing == null then
+              v.hasAspect
+            else
+              den.lib.aspects.__mkLateHasAspect {
+                inherit landing;
+                inherit (den.__fleet.fleet) chains;
+                classes = v.classes or (lib.optional (v ? class) v.class);
+              };
+        };
     in
     sctx
     // lib.genAttrs kinds (

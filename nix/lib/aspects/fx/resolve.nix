@@ -1067,6 +1067,18 @@ let
           sid = entityScopeFor scopeByEntity spec;
         in
         if sid == null then null else "${sid}\n${spec.class or "nixos"}";
+      specByKey = builtins.listToAttrs (
+        lib.concatMap (
+          spec:
+          let
+            k = hostKeyOf spec;
+          in
+          lib.optional (k != null) {
+            name = k;
+            value = spec;
+          }
+        ) allInstantiateSpecs
+      );
       perHostByKey = builtins.listToAttrs (
         lib.concatMap (
           spec:
@@ -1148,30 +1160,37 @@ let
           ) { } subtree;
         };
 
-      # What lands in each instantiated entity, from the delivery that builds its
-      # configuration: keyed by the entity's id_hash, per class, with what lands
-      # in each entity below it (its users) keyed by their id_hash. Built from
-      # the collected locations and routes, never from a module body.
-      fleetLanding = lib.foldl' (
-        acc: k:
-        let
-          pm = perHostByKey.${k};
-          sid = pm.proj.hostScopeId;
-          kind = scopeEntityKind.${sid} or null;
-          entity = if kind == null then null else (scopeContexts.${sid} or { }).${kind} or null;
-        in
-        if pm == null || entity == null || !(entity ? id_hash) || acc ? ${entity.id_hash} then
-          acc
-        else
-          acc
-          // {
-            ${entity.id_hash} = landingOf {
-              rootScopeId = sid;
-              inherit (pm) materialized;
-              subtree = pm.proj.subtreeScopeIds;
-            };
-          }
-      ) { } (builtins.attrNames perHostByKey);
+      # Each instantiated root entity's landing, by den.lib.aspects.__landingKey of its spec; a key two scopes deliver throws only when read.
+      fleetLanding =
+        builtins.mapAttrs
+          (
+            _: ds:
+            let
+              d = builtins.head ds;
+            in
+            if builtins.length ds > 1 then
+              throw "den: two scopes deliver ${d.spec.name or "?"} (${d.spec.system or "?"}, ${d.spec.class or "?"}) to the fleet landing index: ${
+                lib.concatMapStringsSep " and " (x: x.pm.proj.hostScopeId) ds
+              }"
+            else
+              landingOf {
+                rootScopeId = d.pm.proj.hostScopeId;
+                inherit (d.pm) materialized;
+                subtree = d.pm.proj.subtreeScopeIds;
+              }
+          )
+          (
+            builtins.groupBy (d: den.lib.aspects.__landingKey d.spec) (
+              lib.concatMap (
+                k:
+                let
+                  pm = perHostByKey.${k};
+                  spec = specByKey.${k};
+                in
+                lib.optional (pm != null && spec ? id_hash) { inherit pm spec; }
+              ) (builtins.attrNames perHostByKey)
+            )
+          );
 
       # TODO(#694): remove with the `isolated` alias. Every entity scope now
       # bounds its ancestors' merge, so the flag only matters for a scope of an
