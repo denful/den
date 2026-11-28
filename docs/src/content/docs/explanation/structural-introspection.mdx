@@ -148,9 +148,10 @@ assembled, and has these limits:
   entries;
 - in a `mainModule` build, `host.hasAspect` answers about what lands in the
   configuration the flake builds (`nixosConfigurations`), not about that
-  `mainModule` build, and the two can differ for content an entity kind above
-  the host delivers ([#795](https://github.com/denful/den/issues/795)). A
-  `mainModule` class module that reads `host` also forces the flake's resolve;
+  `mainModule` build. With an entity kind above hosts the build carries the
+  same modules; without one it lacks values the host's pipes collect from
+  other hosts. A `mainModule` class module that reads `host` also forces the
+  flake's resolve;
 - a target query forces every instantiated host's walk, including its
   includes, but no module bodies or option values: the first entity binding
   a class module reads forces the head of every host's delivery (its scopes),
