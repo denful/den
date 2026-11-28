@@ -88,26 +88,19 @@ let
               else
                 null;
 
-            # A standalone home always names its user, whether or not a declared
-            # host can resolve one. Binding it from the home is what lets a
-            # `{ user, ... }` class module resolve at all: without it
-            # wrapFunctionModule takes the missingDenArgNames path and the whole
-            # class block is dropped — silently, since the lib.warn it attaches
-            # rides on the discarded module and is never forced.
+            # A standalone home's user is the registry user `den.users.<userName>`,
+            # bound the way a host user is: on a host declared in this home's
+            # system, the host's view (registry user plus that relation's
+            # override); otherwise the registry user alone, so an undeclared
+            # `@host` adds nothing and creates no account. Either way the home's
+            # class drives it, so `classes` is the home's.
             #
-            # A declared host still wins, so a real user keeps its full record
-            # (classes, aspect, host). The synthetic one is identity-only; OS
-            # batteries do not act on it because they gate on `host ? class`,
-            # which no standalone home satisfies.
-            userCtx =
-              if userByName != null then
-                userByName
-              else
-                {
-                  name = userName;
-                  userName = userName;
-                  classes = [ config.class ];
-                };
+            # Binding it is also what lets a `{ user, ... }` class module resolve
+            # at all: without it wrapFunctionModule takes the missingDenArgNames
+            # path and the whole class block is dropped, silently.
+            userCtx = (if userByName != null then userByName else den.users.${config.userName}) // {
+              classes = [ config.class ];
+            };
 
             homeManagerConfiguration =
               if nameWithHost && hostByName != null then

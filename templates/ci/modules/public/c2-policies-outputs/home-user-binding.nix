@@ -1,6 +1,6 @@
-# How a standalone home binds its `user` and `host` today, pinned before the
-# user registry (#781) changes the binding. Each case asserts the whole binding
-# so a change to it fails here rather than downstream.
+# How a standalone home binds its `user` and `host`. A home's user is the
+# registry user `den.users.<userName>` (#781): the user's identity fields
+# below, with `classes` the home's own; on a declared host, that host's view.
 { denTest, ... }:
 let
   homeOf =
@@ -26,6 +26,11 @@ let
     userName = "tux";
     classes = [ "homeManager" ];
   };
+  # The binding's identity: a home's user carries the registry user's whole
+  # record, aspect included, which no cell compares whole.
+  userOf = u: {
+    inherit (u) name userName classes;
+  };
 in
 {
   flake.tests.home-user-binding = {
@@ -41,7 +46,8 @@ in
             home = homeOf den "x86_64-linux" "tux";
           in
           {
-            inherit (home) host user;
+            inherit (home) host;
+            user = userOf home.user;
             os = osOf config "tux";
           };
         expected = {
@@ -63,7 +69,8 @@ in
             home = homeOf den "x86_64-linux" "tux@astra";
           in
           {
-            inherit (home) host user;
+            inherit (home) host;
+            user = userOf home.user;
             os = osOf config "tux@astra";
             hostBuilt = config.flake ? nixosConfigurations && config.flake.nixosConfigurations ? astra;
           };
@@ -97,17 +104,18 @@ in
           {
             hostName = home.host.name;
             hostClass = home.host.class;
-            # The home's user IS the host's user record, not a copy of it.
-            sameRecord = home.user == den.hosts.x86_64-linux.igloo.users.tux;
+            # The host's view of the user, with the home's class: the host
+            # user's own classes stay as declared.
             inherit (home.user) classes email;
+            hostUserClasses = den.hosts.x86_64-linux.igloo.users.tux.classes;
             userHost = home.user.host.name;
             os = osOf config "tux@igloo";
           };
         expected = {
           hostName = "igloo";
           hostClass = "nixos";
-          sameRecord = true;
-          classes = [ "user" ];
+          classes = [ "homeManager" ];
+          hostUserClasses = [ "user" ];
           email = "tux@igloo";
           userHost = "igloo";
           os = "igloo";
@@ -130,7 +138,7 @@ in
           {
             hostName = home.host.name;
             hostClass = home.host.class;
-            inherit (home) user;
+            user = userOf home.user;
             os = osOf config "tux@igloo";
           };
         expected = {
@@ -158,7 +166,8 @@ in
           plain =
             map
               (s: {
-                inherit (homeOf den s "tux") host user system;
+                inherit (homeOf den s "tux") host system;
+                user = userOf (homeOf den s "tux").user;
               })
               [
                 "x86_64-linux"
@@ -169,7 +178,8 @@ in
             email = (homeOf den "x86_64-linux" "tux@igloo").user.email;
           };
           arm = {
-            inherit (homeOf den "aarch64-linux" "tux@igloo") host user;
+            inherit (homeOf den "aarch64-linux" "tux@igloo") host;
+            user = userOf (homeOf den "aarch64-linux" "tux@igloo").user;
           };
         };
         expected = {

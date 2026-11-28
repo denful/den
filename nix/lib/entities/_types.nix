@@ -177,8 +177,8 @@ let
   # An entity's `id_hash` is context-free (kind+name, NOT ancestry) and stable
   # across the standalone-produce and fleet-consume runs, so re-keying by it lets
   # the consumer look up by the consuming entity's OWN id_hash with zero ancestor
-  # reconciliation. The root scope's entity is `config` itself (its kind is
-  # passed in, since the root scope is seeded without a push-scope record).
+  # reconciliation. The root scope's entity is `config` itself; the resolve
+  # seeds the root's kind, so every scope here has one.
   pathSetByScopeOption =
     _den: kind: config:
     lib.mkOption {
@@ -195,7 +195,9 @@ let
           entityForScope =
             scopeStr:
             let
-              k = entityKinds.${scopeStr} or kind;
+              k =
+                entityKinds.${scopeStr}
+                  or (throw "den: scope ${scopeStr} of a ${kind} resolve has no entity kind; every resolve root now carries its kind");
             in
             (scopeCtxs.${scopeStr} or { }).${k} or config;
         in
