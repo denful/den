@@ -142,6 +142,7 @@ in
     mkEntityHasAspect
     mkProjectedHasAspect
     __mkLateHasAspect
+    __landingKey
     ;
   mkAspectsType = typeCfg: lib.mapAttrs (_: v: v typeCfg) rawTypes;
   # Predicates exported directly (not through types mapAttrs which applies { } to each value).

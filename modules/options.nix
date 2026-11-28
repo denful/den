@@ -242,14 +242,13 @@ in
     sctx: e:
     let
       landing = den.__fleet.fleet.landing;
-      direct = landing.${e.id_hash or ""} or null;
+      key = den.lib.aspects.__landingKey;
+      direct = landing.${key e} or null;
       owners =
         builtins.filter
           (
             o:
-            builtins.isAttrs o
-            && o ? id_hash
-            && ((landing.${o.id_hash} or { }).below or { }) ? ${e.id_hash or ""}
+            builtins.isAttrs o && o ? id_hash && ((landing.${key o} or { }).below or { }) ? ${e.id_hash or ""}
           )
           (
             map (k: sctx.${k}) (
@@ -260,7 +259,7 @@ in
     if direct != null then
       direct
     else if owners != [ ] then
-      landing.${(lib.head owners).id_hash}.below.${e.id_hash}
+      landing.${key (lib.head owners)}.below.${e.id_hash}
     else
       null;
   config.den.lib.__hasLandedAspect =
